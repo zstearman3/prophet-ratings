@@ -56,10 +56,10 @@ module Scraper
       document = Nokogiri::HTML(response.body)
 
       team_boxes = document.css("div.scorebox")&.xpath('./div')
-      home_team = team_boxes[0]&.css("strong a")&.text
-      away_team = team_boxes[1]&.css("strong a")&.text
-      home_team_score = team_boxes[0]&.css("div.score")&.text
-      away_team_score = team_boxes[1]&.css("div.score")&.text
+      home_team = team_boxes[1]&.css("strong a")&.text
+      away_team = team_boxes[0]&.css("strong a")&.text
+      home_team_score = team_boxes[1]&.css("div.score")&.text
+      away_team_score = team_boxes[0]&.css("div.score")&.text
       date = document.css("div.scorebox_meta div")[0]&.text
       location = document.css("div.scorebox_meta div")[1]&.text
       away_team_line = document.css("table.stats_table tfoot tr")[0]
