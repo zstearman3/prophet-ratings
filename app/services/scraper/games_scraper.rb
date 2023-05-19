@@ -35,7 +35,7 @@ module Scraper
         three_pt_made: row.css("td[data-stat='fg3']")&.text,
         three_pt_attempted: row.css("td[data-stat='fg3a']")&.text,
         free_throws_made: row.css("td[data-stat='ft']")&.text,
-        free_thows_attempted: row.css("td[data-stat='fta']")&.text,
+        free_throws_attempted: row.css("td[data-stat='fta']")&.text,
         offensive_rebounds: row.css("td[data-stat='orb']")&.text,
         defensive_rebounds: row.css("td[data-stat='drb']")&.text,
         rebounds: row.css("td[data-stat='trb']")&.text,
@@ -74,6 +74,7 @@ module Scraper
         location: location,
         away_team_stats: parse_team_stats(away_team_line),
         home_team_stats: parse_team_stats(home_team_line),
+        url: url,
       }
     end
 
