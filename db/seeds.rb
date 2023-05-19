@@ -11,3 +11,13 @@ CSV.foreach(teams_file, headers: true) do |row|
     unique_by: :school
   )
 end
+
+Season.find_or_create_by(
+  year: 2023, 
+  start_date: Date.new(2022, 11, 07),
+  end_date: Date.new(2023, 04, 03)
+)
+
+Team.all.each do |team|
+  Season.all.each { |s| TeamSeason.find_or_create_by(team: team, season: s)}
+end

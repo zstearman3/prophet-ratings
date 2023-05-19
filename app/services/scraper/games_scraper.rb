@@ -28,7 +28,23 @@ module Scraper
     def parse_team_stats(row)
       {
         minutes: row.css("td[data-stat='mp']")&.text,
-        field_goals: row.css("td[data-stat='fg']")&.text,
+        field_goals_made: row.css("td[data-stat='fg']")&.text,
+        field_goals_attempted: row.css("td[data-stat='fga']")&.text,
+        two_pt_made: row.css("td[data-stat='fg2']")&.text,
+        two_pt_attempted: row.css("td[data-stat='fg2a']")&.text,
+        three_pt_made: row.css("td[data-stat='fg3']")&.text,
+        three_pt_attempted: row.css("td[data-stat='fg3a']")&.text,
+        free_throws_made: row.css("td[data-stat='ft']")&.text,
+        free_thows_attempted: row.css("td[data-stat='fta']")&.text,
+        offensive_rebounds: row.css("td[data-stat='orb']")&.text,
+        defensive_rebounds: row.css("td[data-stat='drb']")&.text,
+        rebounds: row.css("td[data-stat='trb']")&.text,
+        assists: row.css("td[data-stat='ast']")&.text,
+        steals: row.css("td[data-stat='stl']")&.text,
+        blocks: row.css("td[data-stat='blk']")&.text,
+        turnovers: row.css("td[data-stat='tov']")&.text,
+        fouls: row.css("td[data-stat='pf']")&.text,
+        points: row.css("td[data-stat='pts']")&.text,
       }
     end
 

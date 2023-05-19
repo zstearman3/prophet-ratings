@@ -10,19 +10,48 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2023_05_17_205952) do
+ActiveRecord::Schema[7.0].define(version: 2023_05_19_134708) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
   create_table "games", force: :cascade do |t|
-    t.bigint "home_team_id"
-    t.bigint "away_team_id"
     t.string "url", null: false
     t.datetime "start_time", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index ["away_team_id"], name: "index_games_on_away_team_id"
-    t.index ["home_team_id"], name: "index_games_on_home_team_id"
+    t.bigint "season_id", null: false
+    t.index ["season_id"], name: "index_games_on_season_id"
+  end
+
+  create_table "seasons", force: :cascade do |t|
+    t.integer "year", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.date "start_date", null: false
+    t.date "end_date", null: false
+    t.index ["year"], name: "index_seasons_on_year"
+  end
+
+  create_table "team_games", force: :cascade do |t|
+    t.bigint "team_id", null: false
+    t.bigint "game_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.boolean "home"
+    t.index ["game_id", "home"], name: "index_team_games_on_game_id_and_home", unique: true
+    t.index ["game_id"], name: "index_team_games_on_game_id"
+    t.index ["team_id", "game_id"], name: "index_team_games_on_team_id_and_game_id", unique: true
+    t.index ["team_id"], name: "index_team_games_on_team_id"
+  end
+
+  create_table "team_seasons", force: :cascade do |t|
+    t.bigint "team_id", null: false
+    t.bigint "season_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["season_id"], name: "index_team_seasons_on_season_id"
+    t.index ["team_id", "season_id"], name: "index_team_seasons_on_team_id_and_season_id", unique: true
+    t.index ["team_id"], name: "index_team_seasons_on_team_id"
   end
 
   create_table "teams", force: :cascade do |t|
@@ -35,6 +64,4 @@ ActiveRecord::Schema[7.0].define(version: 2023_05_17_205952) do
     t.index ["school"], name: "index_teams_on_school", unique: true
   end
 
-  add_foreign_key "games", "teams", column: "away_team_id"
-  add_foreign_key "games", "teams", column: "home_team_id"
 end
