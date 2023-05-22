@@ -2,15 +2,24 @@ module Scraper
   class GamesScraper < Scraper
     def initialize(date=Date.today)
       @date = date
-      @games_url = schedule_url(@date)
     end
 
     def to_json
-      scrape_day(@date)
+      scrape_day
+    end
+
+    def to_json_in_batches(start_at=0, batch_size=10)
+      scrape_day_batch(start_at, batch_size)
+    end
+
+    def game_count
+      response = HTTParty.get(schedule_url(@date))
+      document = Nokogiri::HTML(response.body)
+
+      game_urls.size
     end
 
     private
-
     def schedule_url(date)
       "#{BASE_URL}/cbb/boxscores/index.cgi?month=#{date.strftime('%-m')}"\
       "&day=#{date.strftime('%-d')}&year=#{date.strftime('%Y')}"
@@ -20,9 +29,18 @@ module Scraper
       BASE_URL + url
     end
 
-    def game_urls(document)
-      document.css("div.game_summaries div.gender-m")&.
-               css("td.gamelink a")&.map { |link| link&.attribute("href")&.value }
+    def set_game_urls
+      response = HTTParty.get(schedule_url(@date))
+      document = Nokogiri::HTML(response.body)
+
+      urls = document.css("div.game_summaries div.gender-m")&.
+                      css("td.gamelink a")&.map { |link| link&.attribute("href")&.value }
+
+      @game_urls = urls
+    end
+
+    def game_urls
+      @game_urls ||= set_game_urls
     end
 
     def parse_team_stats(row)
@@ -78,13 +96,17 @@ module Scraper
       }
     end
 
-    def scrape_day(date=Date.today)
-      response = HTTParty.get(schedule_url(date))
-      document = Nokogiri::HTML(response.body)
-
-      game_urls = game_urls(document)
-
+    def scrape_day
       game_urls.map { |url| scrape_game(url) }
+    end
+
+    def scrape_day_batch(start_at, batch_size)
+      batch_urls = game_urls
+      end_at = start_at + batch_size
+      
+      batch_urls = batch_urls[start_at..end_at]
+
+      batch_urls.map { |url| scrape_game(url) }
     end
   end
 end
