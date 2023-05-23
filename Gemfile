@@ -28,6 +28,7 @@ end
 group :development do
   gem 'pry'
   gem "web-console"
+  gem 'benchmark-memory'
 end
 
 group :test do
