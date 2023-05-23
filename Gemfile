@@ -14,6 +14,8 @@ gem "tzinfo-data", platforms: %i[ mingw mswin x64_mingw jruby ]
 gem "bootsnap", require: false
 gem 'nokogiri'
 gem 'httparty'
+gem 'redis'
+gem 'sidekiq'
 
 group :development, :test do
   gem "debug", platforms: %i[ mri mingw x64_mingw ]
@@ -26,6 +28,7 @@ end
 group :development do
   gem 'pry'
   gem "web-console"
+  gem 'benchmark-memory'
 end
 
 group :test do
