@@ -1,0 +1,81 @@
+require:
+  - rubocop-rails
+  - rubocop-rspec
+  - rubocop-performance
+
+AllCops:
+  NewCops: enable
+  SuggestExtensions: false
+
+  Exclude:
+    - "db/schema.rb"
+    - "config/**/*"
+    - "config.ru"
+    - "bin/**/*"
+    - "db/migrate/*"
+    - "db/seeds.rb"
+    - "**/*.txt"
+    - "**/.keep"
+    - "spec/rails_helper.rb"
+    - "vendor/**/*"
+    - "Rakefile"
+
+  TargetRubyVersion: 3.2.2
+
+Naming/RescuedExceptionsVariableName:
+  Enabled: false
+
+Bundler/OrderedGems:
+  Enabled: false
+
+Style/Documentation:
+  Enabled: false
+
+Rails/PluckInWhere:
+  Enabled: false
+
+Metrics/MethodLength:
+  Max: 40
+
+Metrics/BlockLength:
+  Max: 35
+  Exclude:
+    - "**/*params.rb"
+
+Metrics/ModuleLength:
+  Exclude:
+    - "**/*params.rb"
+
+RSpec/NestedGroups:
+  Max: 8
+
+Layout/LineLength:
+  Max: 140
+  Exclude:
+    - "**/*params.rb"
+
+RSpec/MultipleMemoizedHelpers:
+  Max: 20
+
+RSpec/IndexedLet:
+  Enabled: false
+
+Style/RescueModifier:
+  Exclude:
+    - 'spec/**/*'
+
+Metrics/AbcSize:
+  Max: 22
+
+Metrics/ClassLength:
+  Max: 150
+
+RSpec/ExampleLength:
+  Max: 20
+
+Metrics/CyclomaticComplexity:
+  Max: 10
+
+Style/OpenStructUse:
+  Exclude:
+    - 'spec/**/*'
