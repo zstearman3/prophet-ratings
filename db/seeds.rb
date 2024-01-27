@@ -14,8 +14,8 @@ end
 
 Season.find_or_create_by(
   year: 2024, 
-  start_date: Date.new(2023, 11, 07),
-  end_date: Date.new(2024, 04, 03)
+  start_date: Date.new(2023, 11, 06),
+  end_date: Date.new(2024, 04, 08)
 )
 
 Team.all.each do |team|
