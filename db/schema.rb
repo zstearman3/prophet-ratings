@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2024_01_26_193159) do
+ActiveRecord::Schema[7.1].define(version: 2024_01_27_204108) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -183,6 +183,7 @@ ActiveRecord::Schema[7.1].define(version: 2024_01_26_193159) do
     t.string "location"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "secondary_name"
     t.index ["school"], name: "index_teams_on_school", unique: true
   end
 

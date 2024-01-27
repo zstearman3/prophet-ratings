@@ -79,3 +79,7 @@ Metrics/CyclomaticComplexity:
 Style/OpenStructUse:
   Exclude:
     - 'spec/**/*'
+
+Lint/MissingSuper:
+  Exclude:
+    - 'app/services/**/*'

@@ -31,4 +31,19 @@ class Game < ApplicationRecord
 
     (arr.sum / arr.size)
   end
+
+  def calculated_neutrality
+    return unless home_team&.location
+
+    location.exclude?(home_team&.location)
+    # && (location != home_team.probable_home_venue)
+  end
+
+  def calculate_possessions
+    update(possessions: calculated_possessions)
+  end
+
+  def calculate_neutrality
+    update(neutral: calculated_neutrality)
+  end
 end

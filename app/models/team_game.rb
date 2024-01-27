@@ -6,8 +6,6 @@ class TeamGame < ApplicationRecord
   belongs_to :game
   belongs_to :team
 
-  private
-
   def calculate_game_stats
     update(
       two_pt_percentage: calculated_two_pt_percentage,

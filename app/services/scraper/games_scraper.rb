@@ -1,28 +1,31 @@
+# frozen_string_literal: true
+
 module Scraper
   class GamesScraper < Scraper
-    def initialize(date=Date.today)
+    def initialize(date = Time.zone.today)
       @date = date
     end
 
-    def to_json
+    def to_json(*_args)
       scrape_day
     end
 
-    def to_json_in_batches(start_at=0, batch_size=10)
+    def to_json_in_batches(start_at = 0, batch_size = 10)
       scrape_day_batch(start_at, batch_size)
     end
 
     def game_count
       response = HTTParty.get(schedule_url(@date))
-      document = Nokogiri::HTML(response.body)
+      Nokogiri::HTML(response.body)
 
       game_urls.size
     end
 
     private
+
     def schedule_url(date)
-      "#{BASE_URL}/cbb/boxscores/index.cgi?month=#{date.strftime('%-m')}"\
-      "&day=#{date.strftime('%-d')}&year=#{date.strftime('%Y')}"
+      "#{BASE_URL}/cbb/boxscores/index.cgi?month=#{date.strftime('%-m')}" \
+        "&day=#{date.strftime('%-d')}&year=#{date.strftime('%Y')}"
     end
 
     def game_url(url)
@@ -33,8 +36,8 @@ module Scraper
       response = HTTParty.get(schedule_url(@date))
       document = Nokogiri::HTML(response.body)
 
-      urls = document.css("div.game_summaries div.gender-m")&.
-                      css("td.gamelink a")&.map { |link| link&.attribute("href")&.value }
+      urls = document.css('div.game_summaries div.gender-m')
+                     &.css('td.gamelink a')&.map { |link| link&.attribute('href')&.value }
 
       @game_urls = urls
     end
@@ -62,37 +65,37 @@ module Scraper
         blocks: row.css("td[data-stat='blk']")&.text,
         turnovers: row.css("td[data-stat='tov']")&.text,
         fouls: row.css("td[data-stat='pf']")&.text,
-        points: row.css("td[data-stat='pts']")&.text,
+        points: row.css("td[data-stat='pts']")&.text
       }
     end
 
     def scrape_game(url)
       # To comply with sports reference TOS
-      sleep(3.5)
+      sleep(SLEEP_COUNT)
 
       response = HTTParty.get(game_url(url))
       document = Nokogiri::HTML(response.body)
 
-      team_boxes = document.css("div.scorebox")&.xpath('./div')
-      home_team = team_boxes[1]&.css("strong a")&.text
-      away_team = team_boxes[0]&.css("strong a")&.text
-      home_team_score = team_boxes[1]&.css("div.score")&.text
-      away_team_score = team_boxes[0]&.css("div.score")&.text
-      date = document.css("div.scorebox_meta div")[0]&.text
-      location = document.css("div.scorebox_meta div")[1]&.text
-      away_team_line = document.css("table.stats_table tfoot tr")[0]
-      home_team_line = document.css("table.stats_table tfoot tr")[2]
+      team_boxes = document.css('div.scorebox')&.xpath('./div')
+      home_team = team_boxes[1]&.css('strong a')&.text
+      away_team = team_boxes[0]&.css('strong a')&.text
+      home_team_score = team_boxes[1]&.css('div.score')&.text
+      away_team_score = team_boxes[0]&.css('div.score')&.text
+      date = document.css('div.scorebox_meta div')[0]&.text
+      location = document.css('div.scorebox_meta div')[1]&.text
+      away_team_line = document.css('table.stats_table tfoot tr')[0]
+      home_team_line = document.css('table.stats_table tfoot tr')[2]
 
-      { 
-        home_team: home_team, 
-        away_team: away_team,
-        home_team_score: home_team_score,
-        away_team_score: away_team_score,
-        date: date,
-        location: location,
+      {
+        home_team:,
+        away_team:,
+        home_team_score:,
+        away_team_score:,
+        date:,
+        location:,
         away_team_stats: parse_team_stats(away_team_line),
         home_team_stats: parse_team_stats(home_team_line),
-        url: url,
+        url:
       }
     end
 
@@ -103,7 +106,7 @@ module Scraper
     def scrape_day_batch(start_at, batch_size)
       batch_urls = game_urls
       end_at = start_at + batch_size
-      
+
       batch_urls = batch_urls[start_at..end_at]
 
       batch_urls.map { |url| scrape_game(url) }
