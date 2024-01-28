@@ -66,6 +66,9 @@ Style/RescueModifier:
 
 Metrics/AbcSize:
   Max: 22
+  Exclude:
+    - 'app/services/scraper/*'
+    - 'app/services/importer/*'
 
 Metrics/ClassLength:
   Max: 150
@@ -75,6 +78,12 @@ RSpec/ExampleLength:
 
 Metrics/CyclomaticComplexity:
   Max: 10
+  Exclude:
+    - 'app/services/scraper/*'
+
+Metrics/PerceivedComplexity:
+  Exclude:
+    - 'app/services/scraper/*'
 
 Style/OpenStructUse:
   Exclude:

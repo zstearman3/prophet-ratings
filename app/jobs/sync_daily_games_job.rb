@@ -3,8 +3,8 @@
 class SyncDailyGamesJob < ApplicationJob
   queue_as :default
 
-  def perform(*_args)
-    scraper = Scraper::GamesScraper.new(Date.yesterday)
+  def perform(date = Date.yesterday)
+    scraper = Scraper::GamesScraper.new(date)
     @url_position = 0
     @game_count = scraper.game_count
 

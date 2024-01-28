@@ -1,11 +1,10 @@
 # frozen_string_literal: true
 
-class SyncFullSeasonGamesJob < ApplicationJob
+class SyncFromLastGamesJob < ApplicationJob
   queue_as :default
 
   def perform(*_args)
-    end_date = [Season.last.end_date, Date.yesterday].min
-    (Season.last.start_date..end_date).each do |d|
+    (start_date.to_date..end_date.to_date).each do |d|
       scraper = Scraper::GamesScraper.new(d)
       @url_position = 0
       @game_count = scraper.game_count
@@ -23,6 +22,14 @@ class SyncFullSeasonGamesJob < ApplicationJob
   end
 
   private
+
+  def start_date
+    [Game.order(start_time: :desc).first.start_time, Season.last.start_date].max
+  end
+
+  def end_date
+    [Season.last.end_date, Date.yesterday].min
+  end
 
   def max_url_position
     @url_position + 10 < @game_count ? (@url_position + 10) : @game_count

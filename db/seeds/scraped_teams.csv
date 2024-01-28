@@ -28,7 +28,7 @@ Boston College Eagles,Boston College,Eagles,/cbb/schools/boston-college/men/,"Ch
 Boston University Terriers,Boston University,Terriers,/cbb/schools/boston-university/men/,"Boston, Massachusetts",
 Bowling Green State Falcons,Bowling Green State,Falcons,/cbb/schools/bowling-green-state/men/,"Bowling Green, Ohio",
 Bradley Braves,Bradley,Braves,/cbb/schools/bradley/men/,"Peoria, Illinois",
-Brigham Young Cougars,Brigham Young,Cougars,/cbb/schools/brigham-young/men/,"Provo, Utah",
+Brigham Young Cougars,Brigham Young,Cougars,/cbb/schools/brigham-young/men/,"Provo, Utah",BYU
 Brown Bears,Brown,Bears,/cbb/schools/brown/men/,"Providence, Rhode Island",
 Bryant Bulldogs,Bryant,Bulldogs,/cbb/schools/bryant/men/,"Smithfield, Rhode Island",
 Bucknell Bison,Bucknell,Bison,/cbb/schools/bucknell/men/,"Lewisburg, Pennsylvania",
@@ -43,8 +43,8 @@ California Golden Bears,California,Golden Bears,/cbb/schools/california/men/,"Be
 Campbell Fighting Camels,Campbell,Fighting Camels,/cbb/schools/campbell/men/,"Buies Creek, North Carolina",
 Canisius Golden Griffins,Canisius,Golden Griffins,/cbb/schools/canisius/men/,"Buffalo, New York",
 Central Arkansas Bears,Central Arkansas,Bears,/cbb/schools/central-arkansas/men/,"Conway, Arkansas",
-Central Connecticut State Blue Devils,Central Connecticut State,Blue Devils,/cbb/schools/central-connecticut-state/men/,"New Britain, Connecticut",
-Central Florida Knights,Central Florida,Knights,/cbb/schools/central-florida/men/,"Orlando, Florida",
+Central Connecticut State Blue Devils,Central Connecticut State,Blue Devils,/cbb/schools/central-connecticut-state/men/,"New Britain, Connecticut",Central Connecticut
+Central Florida Knights,Central Florida,Knights,/cbb/schools/central-florida/men/,"Orlando, Florida",UCF
 Central Michigan Chippewas,Central Michigan,Chippewas,/cbb/schools/central-michigan/men/,"Mount Pleasant, Michigan",
 Charleston Southern Buccaneers,Charleston Southern,Buccaneers,/cbb/schools/charleston-southern/men/,"Charleston, South Carolina",
 Charlotte 49ers,Charlotte,49ers,/cbb/schools/charlotte/men/,"Charlotte, North Carolina",
@@ -76,7 +76,7 @@ Drexel Dragons,Drexel,Dragons,/cbb/schools/drexel/men/,"Philadelphia, Pennsylvan
 Duke Blue Devils,Duke,Blue Devils,/cbb/schools/duke/men/,"Durham, North Carolina",
 Duquesne Dukes,Duquesne,Dukes,/cbb/schools/duquesne/men/,"Pittsburgh, Pennsylvania",
 East Carolina Pirates,East Carolina,Pirates,/cbb/schools/east-carolina/men/,"Greenville, North Carolina",
-East Tennessee State Buccaneers,East Tennessee State,Buccaneers,/cbb/schools/east-tennessee-state/men/,"Johnson City, Tennessee",
+East Tennessee State Buccaneers,East Tennessee State,Buccaneers,/cbb/schools/east-tennessee-state/men/,"Johnson City, Tennessee",ETSU
 Eastern Illinois Panthers,Eastern Illinois,Panthers,/cbb/schools/eastern-illinois/men/,"Charleston, Illinois",
 Eastern Kentucky Colonels,Eastern Kentucky,Colonels,/cbb/schools/eastern-kentucky/men/,"Richmond, Kentucky",
 Eastern Michigan Eagles,Eastern Michigan,Eagles,/cbb/schools/eastern-michigan/men/,"Ypsilanti, Michigan",
@@ -120,7 +120,7 @@ Idaho State Bengals,Idaho State,Bengals,/cbb/schools/idaho-state/men/,"Pocatello
 Idaho Vandals,Idaho,Vandals,/cbb/schools/idaho/men/,"Moscow, Idaho",
 Illinois Fighting Illini,Illinois,Fighting Illini,/cbb/schools/illinois/men/,"Champaign, Illinois",
 Illinois State Redbirds,Illinois State,Redbirds,/cbb/schools/illinois-state/men/,"Normal, Illinois",
-Illinois-Chicago Flames,Illinois-Chicago,Flames,/cbb/schools/illinois-chicago/men/,"Chicago, Illinois",
+Illinois-Chicago Flames,Illinois-Chicago,Flames,/cbb/schools/illinois-chicago/men/,"Chicago, Illinois",UIC
 Incarnate Word Cardinals,Incarnate Word,Cardinals,/cbb/schools/incarnate-word/men/,"San Antonio, Texas",
 Indiana Hoosiers,Indiana,Hoosiers,/cbb/schools/indiana/men/,"Bloomington, Indiana",
 Indiana State Sycamores,Indiana State,Sycamores,/cbb/schools/indiana-state/men/,"Terre Haute, Indiana",
@@ -147,10 +147,10 @@ Lindenwood Lions,Lindenwood,Lions,/cbb/schools/lindenwood/men/,"St. Charles, Mis
 Lipscomb Bisons,Lipscomb,Bisons,/cbb/schools/lipscomb/men/,"Nashville, Tennessee",
 Little Rock Trojans,Little Rock,Trojans,/cbb/schools/arkansas-little-rock/men/,"Little Rock, Arkansas",
 Long Beach State Beach,Long Beach State,Beach,/cbb/schools/long-beach-state/men/,"Long Beach, California",
-Long Island University Sharks,Long Island University,Sharks,/cbb/schools/long-island-university/men/,"Brooklyn, New York",
+Long Island University Sharks,Long Island University,Sharks,/cbb/schools/long-island-university/men/,"Brooklyn, New York",LIU
 Longwood Lancers,Longwood,Lancers,/cbb/schools/longwood/men/,"Farmville, Virginia",
 Louisiana Ragin' Cajuns,Louisiana,Ragin' Cajuns,/cbb/schools/louisiana-lafayette/men/,"Lafayette, Louisiana",
-Louisiana State Fighting Tigers,Louisiana State,Fighting Tigers,/cbb/schools/louisiana-state/men/,"Baton Rouge, Louisiana",
+Louisiana State Fighting Tigers,Louisiana State,Fighting Tigers,/cbb/schools/louisiana-state/men/,"Baton Rouge, Louisiana",LSU
 Louisiana Tech Bulldogs,Louisiana Tech,Bulldogs,/cbb/schools/louisiana-tech/men/,"Ruston, Louisiana",
 Louisiana-Monroe Warhawks,Louisiana-Monroe,Warhawks,/cbb/schools/louisiana-monroe/men/,"Monroe, Louisiana",
 Louisville Cardinals,Louisville,Cardinals,/cbb/schools/louisville/men/,"Louisville, Kentucky",
@@ -163,10 +163,10 @@ Marist Red Foxes,Marist,Red Foxes,/cbb/schools/marist/men/,"Poughkeepsie, New Yo
 Marquette Golden Eagles,Marquette,Golden Eagles,/cbb/schools/marquette/men/,"Milwaukee, Wisconsin",
 Marshall Thundering Herd,Marshall,Thundering Herd,/cbb/schools/marshall/men/,"Huntington, West Virginia",
 Maryland Terrapins,Maryland,Terrapins,/cbb/schools/maryland/men/,"College Park, Maryland",
-Maryland-Baltimore County Retrievers,Maryland-Baltimore County,Retrievers,/cbb/schools/maryland-baltimore-county/men/,"Baltimore, Maryland",
+Maryland-Baltimore County Retrievers,Maryland-Baltimore County,Retrievers,/cbb/schools/maryland-baltimore-county/men/,"Baltimore, Maryland",UMBC
 Maryland-Eastern Shore Hawks,Maryland-Eastern Shore,Hawks,/cbb/schools/maryland-eastern-shore/men/,"Princess Anne, Maryland",
-Massachusetts Minutemen,Massachusetts,Minutemen,/cbb/schools/massachusetts/men/,"Amherst, Massachusetts",
-Massachusetts-Lowell River Hawks,Massachusetts-Lowell,River Hawks,/cbb/schools/massachusetts-lowell/men/,"Lowell, Massachusetts",
+Massachusetts Minutemen,Massachusetts,Minutemen,/cbb/schools/massachusetts/men/,"Amherst, Massachusetts",UMass
+Massachusetts-Lowell River Hawks,Massachusetts-Lowell,River Hawks,/cbb/schools/massachusetts-lowell/men/,"Lowell, Massachusetts",UMass-Lowell
 McNeese State Cowboys,McNeese State,Cowboys,/cbb/schools/mcneese-state/men/,"Lake Charles, Louisiana",
 Memphis Tigers,Memphis,Tigers,/cbb/schools/memphis/men/,"Memphis, Tennessee",
 Mercer Bears,Mercer,Bears,/cbb/schools/mercer/men/,"Macon, Georgia",
@@ -242,7 +242,7 @@ Presbyterian Blue Hose,Presbyterian,Blue Hose,/cbb/schools/presbyterian/men/,"Cl
 Princeton Tigers,Princeton,Tigers,/cbb/schools/princeton/men/,"Princeton, New Jersey",
 Providence Friars,Providence,Friars,/cbb/schools/providence/men/,"Providence, Rhode Island",
 Purdue Boilermakers,Purdue,Boilermakers,/cbb/schools/purdue/men/,"West Lafayette, Indiana",
-Purdue-Fort Wayne Mastodons,Purdue-Fort Wayne,Mastodons,/cbb/schools/ipfw/men/,"Fort Wayne, Indiana",
+Purdue-Fort Wayne Mastodons,Purdue-Fort Wayne,Mastodons,/cbb/schools/ipfw/men/,"Fort Wayne, Indiana",Purdue Fort Wayne
 Queens (NC) Royals,Queens (NC),Royals,/cbb/schools/queens-nc/men/,"Charlotte, North Carolina",
 Quinnipiac Bobcats,Quinnipiac,Bobcats,/cbb/schools/quinnipiac/men/,"Hamden, Connecticut",
 Radford Highlanders,Radford,Highlanders,/cbb/schools/radford/men/,"Radford, Virginia",
@@ -256,11 +256,11 @@ Sacramento State Hornets,Sacramento State,Hornets,/cbb/schools/sacramento-state/
 Sacred Heart Pioneers,Sacred Heart,Pioneers,/cbb/schools/sacred-heart/men/,"Fairfield, Connecticut",
 Saint Francis (PA) Red Flash,Saint Francis (PA),Red Flash,/cbb/schools/saint-francis-pa/men/,"Loretto, Pennsylvania",
 Saint Joseph's Hawks,Saint Joseph's,Hawks,/cbb/schools/saint-josephs/men/,"Philadelphia, Pennsylvania",St. Joseph's
-Saint Louis Billikens,Saint Louis,Billikens,/cbb/schools/saint-louis/men/,"St. Louis, Missouri",
-Saint Mary's (CA) Gaels,Saint Mary's (CA),Gaels,/cbb/schools/saint-marys-ca/men/,"Moraga, California",
-Saint Peter's Peacocks,Saint Peter's,Peacocks,/cbb/schools/saint-peters/men/,"Jersey City, New Jersey",
+Saint Louis Billikens,Saint Louis,Billikens,/cbb/schools/saint-louis/men/,"St. Louis, Missouri",St. Joseph's
+Saint Mary's (CA) Gaels,Saint Mary's (CA),Gaels,/cbb/schools/saint-marys-ca/men/,"Moraga, California",St. Mary's
+Saint Peter's Peacocks,Saint Peter's,Peacocks,/cbb/schools/saint-peters/men/,"Jersey City, New Jersey",St. Peter's
 Sam Houston State Bearkats,Sam Houston State,Bearkats,/cbb/schools/sam-houston-state/men/,"Huntsville, Texas",
-Samford Bulldogs,Samford,Bulldogs,/cbb/schools/samford/men/,"Birmingham, Alabama",
+Samford Bulldogs,Samford,Bulldogs,/cbb/schools/samford/men/,"Birmingham, Alabama",Sam Houston
 San Diego State Aztecs, Aztecs,Aztecs,/cbb/schools/san-diego-state/men/,"San Diego, California",
 San Diego Toreros,San Diego,Toreros,/cbb/schools/san-diego/men/,"San Diego, California",
 San Francisco Dons,San Francisco,Dons,/cbb/schools/san-francisco/men/,"San Francisco, California",
@@ -274,7 +274,7 @@ South Carolina Gamecocks,South Carolina,Gamecocks,/cbb/schools/south-carolina/me
 South Carolina State Bulldogs,South Carolina State,Bulldogs,/cbb/schools/south-carolina-state/men/,"Orangeburg, South Carolina",
 South Carolina Upstate Spartans,South Carolina Upstate,Spartans,/cbb/schools/south-carolina-upstate/men/,"Spartanburg, South Carolina",
 South Dakota Coyotes,South Dakota,Coyotes,/cbb/schools/south-dakota/men/,"Vermillion, South Dakota",
-South Dakota State Jackrabbits,South Dakota State ,Jackrabbits,/cbb/schools/south-dakota-state/men/,"Brookings, South Dakota",
+South Dakota State Jackrabbits,South Dakota State,Jackrabbits,/cbb/schools/south-dakota-state/men/,"Brookings, South Dakota",South Dakota State
 South Florida Bulls,South Florida,Bulls,/cbb/schools/south-florida/men/,"Tampa, Florida",
 Southeast Missouri State Redhawks,Southeast Missouri State,Redhawks,/cbb/schools/southeast-missouri-state/men/,"Cape Girardeau, Missouri",
 Southeastern Louisiana Lions,Southeastern Louisiana,Lions,/cbb/schools/southeastern-louisiana/men/,"Hammond, Louisiana",
@@ -283,7 +283,7 @@ Southern Illinois Salukis,Southern Illinois,Salukis,/cbb/schools/southern-illino
 Southern Illinois-Edwardsville Cougars,Southern Illinois-Edwardsville,Cougars,/cbb/schools/southern-illinois-edwardsville/men/,"Edwardsville, Illinois",
 Southern Indiana Screaming Eagles,Southern Indiana,Screaming Eagles,/cbb/schools/southern-indiana/men/,"Evansville, Indiana",
 Southern Jaguars,Southern,Jaguars,/cbb/schools/southern/men/,"Baton Rouge, Louisiana",
-Southern Methodist Mustangs,Southern Methodist,Mustangs,/cbb/schools/southern-methodist/men/,"Dallas, Texas",
+Southern Methodist Mustangs,Southern Methodist,Mustangs,/cbb/schools/southern-methodist/men/,"Dallas, Texas",SMU
 Southern Mississippi Golden Eagles,Southern Mississippi,Golden Eagles,/cbb/schools/southern-mississippi/men/,"Hattiesburg, Mississippi",
 Southern Utah Thunderbirds,Southern Utah,Thunderbirds,/cbb/schools/southern-utah/men/,"Cedar City, Utah",
 St. Bonaventure Bonnies,St. Bonaventure,Bonnies,/cbb/schools/st-bonaventure/men/,"St. Bonaventure, New York",
@@ -302,7 +302,7 @@ Temple Owls,Temple,Owls,/cbb/schools/temple/men/,"Philadelphia, Pennsylvania",
 Tennessee State Tigers,Tennessee State,Tigers,/cbb/schools/tennessee-state/men/,"Nashville, Tennessee",
 Tennessee Tech Golden Eagles,Tennessee Tech,Golden Eagles,/cbb/schools/tennessee-tech/men/,"Cookeville, Tennessee",
 Tennessee Volunteers,Tennessee,Volunteers,/cbb/schools/tennessee/men/,"Knoxville, Tennessee",
-Tennessee-Martin Skyhawks,Tennessee-Martin,Skyhawks,/cbb/schools/tennessee-martin/men/,"Martin, Tennessee",
+Tennessee-Martin Skyhawks,Tennessee-Martin,Skyhawks,/cbb/schools/tennessee-martin/men/,"Martin, Tennessee",UT-Martin
 Texas A&M Aggies,Texas A&M,Aggies,/cbb/schools/texas-am/men/,"College Station, Texas",
 Texas A&M-Commerce Lions,Texas A&M-Commerce,Lions,/cbb/schools/texas-am-commerce/men/,"Commerce, Texas",
 Texas A&M-Corpus Christi Islanders,Texas A&M-Corpus Christi,Islanders,/cbb/schools/texas-am-corpus-christi/men/,"Corpus Christi, Texas",
@@ -318,10 +318,10 @@ Troy Trojans,Troy,Trojans,/cbb/schools/troy/men/,"Troy, Alabama",
 Tulane Green Wave,Tulane,Green Wave,/cbb/schools/tulane/men/,"New Orleans, Louisiana",
 Tulsa Golden Hurricane,Tulsa,Golden Hurricane,/cbb/schools/tulsa/men/,"Tulsa, Oklahoma",
 UAB Blazers,UAB,Blazers,/cbb/schools/alabama-birmingham/men/,"Birmingham, Alabama",
-UC Davis Aggies,UC Davis,Aggies,/cbb/schools/california-davis/men/,"Davis, California",
-UC Irvine Anteaters,UC Irvine,Anteaters,/cbb/schools/california-irvine/men/,"Irvine, California",
-UC Riverside Highlanders,UC Riverside,Highlanders,/cbb/schools/california-riverside/men/,"Riverside, California",
-UC San Diego Tritons,UC San Diego,Tritons,/cbb/schools/california-san-diego/men/,"La Jolla, California",
+UC Davis Aggies,UC Davis,Aggies,/cbb/schools/california-davis/men/,"Davis, California",UC-Davis
+UC Irvine Anteaters,UC Irvine,Anteaters,/cbb/schools/california-irvine/men/,"Irvine, California",UC-Irvine
+UC Riverside Highlanders,UC Riverside,Highlanders,/cbb/schools/california-riverside/men/,"Riverside, California",UC-Riverside
+UC San Diego Tritons,UC San Diego,Tritons,/cbb/schools/california-san-diego/men/,"La Jolla, California",UC-San Diego
 UC Santa Barbara Gauchos,UC Santa Barbara,Gauchos,/cbb/schools/california-santa-barbara/men/,"Santa Barbara, California",UCSB
 UCLA Bruins,UCLA,Bruins,/cbb/schools/ucla/men/,"Los Angeles, California",
 UNC Asheville Bulldogs,UNC Asheville,Bulldogs,/cbb/schools/north-carolina-asheville/men/,"Asheville, North Carolina",

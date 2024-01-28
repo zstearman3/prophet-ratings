@@ -16,6 +16,8 @@ class Team < ApplicationRecord
     where('school = :name OR nickname = :name OR secondary_name = :name', name:)
   }
 
+  scope :missing_secondary_name, -> { includes(:team_games).where(team_games: { id: nil }, secondary_name: nil) }
+
   # Not ideal but until enough data will help determine if a game is neutral
   def probable_home_venue
     arr = home_games.order(start_time: :desc).first(30)

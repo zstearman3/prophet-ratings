@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2024_01_27_204108) do
+ActiveRecord::Schema[7.1].define(version: 2024_01_28_185109) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -171,6 +171,13 @@ ActiveRecord::Schema[7.1].define(version: 2024_01_27_204108) do
     t.bigint "season_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.decimal "offensive_efficiency", precision: 6, scale: 5
+    t.decimal "defensive_efficiency", precision: 6, scale: 5
+    t.decimal "pace", precision: 6, scale: 5
+    t.decimal "adj_offensive_efficiency", precision: 6, scale: 5
+    t.decimal "adj_defensive_efficiency", precision: 6, scale: 5
+    t.decimal "adj_pace", precision: 6, scale: 5
+    t.decimal "rating", precision: 6, scale: 5
     t.index ["season_id"], name: "index_team_seasons_on_season_id"
     t.index ["team_id", "season_id"], name: "index_team_seasons_on_team_id_and_season_id", unique: true
     t.index ["team_id"], name: "index_team_seasons_on_team_id"

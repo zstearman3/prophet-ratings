@@ -96,4 +96,14 @@ Rails.application.configure do
   # ]
   # Skip DNS rebinding protection for the default health check endpoint.
   # config.host_authorization = { exclude: ->(request) { request.path == "/up" } }
+  config.good_job.enable_cron = true # or `true` or via $GOOD_JOB_ENABLE_CRON
+
+  # Configure cron with a hash that has a unique key for each recurring job
+  config.good_job.cron = {
+    # Every 15 minutes, enqueue `ExampleJob.set(priority: -10).perform_later(42, "life", name: "Alice")`
+    daily_game_sync: { # each recurring job must have a unique key
+      cron: "0 10 * * *", # cron-style scheduling format by fugit gem
+      class: "SyncFromLastGamesJob", # name of the job class as a String; must reference an Active Job job class
+      description: "Daily game synce from cbb reference", # optional description that appears in Dashboard
+    },
 end
