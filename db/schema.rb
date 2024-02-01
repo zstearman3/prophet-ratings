@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2024_01_28_185109) do
+ActiveRecord::Schema[7.1].define(version: 2024_02_01_170226) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -160,10 +160,12 @@ ActiveRecord::Schema[7.1].define(version: 2024_01_28_185109) do
     t.decimal "defensive_rating", precision: 6, scale: 5
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "team_season_id", null: false
     t.index ["game_id", "home"], name: "index_team_games_on_game_id_and_home", unique: true
     t.index ["game_id"], name: "index_team_games_on_game_id"
     t.index ["team_id", "game_id"], name: "index_team_games_on_team_id_and_game_id", unique: true
     t.index ["team_id"], name: "index_team_games_on_team_id"
+    t.index ["team_season_id"], name: "index_team_games_on_team_season_id"
   end
 
   create_table "team_seasons", force: :cascade do |t|
@@ -191,6 +193,7 @@ ActiveRecord::Schema[7.1].define(version: 2024_01_28_185109) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.string "secondary_name"
+    t.string "home_venue"
     t.index ["school"], name: "index_teams_on_school", unique: true
   end
 

@@ -20,7 +20,7 @@ class Team < ApplicationRecord
 
   # Not ideal but until enough data will help determine if a game is neutral
   def probable_home_venue
-    arr = home_games.order(start_time: :desc).first(30)
+    arr = home_games.order(start_time: :desc).pluck(:location).first(5)
     arr.max_by { |i| arr.count(i) }
   end
 end

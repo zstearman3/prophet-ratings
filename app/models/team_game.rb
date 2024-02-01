@@ -5,6 +5,9 @@ class TeamGame < ApplicationRecord
 
   belongs_to :game
   belongs_to :team
+  belongs_to :team_season
+
+  has_one :season, through: :game
 
   # rubocop:disable Rails/HasManyOrHasOneDependent, Rails/InverseOf
   has_one :opponent_game, lambda { |g|
