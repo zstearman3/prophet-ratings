@@ -11,7 +11,8 @@ class Season < ApplicationRecord
   end
 
   def average_pace
-    games.average(:possessions).to_f
+    p = (games.sum(:possessions) / games.sum(:minutes).to_f) * 40.0
+    p.to_f
   end
 
   def average_efficiency

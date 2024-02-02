@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2024_02_01_170226) do
+ActiveRecord::Schema[7.1].define(version: 2024_02_02_020844) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -28,6 +28,7 @@ ActiveRecord::Schema[7.1].define(version: 2024_02_01_170226) do
     t.string "location"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.integer "minutes"
     t.index ["season_id"], name: "index_games_on_season_id"
   end
 
@@ -116,6 +117,8 @@ ActiveRecord::Schema[7.1].define(version: 2024_02_01_170226) do
     t.date "end_date", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.decimal "average_efficiency", precision: 6, scale: 5
+    t.decimal "average_pace", precision: 6, scale: 5
     t.index ["year"], name: "index_seasons_on_year", unique: true
   end
 
@@ -156,8 +159,8 @@ ActiveRecord::Schema[7.1].define(version: 2024_02_01_170226) do
     t.decimal "steal_rate", precision: 6, scale: 5
     t.decimal "block_rate", precision: 6, scale: 5
     t.decimal "turnover_rate", precision: 6, scale: 5
-    t.decimal "offensive_rating", precision: 6, scale: 5
-    t.decimal "defensive_rating", precision: 6, scale: 5
+    t.decimal "offensive_rating", precision: 6, scale: 3
+    t.decimal "defensive_rating", precision: 6, scale: 3
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.bigint "team_season_id", null: false
@@ -173,13 +176,13 @@ ActiveRecord::Schema[7.1].define(version: 2024_02_01_170226) do
     t.bigint "season_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.decimal "offensive_efficiency", precision: 6, scale: 5
-    t.decimal "defensive_efficiency", precision: 6, scale: 5
-    t.decimal "pace", precision: 6, scale: 5
-    t.decimal "adj_offensive_efficiency", precision: 6, scale: 5
-    t.decimal "adj_defensive_efficiency", precision: 6, scale: 5
-    t.decimal "adj_pace", precision: 6, scale: 5
-    t.decimal "rating", precision: 6, scale: 5
+    t.decimal "offensive_efficiency", precision: 6, scale: 3
+    t.decimal "defensive_efficiency", precision: 6, scale: 3
+    t.decimal "pace", precision: 6, scale: 3
+    t.decimal "adj_offensive_efficiency", precision: 6, scale: 3
+    t.decimal "adj_defensive_efficiency", precision: 6, scale: 3
+    t.decimal "adj_pace", precision: 6, scale: 3
+    t.decimal "rating", precision: 6, scale: 3
     t.index ["season_id"], name: "index_team_seasons_on_season_id"
     t.index ["team_id", "season_id"], name: "index_team_seasons_on_team_id_and_season_id", unique: true
     t.index ["team_id"], name: "index_team_seasons_on_team_id"

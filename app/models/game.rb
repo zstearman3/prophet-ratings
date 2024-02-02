@@ -17,6 +17,7 @@ class Game < ApplicationRecord
 
     calculate_possessions
     calculate_neutrality
+    calculate_minutes
 
     home_team_game&.calculate_game_stats
     away_team_game&.calculate_game_stats
@@ -32,6 +33,14 @@ class Game < ApplicationRecord
     (arr.sum / arr.size)
   end
 
+  def calculated_minutes
+    arr = [home_team_game&.minutes, away_team_game&.minutes].compact
+
+    return unless arr.size.positive?
+
+    (arr.sum / (5 * arr.size))
+  end
+
   def calculated_neutrality
     return unless home_team&.location
 
@@ -45,5 +54,9 @@ class Game < ApplicationRecord
 
   def calculate_neutrality
     update(neutral: calculated_neutrality)
+  end
+
+  def calculate_minutes
+    update(minutes: calculated_minutes)
   end
 end

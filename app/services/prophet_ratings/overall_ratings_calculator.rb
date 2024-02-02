@@ -12,8 +12,18 @@ module ProphetRatings
     end
 
     def calculate_season_ratings
-      Rails.logger.debug @team
       @games_array.each do |game|
+        find_opponent_game(game)
+      end
+    end
+
+    private
+
+    def find_opponent_game(game)
+      if game.game.home_team_game_id == game.id
+        game.game.away_team_game
+      else
+        game.game.home_team_game
       end
     end
   end

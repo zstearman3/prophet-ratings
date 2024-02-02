@@ -4,11 +4,12 @@ class UpdateRankingsJob < ApplicationJob
   queue_as :default
 
   def perform(season = Season.current)
-    teams = TeamSeason.includes(team_games: %i[game opponent_game]).where(season:)
+    season.update_average_ratings
+    teams = TeamSeason.includes(team_games: [game: %i[away_team_game home_team_game]]).merge(TeamGame.unscoped).where(season:)
     teams_hash = format_teams(teams)
 
-    team.each do |team|
-      ProphetRatings::OverallRatings.new(team, teams_hash, team.team_games).calculate_season_ratings
+    teams.each_with_index do |team, _i|
+      ProphetRatings::OverallRatingsCalculator.new(team, teams_hash, team.team_games).calculate_season_ratings
     end
   end
 
