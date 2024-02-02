@@ -8,6 +8,6 @@ Rails.application.routes.draw do
   get 'up' => 'rails/health#show', as: :rails_health_check
 
   mount GoodJob::Engine => 'good_job'
-  # Defines the root path route ("/")
-  # root "posts#index"
+
+  root "team_seasons#ratings"
 end

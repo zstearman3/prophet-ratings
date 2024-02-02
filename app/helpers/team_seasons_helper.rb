@@ -1,0 +1,2 @@
+module TeamSeasonsHelper
+end

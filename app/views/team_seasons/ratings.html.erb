@@ -1,0 +1,20 @@
+<table>
+  <tr>
+    <th>Rank</th>
+    <th>School</th>
+    <th>Rating</th>
+    <th>Adj ORtg</th>
+    <th>Adj DRtg</th>
+    <th>Adj Pace</th>
+  </tr>
+  <% @team_seasons.each_with_index do |team_season, i| %>
+    <tr>
+      <td><%= i + 1 %>
+      <td><%= team_season.team.school %>
+      <td><%= team_season.rating %>
+      <td><%= team_season.adj_offensive_efficiency %>
+      <td><%= team_season.adj_defensive_efficiency %>
+      <td><%= team_season.adj_pace %>
+    </tr>
+  <% end %>
+</table>
