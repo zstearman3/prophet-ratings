@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require 'pry'
 module ProphetRatings
   class GamePredictor
     def initialize(home_team_season, away_team_season, neutral = false, season = Season.current)

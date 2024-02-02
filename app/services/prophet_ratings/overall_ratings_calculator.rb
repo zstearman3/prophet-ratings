@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require 'pry'
 module ProphetRatings
   class OverallRatingsCalculator
     def initialize(season)
