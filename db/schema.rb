@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2024_02_02_020844) do
+ActiveRecord::Schema[7.1].define(version: 2024_02_02_152208) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -117,8 +117,8 @@ ActiveRecord::Schema[7.1].define(version: 2024_02_02_020844) do
     t.date "end_date", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.decimal "average_efficiency", precision: 6, scale: 5
-    t.decimal "average_pace", precision: 6, scale: 5
+    t.decimal "average_efficiency", precision: 6, scale: 3
+    t.decimal "average_pace", precision: 6, scale: 3
     t.index ["year"], name: "index_seasons_on_year", unique: true
   end
 
@@ -164,8 +164,10 @@ ActiveRecord::Schema[7.1].define(version: 2024_02_02_020844) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.bigint "team_season_id", null: false
+    t.bigint "opponent_team_season_id"
     t.index ["game_id", "home"], name: "index_team_games_on_game_id_and_home", unique: true
     t.index ["game_id"], name: "index_team_games_on_game_id"
+    t.index ["opponent_team_season_id"], name: "index_team_games_on_opponent_team_season_id"
     t.index ["team_id", "game_id"], name: "index_team_games_on_team_id_and_game_id", unique: true
     t.index ["team_id"], name: "index_team_games_on_team_id"
     t.index ["team_season_id"], name: "index_team_games_on_team_season_id"
@@ -200,4 +202,5 @@ ActiveRecord::Schema[7.1].define(version: 2024_02_02_020844) do
     t.index ["school"], name: "index_teams_on_school", unique: true
   end
 
+  add_foreign_key "team_games", "team_seasons", column: "opponent_team_season_id"
 end

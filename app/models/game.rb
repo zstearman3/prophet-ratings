@@ -23,6 +23,10 @@ class Game < ApplicationRecord
     away_team_game&.calculate_game_stats
   end
 
+  def pace
+    ((possessions.to_f / minutes) * 40.0).to_f
+  end
+
   private
 
   def calculated_possessions

@@ -11,10 +11,11 @@ module Importer
 
       private
 
-      def process_team_game(team_game, data, team_season)
+      def process_team_game(team_game, data, team_season, opponent_team_season)
         return unless team_game
 
         data[:team_season_id] = team_season&.id
+        data[:opponent_team_season_id] = opponent_team_season&.id
 
         team_game.update(data)
       end
@@ -42,8 +43,8 @@ module Importer
           url: row[:url]
         )
 
-        process_team_game(game.home_team_game, row[:home_team_stats], home_team_season)
-        process_team_game(game.away_team_game, row[:away_team_stats], away_team_season)
+        process_team_game(game.home_team_game, row[:home_team_stats], home_team_season, away_team_season)
+        process_team_game(game.away_team_game, row[:away_team_stats], away_team_season, home_team_season)
 
         game.finalize
       end

@@ -6,6 +6,7 @@ class TeamGame < ApplicationRecord
   belongs_to :game
   belongs_to :team
   belongs_to :team_season
+  belongs_to :opponent_team_season, class_name: 'TeamSeason', optional: true
 
   has_one :season, through: :game
 

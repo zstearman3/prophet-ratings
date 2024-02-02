@@ -10,12 +10,21 @@ class Season < ApplicationRecord
     order(year: :desc).first
   end
 
-  def average_pace
+  def update_average_ratings
+    update!(
+      average_efficiency: calculated_average_efficiency,
+      average_pace: calculated_average_pace
+    )
+  end
+
+  private
+
+  def calculated_average_pace
     p = (games.sum(:possessions) / games.sum(:minutes).to_f) * 40.0
     p.to_f
   end
 
-  def average_efficiency
+  def calculated_average_efficiency
     points = (games.sum(:home_team_score) + games.sum(:away_team_score)) / 2
     possessions = games.sum(:possessions)
 
