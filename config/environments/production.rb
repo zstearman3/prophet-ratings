@@ -105,7 +105,7 @@ Rails.application.configure do
       cron: "0 12 * * *", # cron-style scheduling format by fugit gem
       class: "SyncFromLastGamesJob", # name of the job class as a String; must reference an Active Job job class
       description: "Daily game synce from cbb reference", # optional description that appears in Dashboard
-    }
+    },
 
     daily_ratings_calculation: { # each recurring job must have a unique key
       cron: "15 12 * * *", # cron-style scheduling format by fugit gem
