@@ -1,20 +1,26 @@
-<table>
-  <tr>
-    <th>Rank</th>
-    <th>School</th>
-    <th>Rating</th>
-    <th>Adj ORtg</th>
-    <th>Adj DRtg</th>
-    <th>Adj Pace</th>
-  </tr>
-  <% @team_seasons.each_with_index do |team_season, i| %>
-    <tr>
-      <td><%= i + 1 %>
-      <td><%= team_season.team.school %>
-      <td><%= team_season.rating %>
-      <td><%= team_season.adj_offensive_efficiency %>
-      <td><%= team_season.adj_defensive_efficiency %>
-      <td><%= team_season.adj_pace %>
-    </tr>
-  <% end %>
-</table>
+<div class="overflow-auto w-full">
+  <table class="w-full text-sm text-left rtl:text-right text-gray-500">
+    <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+      <tr>
+        <th scope="col" class="px-6 py-3">Rank</th>
+        <th scope="col" class="px-6 py-3">School</th>
+        <th scope="col" class="px-6 py-3">Rating</th>
+        <th scope="col" class="px-6 py-3">Adj ORtg</th>
+        <th scope="col" class="px-6 py-3">Adj DRtg</th>
+        <th scope="col" class="px-6 py-3">Adj Pace</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @team_seasons.each_with_index do |team_season, i| %>
+        <tr class="odd:bg-white even:bg-gray-50 border-b dark:border-gray-700">
+          <td class="px-6 py-4"><%= i + 1 %>
+          <td class="px-6 py-4"><%= team_season.team.school %>
+          <td class="px-6 py-4"><%= team_season.rating %>
+          <td class="px-6 py-4"><%= team_season.adj_offensive_efficiency %>
+          <td class="px-6 py-4"><%= team_season.adj_defensive_efficiency %>
+          <td class="px-6 py-4"><%= team_season.adj_pace %>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>

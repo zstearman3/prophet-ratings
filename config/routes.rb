@@ -10,4 +10,6 @@ Rails.application.routes.draw do
   mount GoodJob::Engine => 'good_job'
 
   root "team_seasons#ratings"
+
+  resources 'predictions', only: [:new, :create]
 end

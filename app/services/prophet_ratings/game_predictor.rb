@@ -36,11 +36,11 @@ module ProphetRatings
     end
 
     def home_expected_score
-      (home_expected_ortg * expected_pace).round(2)
+      ((home_expected_ortg * expected_pace) / 100.0).round(2)
     end
 
     def away_expected_score
-      (away_expected_ortg * expected_pace).round(2)
+      ((away_expected_ortg * expected_pace) / 100.0).round(2)
     end
 
     private
