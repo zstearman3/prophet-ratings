@@ -1,0 +1,31 @@
+<%= form_with url: "/game_prediction", method: :get, class: "flex w-full justify-between" do |form| %>
+  <div class="flex flex-col">
+    <%= form.label :home_team %>
+    <%= form.select :home_team_id, options_for_select(@team_options, @home_team_season&.id) %>
+  </div>
+
+  <div class="flex flex-col">
+    <%= form.label :away_team %>
+    <%= form.select :away_team_id, options_for_select(@team_options, @away_team_season&.id) %>
+  </div>
+
+  <div class="flex flex-col">
+    <%= form.label :neutral %>
+    <%= form.check_box :neutral %>
+  </div>
+
+  <%= form.button "Predict Outcome"%>
+<% end %>
+
+<% if @predictor %>
+<div class="flex w-full justify-around mt-20">
+  <div class="flex flex-col">
+    <h1 class="text-xl font-bold">Home Team</h1>
+    <h1 class="text-xl"><%= @predictor.home_expected_score %></h1>
+  </div>
+  <div class="flex flex-col">
+    <h1 class="text-xl font-bold">Away Team</h1>
+    <h1 class="text-xl"><%= @predictor.away_expected_score %></h1>
+  </div>
+</div>
+<% end %>

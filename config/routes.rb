@@ -11,5 +11,5 @@ Rails.application.routes.draw do
 
   root "team_seasons#ratings"
 
-  resources 'predictions', only: [:new, :create]
+  get 'game_prediction', to: "predictions#game"
 end
