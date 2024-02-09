@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2024_02_02_152208) do
+ActiveRecord::Schema[7.1].define(version: 2024_02_09_025506) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -109,6 +109,25 @@ ActiveRecord::Schema[7.1].define(version: 2024_02_02_152208) do
     t.index ["priority", "created_at"], name: "index_good_jobs_jobs_on_priority_created_at_when_unfinished", order: { priority: "DESC NULLS LAST" }, where: "(finished_at IS NULL)"
     t.index ["queue_name", "scheduled_at"], name: "index_good_jobs_on_queue_name_and_scheduled_at", where: "(finished_at IS NULL)"
     t.index ["scheduled_at"], name: "index_good_jobs_on_scheduled_at", where: "(finished_at IS NULL)"
+  end
+
+  create_table "predictions", force: :cascade do |t|
+    t.decimal "home_offensive_efficiency", precision: 6, scale: 3
+    t.decimal "home_defensive_efficiency", precision: 6, scale: 3
+    t.decimal "away_offensive_efficiency", precision: 6, scale: 3
+    t.decimal "away_defensive_efficiency", precision: 6, scale: 3
+    t.decimal "pace", precision: 6, scale: 3
+    t.decimal "home_score", precision: 6, scale: 3
+    t.decimal "away_score", precision: 6, scale: 3
+    t.decimal "home_offensive_efficiency_error", precision: 6, scale: 3
+    t.decimal "home_defensive_efficiency_error", precision: 6, scale: 3
+    t.decimal "away_offensive_efficiency_error", precision: 6, scale: 3
+    t.decimal "away_defensive_efficiency_error", precision: 6, scale: 3
+    t.decimal "pace_error", precision: 6, scale: 3
+    t.bigint "game_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["game_id"], name: "index_predictions_on_game_id"
   end
 
   create_table "seasons", force: :cascade do |t|

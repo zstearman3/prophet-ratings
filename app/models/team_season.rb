@@ -5,4 +5,5 @@ class TeamSeason < ApplicationRecord
   belongs_to :team
 
   has_many :team_games, dependent: :destroy
+  has_many :games, through: :team_games
 end

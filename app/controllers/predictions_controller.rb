@@ -1,8 +1,10 @@
+# frozen_string_literal: true
+
 class PredictionsController < ApplicationController
   def game
     @team_options = TeamSeason.includes(:team).where(season: Season.current)
-    .order("teams.school asc").map do |s|
-        [s.team.school, s.id]
+                              .order('teams.school asc').map do |s|
+      [s.team.school, s.id]
     end
 
     @home_team_season = TeamSeason.find_by(id: predictions_params[:home_team_id])
@@ -18,7 +20,7 @@ class PredictionsController < ApplicationController
     params.permit(
       :home_team_id,
       :away_team_id,
-      :neutral,
+      :neutral
     )
   end
 end

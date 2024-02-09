@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class TeamSeasonsController < ApplicationController
   before_action :set_season
 
