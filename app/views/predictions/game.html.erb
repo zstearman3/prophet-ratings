@@ -1,4 +1,4 @@
-<%= form_with url: "/game_prediction", method: :get, class: "flex w-full justify-between" do |form| %>
+<%= form_with url: "/game_prediction", method: :get, class: "flex w-full justify-between flex-wrap" do |form| %>
   <div class="flex flex-col">
     <%= form.label :home_team %>
     <%= form.select :home_team_id, options_for_select(@team_options, @home_team_season&.id) %>
