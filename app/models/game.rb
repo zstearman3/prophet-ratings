@@ -11,7 +11,7 @@ class Game < ApplicationRecord
   has_one :away_team, through: :away_team_game, source: :team
   has_one :home_team_season, through: :home_team_game, source: :team_season
   has_one :away_team_season, through: :away_team_game, source: :team_season
-  has_one :prediction
+  has_one :prediction, dependent: :destroy
 
   enum status: { scheduled: 0, final: 1, canceled: 2 }
 
@@ -74,20 +74,19 @@ class Game < ApplicationRecord
 
     predictor = ProphetRatings::GamePredictor.new(home_team_season, away_team_season, neutral, season)
 
-    prediction = build_prediction
-    prediction.home_offensive_efficiency = predictor.home_expected_ortg
-    prediction.home_defensive_efficiency = predictor.home_expected_drtg
-    prediction.away_offensive_efficiency = predictor.away_expected_ortg
-    prediction.away_defensive_efficiency = predictor.away_expected_drtg
-    prediction.home_score = predictor.home_expected_score
-    prediction.away_score = predictor.away_expected_score
-    prediction.pace = predictor.expected_pace
-    prediction.home_offensive_efficiency_error = predictor.home_expected_ortg - home_team_game.offensive_rating
-    prediction.home_defensive_efficiency_error = predictor.home_expected_drtg - away_team_game.offensive_rating
-    prediction.away_offensive_efficiency_error = predictor.away_expected_ortg - away_team_game.offensive_rating
-    prediction.away_defensive_efficiency_error = predictor.away_expected_drtg - home_team_game.offensive_rating
-    prediction.pace_error = predictor.expected_pace - possessions
-
-    prediction.save
+    create_prediction!({
+      home_offensive_efficiency: predictor.home_expected_ortg,
+      home_defensive_efficiency: predictor.home_expected_drtg,
+      away_offensive_efficiency: predictor.away_expected_ortg,
+      away_defensive_efficiency: predictor.away_expected_drtg,
+      home_score: predictor.home_expected_score,
+      away_score: predictor.away_expected_score,
+      pace: predictor.expected_pace,
+      home_offensive_efficiency_error: predictor.home_expected_ortg - home_team_game.offensive_rating,
+      home_defensive_efficiency_error: predictor.home_expected_drtg - away_team_game.offensive_rating,
+      away_offensive_efficiency_error: predictor.away_expected_ortg - away_team_game.offensive_rating,
+      away_defensive_efficiency_error: predictor.away_expected_drtg - home_team_game.offensive_rating,
+      pace_error: predictor.expected_pace - pace,
+    })
   end
 end

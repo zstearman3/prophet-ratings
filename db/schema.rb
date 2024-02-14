@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2024_02_09_025506) do
+ActiveRecord::Schema[7.1].define(version: 2024_02_09_151600) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -138,6 +138,8 @@ ActiveRecord::Schema[7.1].define(version: 2024_02_09_025506) do
     t.datetime "updated_at", null: false
     t.decimal "average_efficiency", precision: 6, scale: 3
     t.decimal "average_pace", precision: 6, scale: 3
+    t.decimal "efficiency_std_deviation", precision: 6, scale: 3
+    t.decimal "pace_std_deviation", precision: 6, scale: 3
     t.index ["year"], name: "index_seasons_on_year", unique: true
   end
 

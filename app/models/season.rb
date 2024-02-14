@@ -5,6 +5,7 @@ class Season < ApplicationRecord
 
   has_many :games, dependent: :destroy
   has_many :team_seasons, dependent: :destroy
+  has_many :predictions, through: :games
 
   def self.current
     order(year: :desc).first
@@ -13,7 +14,9 @@ class Season < ApplicationRecord
   def update_average_ratings
     update!(
       average_efficiency: calculated_average_efficiency,
-      average_pace: calculated_average_pace
+      average_pace: calculated_average_pace,
+      efficiency_std_deviation: calculated_efficiency_deviation,
+      pace_std_deviation: calculated_pace_deviation,
     )
   end
 
@@ -29,5 +32,15 @@ class Season < ApplicationRecord
     possessions = games.sum(:possessions)
 
     ((points / possessions) * 100.0).to_f
+  end
+
+  def calculated_efficiency_deviation
+    stdev = predictions.pluck(:home_offensive_efficiency_error).stdev
+    stdev.positive? ? stdev : 12.0
+  end
+
+  def calculated_pace_deviation
+    stdev = predictions.pluck(:pace_error).stdev
+    stdev.positive? ? stdev : 10.0
   end
 end

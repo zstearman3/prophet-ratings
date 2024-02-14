@@ -12,4 +12,5 @@ Rails.application.routes.draw do
   root "team_seasons#ratings"
 
   get 'game_prediction', to: "predictions#game"
+  get 'game_simulation', to: "simulations#game"
 end
