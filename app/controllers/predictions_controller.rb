@@ -11,7 +11,11 @@ class PredictionsController < ApplicationController
     @away_team_season = TeamSeason.find_by(id: predictions_params[:away_team_id])
     @neutral = predictions_params[:neutral] == '1'
 
-    @predictor = ProphetRatings::GamePredictor.new(@home_team_season, @away_team_season, @neutral) if @home_team_season && @away_team_season
+    return unless @home_team_season && @away_team_season
+
+    @predictor = ProphetRatings::GamePredictor.new(
+      home_team_season: @home_team_season, away_team_season: @away_team_season, neutral: @neutral
+    )
   end
 
   private

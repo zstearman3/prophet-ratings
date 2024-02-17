@@ -10,9 +10,13 @@ module ProphetRatings
       @season = season
 
       @predictor = if team_game.home
-                     GamePredictor.new(@team_season, @opponent_team_season, @game.neutral, season)
+                     GamePredictor.new(
+                       home_team_season: @team_season, away_team_season: @opponent_team_season, neutral: @game.neutral, season:
+                     )
                    else
-                     GamePredictor.new(@opponent_team_season, @team_season, @game.neutral, season)
+                     GamePredictor.new(
+                       home_team_season: @opponent_team_season, away_team_season: @team_season, neutral: @game.neutral, season:
+                     )
                    end
     end
 

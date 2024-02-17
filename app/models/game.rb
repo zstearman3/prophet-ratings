@@ -72,7 +72,7 @@ class Game < ApplicationRecord
   def create_prediction
     return unless home_team_season && away_team_season
 
-    predictor = ProphetRatings::GamePredictor.new(home_team_season, away_team_season, neutral, season)
+    predictor = ProphetRatings::GamePredictor.new(home_team_season:, away_team_season:, neutral:, season:)
 
     create_prediction!({
                          home_offensive_efficiency: predictor.home_expected_ortg,

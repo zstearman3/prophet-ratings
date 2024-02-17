@@ -2,7 +2,7 @@
 
 module ProphetRatings
   class GamePredictor
-    def initialize(home_team_season:, away_team_season:, upset_modifier:, neutral: false, season: Season.current)
+    def initialize(home_team_season:, away_team_season:, upset_modifier: 1.0, neutral: false, season: Season.current)
       @home_team_season = home_team_season
       @away_team_season = away_team_season
       @upset_modifier = upset_modifier
