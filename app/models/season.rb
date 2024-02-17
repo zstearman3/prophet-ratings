@@ -16,7 +16,7 @@ class Season < ApplicationRecord
       average_efficiency: calculated_average_efficiency,
       average_pace: calculated_average_pace,
       efficiency_std_deviation: calculated_efficiency_deviation,
-      pace_std_deviation: calculated_pace_deviation,
+      pace_std_deviation: calculated_pace_deviation
     )
   end
 

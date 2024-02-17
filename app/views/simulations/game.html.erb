@@ -1,31 +1,37 @@
 <%= form_with url: "/game_simulation", method: :get, class: "flex w-full justify-between flex-wrap" do |form| %>
   <div class="flex flex-col mb-4">
     <%= form.label :home_team %>
-    <%= form.select :home_team_id, options_for_select(@team_options, @home_team_season&.id) %>
+    <%= form.select :home_team_id, options_for_select(@team_options, @current_options[:home_team_season]&.id) %>
   </div>
 
   <div class="flex flex-col mb-4">
     <%= form.label :away_team %>
-    <%= form.select :away_team_id, options_for_select(@team_options, @away_team_season&.id) %>
+    <%= form.select :away_team_id, options_for_select(@team_options, @current_options[:away_team_season]&.id) %>
   </div>
 
   <div class="flex flex-col">
-    <%= form.label :neutral %>
-    <%= form.check_box :neutral, { checked: @neutral } %>
+    <div>
+      <%= form.label :neutral, class: 'w-36 inline-block' %>
+      <%= form.check_box :neutral, { checked: @current_options[:neutral], class: 'mb-4 w-6 h-6'} %>
+    </div>
+    <div>
+      <%= form.label :upset_modifier, class: 'w-36 inline-block' %>
+      <%= form.number_field :upset_modifier, value: @current_options[:upset_modifier], min: 0.1, max: 2.0, step: 0.1%>
+    </div>
   </div>
 
-  <%= form.submit "Predict Outcome", class: "bg-gray-900 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded mt-6", name: nil %>
+  <%= form.submit "Simulate Outcome", class: "bg-gray-900 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded mt-6", name: nil %>
 <% end %>
 
-<% if @predictor %>
+<% if !@current_prediction.empty? %>
 <div class="flex w-full justify-around mt-20">
   <div class="flex flex-col">
     <h1 class="text-xl font-bold">Home Team</h1>
-    <h1 class="text-xl"><%= @home_score %></h1>
+    <h1 class="text-xl"><%= @current_prediction[:home_score] %></h1>
   </div>
   <div class="flex flex-col">
     <h1 class="text-xl font-bold">Away Team</h1>
-    <h1 class="text-xl"><%= @away_score %></h1>
+    <h1 class="text-xl"><%= @current_prediction[:away_score] %></h1>
   </div>
 </div>
 <% end %>

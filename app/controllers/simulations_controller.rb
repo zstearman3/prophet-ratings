@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class SimulationsController < ApplicationController
-  before_action :set_cache_headers
+  before_action :set_cache_headers, :set_current_options
 
   def game
     @team_options = TeamSeason.includes(:team).where(season: Season.current)
@@ -9,17 +9,15 @@ class SimulationsController < ApplicationController
       [s.team.school, s.id]
     end
 
-    @home_team_season = TeamSeason.find_by(id: simulations_params[:home_team_id])
-    @away_team_season = TeamSeason.find_by(id: simulations_params[:away_team_id])
-    @neutral = simulations_params[:neutral] == '1'
+    @current_prediction = {}
 
-    return unless @home_team_season && @away_team_season
+    return unless @current_options[:home_team_season] && @current_options[:away_team_season]
 
-    @predictor = ProphetRatings::GamePredictor.new(@home_team_season, @away_team_season, @neutral)
-    scores = @predictor.simulated_scores
+    @current_prediction[:predictor] = ProphetRatings::GamePredictor.new(**@current_options)
+    scores = @current_prediction[:predictor].simulated_scores
 
-    @home_score = scores[:home_score]
-    @away_score = scores[:away_score]
+    @current_prediction[:home_score] = scores[:home_score]
+    @current_prediction[:away_score] = scores[:away_score]
   end
 
   private
@@ -28,13 +26,23 @@ class SimulationsController < ApplicationController
     params.permit(
       :home_team_id,
       :away_team_id,
-      :neutral
+      :neutral,
+      :upset_modifier
     )
   end
 
   def set_cache_headers
-    response.headers["Cache-Control"] = "no-cache, no-store"
-    response.headers["Pragma"] = "no-cache"
-    response.headers["Expires"] = "Mon, 01 Jan 1990 00:00:00 GMT"
+    response.headers['Cache-Control'] = 'no-cache, no-store'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = 'Mon, 01 Jan 1990 00:00:00 GMT'
+  end
+
+  def set_current_options
+    @current_options = {}
+
+    @current_options[:home_team_season] = TeamSeason.find_by(id: simulations_params[:home_team_id])
+    @current_options[:away_team_season] = TeamSeason.find_by(id: simulations_params[:away_team_id])
+    @current_options[:neutral] = simulations_params[:neutral] == '1'
+    @current_options[:upset_modifier] = simulations_params[:upset_modifier] || 1.0
   end
 end

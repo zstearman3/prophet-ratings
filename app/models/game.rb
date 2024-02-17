@@ -75,18 +75,18 @@ class Game < ApplicationRecord
     predictor = ProphetRatings::GamePredictor.new(home_team_season, away_team_season, neutral, season)
 
     create_prediction!({
-      home_offensive_efficiency: predictor.home_expected_ortg,
-      home_defensive_efficiency: predictor.home_expected_drtg,
-      away_offensive_efficiency: predictor.away_expected_ortg,
-      away_defensive_efficiency: predictor.away_expected_drtg,
-      home_score: predictor.home_expected_score,
-      away_score: predictor.away_expected_score,
-      pace: predictor.expected_pace,
-      home_offensive_efficiency_error: predictor.home_expected_ortg - home_team_game.offensive_rating,
-      home_defensive_efficiency_error: predictor.home_expected_drtg - away_team_game.offensive_rating,
-      away_offensive_efficiency_error: predictor.away_expected_ortg - away_team_game.offensive_rating,
-      away_defensive_efficiency_error: predictor.away_expected_drtg - home_team_game.offensive_rating,
-      pace_error: predictor.expected_pace - pace,
-    })
+                         home_offensive_efficiency: predictor.home_expected_ortg,
+                         home_defensive_efficiency: predictor.home_expected_drtg,
+                         away_offensive_efficiency: predictor.away_expected_ortg,
+                         away_defensive_efficiency: predictor.away_expected_drtg,
+                         home_score: predictor.home_expected_score,
+                         away_score: predictor.away_expected_score,
+                         pace: predictor.expected_pace,
+                         home_offensive_efficiency_error: predictor.home_expected_ortg - home_team_game.offensive_rating,
+                         home_defensive_efficiency_error: predictor.home_expected_drtg - away_team_game.offensive_rating,
+                         away_offensive_efficiency_error: predictor.away_expected_ortg - away_team_game.offensive_rating,
+                         away_defensive_efficiency_error: predictor.away_expected_drtg - home_team_game.offensive_rating,
+                         pace_error: predictor.expected_pace - pace
+                       })
   end
 end

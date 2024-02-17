@@ -2,9 +2,10 @@
 
 module ProphetRatings
   class GamePredictor
-    def initialize(home_team_season, away_team_season, neutral = false, season = Season.current)
+    def initialize(home_team_season:, away_team_season:, upset_modifier:, neutral: false, season: Season.current)
       @home_team_season = home_team_season
       @away_team_season = away_team_season
+      @upset_modifier = upset_modifier
       @neutral = neutral
       @season = season
     end
@@ -45,8 +46,8 @@ module ProphetRatings
 
     def simulated_scores
       pace = Gaussian.new(@season.average_pace, @season.pace_std_deviation).rand
-      home_ortg = Gaussian.new(home_expected_ortg, @season.efficiency_std_deviation).rand
-      away_ortg = Gaussian.new(away_expected_ortg, @season.efficiency_std_deviation).rand
+      home_ortg = Gaussian.new(home_expected_ortg, (@season.efficiency_std_deviation * @upset_modifier.to_f)).rand
+      away_ortg = Gaussian.new(away_expected_ortg, (@season.efficiency_std_deviation * @upset_modifier.to_f)).rand
       {
         home_score: (pace * (home_ortg / 100.0)).round(2),
         away_score: (pace * (away_ortg / 100.0)).round(2)
