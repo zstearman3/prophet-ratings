@@ -45,8 +45,9 @@ module ProphetRatings
       a_matrix = Matrix.rows(rows)
       b_vector = Vector.elements(b)
 
-      x_vector = (a_matrix.t * a_matrix).inverse * a_matrix.t * b_vector
-
+      lambda_identity = Matrix.identity(a_matrix.column_count) * 0.001
+      x_vector = ((a_matrix.t * a_matrix) + lambda_identity).inverse * a_matrix.t * b_vector
+      
       team_ids.each_with_index do |team_id, idx|
         ts = TeamSeason.find_by(team_id:, season_id: season.id)
         ts.update!(

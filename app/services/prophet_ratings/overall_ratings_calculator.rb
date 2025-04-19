@@ -9,7 +9,7 @@ module ProphetRatings
       turnover_rate: [:adj_turnover_rate, :adj_turnover_rate_forced],
       offensive_rebound_rate: [:adj_offensive_rebound_rate, :adj_defensive_rebound_rate],
       free_throw_rate: [:adj_free_throw_rate, :adj_free_throw_rate_allowed],
-      three_point_attempt_rate: [:adj_three_point_attempt_rate, :adj_three_point_attempt_rate_allowed]
+      three_pt_attempt_rate: [:adj_three_pt_attempt_rate, :adj_three_pt_attempt_rate_allowed]
     }.freeze
 
     def initialize(season)

@@ -1,5 +1,3 @@
-# frozen_string_literal: true
-
 # == Schema Information
 #
 # Table name: team_seasons
@@ -42,10 +40,9 @@
 #  index_team_seasons_on_team_id                (team_id)
 #  index_team_seasons_on_team_id_and_season_id  (team_id,season_id) UNIQUE
 #
-class TeamSeason < ApplicationRecord
-  belongs_to :season
-  belongs_to :team
-
-  has_many :team_games, dependent: :destroy
-  has_many :games, through: :team_games
+FactoryBot.define do
+  factory :team_season do
+    association :team
+    association :season
+  end
 end

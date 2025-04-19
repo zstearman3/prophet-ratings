@@ -24,8 +24,13 @@
 #
 #  index_games_on_season_id  (season_id)
 #
-require 'rails_helper'
-
-RSpec.describe Game do
-  pending "add some examples to (or delete) #{__FILE__}"
+FactoryBot.define do
+  factory :game do
+    sequence(:url) { |n| "https://example.com/game/#{n}" }
+    start_time { Time.zone.now }
+    association :season
+    status { :final }
+    home_team_name { 'Home Team' }
+    away_team_name { 'Away Team' }
+  end
 end

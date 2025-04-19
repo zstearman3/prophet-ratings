@@ -2,7 +2,7 @@ class AddAdjFourFactorsToTeamSeasons < ActiveRecord::Migration[7.1]
   def change
     change_table :team_seasons, bulk: true do |t|
       # Raw Four Factors
-      t.decimal :efg_percentage, precision: 6, scale: 5
+      t.decimal :effective_fg_percentage, precision: 6, scale: 5
       t.decimal :turnover_rate, precision: 6, scale: 5
       t.decimal :offensive_rebound_rate, precision: 6, scale: 5
       t.decimal :free_throw_rate, precision: 6, scale: 5

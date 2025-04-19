@@ -1,5 +1,23 @@
 # frozen_string_literal: true
 
+# == Schema Information
+#
+# Table name: teams
+#
+#  id             :bigint           not null, primary key
+#  home_venue     :string
+#  location       :string
+#  nickname       :string
+#  school         :string
+#  secondary_name :string
+#  url            :string
+#  created_at     :datetime         not null
+#  updated_at     :datetime         not null
+#
+# Indexes
+#
+#  index_teams_on_school  (school) UNIQUE
+#
 class Team < ApplicationRecord
   validates :school, presence: true, uniqueness: true
   validates :url, presence: true

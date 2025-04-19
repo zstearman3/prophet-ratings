@@ -1,5 +1,24 @@
 # frozen_string_literal: true
 
+# == Schema Information
+#
+# Table name: seasons
+#
+#  id                       :bigint           not null, primary key
+#  average_efficiency       :decimal(6, 3)
+#  average_pace             :decimal(6, 3)
+#  efficiency_std_deviation :decimal(6, 3)
+#  end_date                 :date             not null
+#  pace_std_deviation       :decimal(6, 3)
+#  start_date               :date             not null
+#  year                     :integer          not null
+#  created_at               :datetime         not null
+#  updated_at               :datetime         not null
+#
+# Indexes
+#
+#  index_seasons_on_year  (year) UNIQUE
+#
 class Season < ApplicationRecord
   validates :year, presence: true, uniqueness: true
 
