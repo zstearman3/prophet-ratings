@@ -1,0 +1,13 @@
+default: &default
+  confidence_levels:
+    high_max: 2.0
+    medium_max: 5.0
+
+development:
+  <<: *default
+
+test:
+  <<: *default
+
+production:
+  <<: *default
