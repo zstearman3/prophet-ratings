@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2024_02_09_151600) do
+ActiveRecord::Schema[7.1].define(version: 2025_04_19_021936) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -206,6 +206,20 @@ ActiveRecord::Schema[7.1].define(version: 2024_02_09_151600) do
     t.decimal "adj_defensive_efficiency", precision: 6, scale: 3
     t.decimal "adj_pace", precision: 6, scale: 3
     t.decimal "rating", precision: 6, scale: 3
+    t.decimal "efg_percentage", precision: 6, scale: 5
+    t.decimal "turnover_rate", precision: 6, scale: 5
+    t.decimal "offensive_rebound_rate", precision: 6, scale: 5
+    t.decimal "free_throw_rate", precision: 6, scale: 5
+    t.decimal "three_pt_attempt_rate", precision: 6, scale: 5
+    t.decimal "adj_effective_fg_percentage", precision: 6, scale: 5
+    t.decimal "adj_turnover_rate", precision: 6, scale: 5
+    t.decimal "adj_offensive_rebound_rate", precision: 6, scale: 5
+    t.decimal "adj_free_throw_rate", precision: 6, scale: 5
+    t.decimal "adj_three_pt_attempt_rate", precision: 6, scale: 5
+    t.decimal "home_offense_boost", precision: 6, scale: 3
+    t.decimal "home_defense_boost", precision: 6, scale: 3
+    t.decimal "away_offense_penalty", precision: 6, scale: 3
+    t.decimal "away_defense_penalty", precision: 6, scale: 3
     t.index ["season_id"], name: "index_team_seasons_on_season_id"
     t.index ["team_id", "season_id"], name: "index_team_seasons_on_team_id_and_season_id", unique: true
     t.index ["team_id"], name: "index_team_seasons_on_team_id"
