@@ -61,4 +61,7 @@ Use team-season-level performance data to:
 - Home court advantage is currently a constant but will evolve
 - Regularization is done via ridge regression (`λ = 0.001`) to ensure stable matrix inversion
 
+## ⚖️ Licensing & Commercial Use
+This project is open source under the MIT License for educational and non-commercial use.
 
+If you are interested in using ProphetRatings or any of its model output in a commercial product or paid service, please reach out for licensing options. All predictions and derived analytics remain © ProphetRatings.
