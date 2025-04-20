@@ -43,6 +43,6 @@ class Team < ApplicationRecord
   end
 
   def self.search(name)
-    find_by("LOWER(name) = ? OR LOWER(secondary_name) = ?", name.downcase, name.downcase)
+    find_by("LOWER(school) = ? OR LOWER(secondary_name) = ?", name.downcase, name.downcase)
   end
 end

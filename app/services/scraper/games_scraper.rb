@@ -8,10 +8,19 @@ module Scraper
 
     def to_json(*_args)
       scrape_day
+
+      sleep(SLEEP_COUNT)
     end
 
     def to_json_in_batches(start_at = 0, batch_size = 10)
       scrape_day_batch(start_at, batch_size)
+    end
+
+    def to_json_for_team(team)
+      set_game_urls_for_team(team)
+      scrape_day
+
+      sleep(SLEEP_COUNT)
     end
 
     def game_count
@@ -44,6 +53,24 @@ module Scraper
 
     def game_urls
       @game_urls ||= set_game_urls
+    end
+
+    def set_game_urls_for_team(team)
+      response = HTTParty.get(schedule_url(@date))
+      document = Nokogiri::HTML(response.body)
+    
+      urls = document.css('div.game_summaries div.gender-m').filter_map do |game_div|
+        team_names = game_div.css('table.teams tr td:first-child a').map(&:text).compact
+    
+        # Only keep games where both teams are matched in the database
+        next unless team_names.include?(team.school) || team_names.include?(team.secondary_name)
+    
+        # Extract the actual game link
+        gamelink = game_div.at_css('td.gamelink a')
+        gamelink&.attribute('href')&.value
+      end
+
+      @game_urls = urls
     end
 
     def parse_team_stats(row)
