@@ -18,13 +18,14 @@ module StatisticsUtils
     0.5 * (1 + Math.erf(x / Math.sqrt(2)))
   end
 
-  def solve_least_squares_with_python(a_rows, b_vector)
+  def solve_least_squares_with_python(a_rows, b_vector, weights = nil)
     require 'open3'
     require 'json'
   
     input_data = {
       a: a_rows,
-      b: b_vector
+      b: b_vector,
+      w: weights || Array.new(b_vector.length, 1.0)
     }
   
     time = Benchmark.realtime do

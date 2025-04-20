@@ -1,0 +1,16 @@
+default: &default
+  weighting:
+    recency_decay_days: 60.0
+    min_recency_weight: 0.75
+  blowout:
+    max_margin: 15
+    cap_multiplier: 1.0
+
+development:
+  <<: *default
+
+test:
+  <<: *default
+
+production:
+  <<: *default
