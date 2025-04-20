@@ -37,31 +37,16 @@ module ProphetRatings
         team_id = team_season.team_id
         team_index_val = team_index[team_id]
 
-        team_season.team_games.each do |game|
+        team_season.team_games.includes(:game).each do |game|
           opponent = game.opponent_team_season
           next unless opponent&.season_id == season.id
           next unless team_index[opponent.team_id]
 
-          # Game recency weighting
-          decay_days = RATINGS_CONFIG[:weighting][:recency_decay_days]
-          min_weight = RATINGS_CONFIG[:weighting][:min_recency_weight]
-          days_ago = (Date.today - game.game.start_time.to_date).to_i
-          recency_weight = [1.0 - (days_ago / decay_days), min_weight].max
+          observed = stat_value_for_game(game)
 
-          observed =
-          if raw_stat == :possessions
-            game.game&.possessions
-          else
-            game.send(raw_stat)
-          end
           next unless observed.present?
 
-          if %i[offensive_rating defensive_rating].include?(raw_stat)
-            margin_cap = RATINGS_CONFIG[:blowout][:max_margin]
-            margin = (game.points - game.opponent_team_game.points).abs rescue 0
-            blowout_dampening = Math.tanh(margin / margin_cap)
-            observed *= blowout_dampening
-          end
+          observed *= blowout_dampening(game)
 
           row = Array.new(2 * num_teams, 0)
           row[team_index_val] = 1
@@ -69,7 +54,7 @@ module ProphetRatings
 
           rows << row
           b << (observed.to_f - season_avg)
-          weights << recency_weight
+          weights << GameWeightingService.new(game:).call
         end
       end
 
@@ -110,6 +95,26 @@ module ProphetRatings
     def average_stat_for_season
       stat_to_avg = raw_stat == :possessions ? :pace : raw_stat
       TeamSeason.where(season:).average(stat_to_avg).to_f
+    end
+
+    def stat_value_for_game(game)
+      if raw_stat == :possessions
+        game.game&.possessions
+      else
+        game.send(raw_stat)
+      end
+    end
+
+    def blowout_dampening(game)
+      return 1.0 unless %i[offensive_rating defensive_rating].include?(raw_stat)
+
+      margin_cap = RATINGS_CONFIG[:blowout][:max_margin]
+      margin = if game.opponent_team_game&.points && game.points
+        (game.points - game.opponent_team_game.points).abs
+      else
+        0
+      end
+       Math.tanh(margin / margin_cap)
     end
   end
 end
