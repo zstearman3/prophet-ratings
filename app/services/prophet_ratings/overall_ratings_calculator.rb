@@ -4,7 +4,8 @@ module ProphetRatings
   class OverallRatingsCalculator
 
     ADJUSTED_STATS = {
-      offensive_rating: [:adj_offensive_efficiency, :adj_defensive_efficiency],
+      offensive_efficiency: [:adj_offensive_efficiency, :adj_defensive_efficiency],
+      possessions: [:adj_pace, :adj_pace_allowed],
       effective_fg_percentage: [:adj_effective_fg_percentage, :adj_effective_fg_percentage_allowed],
       turnover_rate: [:adj_turnover_rate, :adj_turnover_rate_forced],
       offensive_rebound_rate: [:adj_offensive_rebound_rate, :adj_defensive_rebound_rate],
@@ -14,7 +15,6 @@ module ProphetRatings
 
     def initialize(season)
       @season = season
-      @acceptble_error = 100.0
     end
 
     def calculate_season_ratings
@@ -38,7 +38,7 @@ module ProphetRatings
 
     def run_least_squares_adjustments
       ADJUSTED_STATS.each do |raw_stat, (adj_stat, adj_stat_allowed)|
-        ProphetRatings::LeastSquaresAdjustedStatCalculator.new(
+        ProphetRatings::AdjustedStatCalculator.new(
           season: @season,
           raw_stat:,
           adj_stat:,

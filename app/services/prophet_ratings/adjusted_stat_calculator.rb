@@ -12,49 +12,78 @@ module ProphetRatings
     end
 
     def run
-      team_ids = TeamSeason.where(season:).pluck(:team_id).uniq
+      Rails.logger.info("Starting adjustment: #{raw_stat} → #{adj_stat} / #{adj_stat_allowed}")
+      season_avg = average_stat_for_season
+
+      # Preload only teams with at least 2 games
+      qualified_team_seasons = TeamSeason
+        .includes(:team_games)
+        .where(season: season)
+        .select { |ts| ts.team_games.size >= 2 }
+
+      team_ids = qualified_team_seasons.map(&:team_id)
       team_index = team_ids.each_with_index.to_h
       num_teams = team_ids.size
 
       rows = []
       b = []
 
-      season_avg = average_stat_for_season
+      Rails.logger.info("Building adjustment matrix rows for #{num_teams} qualified teams...")
 
-      TeamGame.includes(:team_season, :opponent_team_season)
-              .where(team_seasons: { season_id: season.id })
-              .find_each do |game|
-        team_id = game.team_id
-        opponent_id = game.opponent_team_season&.team_id
+      qualified_team_seasons.each do |team_season|
+        team_id = team_season.team_id
+        team_index_val = team_index[team_id]
 
-        next unless team_index[team_id] && team_index[opponent_id]
+        team_season.team_games.each do |game|
+          opponent = game.opponent_team_season
+          next unless opponent&.season_id == season.id
+          next unless team_index[opponent.team_id]
 
-        observed = game.send(raw_stat)
-        next unless observed.present?
+          observed =
+          if raw_stat == :possessions
+            game.game&.possessions
+          else
+            game.send(raw_stat)
+          end
+          next unless observed.present?
 
-        row = Array.new(2 * num_teams, 0)
-        row[team_index[team_id]] = 1
-        row[num_teams + team_index[opponent_id]] = 1
+          row = Array.new(2 * num_teams, 0)
+          row[team_index_val] = 1
+          row[num_teams + team_index[opponent.team_id]] = 1
 
-        rows << row
-        b << (observed.to_f - season_avg)
+          rows << row
+          b << (observed.to_f - season_avg)
+        end
       end
 
-      return if rows.empty?
+      if rows.empty?
+        Rails.logger.warn("No valid rows generated for #{raw_stat}")
+        return
+      end
 
-      a_matrix = Matrix.rows(rows)
-      b_vector = Vector.elements(b)
+      Rails.logger.info("Solving matrix with #{rows.size} rows and #{2 * num_teams} columns...")
+      x_values = StatisticsUtils.solve_least_squares_with_python(rows, b)
 
-      lambda_identity = Matrix.identity(a_matrix.column_count) * 0.001
-      x_vector = ((a_matrix.t * a_matrix) + lambda_identity).inverse * a_matrix.t * b_vector
-      
+      team_season_map = TeamSeason.where(season: season, team_id: team_ids).index_by(&:team_id)
       team_ids.each_with_index do |team_id, idx|
-        ts = TeamSeason.find_by(team_id:, season_id: season.id)
-        ts.update!(
-          adj_stat => (x_vector[idx] + season_avg),
-          adj_stat_allowed => (x_vector[num_teams + idx] + season_avg)
-        )
+        ts = team_season_map[team_id]
+        next unless ts
+        
+        stats_to_write = 
+          if raw_stat == :possessions
+            {
+              adj_stat => (x_values[idx] + season_avg),
+            }
+          else
+            {
+              adj_stat => (x_values[idx] + season_avg),
+              adj_stat_allowed => (x_values[num_teams + idx] + season_avg),
+            }
+          end
+        ts.update!(stats_to_write)
       end
+
+      Rails.logger.info("Adjustment complete for #{raw_stat}")
     end
 
     private
@@ -62,7 +91,8 @@ module ProphetRatings
     attr_reader :season, :raw_stat, :adj_stat, :adj_stat_allowed
 
     def average_stat_for_season
-      TeamSeason.where(season:).average(raw_stat).to_f
+      stat_to_avg = raw_stat == :possessions ? :pace : raw_stat
+      TeamSeason.where(season:).average(stat_to_avg).to_f
     end
   end
 end

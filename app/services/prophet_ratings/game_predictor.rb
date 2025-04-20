@@ -35,7 +35,7 @@ module ProphetRatings
         home_expected_score:,
         away_expected_score:,
         expected_margin: margin,
-        win_probability_home: nil, # to be calculated later
+        win_probability_home:,
         confidence_level: confidence_level,
         explanation: "Based on adjusted efficiencies, expected pace, and volatility, " \
                      "#{favorite} is favored by #{margin.abs} points.",
@@ -85,6 +85,13 @@ module ProphetRatings
     def away_expected_score
       @away_expected_score ||= ((away_expected_ortg * expected_pace) / 100.0).round(2)
     end
+
+    def win_probability_home
+      score_diff = home_expected_score - away_expected_score
+      combined_std = Math.sqrt(total_home_std_dev**2 + total_away_std_dev**2)
+      probability = StatisticsUtils.normal_cdf(score_diff / combined_std)
+      probability.round(4)
+    end    
     
     def favorite
       favored_team_season = home_expected_score > away_expected_score ? home_team_season : away_team_season

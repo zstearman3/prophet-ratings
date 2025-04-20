@@ -41,4 +41,8 @@ class Team < ApplicationRecord
     arr = home_games.order(start_time: :desc).pluck(:location).first(5)
     arr.max_by { |i| arr.count(i) }
   end
+
+  def self.search(name)
+    find_by("LOWER(name) = ? OR LOWER(secondary_name) = ?", name.downcase, name.downcase)
+  end
 end

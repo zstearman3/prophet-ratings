@@ -21,11 +21,20 @@ module Importer
       end
 
       def process_game(row)
-        home_team = Team.search(row[:home_team]).first
-        away_team = Team.search(row[:away_team]).first
         season = Season.find_by('start_date <= ? AND end_date >= ?', row[:date], row[:date])
-        home_team_season = TeamSeason.find_by(season:, team: home_team)
-        away_team_season = TeamSeason.find_by(season:, team: away_team)
+
+        home_team_name = row[:home_team]
+        away_team_name = row[:away_team]
+        
+        home_team = Team.search(home_team_name).first
+        away_team = Team.search(away_team_name).first
+
+        if !home_team || !away_team
+          Rails.logger.info("Partial team match: #{home_team_name} vs #{away_team_name} on #{row[:date]}")
+        end
+                
+        home_team_season = home_team ? TeamSeason.find_by(season:, team: home_team) : nil
+        away_team_season = away_team ? TeamSeason.find_by(season:, team: away_team) : nil
 
         game = Game.find_or_initialize_by(
           home_team_name: row[:home_team],
