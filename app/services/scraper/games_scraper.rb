@@ -8,8 +8,6 @@ module Scraper
 
     def to_json(*_args)
       scrape_day
-
-      sleep(SLEEP_COUNT)
     end
 
     def to_json_in_batches(start_at = 0, batch_size = 10)
@@ -19,11 +17,11 @@ module Scraper
     def to_json_for_team(team)
       set_game_urls_for_team(team)
       scrape_day
-
-      sleep(SLEEP_COUNT)
     end
 
     def game_count
+      sleep(SLEEP_COUNT)
+      
       response = HTTParty.get(schedule_url(@date))
       Nokogiri::HTML(response.body)
 
@@ -56,6 +54,8 @@ module Scraper
     end
 
     def set_game_urls_for_team(team)
+      sleep(SLEEP_COUNT)
+
       response = HTTParty.get(schedule_url(@date))
       document = Nokogiri::HTML(response.body)
     
