@@ -1,4 +1,5 @@
 default: &default
+  bundle_name: "v1.0-default"
   weighting:
     recency_decay_days: 60.0
     min_recency_weight: 0.75

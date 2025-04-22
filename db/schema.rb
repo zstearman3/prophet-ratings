@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2025_04_19_163447) do
+ActiveRecord::Schema[7.1].define(version: 2025_04_22_123458) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -194,6 +194,27 @@ ActiveRecord::Schema[7.1].define(version: 2025_04_19_163447) do
     t.index ["team_season_id"], name: "index_team_games_on_team_season_id"
   end
 
+  create_table "team_rating_snapshots", force: :cascade do |t|
+    t.bigint "team_id", null: false
+    t.bigint "season_id", null: false
+    t.bigint "team_season_id", null: false
+    t.date "snapshot_date", null: false
+    t.string "config_bundle_name"
+    t.decimal "rating", precision: 6, scale: 3
+    t.decimal "adj_offensive_efficiency", precision: 6, scale: 3
+    t.decimal "adj_defensive_efficiency", precision: 6, scale: 3
+    t.decimal "adj_pace", precision: 6, scale: 3
+    t.jsonb "stats", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["rating", "snapshot_date"], name: "index_team_rating_snapshots_on_rating_and_snapshot_date"
+    t.index ["season_id"], name: "index_team_rating_snapshots_on_season_id"
+    t.index ["team_id", "season_id", "snapshot_date"], name: "idx_on_team_id_season_id_snapshot_date_8de7607130"
+    t.index ["team_id", "snapshot_date", "config_bundle_name"], name: "idx_on_team_id_snapshot_date_config_bundle_name_56be545c29", unique: true
+    t.index ["team_id"], name: "index_team_rating_snapshots_on_team_id"
+    t.index ["team_season_id"], name: "index_team_rating_snapshots_on_team_season_id"
+  end
+
   create_table "team_seasons", force: :cascade do |t|
     t.bigint "team_id", null: false
     t.bigint "season_id", null: false
@@ -245,4 +266,7 @@ ActiveRecord::Schema[7.1].define(version: 2025_04_19_163447) do
   end
 
   add_foreign_key "team_games", "team_seasons", column: "opponent_team_season_id"
+  add_foreign_key "team_rating_snapshots", "seasons"
+  add_foreign_key "team_rating_snapshots", "team_seasons"
+  add_foreign_key "team_rating_snapshots", "teams"
 end

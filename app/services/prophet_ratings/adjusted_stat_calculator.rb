@@ -6,11 +6,12 @@ module ProphetRatings
   class AdjustedStatCalculator
     RATINGS_CONFIG = Rails.application.config_for(:ratings).deep_symbolize_keys
 
-    def initialize(season:, raw_stat:, adj_stat:, adj_stat_allowed:)
+    def initialize(season:, raw_stat:, adj_stat:, adj_stat_allowed:, as_of: Time.current)
       @season = season
       @raw_stat = raw_stat
       @adj_stat = adj_stat
       @adj_stat_allowed = adj_stat_allowed
+      @as_of = as_of
     end
 
     def run
@@ -37,7 +38,7 @@ module ProphetRatings
         team_id = team_season.team_id
         team_index_val = team_index[team_id]
 
-        team_season.team_games.includes(:game).each do |game|
+        team_season.team_games.joins(:game).where('games.start_time <= ?', as_of).each do |game|
           opponent = game.opponent_team_season
           next unless opponent&.season_id == season.id
           next unless team_index[opponent.team_id]
@@ -90,7 +91,7 @@ module ProphetRatings
 
     private
 
-    attr_reader :season, :raw_stat, :adj_stat, :adj_stat_allowed
+    attr_reader :season, :raw_stat, :adj_stat, :adj_stat_allowed, :as_of
 
     def average_stat_for_season
       stat_to_avg = raw_stat == :possessions ? :pace : raw_stat

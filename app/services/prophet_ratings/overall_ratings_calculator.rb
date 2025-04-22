@@ -13,11 +13,11 @@ module ProphetRatings
       three_pt_attempt_rate: [:adj_three_pt_attempt_rate, :adj_three_pt_attempt_rate_allowed]
     }.freeze
 
-    def initialize(season)
+    def initialize(season = Season.current)
       @season = season
     end
 
-    def calculate_season_ratings
+    def calculate_season_ratings(as_of: Time.current)
       @season.update_average_ratings
 
       # Set default values for adj efficiency/pace before solving
@@ -27,22 +27,27 @@ module ProphetRatings
         adj_pace: @season.average_pace
       )
     
-      run_least_squares_adjustments
+      run_least_squares_adjustments(as_of:)
     
-      TeamSeason.where(season: @season).find_each do |s|
-        s.update!(rating: s.adj_offensive_efficiency - s.adj_defensive_efficiency)
+      TeamSeason.where(season: @season).find_each do |ts|
+        ts.update!(rating: calculate_rating(ts))
       end
     end
 
     private
 
-    def run_least_squares_adjustments
+    def calculate_rating(ts)
+      ts.adj_offensive_efficiency - ts.adj_defensive_efficiency
+    end
+
+    def run_least_squares_adjustments(as_of: nil)
       ADJUSTED_STATS.each do |raw_stat, (adj_stat, adj_stat_allowed)|
         ProphetRatings::AdjustedStatCalculator.new(
           season: @season,
           raw_stat:,
           adj_stat:,
-          adj_stat_allowed:
+          adj_stat_allowed:,
+          as_of:
         ).run
       end
     end
