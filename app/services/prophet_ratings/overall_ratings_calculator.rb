@@ -48,7 +48,7 @@ module ProphetRatings
           adj_stat:,
           adj_stat_allowed:,
           as_of:
-        ).run
+        ).call
       end
     end
   end

@@ -14,13 +14,13 @@ module ProphetRatings
       @as_of = as_of
     end
 
-    def run
+    def call
       Rails.logger.info("Starting adjustment: #{raw_stat} → #{adj_stat} / #{adj_stat_allowed}")
       season_avg = average_stat_for_season
 
       # Preload only teams with at least 2 games
       qualified_team_seasons = TeamSeason
-        .includes(:team_games)
+        .includes(team_games: :game)
         .where(season: season)
         .select { |ts| ts.team_games.size >= 2 }
 
@@ -28,36 +28,7 @@ module ProphetRatings
       team_index = team_ids.each_with_index.to_h
       num_teams = team_ids.size
 
-      rows = []
-      b = []
-      weights = []
-
-      Rails.logger.info("Building adjustment matrix rows for #{num_teams} qualified teams...")
-
-      qualified_team_seasons.each do |team_season|
-        team_id = team_season.team_id
-        team_index_val = team_index[team_id]
-
-        team_season.team_games.joins(:game).where('games.start_time <= ?', as_of).each do |game|
-          opponent = game.opponent_team_season
-          next unless opponent&.season_id == season.id
-          next unless team_index[opponent.team_id]
-
-          observed = stat_value_for_game(game)
-
-          next unless observed.present?
-
-          observed *= blowout_dampening(game)
-
-          row = Array.new(2 * num_teams, 0)
-          row[team_index_val] = 1
-          row[num_teams + team_index[opponent.team_id]] = 1
-
-          rows << row
-          b << (observed.to_f - season_avg)
-          weights << GameWeightingService.new(game:).call
-        end
-      end
+      rows, b, weights = build_matrix_components(qualified_team_seasons, team_index, num_teams, season_avg)
 
       if rows.empty?
         Rails.logger.warn("No valid rows generated for #{raw_stat}")
@@ -72,17 +43,7 @@ module ProphetRatings
         ts = team_season_map[team_id]
         next unless ts
 
-        stats_to_write = 
-          if raw_stat == :possessions
-            {
-              adj_stat => (x_values[idx] + season_avg),
-            }
-          else
-            {
-              adj_stat => (x_values[idx] + season_avg),
-              adj_stat_allowed => (x_values[num_teams + idx] + season_avg),
-            }
-          end
+        stats_to_write = build_stats_to_write(ts, x_values, season_avg, idx, num_teams)
         ts.update!(stats_to_write)
       end
 
@@ -116,6 +77,77 @@ module ProphetRatings
         0
       end
        Math.tanh(margin / margin_cap)
+    end
+
+    def blend_with_preseason(preseason_value, observed_value)
+      return observed_value unless preseason_value.present?
+    
+      weight = preseason_weight
+      (weight * preseason_value) + ((1 - weight) * observed_value)
+    end
+    
+    def preseason_weight
+      start_date = season.start_date
+      days_since_start = (as_of.to_date - start_date).to_i
+      decay_days = RATINGS_CONFIG[:weighting][:preseason_decay_days] || 30
+      min_weight = RATINGS_CONFIG[:weighting][:min_preseason_weight] || 0.0
+    
+      weight = [1.0 - (days_since_start.to_f / decay_days), min_weight].max
+      weight.round(4)
+    end
+
+    def build_stats_to_write(ts, x_values, season_avg, idx, num_teams)
+      offense_value = x_values[idx] + season_avg
+      defense_value = x_values[num_teams + idx] + season_avg
+    
+      case raw_stat
+      when :possessions
+        {
+          adj_stat => blend_with_preseason(ts.preseason_adj_pace, offense_value)
+        }
+      when :offensive_efficiency
+        {
+          adj_stat => blend_with_preseason(ts.preseason_adj_offensive_efficiency, offense_value),
+          adj_stat_allowed => blend_with_preseason(ts.preseason_adj_defensive_efficiency, defense_value)
+        }
+      else
+        {
+          adj_stat => offense_value,
+          adj_stat_allowed => defense_value
+        }
+      end
+    end
+
+    def build_matrix_components(team_seasons, team_index, num_teams, season_avg)
+      rows = []
+      b = []
+      weights = []
+    
+      team_seasons.each do |team_season|
+        team_id = team_season.team_id
+        team_index_val = team_index[team_id]
+    
+        team_season.team_games.joins(:game).where('games.start_time <= ?', as_of).each do |game|
+          opponent = game.opponent_team_season
+          next unless opponent&.season_id == season.id
+          next unless team_index[opponent.team_id]
+    
+          observed = stat_value_for_game(game)
+          next unless observed.present?
+    
+          observed *= blowout_dampening(game)
+    
+          row = Array.new(2 * num_teams, 0)
+          row[team_index_val] = 1
+          row[num_teams + team_index[opponent.team_id]] = 1
+    
+          rows << row
+          b << (observed.to_f - season_avg)
+          weights << GameWeightingService.new(game:, season:, as_of:).call
+        end
+      end
+    
+      [rows, b, weights]
     end
   end
 end
