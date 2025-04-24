@@ -7,6 +7,8 @@ module ProphetRatings
       offensive_rebound_rate
       free_throw_rate
       three_pt_attempt_rate
+      offensive_efficiency
+      defensive_efficiency
     ].freeze
 
     DERIVED_STATS = {
@@ -16,15 +18,16 @@ module ProphetRatings
       }
     }.freeze
 
-    def initialize(season)
+    def initialize(season: Season.current, as_of: Time.current)
       @season = season
+      @as_of = as_of
     end
 
     def run
       off_stdevs = []
       def_stdevs = []
     
-      TeamSeason.includes(:team_games).where(season: @season).find_each do |team_season|
+      TeamSeason.includes(team_games: :game).where(season: @season).where(game: { start_time: ..@as_of }).find_each do |team_season|
         aggregates = calculate_average_stats(team_season)
         aggregates.merge!(calculate_efficiency_stddevs(team_season))
     

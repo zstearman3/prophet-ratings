@@ -42,15 +42,11 @@ class Season < ApplicationRecord
   private
 
   def calculated_average_pace
-    p = (games.sum(:possessions) / games.sum(:minutes).to_f) * 40.0
-    p.to_f
+    team_seasons.average(:pace)
   end
 
   def calculated_average_efficiency
-    points = (games.sum(:home_team_score) + games.sum(:away_team_score)) / 2
-    possessions = games.sum(:possessions)
-
-    ((points / possessions) * 100.0).to_f
+    team_seasons.average(:offensive_efficiency)
   end
 
   def calculated_efficiency_deviation

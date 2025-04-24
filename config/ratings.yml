@@ -8,6 +8,10 @@ default: &default
   blowout:
     max_margin: 15
     cap_multiplier: 1.0
+  home_court_advantage: 3.5
+  home_court_adjusted_stats:
+  - offensive_efficiency
+  - defensive_efficiency
   ridge:
     alpha: 0.001
 development:

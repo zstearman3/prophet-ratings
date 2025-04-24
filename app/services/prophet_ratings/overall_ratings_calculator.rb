@@ -18,6 +18,7 @@ module ProphetRatings
     end
 
     def calculate_season_ratings(as_of: Time.current)
+      TeamSeasonStatsAggregator.new(season: @season, as_of:).run
       @season.update_average_ratings
 
       # Set default values for adj efficiency/pace before solving
