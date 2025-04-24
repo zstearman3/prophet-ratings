@@ -50,6 +50,12 @@ module ProphetRatings
         avg = values.sum / values.size.to_f if values.any?
         aggregates[stat] = avg
       end
+
+      possession_vals = team_season.team_games.map { |g| g.game&.possessions }.compact
+      if possession_vals.any?
+        avg_possessions = possession_vals.sum / possession_vals.size.to_f
+        aggregates[:pace] = avg_possessions
+      end
     
       fgm = team_season.team_games.sum(&:field_goals_made)
       fga = team_season.team_games.sum(&:field_goals_attempted)

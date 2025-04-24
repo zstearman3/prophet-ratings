@@ -17,6 +17,7 @@ module ProphetRatings
     def call
       Rails.logger.info("Starting adjustment: #{raw_stat} → #{adj_stat} / #{adj_stat_allowed}")
       season_avg = average_stat_for_season
+      Rails.logger.warn("DEBUG: Season average for #{raw_stat} is #{season_avg}")
 
       # Preload only teams with at least 2 games
       qualified_team_seasons = TeamSeason
@@ -36,6 +37,9 @@ module ProphetRatings
       end
 
       Rails.logger.info("Solving matrix with #{rows.size} rows and #{2 * num_teams} columns...")
+      puts "Sample b values: #{b.take(5).map { |val| val.round(2) }.inspect}"
+      puts "b mean: #{(b.sum / b.size).round(2)}"
+      
       x_values = StatisticsUtils.solve_least_squares_with_python(rows, b, weights)
 
       team_season_map = TeamSeason.where(season: season, team_id: team_ids).index_by(&:team_id)
@@ -129,7 +133,12 @@ module ProphetRatings
 
           observed *= blowout_dampening(off_tg)
 
-          home_court = apply_home_court && tg1 == off_tg ? home_adv : 0.0
+          home_court = if apply_home_court
+             tg1 == off_tg ? home_adv : -home_adv
+          else
+            0.0
+          end
+
           adjusted_observed = observed - home_court - season_avg
 
           row = Array.new(2 * num_teams, 0)
