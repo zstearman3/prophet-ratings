@@ -24,6 +24,7 @@ module ProphetRatings
         .includes(team_games: :game)
         .where(season: season)
         .select { |ts| ts.team_games.size >= 2 }
+        .sort_by(&:team_id)
 
       team_ids = qualified_team_seasons.map(&:team_id)
       team_index = team_ids.each_with_index.to_h
@@ -107,6 +108,8 @@ module ProphetRatings
           adj_stat => blend_with_preseason(ts.preseason_adj_offensive_efficiency, offense_value),
           adj_stat_allowed => blend_with_preseason(ts.preseason_adj_defensive_efficiency, defense_value)
         }
+      when :offensive_rebound_rate
+        { adj_stat => offense_value, adj_stat_allowed => (1.0 - defense_value) }
       else
         { adj_stat => offense_value, adj_stat_allowed => defense_value }
       end
