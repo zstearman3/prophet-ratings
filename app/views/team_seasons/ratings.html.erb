@@ -4,38 +4,46 @@
       <thead class="text-xs text-gray-700 uppercase bg-gray-50 sticky top-0 z-20">
         <tr>
           <% sortable_columns = {
-              "Rank" => nil,
-              "School" => "school",
-              "Rating" => "rating",
-              "Adj ORtg" => "adj_offensive_efficiency",
-              "Adj DRtg" => "adj_defensive_efficiency",
-              "Adj Pace" => "adj_pace",
-              "Adj TO%" => "adj_turnover_rate",
-              "Adj TO% Forced" => "adj_turnover_rate_forced",
-              "Adj ORB%" => "adj_offensive_rebound_rate",
-              "Adj DRB%" => "adj_defensive_rebound_rate",
-              "Adj FT Rate" => "adj_free_throw_rate",
-              "Adj 3PA Rate" => "adj_three_pt_attempt_rate",
-              "Adj eFG%" => "adj_effective_fg_percentage",
-              "Adj eFG% Allowed" => "adj_effective_fg_percentage_allowed",
-              "Raw ORtg" => "offensive_efficiency",
-              "Raw DRtg" => "defensive_efficiency",
-              "Raw Pace" => "pace",
-              "Raw eFG%" => "effective_fg_percentage",
-              "Raw FT Rate" => "free_throw_rate",
-              "Raw 3PA Rate" => "three_pt_attempt_rate",
-              "Raw ORB%" => "offensive_rebound_rate",
-              "Raw TO%" => "turnover_rate",
-              "ORtg Std Dev" => "offensive_efficiency_std_dev",
-              "DRtg Std Dev" => "defensive_efficiency_std_dev",
-            } %>
+            "Rank" => nil,
+            "School" => { column: "school", default_direction: "desc" },
+            "Rating" => { column: "rating", default_direction: "desc" },
+            "Adj ORtg" => { column: "adj_offensive_efficiency", default_direction: "desc" },
+            "Adj DRtg" => { column: "adj_defensive_efficiency", default_direction: "asc" },
+            "Adj Pace" => { column: "adj_pace", default_direction: "desc" },
+            "Adj TO%" => { column: "adj_turnover_rate", default_direction: "asc" },
+            "Adj TO% Forced" => { column: "adj_turnover_rate_forced", default_direction: "desc" },
+            "Adj ORB%" => { column: "adj_offensive_rebound_rate", default_direction: "desc" },
+            "Adj DRB%" => { column: "adj_defensive_rebound_rate", default_direction: "desc" },
+            "Adj FT Rate" => { column: "adj_free_throw_rate", default_direction: "desc" },
+            "Adj 3PA Rate" => { column: "adj_three_pt_attempt_rate", default_direction: "desc" },
+            "Adj eFG%" => { column: "adj_effective_fg_percentage", default_direction: "desc" },
+            "Adj eFG% Allowed" => { column: "adj_effective_fg_percentage_allowed", default_direction: "asc" },
+            "Raw ORtg" => { column: "offensive_efficiency", default_direction: "desc" },
+            "Raw DRtg" => { column: "defensive_efficiency", default_direction: "desc" },
+            "Raw Pace" => { column: "pace", default_direction: "desc" },
+            "Raw eFG%" => { column: "effective_fg_percentage", default_direction: "desc" },
+            "Raw FT Rate" => { column: "free_throw_rate", default_direction: "desc" },
+            "Raw 3PA Rate" => { column: "three_pt_attempt_rate", default_direction: "desc" },
+            "Raw ORB%" => { column: "offensive_rebound_rate", default_direction: "desc" },
+            "Raw TO%" => { column: "turnover_rate", default_direction: "asc" },
+            "ORtg Std Dev" => { column: "offensive_efficiency_std_dev", default_direction: "desc" },
+            "DRtg Std Dev" => { column: "defensive_efficiency_std_dev", default_direction: "desc" }
+          } %>
 
           <% sortable_columns.each do |label, column| %>
             <th class="px-4 py-2 whitespace-nowrap bg-gray-50 <%= 'sticky left-0 z-30' if ['Rank','School'].include?(label) %>">
               <% if column %>
-                <% direction = params[:sort] == column && params[:direction] == "asc" ? "desc" : "asc" %>
-                <%= link_to label, { sort: column, direction: direction }, class: "hover:underline" %>
-                <% if params[:sort] == column %>
+                <% column_name = column.is_a?(Hash) ? column[:column] : column %>
+                <% default_direction = column.is_a?(Hash) ? column[:default_direction] : "asc" %>
+
+                <% if params[:sort] == column_name %>
+                  <% direction = params[:direction] == "asc" ? "desc" : "asc" %>
+                <% else %>
+                  <% direction = default_direction %>
+                <% end %>
+
+                <%= link_to label, { sort: column_name, direction: direction }, class: "hover:underline" %>
+                <% if params[:sort] == column_name %>
                   <%= params[:direction] == "asc" ? "▲" : "▼" %>
                 <% end %>
               <% else %>
