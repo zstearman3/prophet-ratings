@@ -7,13 +7,15 @@ default: &default
     min_preseason_weight: 0.1
   blowout:
     max_margin: 15
-    cap_multiplier: 1.0
+    cap_multiplier: 1.25
   home_court_advantage: 3.5
   home_court_adjusted_stats:
   - offensive_efficiency
   - defensive_efficiency
   ridge:
     alpha: 0.001
+  anchor:
+    weight: 0.05
 development:
   <<: *default
 

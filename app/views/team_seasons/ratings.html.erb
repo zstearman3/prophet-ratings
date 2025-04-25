@@ -1,26 +1,78 @@
-<div class="overflow-auto w-full">
-  <table class="w-full text-sm text-left rtl:text-right text-gray-500">
-    <thead class="text-xs text-gray-700 uppercase bg-gray-50">
-      <tr>
-        <th scope="col" class="px-6 py-3">Rank</th>
-        <th scope="col" class="px-6 py-3">School</th>
-        <th scope="col" class="px-6 py-3">Rating</th>
-        <th scope="col" class="px-6 py-3">Adj ORtg</th>
-        <th scope="col" class="px-6 py-3">Adj DRtg</th>
-        <th scope="col" class="px-6 py-3">Adj Pace</th>
-      </tr>
-    </thead>
-    <tbody>
-      <% @team_seasons.each_with_index do |team_season, i| %>
-        <tr class="odd:bg-white even:bg-gray-50 border-b dark:border-gray-700">
-          <td class="px-6 py-4"><%= i + 1 %>
-          <td class="px-6 py-4"><%= team_season.team.school %>
-          <td class="px-6 py-4"><%= team_season.rating %>
-          <td class="px-6 py-4"><%= team_season.adj_offensive_efficiency %>
-          <td class="px-6 py-4"><%= team_season.adj_defensive_efficiency %>
-          <td class="px-6 py-4"><%= team_season.adj_pace %>
+<%= turbo_frame_tag "team_stats" do %>
+  <div class="table-responsive overflow-auto">
+    <table class="text-sm text-left text-gray-500 border-collapse">
+      <thead class="text-xs text-gray-700 uppercase bg-gray-50 sticky top-0 z-20">
+        <tr>
+          <% sortable_columns = {
+              "Rank" => nil,
+              "School" => "school",
+              "Rating" => "rating",
+              "Adj ORtg" => "adj_offensive_efficiency",
+              "Adj DRtg" => "adj_defensive_efficiency",
+              "Adj Pace" => "adj_pace",
+              "Adj TO%" => "adj_turnover_rate",
+              "Adj ORB%" => "adj_offensive_rebound_rate",
+              "Adj FT Rate" => "adj_free_throw_rate",
+              "Adj 3PA Rate" => "adj_three_pt_attempt_rate",
+              "Adj eFG%" => "adj_effective_fg_percentage",
+              "Adj eFG% Allowed" => "adj_effective_fg_percentage_allowed",
+              "Adj DRB%" => "adj_defensive_rebound_rate",
+              "Adj TO% Forced" => "adj_turnover_rate_forced",
+              "Raw ORtg" => "offensive_efficiency",
+              "Raw DRtg" => "defensive_efficiency",
+              "Raw Pace" => "pace",
+              "Raw eFG%" => "effective_fg_percentage",
+              "Raw FT Rate" => "free_throw_rate",
+              "Raw ORB%" => "offensive_rebound_rate",
+              "Raw TO%" => "turnover_rate",
+              "ORtg Std Dev" => "offensive_efficiency_std_dev",
+              "DRtg Std Dev" => "defensive_efficiency_std_dev",
+            } %>
+
+          <% sortable_columns.each do |label, column| %>
+            <th class="px-4 py-2 whitespace-nowrap bg-gray-50 <%= 'sticky left-0 z-30' if ['Rank','School'].include?(label) %>">
+              <% if column %>
+                <% direction = params[:sort] == column && params[:direction] == "asc" ? "desc" : "asc" %>
+                <%= link_to label, { sort: column, direction: direction }, class: "hover:underline" %>
+                <% if params[:sort] == column %>
+                  <%= params[:direction] == "asc" ? "▲" : "▼" %>
+                <% end %>
+              <% else %>
+                <%= label %>
+              <% end %>
+            </th>
+          <% end %>
         </tr>
-      <% end %>
-    </tbody>
-  </table>
-</div>
+      </thead>
+      <tbody>
+        <% @team_seasons.each_with_index do |ts, i| %>
+          <tr class="odd:bg-white even:bg-gray-50 border-b">
+            <td class="px-4 py-2 sticky left-0 bg-white z-10"><%= i + 1 %></td>
+            <td class="px-4 py-2 sticky left-0 bg-white z-10"><%= ts.team.school %></td>
+            <td class="px-4 py-2"><%= ts.rating %></td>
+            <td class="px-4 py-2"><%= ts.adj_offensive_efficiency %></td>
+            <td class="px-4 py-2"><%= ts.adj_defensive_efficiency %></td>
+            <td class="px-4 py-2"><%= ts.adj_pace %></td>
+            <td class="px-4 py-2"><%= ts.adj_turnover_rate %></td>
+            <td class="px-4 py-2"><%= ts.adj_offensive_rebound_rate %></td>
+            <td class="px-4 py-2"><%= ts.adj_free_throw_rate %></td>
+            <td class="px-4 py-2"><%= ts.adj_three_pt_attempt_rate %></td>
+            <td class="px-4 py-2"><%= ts.adj_effective_fg_percentage %></td>
+            <td class="px-4 py-2"><%= ts.adj_effective_fg_percentage_allowed %></td>
+            <td class="px-4 py-2"><%= ts.adj_defensive_rebound_rate %></td>
+            <td class="px-4 py-2"><%= ts.adj_turnover_rate_forced %></td>
+            <td class="px-4 py-2"><%= ts.offensive_efficiency %></td>
+            <td class="px-4 py-2"><%= ts.defensive_efficiency %></td>
+            <td class="px-4 py-2"><%= ts.pace %></td>
+            <td class="px-4 py-2"><%= ts.effective_fg_percentage %></td>
+            <td class="px-4 py-2"><%= ts.free_throw_rate %></td>
+            <td class="px-4 py-2"><%= ts.offensive_rebound_rate %></td>
+            <td class="px-4 py-2"><%= ts.turnover_rate %></td>
+            <td class="px-4 py-2"><%= ts.offensive_efficiency_std_dev %></td>
+            <td class="px-4 py-2"><%= ts.defensive_efficiency_std_dev %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>

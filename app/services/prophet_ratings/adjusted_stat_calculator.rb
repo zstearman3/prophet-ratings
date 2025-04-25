@@ -72,12 +72,13 @@ module ProphetRatings
       return 1.0 unless %i[offensive_rating defensive_rating].include?(raw_stat)
 
       margin_cap = RATINGS_CONFIG[:blowout][:max_margin]
+      multiplier = config[:cap_multiplier].to_f
       margin = if team_game.opponent_team_game&.points && team_game.points
         (team_game.points - team_game.opponent_team_game.points).abs
       else
         0
       end
-      Math.tanh(margin / margin_cap)
+      Math.tanh(multiplier * margin / margin_cap)
     end
 
     def blend_with_preseason(preseason_value, observed_value)
@@ -150,6 +151,12 @@ module ProphetRatings
           weights << GameWeightingService.new(game: off_tg, season:, as_of:).call
         end
       end
+
+      anchor_weight = RATINGS_CONFIG.dig(:anchor, :weight).to_f
+      anchor_row = Array.new(2 * num_teams, 1.0)  # or only first N if anchoring just offense
+      rows << anchor_row
+      b << 0.0
+      weights << anchor_weight
 
       [rows, b, weights]
     end
