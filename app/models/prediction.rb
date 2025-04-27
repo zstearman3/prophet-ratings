@@ -39,7 +39,22 @@
 #
 class Prediction < ApplicationRecord
   belongs_to :game
+  belongs_to :home_team_snapshot, class_name: "TeamRatingSnapshot"
+  belongs_to :away_team_snapshot, class_name: "TeamRatingSnapshot"
   has_one :home_team_game, through: :game
   has_one :away_team_game, through: :game
   has_one :season, through: :game
+
+  validates :game, uniqueness: { scope: [:home_team_snapshot_id, :away_team_snapshot_id] }
+  validate :snapshots_must_have_same_ratings_version
+
+  private
+
+  def snapshots_must_have_same_ratings_version
+    return if home_team_snapshot.nil? || away_team_snapshot.nil?
+
+    if home_team_snapshot.ratings_config_version_id != away_team_snapshot.ratings_config_version_id
+      errors.add(:base, "Home and away team snapshots must use the same ratings config version")
+    end
+  end
 end

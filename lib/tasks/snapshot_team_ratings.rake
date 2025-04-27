@@ -8,11 +8,8 @@ namespace :ratings do
 
     (start_date..season.end_date).each do |date|
       puts "Backfilling for #{date}..."
-      ProphetRatings::OverallRatingsCalculator.new(
-        season: season
-      ).calculate_season_ratings(
-        as_of: date
-      ).call
+      ProphetRatings::OverallRatingsCalculator.new(season)
+        .calculate_season_ratings(as_of: date)
     end
 
     puts "✅ Done backfilling ratings for season #{season.year}"

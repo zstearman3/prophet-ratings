@@ -5,15 +5,52 @@ module ProphetRatings
     PREDICTION_CONFIG = Rails.application.config_for(:prediction).deep_symbolize_keys
     CONFIDENCE_LEVELS = PREDICTION_CONFIG[:confidence_levels]
 
-    def initialize(home_team_season:, away_team_season:, upset_modifier: 1.0, neutral: false, season: Season.current)
-      @home_team_season = home_team_season
-      @away_team_season = away_team_season
+    def initialize(home_rating_snapshot:, away_rating_snapshot:, upset_modifier: 1.0, neutral: false, season: Season.current)
+      @home_rating_snapshot = home_rating_snapshot
+      @away_rating_snapshot = away_rating_snapshot
+      @home_team_season = home_rating_snapshot.team_season
+      @away_team_season = away_rating_snapshot.team_season
       @upset_modifier = upset_modifier
       @neutral = neutral
       @season = season
     end
 
     def call
+      @prediction_hash ||= build_prediction_hash
+    end
+
+    def save!(game:)
+      raise "Must call #call first to generate prediction" unless prediction_hash
+
+      Prediction.create!(
+        game: game,
+        home_team_snapshot: home_rating_snapshot,
+        away_team_snapshot: away_rating_snapshot,
+        home_score: prediction_hash[:home_expected_score],
+        away_score: prediction_hash[:away_expected_score],
+        home_win_probability: prediction_hash[:win_probability_home],
+        pace: prediction_hash[:meta][:expected_pace],
+        home_offensive_efficiency: prediction_hash[:meta][:home_offensive_efficiency],
+        away_offensive_efficiency: prediction_hash[:meta][:away_offensive_efficiency],
+        # You can add fields like vegas spread if you want too
+      )
+    end
+
+    def simulated_scores
+      pace = Gaussian.new(@season.average_pace, @season.pace_std_deviation).rand
+      home_ortg = Gaussian.new(home_expected_ortg, total_home_std_dev).rand
+      away_ortg = Gaussian.new(away_expected_ortg, total_away_std_dev).rand
+      {
+        home_score: (pace * (home_ortg / 100.0)).round(2),
+        away_score: (pace * (away_ortg / 100.0)).round(2)
+      }
+    end
+
+    private
+
+    attr_reader :home_team_season, :away_team_season, :prediction_hash, :home_rating_snapshot, :away_rating_snapshot
+
+    def build_prediction_hash
       margin = (home_expected_score - away_expected_score).round(2)
     
       home_std = total_home_std_dev
@@ -50,7 +87,6 @@ module ProphetRatings
         }
       }
     end
-    
 
     def home_expected_ortg
       @home_expected_ortg ||= (@home_team_season.adj_offensive_efficiency - @season.average_efficiency) +
@@ -98,20 +134,6 @@ module ProphetRatings
       favored_team_season.team.school
     end
 
-    def simulated_scores
-      pace = Gaussian.new(@season.average_pace, @season.pace_std_deviation).rand
-      home_ortg = Gaussian.new(home_expected_ortg, total_home_std_dev).rand
-      away_ortg = Gaussian.new(away_expected_ortg, total_away_std_dev).rand
-      {
-        home_score: (pace * (home_ortg / 100.0)).round(2),
-        away_score: (pace * (away_ortg / 100.0)).round(2)
-      }
-    end
-
-    private
-
-    attr_reader :home_team_season, :away_team_season
-
     # eventually this will be calculated based on team seasons but for now is a constant
     def home_court_advantage
       @neutral ? 0 : 1.8
@@ -130,7 +152,7 @@ module ProphetRatings
     end
 
     def away_defensive_efficiency_std_dev
-      home_team_season&.defensive_efficiency_std_dev || season.efficiency_std_deviation
+      away_team_season&.defensive_efficiency_std_dev || season.efficiency_std_deviation
     end
 
     def total_home_std_dev

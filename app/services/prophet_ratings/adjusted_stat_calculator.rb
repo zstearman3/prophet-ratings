@@ -17,7 +17,6 @@ module ProphetRatings
     def call
       Rails.logger.info("Starting adjustment: #{raw_stat} → #{adj_stat} / #{adj_stat_allowed}")
       season_avg = average_stat_for_season
-      Rails.logger.warn("DEBUG: Season average for #{raw_stat} is #{season_avg}")
 
       # Preload only teams with at least 2 games
       qualified_team_seasons = TeamSeason
@@ -38,8 +37,6 @@ module ProphetRatings
       end
 
       Rails.logger.info("Solving matrix with #{rows.size} rows and #{2 * num_teams} columns...")
-      puts "Sample b values: #{b.take(5).map { |val| val.round(2) }.inspect}"
-      puts "b mean: #{(b.sum / b.size).round(2)}"
       
       x_values = StatisticsUtils.solve_least_squares_with_python(rows, b, weights)
 
