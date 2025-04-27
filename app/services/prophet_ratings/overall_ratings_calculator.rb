@@ -33,6 +33,8 @@ module ProphetRatings
       TeamSeason.where(season: @season).find_each do |ts|
         ts.update!(rating: calculate_rating(ts))
       end
+
+      TeamRatingSnapshotService.new(season: @season, as_of:).call
     end
 
     private

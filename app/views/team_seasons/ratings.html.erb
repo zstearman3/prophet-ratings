@@ -1,5 +1,5 @@
 <%= turbo_frame_tag "team_stats" do %>
-  <div class="table-responsive overflow-auto">
+  <div class="table-responsive max-h-screen overflow-auto">
     <table class="text-sm text-left text-gray-500 border-collapse">
       <thead class="text-xs text-gray-700 uppercase bg-gray-50 sticky top-0 z-20">
         <tr>
@@ -31,7 +31,17 @@
           } %>
 
           <% sortable_columns.each do |label, column| %>
-            <th class="px-4 py-2 whitespace-nowrap bg-gray-50 <%= 'sticky left-0 z-30' if ['Rank','School'].include?(label) %>">
+            <%
+              sticky_class = case label
+                when 'Rank'
+                  'sticky left-0 z-30'
+                when 'School'
+                  'sticky left-[60px] z-30'
+                else
+                  ''
+              end
+            %>
+            <th class="px-4 py-2 whitespace-nowrap bg-gray-50 <%= sticky_class %>">
               <% if column %>
                 <% column_name = column.is_a?(Hash) ? column[:column] : column %>
                 <% default_direction = column.is_a?(Hash) ? column[:default_direction] : "asc" %>
@@ -55,9 +65,10 @@
       </thead>
       <tbody>
         <% @team_seasons.each_with_index do |ts, i| %>
+          <% row_class = i.even? ? 'bg-white' : 'bg-gray-50' %>
           <tr class="odd:bg-white even:bg-gray-50 border-b">
-            <td class="px-4 py-2 sticky left-0 bg-white z-10"><%= i + 1 %></td>
-            <td class="px-4 py-2 sticky left-0 bg-white z-10"><%= ts.team.school %></td>
+            <td class="px-4 py-2 sticky left-0 z-10 <%= row_class %>"><%= i + 1 %></td>
+            <td class="px-4 py-2 sticky left-[60px] z-10 <%= row_class %>"><%= ts.team.school %></td>
             <td class="px-4 py-2"><%= ts.rating %></td>
             <td class="px-4 py-2"><%= ts.adj_offensive_efficiency %></td>
             <td class="px-4 py-2"><%= ts.adj_defensive_efficiency %></td>

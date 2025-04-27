@@ -6,7 +6,7 @@ module Scraper
   class TeamsScraper < Scraper
     def initialize
       @schools_url = "#{BASE_URL}/cbb/schools"
-      @max_year = 2024
+      @max_year = 2025
     end
 
     def to_csv(file_path)

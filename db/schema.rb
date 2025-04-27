@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2025_04_23_023631) do
+ActiveRecord::Schema[7.1].define(version: 2025_04_27_132635) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -127,7 +127,23 @@ ActiveRecord::Schema[7.1].define(version: 2025_04_23_023631) do
     t.bigint "game_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "home_team_snapshot_id"
+    t.bigint "away_team_snapshot_id"
+    t.decimal "home_win_probability", precision: 5, scale: 4
+    t.decimal "vegas_spread", precision: 6, scale: 3
+    t.decimal "vegas_total", precision: 6, scale: 3
+    t.index ["away_team_snapshot_id"], name: "index_predictions_on_away_team_snapshot_id"
     t.index ["game_id"], name: "index_predictions_on_game_id"
+    t.index ["home_team_snapshot_id"], name: "index_predictions_on_home_team_snapshot_id"
+  end
+
+  create_table "ratings_config_versions", force: :cascade do |t|
+    t.jsonb "config", null: false
+    t.string "description"
+    t.string "name", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_ratings_config_versions_on_name", unique: true
   end
 
   create_table "seasons", force: :cascade do |t|
@@ -199,7 +215,6 @@ ActiveRecord::Schema[7.1].define(version: 2025_04_23_023631) do
     t.bigint "season_id", null: false
     t.bigint "team_season_id", null: false
     t.date "snapshot_date", null: false
-    t.string "config_bundle_name"
     t.decimal "rating", precision: 6, scale: 3
     t.decimal "adj_offensive_efficiency", precision: 6, scale: 3
     t.decimal "adj_defensive_efficiency", precision: 6, scale: 3
@@ -207,10 +222,11 @@ ActiveRecord::Schema[7.1].define(version: 2025_04_23_023631) do
     t.jsonb "stats", default: {}, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "ratings_config_version_id"
     t.index ["rating", "snapshot_date"], name: "index_team_rating_snapshots_on_rating_and_snapshot_date"
+    t.index ["ratings_config_version_id"], name: "index_team_rating_snapshots_on_ratings_config_version_id"
     t.index ["season_id"], name: "index_team_rating_snapshots_on_season_id"
     t.index ["team_id", "season_id", "snapshot_date"], name: "idx_on_team_id_season_id_snapshot_date_8de7607130"
-    t.index ["team_id", "snapshot_date", "config_bundle_name"], name: "idx_on_team_id_snapshot_date_config_bundle_name_56be545c29", unique: true
     t.index ["team_id"], name: "index_team_rating_snapshots_on_team_id"
     t.index ["team_season_id"], name: "index_team_rating_snapshots_on_team_season_id"
   end
@@ -268,7 +284,10 @@ ActiveRecord::Schema[7.1].define(version: 2025_04_23_023631) do
     t.index ["school"], name: "index_teams_on_school", unique: true
   end
 
+  add_foreign_key "predictions", "team_rating_snapshots", column: "away_team_snapshot_id"
+  add_foreign_key "predictions", "team_rating_snapshots", column: "home_team_snapshot_id"
   add_foreign_key "team_games", "team_seasons", column: "opponent_team_season_id"
+  add_foreign_key "team_rating_snapshots", "ratings_config_versions"
   add_foreign_key "team_rating_snapshots", "seasons"
   add_foreign_key "team_rating_snapshots", "team_seasons"
   add_foreign_key "team_rating_snapshots", "teams"
