@@ -27,7 +27,7 @@ module ProphetRatings
       off_stdevs = []
       def_stdevs = []
     
-      TeamSeason.includes(team_games: :game).where(season_id: @season.id).where(game: { start_time: ..@as_of }).find_each do |team_season|
+      TeamSeason.includes(team_games: :game).where(season_id: @season.id).where(game: { status: :final, start_time: ..@as_of }).find_each do |team_season|
         aggregates = calculate_average_stats(team_season)
         aggregates.merge!(calculate_efficiency_stddevs(team_season))
     

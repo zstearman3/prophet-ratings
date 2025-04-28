@@ -50,12 +50,10 @@ class Season < ApplicationRecord
   end
 
   def calculated_efficiency_deviation
-    stdev = predictions.pluck(:home_offensive_efficiency_error).stdev
-    stdev.positive? ? stdev : 12.0
+    team_seasons.average(:offensive_efficiency_std_dev)
   end
 
   def calculated_pace_deviation
-    stdev = predictions.pluck(:pace_error).stdev
-    stdev.positive? ? stdev : 10.0
+    games.map(&:pace).stdev
   end
 end

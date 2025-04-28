@@ -35,9 +35,37 @@ class Game < ApplicationRecord
   has_one :away_team, through: :away_team_game, source: :team
   has_one :home_team_season, through: :home_team_game, source: :team_season
   has_one :away_team_season, through: :away_team_game, source: :team_season
-  has_one :prediction, dependent: :destroy
+  has_many :predictions, dependent: :destroy
 
   enum status: { scheduled: 0, final: 1, canceled: 2 }
+
+  def generate_prediction!
+    return unless home_rating_snapshot && away_rating_snapshot
+
+    prediction_hash = ProphetRatings::GamePredictor.new(
+      home_rating_snapshot:, 
+      away_rating_snapshot:, 
+      neutral:, 
+      season:
+    ).call
+    
+    Prediction.find_or_initialize_by(
+      home_team_snapshot: home_rating_snapshot,
+      away_team_snapshot: away_rating_snapshot,
+      game: self,
+    ).tap do |prediction|
+      prediction.home_offensive_efficiency = prediction_hash[:meta][:home_expected_ortg]
+      prediction.away_offensive_efficiency = prediction_hash[:meta][:away_expected_ortg]
+      prediction.home_defensive_efficiency = prediction_hash[:meta][:away_expected_ortg]
+      prediction.away_defensive_efficiency = prediction_hash[:meta][:home_expected_ortg]
+      prediction.home_score = prediction_hash[:home_expected_score]
+      prediction.away_score = prediction_hash[:away_expected_score]
+      prediction.home_win_probability = prediction_hash[:win_probability_home]
+      prediction.pace = prediction_hash[:meta][:expected_pace]
+
+      prediction.save!
+    end
+  end
 
   def finalize
     final!
@@ -49,7 +77,7 @@ class Game < ApplicationRecord
     home_team_game&.calculate_game_stats
     away_team_game&.calculate_game_stats
 
-    create_prediction if prediction.blank?
+    finalize_prediction!
   end
 
   def pace
@@ -93,7 +121,25 @@ class Game < ApplicationRecord
     update(minutes: calculated_minutes)
   end
 
-  def create_prediction
+  def home_rating_snapshot
+    ratings_config_version = RatingsConfigVersion.current
+    TeamRatingSnapshot
+      .where(team_season: home_team_season, ratings_config_version: ratings_config_version)
+      .where('snapshot_date <= ?', start_time.to_date)
+      .order(snapshot_date: :desc)
+      .first
+  end
+
+  def away_rating_snapshot
+    ratings_config_version = RatingsConfigVersion.current
+    TeamRatingSnapshot
+      .where(team_season: away_team_season, ratings_config_version: ratings_config_version)
+      .where('snapshot_date <= ?', start_time.to_date)
+      .order(snapshot_date: :desc)
+      .first
+  end
+
+  def finalize_prediction!
     ratings_config_version = RatingsConfigVersion.current 
     
     home_rating_snapshot = TeamRatingSnapshot
@@ -110,14 +156,12 @@ class Game < ApplicationRecord
 
     return unless home_rating_snapshot && away_rating_snapshot
 
-    predictor = ProphetRatings::GamePredictor.new(
+    prediction_hash = ProphetRatings::GamePredictor.new(
       home_rating_snapshot:, 
       away_rating_snapshot:, 
       neutral:, 
       season:
-    )
+    ).call
     
-    predictor.call
-    predictor.save!(game: self)
   end
 end

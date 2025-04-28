@@ -54,6 +54,11 @@ class TeamRatingSnapshot < ApplicationRecord
     adj_free_throw_rate_allowed
     adj_three_pt_attempt_rate
     adj_three_pt_attempt_rate_allowed
+    offensive_efficiency_volatility
+    defensive_efficiency_volatility
+    pace_volatility
+    home_offense_boost
+    home_defense_boost
   ]
 
   STORED_STATS = %w[

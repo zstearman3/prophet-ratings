@@ -62,7 +62,14 @@ module ProphetRatings
     end
 
     def stat_value_for_game(team_game)
-      return team_game.game&.possessions if raw_stat == :possessions
+      if raw_stat == :possessions
+        game = team_game.game
+        return nil unless game
+
+        pace = (game&.possessions * 40.0) / game.minutes
+        return pace
+      end
+      
       team_game.send(raw_stat)
     end
 
@@ -120,7 +127,7 @@ module ProphetRatings
       hca_stats = Array(RATINGS_CONFIG[:home_court_adjusted_stats]).map(&:to_sym)
       home_adv = RATINGS_CONFIG[:home_court_advantage].to_f
 
-      Game.where(season: season, start_time: ..as_of).includes(:home_team_game, :away_team_game).find_each do |game|
+      Game.where(season: season, status: :final, start_time: ..as_of).includes(:home_team_game, :away_team_game).find_each do |game|
         tg1 = game.home_team_game
         tg2 = game.away_team_game
         next unless tg1 && tg2
