@@ -140,28 +140,22 @@ class Game < ApplicationRecord
   end
 
   def finalize_prediction!
-    ratings_config_version = RatingsConfigVersion.current 
-    
-    home_rating_snapshot = TeamRatingSnapshot
-      .where(team_season: home_team_season, ratings_config_version: ratings_config_version)
-      .where('snapshot_date <= ?', start_time.to_date)
-      .order(snapshot_date: :desc)
-      .first
-
-    away_rating_snapshot = TeamRatingSnapshot
-      .where(team_season: away_team_season, ratings_config_version: ratings_config_version)
-      .where('snapshot_date <= ?', start_time.to_date)
-      .order(snapshot_date: :desc)
-      .first
-
     return unless home_rating_snapshot && away_rating_snapshot
-
-    prediction_hash = ProphetRatings::GamePredictor.new(
-      home_rating_snapshot:, 
-      away_rating_snapshot:, 
-      neutral:, 
-      season:
-    ).call
     
+    prediction = Prediction.find_by(
+      home_team_snapshot: home_rating_snapshot,
+      away_team_snapshot: away_rating_snapshot,
+      game: self,
+    )
+
+    return unless prediction
+    
+    prediction.home_offensive_efficiency_error = home_team_game.offensive_efficiency - prediction.home_offensive_efficiency
+    prediction.away_offensive_efficiency_error = away_team_game.offensive_efficiency - prediction.away_offensive_efficiency
+    prediction.home_defensive_efficiency_error = away_team_game.offensive_efficiency - prediction.away_offensive_efficiency
+    prediction.away_defensive_efficiency_error = home_team_game.offensive_efficiency - prediction.home_offensive_efficiency
+    prediction.pace_error = pace - prediction.pace
+
+    prediction.save!
   end
 end
