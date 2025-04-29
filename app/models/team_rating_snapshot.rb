@@ -72,7 +72,18 @@ class TeamRatingSnapshot < ApplicationRecord
     adj_defensive_rebound_rate
     adj_three_pt_attempt_rate
     adj_three_pt_attempt_rate_allowed
+    offensive_efficiency_volatility
+    defensive_efficiency_volatility
+    pace_volatility
+    home_offense_boost
+    home_defense_boost
   ].freeze
+
+  STORED_STATS.each do |attr|
+    define_method(attr) do
+      super().to_f if super()
+    end
+  end
 
   scope :on_date, ->(date) { where(snapshot_date: date) }
   scope :for_team, ->(team_id) { where(team_id: team_id) }

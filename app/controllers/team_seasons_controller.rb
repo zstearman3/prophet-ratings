@@ -43,6 +43,9 @@ class TeamSeasonsController < ApplicationController
       free_throw_rate
       offensive_rebound_rate
       turnover_rate
+      offensive_efficiency_volatility
+      defensive_efficiency_volatility
+      pace_volatility
       offensive_efficiency_std_dev
       defensive_efficiency_std_dev
       team.school

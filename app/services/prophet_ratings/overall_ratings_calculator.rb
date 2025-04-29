@@ -28,7 +28,7 @@ module ProphetRatings
         adj_pace: @season.average_pace
       )
     
-      run_least_squares_adjustments(as_of:)
+      run_least_squares_adjustments(as_of:) if (as_of.to_date - @season.start_date) > 14
     
       TeamSeason.where(season: @season).find_each do |ts|
         ts.update!(rating: calculate_rating(ts))

@@ -28,13 +28,14 @@ module ProphetRatings
       def_stdevs = []
     
       TeamSeason
-      .includes(team_games: :game)
+      .includes(team_games: { game: :predictions })
       .where(season_id: @season.id)
       .where(game: { status: Game.statuses[:final], start_time: ..@as_of })
       .find_each do |team_season|
     
         aggregates = calculate_average_stats(team_season)
         aggregates.merge!(calculate_efficiency_stddevs(team_season))
+        aggregates.merge!(calculate_volatility(team_season))
     
         off_stdevs << aggregates[:off_efficiency_std_deviation]
         def_stdevs << aggregates[:def_efficiency_std_deviation]
@@ -83,6 +84,28 @@ module ProphetRatings
         offensive_efficiency_std_dev: StatisticsUtils.stddev(off_vals),
         defensive_efficiency_std_dev: StatisticsUtils.stddev(def_vals)
       }
-    end 
+    end
+    
+    def calculate_volatility(team_season)
+      ratings_config_version = RatingsConfigVersion.current
+
+      home_predictions = Prediction.joins(:game, :home_team_snapshot)
+        .where(home_team_snapshot: { ratings_config_version: ratings_config_version, team_season: })
+        .where(game: { start_time: ..@as_of })
+
+      away_predictions = Prediction.joins(:game, :away_team_snapshot)
+        .where(away_team_snapshot: { ratings_config_version: ratings_config_version, team_season: })
+        .where(game: { start_time: ..@as_of })
+
+      offensive_prediction_errors = home_predictions.pluck(:home_offensive_efficiency_error) + away_predictions.pluck(:away_offensive_efficiency_error)
+      defensive_prediction_errors = home_predictions.pluck(:home_defensive_efficiency_error) + away_predictions.pluck(:away_defensive_efficiency_error)
+      pace_prediction_errors = home_predictions.pluck(:pace_error) + away_predictions.pluck(:pace_error)
+
+      {
+        offensive_efficiency_volatility: StatisticsUtils.stddev(offensive_prediction_errors.compact),
+        defensive_efficiency_volatility: StatisticsUtils.stddev(defensive_prediction_errors.compact),
+        pace_volatility: StatisticsUtils.stddev(pace_prediction_errors.compact),
+      }
+    end
   end
 end
