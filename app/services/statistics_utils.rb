@@ -13,6 +13,11 @@ module StatisticsUtils
     Math.sqrt(sum_of_squares / (values.size - 1))
   end
 
+  def mae(values)
+    return nil if values.blank?
+    values.compact.map(&:abs).sum / values.compact.size.to_f
+  end
+
   def normal_cdf(x)
     # Approximation of the standard normal CDF using the error function
     0.5 * (1 + Math.erf(x / Math.sqrt(2)))

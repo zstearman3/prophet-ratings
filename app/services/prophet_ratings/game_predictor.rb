@@ -78,7 +78,7 @@ module ProphetRatings
     def away_expected_ortg
       @away_expected_ortg ||= (away_rating_snapshot.adj_offensive_efficiency - season.average_efficiency) +
         (home_rating_snapshot.adj_defensive_efficiency - season.average_efficiency) +
-        season.average_efficiency - home_defense_boost
+        season.average_efficiency + home_defense_boost
     end
 
     def home_expected_drtg
@@ -118,13 +118,17 @@ module ProphetRatings
     def home_offense_boost
       return 0 if @neutral
 
-      home_rating_snapshot&.home_offense_boost || 1.8
+      home_rating_snapshot&.home_offense_boost || default_home_boost
     end
 
     def home_defense_boost
       return 0 if @neutral
 
-      home_rating_snapshot&.home_defense_boost || 1.8
+      home_rating_snapshot&.home_defense_boost || -default_home_boost
+    end
+
+    def default_home_boost
+      @default_home_boost ||= Rails.application.config_for(:ratings).home_court_advantage
     end
 
     def home_offensive_volatility

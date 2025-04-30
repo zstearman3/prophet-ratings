@@ -35,6 +35,7 @@ group :development, :test do
   gem 'annotate'
   gem 'debug', platforms: %i[mri windows]
   gem 'factory_bot_rails'
+  gem 'gruff'
   gem 'pry'
   gem 'rspec-rails'
   gem 'rubocop'

@@ -26,6 +26,8 @@
             "Raw 3PA Rate" => { column: "three_pt_attempt_rate", default_direction: "desc" },
             "Raw ORB%" => { column: "offensive_rebound_rate", default_direction: "desc" },
             "Raw TO%" => { column: "turnover_rate", default_direction: "asc" },
+            "Home Off Boost" => { column: "home_offense_boost", default_direction: "desc" },
+            "Home Def Boost" => { column: "home_defense_boost", default_direction: "asc" },
             "Off Volatility" => { column: "offensive_efficiency_volatility", default_direction: "desc" },
             "Def Volatility" => { column: "defensive_efficiency_volatility", default_direction: "desc" },
             "Pace Volatility" => { column: "pace_volatility", default_direction: "desc" },
@@ -92,6 +94,8 @@
             <td class="px-4 py-2"><%= ts.three_pt_attempt_rate %></td>
             <td class="px-4 py-2"><%= ts.offensive_rebound_rate %></td>
             <td class="px-4 py-2"><%= ts.turnover_rate %></td>
+            <td class="px-4 py-2"><%= ts.home_offense_boost %></td>
+            <td class="px-4 py-2"><%= ts.home_defense_boost %></td>
             <td class="px-4 py-2"><%= ts.offensive_efficiency_volatility %></td>
             <td class="px-4 py-2"><%= ts.defensive_efficiency_volatility %></td>
             <td class="px-4 py-2"><%= ts.pace_volatility %></td>

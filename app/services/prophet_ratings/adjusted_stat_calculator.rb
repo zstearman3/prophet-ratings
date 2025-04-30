@@ -29,7 +29,7 @@ module ProphetRatings
       team_index = team_ids.each_with_index.to_h
       num_teams = team_ids.size
 
-      rows, b, weights = build_matrix_components(team_index, num_teams, season_avg)
+      rows, b, weights, row_metadata = build_matrix_components(team_index, num_teams, season_avg)
 
       if rows.empty?
         Rails.logger.warn("No valid rows generated for #{raw_stat}")
@@ -37,7 +37,34 @@ module ProphetRatings
       end
 
       Rails.logger.info("Solving matrix with #{rows.size} rows and #{2 * num_teams} columns...")
-      
+
+      # --- Matrix Diagnostics ---
+      b_mean = b.sum / b.size.to_f
+      b_stddev = StatisticsUtils.stddev(b)
+      Rails.logger.info("[Diagnostics] #{raw_stat}:")
+      Rails.logger.info("  → Matrix rows: #{rows.size}")
+      Rails.logger.info("  → Columns (teams x 2): #{2 * num_teams}")
+      Rails.logger.info("  → b mean: #{b_mean.round(4)}")
+      Rails.logger.info("  → b stddev: #{b_stddev.round(4)}")
+
+      # Check for NaNs or Infs safely
+      has_nan_or_inf = rows.flatten.map(&:to_f).any? { |v| v.nan? || v.infinite? } ||
+        b.map(&:to_f).any? { |v| v.nan? || v.infinite? }
+
+      if has_nan_or_inf
+        Rails.logger.error("⚠️ Matrix contains NaN or Inf values! Stat=#{raw_stat}")
+      end
+
+      extreme_b_indices = b.each_index.select { |i| b[i].abs > 15 }
+
+      extreme_b_indices.each do |i|
+        meta = row_metadata[i]
+        Rails.logger.warn(
+          "[Extreme b] index=#{i}, adjusted=#{meta[:adjusted_observed]}, team_id=#{meta[:team_id]}, game_id=#{meta[:game_id]}, "\
+          "raw=#{meta[:observed]}, home_court=#{meta[:home_court]}, possessions=#{meta[:raw_possessions]}, minutes=#{meta[:minutes]}"
+        )
+      end
+
       x_values = StatisticsUtils.solve_least_squares_with_python(rows, b, weights)
 
       team_season_map = TeamSeason.where(season: season, team_id: team_ids).index_by(&:team_id)
@@ -123,6 +150,7 @@ module ProphetRatings
       rows = []
       b = []
       weights = []
+      row_metadata = []  # Add this to collect game+team context
 
       hca_stats = Array(RATINGS_CONFIG[:home_court_adjusted_stats]).map(&:to_sym)
       home_adv = RATINGS_CONFIG[:home_court_advantage].to_f
@@ -156,16 +184,28 @@ module ProphetRatings
           rows << row
           b << adjusted_observed.to_f
           weights << GameWeightingService.new(game: off_tg, season:, as_of:).call
+
+          # ➕ Add metadata
+          row_metadata << {
+            game_id: off_tg.game_id,
+            team_id: off_tg.team_id,
+            observed: observed,
+            adjusted_observed: adjusted_observed.round(2),
+            home_court: home_court,
+            raw_possessions: off_tg.game&.possessions,
+            minutes: off_tg.game&.minutes
+          }
         end
       end
 
       anchor_weight = RATINGS_CONFIG.dig(:anchor, :weight).to_f
-      anchor_row = Array.new(2 * num_teams, 1.0)  # or only first N if anchoring just offense
+      anchor_row = Array.new(2 * num_teams, 0.0)
+      (0...num_teams).each { |i| anchor_row[i] = 1.0 }
       rows << anchor_row
       b << 0.0
       weights << anchor_weight
 
-      [rows, b, weights]
+      [rows, b, weights, row_metadata]
     end
   end
 end

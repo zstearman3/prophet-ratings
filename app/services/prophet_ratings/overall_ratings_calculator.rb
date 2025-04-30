@@ -20,13 +20,6 @@ module ProphetRatings
     def calculate_season_ratings(as_of: Time.current)
       TeamSeasonStatsAggregator.new(season: @season, as_of:).run
       @season.update_average_ratings
-
-      # Set default values for adj efficiency/pace before solving
-      TeamSeason.where(season: @season).update_all(
-        adj_offensive_efficiency: @season.average_efficiency,
-        adj_defensive_efficiency: @season.average_efficiency,
-        adj_pace: @season.average_pace
-      )
     
       run_least_squares_adjustments(as_of:) if (as_of.to_date - @season.start_date) > 14
     
@@ -44,6 +37,13 @@ module ProphetRatings
     end
 
     def run_least_squares_adjustments(as_of: nil)
+      # Set default values for adj efficiency/pace before solving
+      TeamSeason.where(season: @season).update_all(
+        adj_offensive_efficiency: @season.average_efficiency,
+        adj_defensive_efficiency: @season.average_efficiency,
+        adj_pace: @season.average_pace
+      )
+
       ADJUSTED_STATS.each do |raw_stat, (adj_stat, adj_stat_allowed)|
         ProphetRatings::AdjustedStatCalculator.new(
           season: @season,
