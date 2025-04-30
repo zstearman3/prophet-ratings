@@ -1,5 +1,5 @@
 default: &default
-  bundle_name: "v1.1-default"
+  bundle_name: "v1.2-default"
   weighting:
     recency_decay_days: 60.0
     min_recency_weight: 0.75
@@ -8,7 +8,10 @@ default: &default
   blowout:
     max_margin: 15
     cap_multiplier: 1.25
-  home_court_advantage: 3.0
+  baseline_volatility:
+    efficiency_volatility: 11.5
+    pace_volatility: 4.5
+  home_court_advantage: 2.2
   home_court_adjusted_stats:
   - offensive_efficiency
   - defensive_efficiency

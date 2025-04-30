@@ -87,18 +87,53 @@ module ProphetRatings
       }
     end
 
+    def offensive_efficiency_volatility(home_predictions, away_predictions)
+      baseline = Rails.application.config_for(:ratings).baseline_volatility[:efficiency_volatility].to_f
+      offensive_errors = home_predictions.map(&:home_offensive_efficiency_error) + away_predictions.map(&:away_offensive_efficiency_error)
+
+      return baseline if offensive_errors.size < 4
+
+      calculated_volatility = StatisticsUtils.stddev(offensive_errors.compact)
+
+      weight = [(offensive_errors.size / 16.0), 0.50].min.round(4)
+
+      (weight * calculated_volatility) + ((1.0 - weight) * baseline)
+    end
+
+    def defensive_efficiency_volatility(home_predictions, away_predictions)
+      baseline = Rails.application.config_for(:ratings).baseline_volatility[:efficiency_volatility].to_f
+      defensive_errors = home_predictions.map(&:home_defensive_efficiency_error) + away_predictions.map(&:away_defensive_efficiency_error)
+
+      return baseline if defensive_errors.size < 4
+
+      calculated_volatility = StatisticsUtils.stddev(defensive_errors.compact)
+
+      weight = [(defensive_errors.size / 16.0), 0.50].min.round(4)
+
+      (weight * calculated_volatility) + ((1.0 - weight) * baseline)
+    end
+
+    def pace_volatility(home_predictions, away_predictions)
+      baseline = Rails.application.config_for(:ratings).baseline_volatility[:pace_volatility].to_f
+      pace_errors = home_predictions.map(&:pace_error) + away_predictions.map(&:pace_error)
+
+      return baseline if pace_errors.size < 4
+
+      calculated_volatility = StatisticsUtils.stddev(pace_errors.compact)
+
+      weight = [(pace_errors.size / 16.0), 0.50].min.round(4)
+
+      (weight * calculated_volatility) + ((1.0 - weight) * baseline)
+    end
+
     def calculate_volatility(team_season)
       home_preds = home_preds_by_season[team_season.id] || []
       away_preds = away_preds_by_season[team_season.id] || []
 
-      offensive_errors = home_preds.map(&:home_offensive_efficiency_error) + away_preds.map(&:away_offensive_efficiency_error)
-      defensive_errors = home_preds.map(&:home_defensive_efficiency_error) + away_preds.map(&:away_defensive_efficiency_error)
-      pace_errors = home_preds.map(&:pace_error) + away_preds.map(&:pace_error)
-
       {
-        offensive_efficiency_volatility: StatisticsUtils.stddev(offensive_errors.compact),
-        defensive_efficiency_volatility: StatisticsUtils.stddev(defensive_errors.compact),
-        pace_volatility: StatisticsUtils.stddev(pace_errors.compact)
+        offensive_efficiency_volatility: offensive_efficiency_volatility(home_preds, away_preds),
+        defensive_efficiency_volatility: defensive_efficiency_volatility(home_preds, away_preds),
+        pace_volatility: pace_volatility(home_preds, away_preds)
       }
     end
 
