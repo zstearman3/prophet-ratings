@@ -64,7 +64,7 @@
 
 require 'rails_helper'
 
-RSpec.describe TeamGame, type: :model do
+RSpec.describe TeamGame do
   describe '#calculate_game_stats' do
     let(:team) { create(:team) }
     let(:season) { create(:season) }
@@ -126,7 +126,7 @@ RSpec.describe TeamGame, type: :model do
 
       possessions = expected_possessions(fga:, orb:, tov:, fta:)
       expected_tov_rate = expected_turnover_rate(tov:, possessions:)
-      
+
       expect(team_game.turnover_rate).to be_within(0.001).of(expected_tov_rate)
     end
   end

@@ -73,7 +73,7 @@
           <% row_class = i.even? ? 'bg-white' : 'bg-gray-50' %>
           <tr class="odd:bg-white even:bg-gray-50 border-b">
             <td class="px-4 py-2 sticky left-0 z-10 <%= row_class %>"><%= i + 1 %></td>
-            <td class="px-4 py-2 sticky left-[60px] z-10 <%= row_class %>"><%= ts.team.school %></td>
+            <td class="px-4 py-2 sticky left-[60px] z-10 <%= row_class %>"><%= link_to ts.team.school, ts.team, data: { turbo: false }  %></td>
             <td class="px-4 py-2"><%= ts.rating %></td>
             <td class="px-4 py-2"><%= ts.adj_offensive_efficiency %></td>
             <td class="px-4 py-2"><%= ts.adj_defensive_efficiency %></td>

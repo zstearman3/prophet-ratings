@@ -4,13 +4,14 @@ class TeamSeasonsController < ApplicationController
   before_action :set_season
 
   def ratings
-    sort_column = permitted_sort_columns.include?(params[:sort]) ? params[:sort] : "rating"
-    direction = %w[asc desc].include?(params[:direction]) ? params[:direction] : "desc"
+    sort_column = permitted_sort_columns.include?(params[:sort]) ? params[:sort] : 'rating'
+    direction = %w[asc desc].include?(params[:direction]) ? params[:direction] : 'desc'
 
     @team_seasons = TeamSeason
-      .includes(:team)
-      .where(season: @season)
-      .order("#{sort_column} #{direction}")  end
+                    .includes(:team)
+                    .where(season: @season)
+                    .order("#{sort_column} #{direction}")
+  end
 
   private
 

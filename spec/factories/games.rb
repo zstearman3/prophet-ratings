@@ -28,7 +28,7 @@ FactoryBot.define do
   factory :game do
     sequence(:url) { |n| "https://example.com/game/#{n}" }
     start_time { Time.zone.now }
-    association :season
+    season
     status { :final }
     home_team_name { 'Home Team' }
     away_team_name { 'Away Team' }

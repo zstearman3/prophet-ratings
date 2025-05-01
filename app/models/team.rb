@@ -36,6 +36,10 @@ class Team < ApplicationRecord
 
   scope :missing_secondary_name, -> { includes(:team_games).where(team_games: { id: nil }, secondary_name: nil) }
 
+  def to_param
+    school.parameterize
+  end
+
   # Not ideal but until enough data will help determine if a game is neutral
   def probable_home_venue
     arr = home_games.order(start_time: :desc).pluck(:location).first(5)
@@ -43,6 +47,6 @@ class Team < ApplicationRecord
   end
 
   def self.search(name)
-    find_by("LOWER(school) = ? OR LOWER(secondary_name) = ?", name.downcase, name.downcase)
+    find_by('LOWER(school) = ? OR LOWER(secondary_name) = ?', name.downcase, name.downcase)
   end
 end

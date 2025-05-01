@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'rails_helper'
 
 RSpec.describe ProphetRatings::AdjustedStatCalculator, type: :service do
@@ -13,7 +15,7 @@ RSpec.describe ProphetRatings::AdjustedStatCalculator, type: :service do
       allow_any_instance_of(described_class).to receive(:average_stat_for_season).and_return(0.50)
 
       described_class.new(
-        season: season,
+        season:,
         raw_stat: :effective_fg_percentage,
         adj_stat: :adj_effective_fg_percentage,
         adj_stat_allowed: :adj_effective_fg_percentage_allowed

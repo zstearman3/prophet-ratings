@@ -14,7 +14,7 @@ module ProphetRatings
     end
 
     def call
-      @prediction_hash ||= build_prediction_hash
+      @call ||= build_prediction_hash
     end
 
     def simulated_scores
@@ -33,20 +33,20 @@ module ProphetRatings
 
     def build_prediction_hash
       margin = (home_expected_score - away_expected_score).round(2)
-    
+
       home_volatility = total_home_volatility
       away_volatility = total_away_volatility
       volatility_gap = (home_volatility - away_volatility).abs
-    
+
       confidence_level =
         if volatility_gap < CONFIDENCE_LEVELS[:high_max]
-          "High"
+          'High'
         elsif volatility_gap < CONFIDENCE_LEVELS[:medium_max]
-          "Medium"
+          'Medium'
         else
-          "Low"
+          'Low'
         end
-    
+
       {
         home_team: @home_rating_snapshot.team.school,
         away_team: @away_rating_snapshot.team.school,
@@ -54,8 +54,8 @@ module ProphetRatings
         away_expected_score:,
         expected_margin: margin,
         win_probability_home:,
-        confidence_level: confidence_level,
-        explanation: "Based on adjusted efficiencies, expected pace, and volatility, " \
+        confidence_level:,
+        explanation: 'Based on adjusted efficiencies, expected pace, and volatility, ' \
                      "#{favorite} is favored by #{margin.abs} points.",
         meta: {
           expected_pace: expected_pace.round(2),
@@ -71,14 +71,14 @@ module ProphetRatings
 
     def home_expected_ortg
       @home_expected_ortg ||= (home_rating_snapshot.adj_offensive_efficiency - season.average_efficiency) +
-        (away_rating_snapshot.adj_defensive_efficiency - season.average_efficiency) +
-        season.average_efficiency + home_offense_boost
+                              (away_rating_snapshot.adj_defensive_efficiency - season.average_efficiency) +
+                              season.average_efficiency + home_offense_boost
     end
 
     def away_expected_ortg
       @away_expected_ortg ||= (away_rating_snapshot.adj_offensive_efficiency - season.average_efficiency) +
-        (home_rating_snapshot.adj_defensive_efficiency - season.average_efficiency) +
-        season.average_efficiency + home_defense_boost
+                              (home_rating_snapshot.adj_defensive_efficiency - season.average_efficiency) +
+                              season.average_efficiency + home_defense_boost
     end
 
     def home_expected_drtg
@@ -105,11 +105,11 @@ module ProphetRatings
 
     def win_probability_home
       score_diff = home_expected_score - away_expected_score
-      volatility = Math.sqrt(total_home_volatility**2 + total_away_volatility**2)
+      volatility = Math.sqrt((total_home_volatility**2) + (total_away_volatility**2))
       probability = StatisticsUtils.normal_cdf(score_diff / volatility)
       probability.round(4)
-    end    
-    
+    end
+
     def favorite
       favored_team_season = home_expected_score > away_expected_score ? home_rating_snapshot : away_rating_snapshot
       favored_team_season.team.school
@@ -164,7 +164,7 @@ module ProphetRatings
     end
 
     def total_pace_volatility
-      Math.sqrt(home_pace_volatility**2 + away_pace_volatility**2)
+      Math.sqrt((home_pace_volatility**2) + (away_pace_volatility**2))
     end
   end
 end

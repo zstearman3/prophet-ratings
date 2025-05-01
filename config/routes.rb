@@ -14,5 +14,7 @@ Rails.application.routes.draw do
 
   get 'game_prediction', to: "predictions#game"
   get 'game_simulation', to: "simulations#game"
-  get 'games', to: "games#index"
+  resources :games, only: [:index, :show]
+
+  resources :teams, param: :school, only: [:index, :show]
 end

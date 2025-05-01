@@ -43,16 +43,16 @@ class Game < ApplicationRecord
     return unless home_rating_snapshot && away_rating_snapshot
 
     prediction_hash = ProphetRatings::GamePredictor.new(
-      home_rating_snapshot:, 
-      away_rating_snapshot:, 
-      neutral:, 
+      home_rating_snapshot:,
+      away_rating_snapshot:,
+      neutral:,
       season:
     ).call
-    
+
     Prediction.find_or_initialize_by(
       home_team_snapshot: home_rating_snapshot,
       away_team_snapshot: away_rating_snapshot,
-      game: self,
+      game: self
     ).tap do |prediction|
       prediction.home_offensive_efficiency = prediction_hash[:meta][:home_expected_ortg]
       prediction.away_offensive_efficiency = prediction_hash[:meta][:away_expected_ortg]
@@ -69,15 +69,15 @@ class Game < ApplicationRecord
 
   def finalize_prediction!
     return unless home_rating_snapshot && away_rating_snapshot
-    
+
     prediction = Prediction.find_by(
       home_team_snapshot: home_rating_snapshot,
       away_team_snapshot: away_rating_snapshot,
-      game: self,
+      game: self
     )
 
     return unless prediction
-    
+
     prediction.home_offensive_efficiency_error = home_team_game.offensive_efficiency - prediction.home_offensive_efficiency
     prediction.away_offensive_efficiency_error = away_team_game.offensive_efficiency - prediction.away_offensive_efficiency
     prediction.home_defensive_efficiency_error = away_team_game.offensive_efficiency - prediction.away_offensive_efficiency
@@ -98,6 +98,14 @@ class Game < ApplicationRecord
     away_team_game&.calculate_game_stats
 
     finalize_prediction!
+  end
+
+  def current_prediction
+    Prediction.find_by(
+      home_team_snapshot: home_rating_snapshot,
+      away_team_snapshot: away_rating_snapshot,
+      game: self
+    )
   end
 
   def pace
@@ -144,7 +152,7 @@ class Game < ApplicationRecord
   def home_rating_snapshot
     ratings_config_version = RatingsConfigVersion.current
     TeamRatingSnapshot
-      .where(team_season: home_team_season, ratings_config_version: ratings_config_version)
+      .where(team_season: home_team_season, ratings_config_version:)
       .where('snapshot_date <= ?', start_time.to_date)
       .order(snapshot_date: :desc)
       .first
@@ -153,7 +161,7 @@ class Game < ApplicationRecord
   def away_rating_snapshot
     ratings_config_version = RatingsConfigVersion.current
     TeamRatingSnapshot
-      .where(team_season: away_team_season, ratings_config_version: ratings_config_version)
+      .where(team_season: away_team_season, ratings_config_version:)
       .where('snapshot_date <= ?', start_time.to_date)
       .order(snapshot_date: :desc)
       .first

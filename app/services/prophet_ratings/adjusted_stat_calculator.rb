@@ -20,10 +20,10 @@ module ProphetRatings
 
       # Preload only teams with at least 2 games
       qualified_team_seasons = TeamSeason
-        .includes(team_games: :game)
-        .where(season: season)
-        .select { |ts| ts.team_games.size >= 2 }
-        .sort_by(&:team_id)
+                               .includes(team_games: :game)
+                               .where(season:)
+                               .select { |ts| ts.team_games.size >= 2 }
+                               .sort_by(&:team_id)
 
       team_ids = qualified_team_seasons.map(&:team_id)
       team_index = team_ids.each_with_index.to_h
@@ -49,25 +49,23 @@ module ProphetRatings
 
       # Check for NaNs or Infs safely
       has_nan_or_inf = rows.flatten.map(&:to_f).any? { |v| v.nan? || v.infinite? } ||
-        b.map(&:to_f).any? { |v| v.nan? || v.infinite? }
+                       b.map(&:to_f).any? { |v| v.nan? || v.infinite? }
 
-      if has_nan_or_inf
-        Rails.logger.error("⚠️ Matrix contains NaN or Inf values! Stat=#{raw_stat}")
-      end
+      Rails.logger.error("⚠️ Matrix contains NaN or Inf values! Stat=#{raw_stat}") if has_nan_or_inf
 
       extreme_b_indices = b.each_index.select { |i| b[i].abs > 15 }
 
       extreme_b_indices.each do |i|
         meta = row_metadata[i]
         Rails.logger.warn(
-          "[Extreme b] index=#{i}, adjusted=#{meta[:adjusted_observed]}, team_id=#{meta[:team_id]}, game_id=#{meta[:game_id]}, "\
+          "[Extreme b] index=#{i}, adjusted=#{meta[:adjusted_observed]}, team_id=#{meta[:team_id]}, game_id=#{meta[:game_id]}, " \
           "raw=#{meta[:observed]}, home_court=#{meta[:home_court]}, possessions=#{meta[:raw_possessions]}, minutes=#{meta[:minutes]}"
         )
       end
 
       x_values = StatisticsUtils.solve_least_squares_with_python(rows, b, weights)
 
-      team_season_map = TeamSeason.where(season: season, team_id: team_ids).index_by(&:team_id)
+      team_season_map = TeamSeason.where(season:, team_id: team_ids).index_by(&:team_id)
       team_ids.each_with_index do |team_id, idx|
         ts = team_season_map[team_id]
         next unless ts
@@ -93,10 +91,10 @@ module ProphetRatings
         game = team_game.game
         return nil unless game
 
-        pace = (game&.possessions * 40.0) / game.minutes
+        pace = (game&.possessions&.* 40.0) / game.minutes
         return pace
       end
-      
+
       team_game.send(raw_stat)
     end
 
@@ -106,15 +104,16 @@ module ProphetRatings
       margin_cap = RATINGS_CONFIG[:blowout][:max_margin]
       multiplier = config[:cap_multiplier].to_f
       margin = if team_game.opponent_team_game&.points && team_game.points
-        (team_game.points - team_game.opponent_team_game.points).abs
-      else
-        0
-      end
+                 (team_game.points - team_game.opponent_team_game.points).abs
+               else
+                 0
+               end
       Math.tanh(multiplier * margin / margin_cap)
     end
 
     def blend_with_preseason(preseason_value, observed_value)
-      return observed_value unless preseason_value.present?
+      return observed_value if preseason_value.blank?
+
       weight = preseason_weight
       (weight * preseason_value) + ((1 - weight) * observed_value)
     end
@@ -150,12 +149,12 @@ module ProphetRatings
       rows = []
       b = []
       weights = []
-      row_metadata = []  # Add this to collect game+team context
+      row_metadata = [] # Add this to collect game+team context
 
       hca_stats = Array(RATINGS_CONFIG[:home_court_adjusted_stats]).map(&:to_sym)
       home_adv = RATINGS_CONFIG[:home_court_advantage].to_f
 
-      Game.where(season: season, status: :final, start_time: ..as_of).includes(:home_team_game, :away_team_game).find_each do |game|
+      Game.where(season:, status: :final, start_time: ..as_of).includes(:home_team_game, :away_team_game).find_each do |game|
         tg1 = game.home_team_game
         tg2 = game.away_team_game
         next unless tg1 && tg2
@@ -163,17 +162,17 @@ module ProphetRatings
 
         apply_home_court = hca_stats.include?(raw_stat) && !game.neutral
 
-        [ [tg1, tg2], [tg2, tg1] ].each do |off_tg, def_tg|
+        [[tg1, tg2], [tg2, tg1]].each do |off_tg, def_tg|
           observed = stat_value_for_game(off_tg)
-          next unless observed.present?
+          next if observed.blank?
 
           observed *= blowout_dampening(off_tg)
 
           home_court = if apply_home_court
-             tg1 == off_tg ? home_adv : -home_adv
-          else
-            0.0
-          end
+                         tg1 == off_tg ? home_adv : -home_adv
+                       else
+                         0.0
+                       end
 
           adjusted_observed = observed - home_court - season_avg
 
@@ -189,9 +188,9 @@ module ProphetRatings
           row_metadata << {
             game_id: off_tg.game_id,
             team_id: off_tg.team_id,
-            observed: observed,
+            observed:,
             adjusted_observed: adjusted_observed.round(2),
-            home_court: home_court,
+            home_court:,
             raw_possessions: off_tg.game&.possessions,
             minutes: off_tg.game&.minutes
           }

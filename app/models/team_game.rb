@@ -78,7 +78,7 @@ class TeamGame < ApplicationRecord
                               .where.not(id: g.id)
                           }, class_name: 'TeamGame'
   # rubocop:enable Rails/HasManyOrHasOneDependent, Rails/InverseOf
-  # 
+  #
   ## Alias for naming consistency in analytics
   alias_attribute :offensive_efficiency, :offensive_rating
   alias_attribute :defensive_efficiency, :defensive_rating

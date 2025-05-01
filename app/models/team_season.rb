@@ -51,9 +51,33 @@
 #  index_team_seasons_on_team_id_and_season_id  (team_id,season_id) UNIQUE
 #
 class TeamSeason < ApplicationRecord
-  belongs_to :season
   belongs_to :team
-
+  belongs_to :season
   has_many :team_games, dependent: :destroy
   has_many :games, through: :team_games
+  has_many :team_rating_snapshots, dependent: :destroy
+  has_many :predictions, through: :team_rating_snapshots
+  has_many :season_ratings, dependent: :destroy
+
+  def rank(as_of: nil)
+    bundle_name = Rails.application.config_for(:ratings).bundle_name
+    config = RatingsConfigVersion.find_by(name: bundle_name)
+
+    snapshot_scope = TeamRatingSnapshot
+                     .where(ratings_config_version: config)
+                     .order(:team_season_id, snapshot_date: :desc)
+
+    snapshot_scope = snapshot_scope.where('snapshot_date <= ?', as_of) if as_of.present?
+
+    # DISTINCT ON requires ordering by the same column(s)
+    snapshots = snapshot_scope
+                .select('DISTINCT ON (team_season_id) *')
+                .to_a
+
+    sorted = snapshots.sort_by { |s| [-s.rating, s.team_season_id] }
+
+    index = sorted.find_index { |s| s.team_season_id == id }
+
+    index ? index + 1 : nil
+  end
 end

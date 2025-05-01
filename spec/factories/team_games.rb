@@ -63,9 +63,9 @@
 #
 FactoryBot.define do
   factory :team_game do
-    association :team
-    association :team_season
-    association :game
+    team
+    team_season
+    game
     home { false }
     minutes { 200 }
   end

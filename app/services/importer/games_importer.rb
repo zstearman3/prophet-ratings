@@ -13,12 +13,12 @@ module Importer
 
       def find_or_create_team_game(game, team_season, home:)
         return nil unless team_season&.team
-      
+
         TeamGame.find_or_create_by!(
-          game: game,
+          game:,
           team: team_season.team,
-          team_season: team_season,
-          home: home
+          team_season:,
+          home:
         )
       end
 
@@ -36,14 +36,12 @@ module Importer
 
         home_team_name = row[:home_team]
         away_team_name = row[:away_team]
-        
+
         home_team = Team.search(home_team_name)
         away_team = Team.search(away_team_name)
 
-        if !home_team || !away_team
-          Rails.logger.info("Partial team match: #{home_team_name} vs #{away_team_name} on #{row[:date]}")
-        end
-                
+        Rails.logger.info("Partial team match: #{home_team_name} vs #{away_team_name} on #{row[:date]}") if !home_team || !away_team
+
         home_team_season = home_team ? TeamSeason.find_by(season:, team: home_team) : nil
         away_team_season = away_team ? TeamSeason.find_by(season:, team: away_team) : nil
 
@@ -64,7 +62,7 @@ module Importer
         if (home_game = find_or_create_team_game(game, home_team_season, home: true))
           process_team_game(home_game, row[:home_team_stats], home_team_season, away_team_season)
         end
-      
+
         if (away_game = find_or_create_team_game(game, away_team_season, home: false))
           process_team_game(away_game, row[:away_team_stats], away_team_season, home_team_season)
         end

@@ -21,7 +21,7 @@ module Scraper
 
     def game_count
       sleep(SLEEP_COUNT)
-      
+
       response = HTTParty.get(schedule_url(@date))
       Nokogiri::HTML(response.body)
 
@@ -58,13 +58,13 @@ module Scraper
 
       response = HTTParty.get(schedule_url(@date))
       document = Nokogiri::HTML(response.body)
-    
+
       urls = document.css('div.game_summaries div.gender-m').filter_map do |game_div|
-        team_names = game_div.css('table.teams tr td:first-child a').map(&:text).compact
-    
+        team_names = game_div.css('table.teams tr td:first-child a').filter_map(&:text)
+
         # Only keep games where both teams are matched in the database
         next unless team_names.include?(team.school) || team_names.include?(team.secondary_name)
-    
+
         # Extract the actual game link
         gamelink = game_div.at_css('td.gamelink a')
         gamelink&.attribute('href')&.value

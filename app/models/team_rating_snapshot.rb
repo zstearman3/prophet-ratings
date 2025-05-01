@@ -41,7 +41,7 @@ class TeamRatingSnapshot < ApplicationRecord
   belongs_to :ratings_config_version
 
   validates :snapshot_date, presence: true
-  validates :team_id, uniqueness: { scope: [:season_id, :snapshot_date, :ratings_config_version] }
+  validates :team_id, uniqueness: { scope: %i[season_id snapshot_date ratings_config_version] }
 
   store_accessor :stats, *%i[
     adj_effective_fg_percentage
@@ -81,16 +81,16 @@ class TeamRatingSnapshot < ApplicationRecord
 
   STORED_STATS.each do |attr|
     define_method(attr) do
-      super().to_f if super()
+      super()&.to_f
     end
   end
 
   scope :on_date, ->(date) { where(snapshot_date: date) }
-  scope :for_team, ->(team_id) { where(team_id: team_id) }
-  scope :for_season, ->(season_id) { where(season_id: season_id) }
+  scope :for_team, ->(team_id) { where(team_id:) }
+  scope :for_season, ->(season_id) { where(season_id:) }
 
   def self.latest_for_season(season_id)
-    where(season_id: season_id)
+    where(season_id:)
       .where(snapshot_date: maximum(:snapshot_date))
   end
 end

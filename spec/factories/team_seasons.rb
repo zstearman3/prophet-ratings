@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # == Schema Information
 #
 # Table name: team_seasons
@@ -50,7 +52,7 @@
 #
 FactoryBot.define do
   factory :team_season do
-    association :team
-    association :season
+    team
+    season
   end
 end

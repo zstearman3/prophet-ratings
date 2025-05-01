@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # app/services/prophet_ratings/game_weighting_service.rb
 module ProphetRatings
   class GameWeightingService

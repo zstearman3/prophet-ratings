@@ -8,9 +8,10 @@ module ProphetRatings
     ].freeze
 
     DERIVED_STATS = {
-      effective_fg_percentage: ->(fgm:, fga:, three_pm:) {
+      effective_fg_percentage: lambda { |fgm:, fga:, three_pm:|
         return nil if fga.zero?
-        (fgm + 0.5 * three_pm) / fga.to_f
+
+        (fgm + (0.5 * three_pm)) / fga.to_f
       }
     }.freeze
 
@@ -26,7 +27,6 @@ module ProphetRatings
         .where(season_id: @season.id)
         .where(game: { status: Game.statuses[:final], start_time: ..@as_of })
         .find_each do |team_season|
-
         aggregates = calculate_average_stats(team_season)
         aggregates.merge!(calculate_efficiency_stddevs(team_season))
         aggregates.merge!(calculate_volatility(team_season))
@@ -42,44 +42,44 @@ module ProphetRatings
 
     def preload_predictions
       predictions = Prediction
-        .joins(:game)
-        .where(game: { start_time: ..as_of })
-        .includes(:home_team_snapshot, :away_team_snapshot)
-        .to_a
+                    .joins(:game)
+                    .where(game: { start_time: ..as_of })
+                    .includes(:home_team_snapshot, :away_team_snapshot)
+                    .to_a
 
       @home_preds_by_season = predictions
-        .select { |p| p.home_team_snapshot&.team_season_id }
-        .group_by { |p| p.home_team_snapshot.team_season_id }
+                              .select { |p| p.home_team_snapshot&.team_season_id }
+                              .group_by { |p| p.home_team_snapshot.team_season_id }
 
       @away_preds_by_season = predictions
-        .select { |p| p.away_team_snapshot&.team_season_id }
-        .group_by { |p| p.away_team_snapshot.team_season_id }
+                              .select { |p| p.away_team_snapshot&.team_season_id }
+                              .group_by { |p| p.away_team_snapshot.team_season_id }
     end
 
     def calculate_average_stats(team_season)
       aggregates = {}
 
       AVERAGE_STATS.each do |stat|
-        values = team_season.team_games.map { |g| g.send(stat) }.compact
+        values = team_season.team_games.filter_map { |g| g.send(stat) }
         avg = values.sum / values.size.to_f if values.any?
         aggregates[stat] = avg
       end
 
-      possession_vals = team_season.team_games.map { |g| g.game&.possessions }.compact
+      possession_vals = team_season.team_games.filter_map { |g| g.game&.possessions }
       aggregates[:pace] = possession_vals.sum / possession_vals.size.to_f if possession_vals.any?
 
       fgm = team_season.team_games.sum(&:field_goals_made)
       fga = team_season.team_games.sum(&:field_goals_attempted)
       three_pm = team_season.team_games.sum(&:three_pt_made)
 
-      aggregates[:effective_fg_percentage] = DERIVED_STATS[:effective_fg_percentage].call(fgm: fgm, fga: fga, three_pm: three_pm)
+      aggregates[:effective_fg_percentage] = DERIVED_STATS[:effective_fg_percentage].call(fgm:, fga:, three_pm:)
 
       aggregates
     end
 
     def calculate_efficiency_stddevs(team_season)
-      off_vals = team_season.team_games.map(&:offensive_efficiency).compact
-      def_vals = team_season.team_games.map(&:defensive_efficiency).compact
+      off_vals = team_season.team_games.filter_map(&:offensive_efficiency)
+      def_vals = team_season.team_games.filter_map(&:defensive_efficiency)
 
       {
         offensive_efficiency_std_dev: StatisticsUtils.stddev(off_vals),
@@ -139,11 +139,11 @@ module ProphetRatings
 
     def calculate_home_advantages(team_season)
       baseline = Rails.application.config_for(:ratings).home_court_advantage.to_f
-      home_preds = (home_preds_by_season[team_season.id] || []).select { |p| !p.game.neutral? }
+      home_preds = (home_preds_by_season[team_season.id] || []).reject { |p| p.game.neutral? }
       return { home_offense_boost: baseline, home_defense_boost: -baseline } if home_preds.empty?
 
-      off_deltas = home_preds.map(&:home_offensive_efficiency_error).compact
-      def_deltas = home_preds.map(&:home_defensive_efficiency_error).compact
+      off_deltas = home_preds.filter_map(&:home_offensive_efficiency_error)
+      def_deltas = home_preds.filter_map(&:home_defensive_efficiency_error)
 
       avg_off = StatisticsUtils.average(off_deltas)
       avg_def = StatisticsUtils.average(def_deltas)
