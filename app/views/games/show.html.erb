@@ -188,7 +188,7 @@
                 </div>
                 <div class="flex justify-between">
                   <span class="text-gray-600">Win Probability:</span>
-                  <span class="font-medium"><%= @prediction.favorite_win_probability.round(1) * 100 %>%</span>
+                  <span class="font-medium"><%= @prediction.favorite_win_probability.round(3) * 100.0 %>%</span>
                 </div>
                 <div class="flex justify-between">
                   <span class="text-gray-600">Predicted Score:</span>

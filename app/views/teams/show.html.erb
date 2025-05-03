@@ -51,6 +51,7 @@
             <% @team_games.each do |tg| %>
               <% game = tg.game %>
               <% opponent_game = tg.home? ? game.away_team_game : game.home_team_game %>
+              <% next unless game && opponent_game %>
               <% opponent = opponent_game.team %>
               <tr>
                 <td class="px-6 py-4 whitespace-nowrap">

@@ -53,11 +53,11 @@ class Prediction < ApplicationRecord
   end
 
   def win_probability_for_team(team_id)
-    home_team_snapshot.team_id == team_id ? home_win_probability : (1 - home_win_probability)
+    home_team_snapshot.team_id == team_id ? home_win_probability : (1.0 - home_win_probability)
   end
 
   def favorite_win_probability
-    home_score > away_score ? home_win_probability : (1 - home_win_probability)
+    home_score > away_score ? home_win_probability : (1.0 - home_win_probability)
   end
 
   def total
