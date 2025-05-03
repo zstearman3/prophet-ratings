@@ -12,6 +12,7 @@ Rails.application.routes.draw do
 
   root "team_seasons#ratings"
 
+  get 'game_tool', to: "games#game_tool"
   get 'game_prediction', to: "predictions#game"
   get 'game_simulation', to: "simulations#game"
   resources :games, only: [:index, :show]

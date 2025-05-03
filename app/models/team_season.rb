@@ -59,6 +59,8 @@ class TeamSeason < ApplicationRecord
   has_many :predictions, through: :team_rating_snapshots
   has_many :season_ratings, dependent: :destroy
 
+  scope :current, -> { where(season: Season.current) }
+
   def rank(as_of: nil)
     bundle_name = Rails.application.config_for(:ratings).bundle_name
     config = RatingsConfigVersion.find_by(name: bundle_name)
@@ -70,9 +72,7 @@ class TeamSeason < ApplicationRecord
     snapshot_scope = snapshot_scope.where('snapshot_date <= ?', as_of) if as_of.present?
 
     # DISTINCT ON requires ordering by the same column(s)
-    snapshots = snapshot_scope
-                .select('DISTINCT ON (team_season_id) *')
-                .to_a
+    snapshots = snapshot_scope.select('DISTINCT ON (team_season_id) *').to_a
 
     sorted = snapshots.sort_by { |s| [-s.rating, s.team_season_id] }
 
