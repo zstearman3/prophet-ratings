@@ -12,6 +12,8 @@ class TeamsController < ApplicationController
                              .where(ratings_config_version: @config)
                              .order(:snapshot_date)
 
+    @chart_data = @snapshots.map { |s| [s.snapshot_date, s.rating] }
+
     @team_games = @team_season.team_games
                               .includes(
                                 game: [
@@ -24,22 +26,25 @@ class TeamsController < ApplicationController
                               )
                               .order('games.start_time')
 
-    # For in-memory prediction matching (config-aware)
-    snapshot_scope = TeamRatingSnapshot
-                     .where(ratings_config_version: @config)
-                     .where(team_season: @team_games.map(&:game).flat_map { |g| [g.home_team_season, g.away_team_season] }.uniq)
-                     .where('snapshot_date <= ?', @team_games.map(&:game).map(&:start_time).max.to_date)
+    @snapshot_lookup = TeamRatingSnapshot
+      .where(ratings_config_version: @config)
+      .where(team_season_id: @team_games.map(&:game).flat_map { |g| [g.home_team_season.id, g.away_team_season.id] }.uniq)
+      .where('snapshot_date <= ?', @team_games.map(&:game).map(&:start_time).max.to_date)
+      .group_by(&:team_season_id)
 
-    @snapshot_lookup = snapshot_scope.group_by(&:team_season_id)
+      @predictions_by_game = {}
 
-    # Compute current rank (optional)
-    latest_snapshot = @snapshots.last
-    @rank = if latest_snapshot
-              TeamRatingSnapshot
-                .where(snapshot_date: latest_snapshot.snapshot_date, ratings_config_version: @config)
-                .order(rating: :desc)
-                .pluck(:team_season_id)
-                .index(@team_season.id) + 1
-            end
+    @team_games.each do |tg|
+      game = tg.game
+    
+      latest_snapshot_date = @snapshots.last&.snapshot_date
+      next unless latest_snapshot_date
+    
+      prediction = game.predictions.find do |p|
+          p.home_team_snapshot.ratings_config_version_id == @config.id
+      end
+    
+      @predictions_by_game[game.id] = prediction
+    end
   end
 end

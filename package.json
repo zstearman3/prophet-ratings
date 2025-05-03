@@ -4,6 +4,9 @@
   "dependencies": {
     "@hotwired/stimulus": "^3.2.2",
     "@hotwired/turbo-rails": "^7.3.0",
+    "chart.js": "^4.4.9",
+    "chartjs-adapter-date-fns": "^3.0.0",
+    "chartkick": "^5.0.1",
     "esbuild": "^0.19.12",
     "sass": "^1.70.0"
   },

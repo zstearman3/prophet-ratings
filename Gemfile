@@ -3,9 +3,11 @@
 source 'https://rubygems.org'
 
 ruby '3.2.2'
+gem 'chartkick'
 gem 'cssbundling-rails'
 gem 'enumerable-statistics'
 gem 'good_job', '~> 3.23'
+gem 'groupdate'
 gem 'httparty'
 gem 'jbuilder'
 gem 'jsbundling-rails'
