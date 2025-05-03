@@ -87,6 +87,7 @@ class TeamGame < ApplicationRecord
     update(
       two_pt_percentage: calculated_two_pt_percentage,
       three_pt_percentage: calculated_three_pt_percentage,
+      field_goals_percentage: calculated_field_goals_percentage,
       free_throws_percentage: calculated_free_throws_percentage,
       true_shooting_percentage: calculated_true_shooting_percentage,
       effective_fg_percentage: calculated_effective_fg_percentage,

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2025_04_28_124337) do
+ActiveRecord::Schema[7.1].define(version: 2025_05_03_030859) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -284,7 +284,9 @@ ActiveRecord::Schema[7.1].define(version: 2025_04_28_124337) do
     t.datetime "updated_at", null: false
     t.string "secondary_name"
     t.string "home_venue"
+    t.string "slug"
     t.index ["school"], name: "index_teams_on_school", unique: true
+    t.index ["slug"], name: "index_teams_on_slug", unique: true
   end
 
   add_foreign_key "predictions", "team_rating_snapshots", column: "away_team_snapshot_id"

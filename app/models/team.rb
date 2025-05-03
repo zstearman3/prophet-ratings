@@ -10,6 +10,7 @@
 #  nickname       :string
 #  school         :string
 #  secondary_name :string
+#  slug           :string
 #  url            :string
 #  created_at     :datetime         not null
 #  updated_at     :datetime         not null
@@ -17,10 +18,14 @@
 # Indexes
 #
 #  index_teams_on_school  (school) UNIQUE
+#  index_teams_on_slug    (slug) UNIQUE
 #
 class Team < ApplicationRecord
   validates :school, presence: true, uniqueness: true
   validates :url, presence: true
+  validates :slug, presence: true, uniqueness: true
+
+  before_validation :set_slug, on: :create
 
   has_many :team_seasons, dependent: :destroy
   has_many :team_games, dependent: :destroy
@@ -37,16 +42,18 @@ class Team < ApplicationRecord
   scope :missing_secondary_name, -> { includes(:team_games).where(team_games: { id: nil }, secondary_name: nil) }
 
   def to_param
-    school.parameterize
+    slug
+  end
+
+  private
+
+  def set_slug
+    self.slug = school.parameterize
   end
 
   # Not ideal but until enough data will help determine if a game is neutral
   def probable_home_venue
     arr = home_games.order(start_time: :desc).pluck(:location).first(5)
     arr.max_by { |i| arr.count(i) }
-  end
-
-  def self.search(name)
-    find_by('LOWER(school) = ? OR LOWER(secondary_name) = ?', name.downcase, name.downcase)
   end
 end

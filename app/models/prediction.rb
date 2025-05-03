@@ -48,6 +48,41 @@ class Prediction < ApplicationRecord
   validates :game, uniqueness: { scope: %i[home_team_snapshot_id away_team_snapshot_id] }
   validate :snapshots_must_have_same_ratings_version
 
+  def favorite
+    home_score > away_score ? game.home_team : game.away_team
+  end
+
+  def win_probability_for_team(team_id)
+    home_team_snapshot.team_id == team_id ? home_win_probability : (1 - home_win_probability)
+  end
+
+  def favorite_win_probability
+    home_score > away_score ? home_win_probability : (1 - home_win_probability)
+  end
+
+  def total
+    ((home_score + away_score) * 2).round / 2.0
+  end
+
+  def correct?
+    predicted_home_win = home_win_probability >= 0.5
+    actual_home_win = game.home_team_score > game.away_team_score
+
+    predicted_home_win == actual_home_win
+  end
+
+  def predicted_score_string
+    if home_score.round == away_score.round
+      if home_score > away_score
+        "#{home_score.round + 1} - #{away_score.round}"
+      else
+        "#{home_score.round} - #{away_score.round + 1}"
+      end
+    else
+      "#{home_score.round} - #{away_score.round}"
+    end
+  end
+
   private
 
   def snapshots_must_have_same_ratings_version

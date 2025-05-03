@@ -3,7 +3,7 @@
 # app/controllers/teams_controller.rb
 class TeamsController < ApplicationController
   def show
-    @team = Team.all.find { |t| t.school.parameterize == params[:school] }
+    @team = Team.find_by!(slug: params[:slug])
     @season = Season.find_by(year: params[:year]) || Season.current
     @team_season = TeamSeason.find_by!(team: @team, season: @season)
     @config = RatingsConfigVersion.current

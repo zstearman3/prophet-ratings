@@ -14,6 +14,10 @@ module BasketballCalculations
       (free_throws_made.to_f / free_throws_attempted).round(5)
     end
 
+    def calculated_field_goals_percentage
+      (field_goals_made.to_f / field_goals_attempted).round(5)
+    end
+
     def calculated_true_shooting_attempts
       field_goals_attempted.to_f + (0.44 * free_throws_attempted)
     end

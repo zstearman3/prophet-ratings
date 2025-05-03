@@ -101,15 +101,33 @@ class Game < ApplicationRecord
   end
 
   def current_prediction
-    Prediction.find_by(
-      home_team_snapshot: home_rating_snapshot,
-      away_team_snapshot: away_rating_snapshot,
-      game: self
-    )
+    predictions.find do |prediction|
+      prediction.home_team_snapshot == home_rating_snapshot
+    end
+  end
+
+  def winning_team
+    home_team_score > away_team_score ? home_team : away_team
   end
 
   def pace
     ((possessions.to_f / minutes) * 40.0).to_f
+  end
+
+  def overtimes
+    ((minutes - 40) / 5).to_i
+  end
+
+  def overtime?
+    overtimes.positive?
+  end
+
+  def status_string
+    if final? && overtime?
+      overtimes == 1 ? 'Final OT' : "Final #{overtimes}OT"
+    else
+      status.upcase
+    end
   end
 
   private

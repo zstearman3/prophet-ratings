@@ -12,15 +12,15 @@
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div class="bg-white p-4 rounded-lg shadow">
             <p class="text-sm text-gray-600">Adj ORtg</p>
-            <p class="text-xl font-semibold text-gray-900"><%= @snapshots.last.adj_offensive_efficiency %></p>
+            <p class="text-xl font-semibold text-gray-900"><%= @snapshots.last.adj_offensive_efficiency.round(1) %></p>
           </div>
           <div class="bg-white p-4 rounded-lg shadow">
             <p class="text-sm text-gray-600">Adj DRtg</p>
-            <p class="text-xl font-semibold text-gray-900"><%= @snapshots.last.adj_defensive_efficiency %></p>
+            <p class="text-xl font-semibold text-gray-900"><%= @snapshots.last.adj_defensive_efficiency.round(1) %></p>
           </div>
           <div class="bg-white p-4 rounded-lg shadow">
             <p class="text-sm text-gray-600">Adj Pace</p>
-            <p class="text-xl font-semibold text-gray-900"><%= @snapshots.last.adj_pace %></p>
+            <p class="text-xl font-semibold text-gray-900"><%= @snapshots.last.adj_pace.round(1) %></p>
           </div>
         </div>
       <% end %>
@@ -43,7 +43,9 @@
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Opponent</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Result</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Prediction</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Correct?</th>
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
@@ -55,24 +57,25 @@
                 <td class="px-6 py-4 whitespace-nowrap">
                   <%= link_to game.start_time.to_date, game_path(game), class: "text-sm text-gray-900 hover:text-blue-600" %>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><%= opponent.school %></td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <%= link_to opponent.school, team_path(opponent.slug), class: "text-sm text-gray-900 hover:text-blue-600" %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <%= game.winning_team == @team ? 'W' : 'L' %>
+                </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   <%= game.home_team_score %>–<%= game.away_team_score %>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  <% def prediction_for(game, snapshot_lookup, config) %>
-                      <% home_ss = snapshot_lookup[game.home_team_season.id]&.select { |s| s.snapshot_date <= game.start_time.to_date }&.max_by(&:snapshot_date) %>
-                      <% away_ss = snapshot_lookup[game.away_team_season.id]&.select { |s| s.snapshot_date <= game.start_time.to_date }&.max_by(&:snapshot_date) %>
-                      <% return nil unless home_ss && away_ss %>
-                      <% game.predictions.find { |p| p.home_team_snapshot_id == home_ss.id && p.away_team_snapshot_id == away_ss.id } %>
-                  <% end %>
-                  <% prediction = prediction_for(game, @snapshot_lookup, @config) %>
+                  <% prediction = game.current_prediction %>
                   <% if prediction %>
-                    <% win_prob = (prediction.home_team_snapshot.team_id == tg.team_id) ? prediction.home_win_probability : (1 - prediction.home_win_probability) %>
-                    <%= win_prob.round(2) %>
+                    <%= prediction.predicted_score_string %>
                   <% else %>
                     —
                   <% end %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 uppercase">
+                  <%= prediction.correct? %>
                 </td>
               </tr>
             <% end %>

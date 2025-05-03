@@ -10,6 +10,7 @@
 #  nickname       :string
 #  school         :string
 #  secondary_name :string
+#  slug           :string
 #  url            :string
 #  created_at     :datetime         not null
 #  updated_at     :datetime         not null
@@ -17,10 +18,12 @@
 # Indexes
 #
 #  index_teams_on_school  (school) UNIQUE
+#  index_teams_on_slug    (slug) UNIQUE
 #
 FactoryBot.define do
   factory :team do
-    sequence(:school) { |n| "Test University #{n}" }
+    school { Faker::University.name }
+    slug { school.parameterize }
     nickname { 'Testers' }
     url { 'test-university' }
     location { 'Testville, TS' }
