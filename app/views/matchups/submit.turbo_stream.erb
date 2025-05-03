@@ -1,0 +1,19 @@
+<% if @prediction %>
+  <turbo-stream target="prediction_result_frame" action="update">
+    <template>
+      <%= render partial: "matchups/prediction_result", formats: [:html], locals: { prediction: @prediction } %>
+    </template>
+  </turbo-stream>
+<% elsif @simulation %>
+  <turbo-stream target="prediction_result_frame" action="update">
+    <template>
+      <%= render partial: "matchups/simulation_result", formats: [:html], locals: { result: @simulation } %>
+    </template>
+  </turbo_stream>
+<% else %>
+  <turbo-stream target="prediction_result_frame" action="update">
+    <template>
+      <div class="text-red-600 font-semibold">No result generated.</div>
+    </template>
+  </turbo_stream>
+<% end %>

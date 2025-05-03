@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 Rails.application.routes.draw do
+  get 'matchups/new'
+  get 'matchups/submit'
   get 'games/index'
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 
@@ -11,11 +13,9 @@ Rails.application.routes.draw do
   mount GoodJob::Engine => 'good_job'
 
   root "team_seasons#ratings"
-
-  get 'game_tool', to: "games#game_tool"
-  get 'game_prediction', to: "predictions#game"
-  get 'game_simulation', to: "simulations#game"
   resources :games, only: [:index, :show]
-
+  resource :matchup, only: [:show] do
+    post :submit, on: :collection
+  end
   resources :teams, param: :slug, only: [:index, :show]
 end

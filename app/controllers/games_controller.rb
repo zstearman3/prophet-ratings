@@ -14,12 +14,4 @@ class GamesController < ApplicationController
     @prediction = @game.predictions.order(created_at: :desc).first
     @config = RatingsConfigVersion.current
   end
-
-  def game_tool
-    @team_options = TeamSeason.current.includes(:team).map { |ts| [ts.team.school, ts.id] }.sort_by { |school, _| school }
-    @home_team_season = TeamSeason.find_by(id: params[:home_team_id]) if params[:home_team_id]
-    @away_team_season = TeamSeason.find_by(id: params[:away_team_id]) if params[:away_team_id]
-    @neutral = params[:neutral].present?
-    @upset_modifier = params[:upset_modifier].to_f if params[:upset_modifier]
-  end
 end
