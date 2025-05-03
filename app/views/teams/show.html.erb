@@ -73,8 +73,12 @@
                     —
                   <% end %>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 uppercase">
-                  <%= prediction.correct? %>
+                <td class="px-6 py-4 whitespace-nowrap text-sm uppercase">
+                  <% if prediction.correct? %>
+                    <span title="Prediction was correct" class="text-green-600">✔</span>
+                  <% else %>
+                    <span title="Prediction missed" class="text-red-600">✖</span>
+                  <% end %>
                 </td>
               </tr>
             <% end %>
