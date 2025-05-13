@@ -50,6 +50,7 @@ module ProphetRatings
       {
         home_team: @home_rating_snapshot.team.school,
         away_team: @away_rating_snapshot.team.school,
+        favorite:,
         home_expected_score:,
         away_expected_score:,
         expected_margin: margin,

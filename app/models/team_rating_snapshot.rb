@@ -56,9 +56,25 @@ class TeamRatingSnapshot < ApplicationRecord
     adj_three_pt_attempt_rate_allowed
     offensive_efficiency_volatility
     defensive_efficiency_volatility
+    total_volatility
     pace_volatility
     home_offense_boost
     home_defense_boost
+    home_total_boost
+    overall_rank
+    adj_offensive_efficiency_rank
+    adj_defensive_efficiency_rank
+    adj_pace_rank
+    adj_effective_fg_percentage_rank
+    adj_turnover_rate_rank
+    adj_offensive_rebound_rate_rank
+    adj_free_throw_rate_rank
+    adj_effective_fg_percentage_allowed_rank
+    adj_turnover_rate_forced_rank
+    adj_defensive_rebound_rate_rank
+    adj_free_throw_rate_allowed_rank
+    adj_three_pt_attempt_rate_rank
+    adj_three_pt_attempt_rate_allowed_rank
   ]
 
   STORED_STATS = %w[
@@ -74,14 +90,39 @@ class TeamRatingSnapshot < ApplicationRecord
     adj_three_pt_attempt_rate_allowed
     offensive_efficiency_volatility
     defensive_efficiency_volatility
+    total_volatility
     pace_volatility
     home_offense_boost
     home_defense_boost
+    home_total_boost
   ].freeze
+
+  STORED_RANKS = %w[
+    overall_rank
+    adj_offensive_efficiency_rank
+    adj_defensive_efficiency_rank
+    adj_pace_rank
+    adj_effective_fg_percentage_rank
+    adj_turnover_rate_rank
+    adj_offensive_rebound_rate_rank
+    adj_free_throw_rate_rank
+    adj_effective_fg_percentage_allowed_rank
+    adj_turnover_rate_forced_rank
+    adj_defensive_rebound_rate_rank
+    adj_free_throw_rate_allowed_rank
+    adj_three_pt_attempt_rate_rank
+    adj_three_pt_attempt_rate_allowed_rank
+  ]
 
   STORED_STATS.each do |attr|
     define_method(attr) do
       super()&.to_f
+    end
+  end
+
+  STORED_RANKS.each do |attr|
+    define_method(attr) do
+      super()&.to_i
     end
   end
 

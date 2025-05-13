@@ -46,6 +46,7 @@ class TeamSeasonsController < ApplicationController
       turnover_rate
       home_offense_boost
       home_defense_boost
+      total_home_boost
       offensive_efficiency_volatility
       defensive_efficiency_volatility
       pace_volatility

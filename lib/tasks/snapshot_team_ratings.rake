@@ -12,7 +12,7 @@ namespace :ratings do
       puts "Backfilling for #{date}..."
       games = Game.where(start_time: date.all_day)
       ProphetRatings::OverallRatingsCalculator.new(season)
-                                              .calculate_season_ratings(as_of: date)
+                                              .call(as_of: date)
       games.each(&:generate_prediction!)
       games.each do |game|
         game.finalize_prediction! if game.final?

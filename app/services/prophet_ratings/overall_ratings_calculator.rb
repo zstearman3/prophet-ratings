@@ -16,23 +16,71 @@ module ProphetRatings
       @season = season
     end
 
-    def calculate_season_ratings(as_of: Time.current)
+    def call(as_of: [Time.current, Season.current.end_date].min)
       TeamSeasonStatsAggregator.new(season: @season, as_of:).run
       @season.update_average_ratings
-
       run_least_squares_adjustments(as_of:) if (as_of.to_date - @season.start_date) > 14
-
-      TeamSeason.where(season: @season).find_each do |ts|
-        ts.update!(rating: calculate_rating(ts))
-      end
-
+      recalculate_all_aggregate_ratings
       TeamRatingSnapshotService.new(season: @season, as_of:).call
+      @season.update_adjusted_averages
     end
 
     private
 
-    def calculate_rating(ts)
-      ts.adj_offensive_efficiency - ts.adj_defensive_efficiency
+    def recalculate_all_aggregate_ratings
+      team_seasons = TeamSeason.where(season: @season).to_a
+
+      team_seasons.each do |ts|
+        ts.rating = ts.adj_offensive_efficiency - ts.adj_defensive_efficiency
+        ts.total_home_boost = ts.home_offense_boost - ts.home_defense_boost
+        ts.total_volatility = (ts.offensive_efficiency_volatility + ts.defensive_efficiency_volatility) / 2.0
+      end
+
+      # Persist first round of updates
+      TeamSeason.import team_seasons, on_duplicate_key_update: {
+        columns: %i[rating total_home_boost total_volatility]
+      }
+
+      # Refresh records from DB with updated fields (optional but ensures accuracy)
+      team_seasons = TeamSeason.where(season: @season).to_a
+
+      # Compute ranks
+      assign_rank!(team_seasons, :rating, :overall_rank, :desc)
+      assign_rank!(team_seasons, :adj_offensive_efficiency, :adj_offensive_efficiency_rank, :desc)
+      assign_rank!(team_seasons, :adj_defensive_efficiency, :adj_defensive_efficiency_rank, :asc)
+      assign_rank!(team_seasons, :adj_pace, :pace_rank, :desc)
+      assign_rank!(team_seasons, :adj_free_throw_rate, :adj_free_throw_rate_rank, :desc)
+      assign_rank!(team_seasons, :adj_free_throw_rate_allowed, :adj_free_throw_rate_allowed_rank, :asc)
+      assign_rank!(team_seasons, :adj_turnover_rate, :adj_turnover_rate_rank, :asc)
+      assign_rank!(team_seasons, :adj_turnover_rate_forced, :adj_turnover_rate_forced_rank, :desc)
+      assign_rank!(team_seasons, :adj_offensive_rebound_rate, :adj_offensive_rebound_rate_rank, :desc)
+      assign_rank!(team_seasons, :adj_defensive_rebound_rate, :adj_defensive_rebound_rate_rank, :desc)
+      assign_rank!(team_seasons, :adj_effective_fg_percentage, :adj_effective_fg_percentage_rank, :desc)
+      assign_rank!(team_seasons, :adj_effective_fg_percentage_allowed, :adj_effective_fg_percentage_allowed_rank, :asc)
+      assign_rank!(team_seasons, :adj_three_pt_attempt_rate, :adj_three_pt_attempt_rate_rank, :desc)
+      assign_rank!(team_seasons, :adj_three_pt_attempt_rate_allowed, :adj_three_pt_attempt_rate_allowed_rank, :asc)
+      assign_rank!(team_seasons, :adj_pace, :adj_pace_rank, :desc)
+
+      # Persist ranks
+      TeamSeason.import team_seasons, on_duplicate_key_update: {
+        columns: %i[
+          overall_rank
+          adj_offensive_efficiency_rank
+          adj_defensive_efficiency_rank
+          pace_rank
+          adj_free_throw_rate_rank
+          adj_free_throw_rate_allowed_rank
+          adj_turnover_rate_rank
+          adj_turnover_rate_forced_rank
+          adj_offensive_rebound_rate_rank
+          adj_defensive_rebound_rate_rank
+          adj_effective_fg_percentage_rank
+          adj_effective_fg_percentage_allowed_rank
+          adj_three_pt_attempt_rate_rank
+          adj_three_pt_attempt_rate_allowed_rank
+          adj_pace_rank
+        ]
+      }
     end
 
     def run_least_squares_adjustments(as_of: nil)
@@ -52,6 +100,12 @@ module ProphetRatings
           as_of:
         ).call
       end
+    end
+
+    def assign_rank!(records, attr, rank_attr, direction = :desc)
+      sorted = records.sort_by { |r| r.send(attr) }
+      sorted.reverse! if direction == :desc
+      sorted.each_with_index { |r, i| r.send(:"#{rank_attr}=", i + 1) }
     end
   end
 end

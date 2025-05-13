@@ -3,6 +3,7 @@
 source 'https://rubygems.org'
 
 ruby '3.2.2'
+gem 'activerecord-import'
 gem 'chartkick'
 gem 'cssbundling-rails'
 gem 'enumerable-statistics'

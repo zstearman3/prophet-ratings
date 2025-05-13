@@ -31,6 +31,7 @@ module ProphetRatings
         aggregates.merge!(calculate_efficiency_stddevs(team_season))
         aggregates.merge!(calculate_volatility(team_season))
         aggregates.merge!(calculate_home_advantages(team_season))
+        aggregates.merge!(calculate_wins_and_losses(team_season))
 
         team_season.update_columns(aggregates) if aggregates.any?
       end
@@ -156,6 +157,23 @@ module ProphetRatings
         home_offense_boost: [blended_off, 0.0].max.round(3),
         home_defense_boost: [blended_def, 0.0].min.round(3)
       }
+    end
+
+    def calculate_wins_and_losses(team_season)
+      games = team_season.team_games
+                         .includes(:game)
+                         .where(game: { status: Game.statuses[:final], start_time: ..as_of })
+    
+      wins, losses = games.partition do |tg|
+        game = tg.game
+        if tg.home?
+          game.home_team_score > game.away_team_score
+        else
+          game.away_team_score > game.home_team_score
+        end
+      end
+    
+      { wins: wins.size, losses: losses.size }
     end
   end
 end

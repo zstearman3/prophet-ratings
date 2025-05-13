@@ -26,8 +26,10 @@
 
         <div class="space-y-2 md:col-span-2">
           <div class="flex items-center space-x-2">
-            <%= form.check_box :neutral, { checked: @neutral == true }, class: "w-5 h-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" %>
-            <label class="block text-sm font-medium text-gray-700">Neutral Site</label>
+            <%= form.check_box :neutral,
+                  { class: "w-5 h-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" },
+                  "1", "0" %> 
+              <label class="block text-sm font-medium text-gray-700">Neutral Site</label>
             <span class="text-sm text-gray-500">Game is played at neutral location</span>
           </div>
         </div>
@@ -45,10 +47,21 @@
         </div>
       </div>
 
-      <div class="flex space-x-4 pt-4">
-        <%= form.submit "Predict Outcome", name: "action_type", value: "predict", class: "bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" %>
-        <%= form.submit "Simulate Outcome", name: "action_type", value: "simulate", class: "bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded" %>
-      </div>
+    <div class="flex justify-between pt-4">
+      <%= icon_button(form,
+            text: "Predict Outcome",
+            icon_svg: heroicon_brain,
+            name: "action_type",
+            value: "predict",
+            class: "bg-gray-900 hover:bg-gray-800 text-white font-bold py-2 px-4 rounded inline-flex items-center space-x-2") %>
+
+      <%= icon_button(form,
+            text: "Simulate Outcome",
+            icon_svg: lucide_dice,
+            name: "action_type",
+            value: "simulate",
+            class: "bg-gray-900 hover:bg-gray-800 text-white font-bold py-2 px-4 rounded inline-flex items-center space-x-2") %>
+    </div>
     <% end %>
 
     <turbo-frame id="prediction_result_frame" class="mt-8">

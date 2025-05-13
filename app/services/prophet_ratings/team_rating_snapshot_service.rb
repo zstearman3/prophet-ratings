@@ -26,7 +26,8 @@ module ProphetRatings
 
           # All other adjusted stats into stats column
           snapshot.stats = team_season.attributes.slice(
-            *TeamRatingSnapshot::STORED_STATS
+            *TeamRatingSnapshot::STORED_STATS,
+            *TeamRatingSnapshot::STORED_RANKS,
           )
 
           snapshot.save!

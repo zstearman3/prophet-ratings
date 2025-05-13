@@ -5,22 +5,114 @@
       <h1 class="text-2xl font-bold text-gray-900"><%= @team.school %></h1>
       <span class="text-2xl text-gray-600 ml-2"><%= @team.nickname %></span>
     </div>
+    <div class="flex items-center">
+      <span class="text-sm text-gray-600 mr-2"><%= "#{@team_season.wins}-#{@team_season.losses}" %></span>
+    </div>
 
     <div class="mt-8">
       <h2 class="text-xl font-semibold text-gray-900 mb-4">Adjusted Stats</h2>
       <% if @snapshots.last %>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div class="bg-white p-4 rounded-lg shadow">
+            <p class="text-sm text-gray-600">Rating</p>
+            <p class="text-lg font-semibold text-gray-900"><%= @snapshots.last.rating.round(1) %>
+              <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.overall_rank %></span>
+            </p>
+          </div>
           <div class="bg-white p-4 rounded-lg shadow">
             <p class="text-sm text-gray-600">Adj ORtg</p>
-            <p class="text-xl font-semibold text-gray-900"><%= @snapshots.last.adj_offensive_efficiency.round(1) %></p>
+            <p class="text-lg font-semibold text-gray-900"><%= @snapshots.last.adj_offensive_efficiency.round(1) %>
+              <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.adj_offensive_efficiency_rank %></span>
+            </p>
           </div>
           <div class="bg-white p-4 rounded-lg shadow">
             <p class="text-sm text-gray-600">Adj DRtg</p>
-            <p class="text-xl font-semibold text-gray-900"><%= @snapshots.last.adj_defensive_efficiency.round(1) %></p>
+            <p class="text-lg font-semibold text-gray-900"><%= @snapshots.last.adj_defensive_efficiency.round(1) %>
+              <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.adj_defensive_efficiency_rank %></span>
+            </p>
           </div>
           <div class="bg-white p-4 rounded-lg shadow">
             <p class="text-sm text-gray-600">Adj Pace</p>
-            <p class="text-xl font-semibold text-gray-900"><%= @snapshots.last.adj_pace.round(1) %></p>
+            <p class="text-lg font-semibold text-gray-900"><%= @snapshots.last.adj_pace.round(1) %>
+              <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.adj_pace_rank %></span>
+            </p>
+          </div>
+        </div>
+      <% end %>
+    </div>
+
+    <div class="mt-8">
+      <h2 class="text-xl font-semibold text-gray-900 mb-4">Adjusted Four Factors</h2>
+      <% if @snapshots.last %>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <!-- Offense -->
+          <div class="bg-white p-4 rounded-lg shadow">
+            <h3 class="text-sm font-medium text-gray-500 mb-2">Offense</h3>
+            <div class="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p class="text-gray-600">eFG%</p>
+                <p class="text-lg font-semibold text-gray-900">
+                  <%= @snapshots.last.adj_effective_fg_percentage.round(3) %>
+                  <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.adj_effective_fg_percentage_rank %></span>
+                </p>
+              </div>
+              <div>
+                <p class="text-gray-600">TO%</p>
+                <p class="text-lg font-semibold text-gray-900">
+                  <%= @snapshots.last.adj_turnover_rate.round(3) %>
+                  <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.adj_turnover_rate_rank %></span>
+                </p>
+              </div>
+              <div>
+                <p class="text-gray-600">ORB%</p>
+                <p class="text-lg font-semibold text-gray-900">
+                  <%= @snapshots.last.adj_offensive_rebound_rate.round(3) %>
+                  <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.adj_offensive_rebound_rate_rank %></span>
+                </p>
+              </div>
+              <div>
+                <p class="text-gray-600">FT Rate</p>
+                <p class="text-lg font-semibold text-gray-900">
+                  <%= @snapshots.last.adj_free_throw_rate.round(3) %>
+                  <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.adj_free_throw_rate_rank %></span>
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Defense -->
+          <div class="bg-white p-4 rounded-lg shadow">
+            <h3 class="text-sm font-medium text-gray-500 mb-2">Defense</h3>
+            <div class="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p class="text-gray-600">eFG% Allowed</p>
+                <p class="text-lg font-semibold text-gray-900">
+                  <%= @snapshots.last.adj_effective_fg_percentage_allowed.round(3) %>
+                  <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.adj_effective_fg_percentage_allowed_rank %></span>
+                </p>
+              </div>
+              <div>
+                <p class="text-gray-600">TO% Forced</p>
+                <p class="text-lg font-semibold text-gray-900">
+                  <%= @snapshots.last.adj_turnover_rate_forced.round(3) %>
+                  <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.adj_turnover_rate_forced_rank %></span>
+                </p>
+              </div>
+              <div>
+                <p class="text-gray-600">DReb%</p>
+                <p class="text-lg font-semibold text-gray-900">
+                  <%= @snapshots.last.adj_defensive_rebound_rate.round(3) %>
+                  <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.adj_defensive_rebound_rate_rank %></span>
+                </p>
+              </div>
+              <div>
+                <p class="text-gray-600">FT Rate Allowed</p>
+                <p class="text-lg font-semibold text-gray-900">
+                  <%= @snapshots.last.adj_free_throw_rate_allowed.round(3) %>
+                  <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.adj_free_throw_rate_allowed_rank %></span>
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       <% end %>

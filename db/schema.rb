@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2025_05_03_030859) do
+ActiveRecord::Schema[7.1].define(version: 2025_05_13_034726) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -156,6 +156,26 @@ ActiveRecord::Schema[7.1].define(version: 2025_05_03_030859) do
     t.decimal "average_pace", precision: 6, scale: 3
     t.decimal "efficiency_std_deviation", precision: 6, scale: 3
     t.decimal "pace_std_deviation", precision: 6, scale: 3
+    t.decimal "avg_adj_offensive_efficiency", precision: 6, scale: 3
+    t.decimal "stddev_adj_offensive_efficiency", precision: 6, scale: 3
+    t.decimal "avg_adj_defensive_efficiency", precision: 6, scale: 3
+    t.decimal "stddev_adj_defensive_efficiency", precision: 6, scale: 3
+    t.decimal "avg_adj_effective_fg_percentage", precision: 6, scale: 5
+    t.decimal "stddev_adj_effective_fg_percentage", precision: 6, scale: 5
+    t.decimal "avg_adj_turnover_rate", precision: 6, scale: 5
+    t.decimal "stddev_adj_turnover_rate", precision: 6, scale: 5
+    t.decimal "avg_adj_offensive_rebound_rate", precision: 6, scale: 5
+    t.decimal "stddev_adj_offensive_rebound_rate", precision: 6, scale: 5
+    t.decimal "avg_adj_free_throw_rate", precision: 6, scale: 5
+    t.decimal "stddev_adj_free_throw_rate", precision: 6, scale: 5
+    t.decimal "avg_adj_effective_fg_percentage_allowed", precision: 6, scale: 5
+    t.decimal "stddev_adj_effective_fg_percentage_allowed", precision: 6, scale: 5
+    t.decimal "avg_adj_turnover_rate_forced", precision: 6, scale: 5
+    t.decimal "stddev_adj_turnover_rate_forced", precision: 6, scale: 5
+    t.decimal "avg_adj_defensive_rebound_rate", precision: 6, scale: 5
+    t.decimal "stddev_adj_defensive_rebound_rate", precision: 6, scale: 5
+    t.decimal "avg_adj_free_throw_rate_allowed", precision: 6, scale: 5
+    t.decimal "stddev_adj_free_throw_rate_allowed", precision: 6, scale: 5
     t.index ["year"], name: "index_seasons_on_year", unique: true
   end
 
@@ -270,6 +290,25 @@ ActiveRecord::Schema[7.1].define(version: 2025_05_03_030859) do
     t.decimal "offensive_efficiency_volatility", precision: 6, scale: 3
     t.decimal "defensive_efficiency_volatility", precision: 6, scale: 3
     t.decimal "pace_volatility", precision: 6, scale: 3
+    t.integer "overall_rank"
+    t.integer "pace_rank"
+    t.integer "adj_offensive_efficiency_rank"
+    t.integer "adj_defensive_efficiency_rank"
+    t.integer "adj_effective_fg_percentage_rank"
+    t.integer "adj_turnover_rate_rank"
+    t.integer "adj_offensive_rebound_rate_rank"
+    t.integer "adj_free_throw_rate_rank"
+    t.integer "adj_effective_fg_percentage_allowed_rank"
+    t.integer "adj_turnover_rate_forced_rank"
+    t.integer "adj_defensive_rebound_rate_rank"
+    t.integer "adj_free_throw_rate_allowed_rank"
+    t.decimal "total_home_boost", precision: 6, scale: 3
+    t.decimal "total_volatility", precision: 6, scale: 3
+    t.integer "wins", default: 0
+    t.integer "losses", default: 0
+    t.integer "adj_three_pt_attempt_rate_rank"
+    t.integer "adj_three_pt_attempt_rate_allowed_rank"
+    t.integer "adj_pace_rank"
     t.index ["season_id"], name: "index_team_seasons_on_season_id"
     t.index ["team_id", "season_id"], name: "index_team_seasons_on_team_id_and_season_id", unique: true
     t.index ["team_id"], name: "index_team_seasons_on_team_id"
