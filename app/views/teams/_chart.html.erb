@@ -41,9 +41,11 @@
 <div class="my-4">
   <%= line_chart [
       { name: "Team", data: chart_data },
-      { name: "D-I Average", data: avg_line, color: "#888", stroke: { dash: [4, 4] } },
-      { name: "Above Avg (+1 SD)", data: upper_line, color: "#ccc", stroke: { dash: [2, 4] } },
-      { name: "Below Avg (−1 SD)", data: lower_line, color: "#ccc", stroke: { dash: [2, 4] } }
+      { name: "D-I Average", data: avg_line, color: "#888", library: { borderDash: [4, 4] } },
+      { name: "+2 Std Dev", data: upper2_line, color: "#A5B4FC", library: { borderDash: [2, 6] } },
+      { name: "+1 Std Dev", data: upper_line, color: "#4F46E5", library: { borderDash: [2, 6] } },
+      { name: "-1 Std Dev", data: lower_line, color: "#4F46E5", library: { borderDash: [2, 6] } },
+      { name: "-2 Std Dev", data: lower2_line, color: "#A5B4FC", library: { borderDash: [2, 6] } }
     ],
     xtitle: "Date",
     ytitle: selected_stat_title || "Rating",

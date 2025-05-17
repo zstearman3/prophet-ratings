@@ -50,7 +50,7 @@ class ChartDataBuilder
     avg_attr = stat_to_avg_attr(@stat)
     stddev_attr = stat_to_stddev_attr(@stat)
     avg = season_average(avg_attr)
-    stddev = @season.try(stddev_attr) || 0
+    stddev = season_std_dev(stddev_attr)
 
     avg *= 100 if percentage?
     stddev *= 100 if percentage?
@@ -59,7 +59,9 @@ class ChartDataBuilder
     {
       avg: dates.map { |d| [d, avg] },
       upper: dates.map { |d| [d, avg + stddev] },
-      lower: dates.map { |d| [d, avg - stddev] }
+      lower: dates.map { |d| [d, avg - stddev] },
+      upper2: dates.map { |d| [d, avg + (2.0 * stddev)] },
+      lower2: dates.map { |d| [d, avg - (2.0 * stddev)] }
     }
   end
 
@@ -69,6 +71,12 @@ class ChartDataBuilder
     return @season.avg_adj_offensive_efficiency - @season.avg_adj_defensive_efficiency if avg_attr == 'rating'
 
     @season.try(avg_attr) || 0
+  end
+
+  def season_std_dev(stddev_attr)
+    return StatisticsUtils.stddev(@season.team_seasons.pluck(:rating)).round(3) if stddev_attr == 'rating'
+
+    @season.try(stddev_attr) || 0
   end
 
   def stat_to_avg_attr(stat)
@@ -91,7 +99,7 @@ class ChartDataBuilder
 
   def stat_to_stddev_attr(stat)
     {
-      'rating' => 'stddev_adj_offensive_efficiency',
+      'rating' => 'rating',
       'adj_offensive_efficiency' => 'stddev_adj_offensive_efficiency',
       'adj_defensive_efficiency' => 'stddev_adj_defensive_efficiency',
       'adj_pace' => 'pace_std_deviation',

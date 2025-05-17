@@ -24,6 +24,8 @@ class TeamsController < ApplicationController
     @avg_line = chart_builder.reference_lines[:avg]
     @upper_line = chart_builder.reference_lines[:upper]
     @lower_line = chart_builder.reference_lines[:lower]
+    @upper2_line = chart_builder.reference_lines[:upper2]
+    @lower2_line = chart_builder.reference_lines[:lower2]
 
     @team_games = @team_season.team_games
                               .includes(
