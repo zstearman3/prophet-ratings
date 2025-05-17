@@ -12,66 +12,18 @@ class TeamsController < ApplicationController
                              .where(ratings_config_version: @config)
                              .order(:snapshot_date)
 
-    # Stat selection for chart
-    stat_param = params[:stat].presence || 'rating'
-    stat_options = {
-      'rating' => 'Rating',
-      'adj_offensive_efficiency' => 'Adj ORtg',
-      'adj_defensive_efficiency' => 'Adj DRtg',
-      'adj_pace' => 'Adj Pace',
-      'adj_three_pt_proficiency' => 'Adj 3PT Proficiency',
-      'adj_defensive_rebound_rate' => 'Adj DRB Rate',
-      'adj_offensive_rebound_rate' => 'Adj ORB Rate',
-      'adj_effective_fg_percentage' => 'Adj eFG%',
-      'adj_effective_fg_percentage_allowed' => 'Adj eFG% Allowed',
-      'adj_turnover_rate' => 'Adj TO Rate',
-      'adj_turnover_rate_forced' => 'Adj TO Rate Forced',
-      'adj_free_throw_rate' => 'Adj FTR',
-      'adj_free_throw_rate_allowed' => 'Adj FTR Allowed'
-    }
-    @selected_stat = stat_param
-    @selected_stat_title = stat_options[@selected_stat] || 'Rating'
-    @chart_data = @snapshots.map { |s| [s.snapshot_date, s[@selected_stat] || s.rating] }
+    chart_builder = ChartDataBuilder.new(
+      snapshots: @snapshots,
+      season: @season,
+      selected_stat: params[:stat]
+    )
 
-    # League average and stddev lines
-    avg_attr = case @selected_stat
-               when 'rating' then 'average_efficiency'
-               when 'adj_offensive_efficiency' then 'avg_adj_offensive_efficiency'
-               when 'adj_defensive_efficiency' then 'avg_adj_defensive_efficiency'
-               when 'adj_pace' then 'average_pace'
-               when 'adj_three_pt_proficiency' then 'avg_adj_three_pt_proficiency'
-               when 'adj_defensive_rebound_rate' then 'avg_adj_defensive_rebound_rate'
-               when 'adj_offensive_rebound_rate' then 'avg_adj_offensive_rebound_rate'
-               when 'adj_effective_fg_percentage' then 'avg_adj_effective_fg_percentage'
-               when 'adj_effective_fg_percentage_allowed' then 'avg_adj_effective_fg_percentage_allowed'
-               when 'adj_turnover_rate' then 'avg_adj_turnover_rate'
-               when 'adj_turnover_rate_forced' then 'avg_adj_turnover_rate_forced'
-               when 'adj_free_throw_rate' then 'avg_adj_free_throw_rate'
-               when 'adj_free_throw_rate_allowed' then 'avg_adj_free_throw_rate_allowed'
-               else 'average'
-               end
-    stddev_attr = case @selected_stat
-                  when 'rating' then 'efficiency_std_deviation'
-                  when 'adj_offensive_efficiency' then 'stddev_adj_offensive_efficiency'
-                  when 'adj_defensive_efficiency' then 'stddev_adj_defensive_efficiency'
-                  when 'adj_pace' then 'pace_std_deviation'
-                  when 'adj_three_pt_proficiency' then 'stddev_adj_three_pt_proficiency'
-                  when 'adj_defensive_rebound_rate' then 'stddev_adj_defensive_rebound_rate'
-                  when 'adj_offensive_rebound_rate' then 'stddev_adj_offensive_rebound_rate'
-                  when 'adj_effective_fg_percentage' then 'stddev_adj_effective_fg_percentage'
-                  when 'adj_effective_fg_percentage_allowed' then 'stddev_adj_effective_fg_percentage_allowed'
-                  when 'adj_turnover_rate' then 'stddev_adj_turnover_rate'
-                  when 'adj_turnover_rate_forced' then 'stddev_adj_turnover_rate_forced'
-                  when 'adj_free_throw_rate' then 'stddev_adj_free_throw_rate'
-                  when 'adj_free_throw_rate_allowed' then 'stddev_adj_free_throw_rate_allowed'
-                  else 'std_deviation'
-                  end
-    avg = @season.try(avg_attr) || 0
-    stddev = @season.try(stddev_attr) || 0
-    dates = @snapshots.map(&:snapshot_date)
-    @avg_line = dates.map { |d| [d, avg] }
-    @upper_line = dates.map { |d| [d, avg + stddev] }
-    @lower_line = dates.map { |d| [d, avg - stddev] }
+    @selected_stat = chart_builder.instance_variable_get(:@stat)
+    @selected_stat_title = chart_builder.stat_title
+    @chart_data = chart_builder.chart_data
+    @avg_line = chart_builder.reference_lines[:avg]
+    @upper_line = chart_builder.reference_lines[:upper]
+    @lower_line = chart_builder.reference_lines[:lower]
 
     @team_games = @team_season.team_games
                               .includes(

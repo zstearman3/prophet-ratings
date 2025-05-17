@@ -40,10 +40,10 @@
 %>
 <div class="my-4">
   <%= line_chart [
-      { name: selected_stat_title || "Rating", data: chart_data },
-      { name: "League Avg", data: avg_line, color: "#888", stroke: { dash: [4, 4] } },
-      { name: "+1 Std Dev", data: upper_line, color: "#ccc", stroke: { dash: [2, 4] } },
-      { name: "-1 Std Dev", data: lower_line, color: "#ccc", stroke: { dash: [2, 4] } }
+      { name: "Team", data: chart_data },
+      { name: "D-I Average", data: avg_line, color: "#888", stroke: { dash: [4, 4] } },
+      { name: "Above Avg (+1 SD)", data: upper_line, color: "#ccc", stroke: { dash: [2, 4] } },
+      { name: "Below Avg (−1 SD)", data: lower_line, color: "#ccc", stroke: { dash: [2, 4] } }
     ],
     xtitle: "Date",
     ytitle: selected_stat_title || "Rating",
