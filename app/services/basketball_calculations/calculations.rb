@@ -38,6 +38,10 @@ module BasketballCalculations
       (free_throws_attempted.to_f / field_goals_attempted).to_f
     end
 
+    def calculated_three_pt_proficiency
+      (3.0 * calculated_three_pt_attempt_rate * calculated_three_pt_percentage).round(5)
+    end
+
     def calculated_offensive_rebound_rate
       return nil unless opponent_game
 

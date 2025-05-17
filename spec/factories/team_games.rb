@@ -35,6 +35,7 @@
 #  three_pt_attempted       :integer
 #  three_pt_made            :integer
 #  three_pt_percentage      :decimal(6, 5)
+#  three_pt_proficiency     :decimal(6, 5)
 #  true_shooting_percentage :decimal(6, 5)
 #  turnover_rate            :decimal(6, 5)
 #  turnovers                :integer

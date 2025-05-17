@@ -52,8 +52,8 @@ class TeamRatingSnapshot < ApplicationRecord
     adj_defensive_rebound_rate
     adj_free_throw_rate
     adj_free_throw_rate_allowed
-    adj_three_pt_attempt_rate
-    adj_three_pt_attempt_rate_allowed
+    adj_three_pt_proficiency
+    adj_three_pt_proficiency_allowed
     offensive_efficiency_volatility
     defensive_efficiency_volatility
     total_volatility
@@ -73,8 +73,8 @@ class TeamRatingSnapshot < ApplicationRecord
     adj_turnover_rate_forced_rank
     adj_defensive_rebound_rate_rank
     adj_free_throw_rate_allowed_rank
-    adj_three_pt_attempt_rate_rank
-    adj_three_pt_attempt_rate_allowed_rank
+    adj_three_pt_proficiency_rank
+    adj_three_pt_proficiency_allowed_rank
   ]
 
   STORED_STATS = %w[
@@ -86,8 +86,8 @@ class TeamRatingSnapshot < ApplicationRecord
     adj_effective_fg_percentage_allowed
     adj_offensive_rebound_rate
     adj_defensive_rebound_rate
-    adj_three_pt_attempt_rate
-    adj_three_pt_attempt_rate_allowed
+    adj_three_pt_proficiency
+    adj_three_pt_proficiency_allowed
     offensive_efficiency_volatility
     defensive_efficiency_volatility
     total_volatility
@@ -110,8 +110,8 @@ class TeamRatingSnapshot < ApplicationRecord
     adj_turnover_rate_forced_rank
     adj_defensive_rebound_rate_rank
     adj_free_throw_rate_allowed_rank
-    adj_three_pt_attempt_rate_rank
-    adj_three_pt_attempt_rate_allowed_rank
+    adj_three_pt_proficiency_rank
+    adj_three_pt_proficiency_allowed_rank
   ]
 
   STORED_STATS.each do |attr|

@@ -32,7 +32,8 @@ class TeamSeasonsController < ApplicationController
       adj_turnover_rate
       adj_offensive_rebound_rate
       adj_free_throw_rate
-      adj_three_pt_attempt_rate
+      adj_three_pt_proficiency
+      adj_three_pt_proficiency_allowed
       adj_effective_fg_percentage
       adj_effective_fg_percentage_allowed
       adj_defensive_rebound_rate

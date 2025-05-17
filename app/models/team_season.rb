@@ -23,10 +23,10 @@
 #  adj_offensive_rebound_rate_rank          :integer
 #  adj_pace                                 :decimal(6, 3)
 #  adj_pace_rank                            :integer
-#  adj_three_pt_attempt_rate                :decimal(6, 5)
-#  adj_three_pt_attempt_rate_allowed        :decimal(6, 5)
-#  adj_three_pt_attempt_rate_allowed_rank   :integer
-#  adj_three_pt_attempt_rate_rank           :integer
+#  adj_three_pt_proficiency                 :decimal(6, 5)
+#  adj_three_pt_proficiency_allowed         :decimal(6, 5)
+#  adj_three_pt_proficiency_allowed_rank    :integer
+#  adj_three_pt_proficiency_rank            :integer
 #  adj_turnover_rate                        :decimal(6, 5)
 #  adj_turnover_rate_forced                 :decimal(6, 5)
 #  adj_turnover_rate_forced_rank            :integer
@@ -54,6 +54,7 @@
 #  preseason_adj_pace                       :decimal(6, 3)
 #  rating                                   :decimal(6, 3)
 #  three_pt_attempt_rate                    :decimal(6, 5)
+#  three_pt_proficiency                     :decimal(6, 5)
 #  total_home_boost                         :decimal(6, 3)
 #  total_volatility                         :decimal(6, 3)
 #  turnover_rate                            :decimal(6, 5)

@@ -9,7 +9,7 @@ module ProphetRatings
       turnover_rate: %i[adj_turnover_rate adj_turnover_rate_forced],
       offensive_rebound_rate: %i[adj_offensive_rebound_rate adj_defensive_rebound_rate],
       free_throw_rate: %i[adj_free_throw_rate adj_free_throw_rate_allowed],
-      three_pt_attempt_rate: %i[adj_three_pt_attempt_rate adj_three_pt_attempt_rate_allowed]
+      three_pt_proficiency: %i[adj_three_pt_proficiency adj_three_pt_proficiency_allowed]
     }.freeze
 
     def initialize(season = Season.current)
@@ -57,8 +57,8 @@ module ProphetRatings
       assign_rank!(team_seasons, :adj_defensive_rebound_rate, :adj_defensive_rebound_rate_rank, :desc)
       assign_rank!(team_seasons, :adj_effective_fg_percentage, :adj_effective_fg_percentage_rank, :desc)
       assign_rank!(team_seasons, :adj_effective_fg_percentage_allowed, :adj_effective_fg_percentage_allowed_rank, :asc)
-      assign_rank!(team_seasons, :adj_three_pt_attempt_rate, :adj_three_pt_attempt_rate_rank, :desc)
-      assign_rank!(team_seasons, :adj_three_pt_attempt_rate_allowed, :adj_three_pt_attempt_rate_allowed_rank, :asc)
+      assign_rank!(team_seasons, :adj_three_pt_proficiency, :adj_three_pt_proficiency_rank, :desc)
+      assign_rank!(team_seasons, :adj_three_pt_proficiency_allowed, :adj_three_pt_proficiency_allowed_rank, :asc)
       assign_rank!(team_seasons, :adj_pace, :adj_pace_rank, :desc)
 
       # Persist ranks
@@ -76,8 +76,8 @@ module ProphetRatings
           adj_defensive_rebound_rate_rank
           adj_effective_fg_percentage_rank
           adj_effective_fg_percentage_allowed_rank
-          adj_three_pt_attempt_rate_rank
-          adj_three_pt_attempt_rate_allowed_rank
+          adj_three_pt_proficiency_rank
+          adj_three_pt_proficiency_allowed_rank
           adj_pace_rank
         ]
       }

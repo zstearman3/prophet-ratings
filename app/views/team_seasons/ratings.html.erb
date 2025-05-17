@@ -15,7 +15,8 @@
             "Adj ORB%" => { column: "adj_offensive_rebound_rate", default_direction: "desc" },
             "Adj DRB%" => { column: "adj_defensive_rebound_rate", default_direction: "desc" },
             "Adj FT Rate" => { column: "adj_free_throw_rate", default_direction: "desc" },
-            "Adj 3PA Rate" => { column: "adj_three_pt_attempt_rate", default_direction: "desc" },
+            "Adj 3PT Prof" => { column: "adj_three_pt_proficiency", default_direction: "desc" },
+            "Adj 3PT Prof Allowed" => { column: "adj_three_pt_proficiency_allowed", default_direction: "asc" },
             "Adj eFG%" => { column: "adj_effective_fg_percentage", default_direction: "desc" },
             "Adj eFG% Allowed" => { column: "adj_effective_fg_percentage_allowed", default_direction: "asc" },
             "Raw ORtg" => { column: "offensive_efficiency", default_direction: "desc" },
@@ -84,7 +85,8 @@
             <td class="px-4 py-2"><%= ts.adj_offensive_rebound_rate %></td>
             <td class="px-4 py-2"><%= ts.adj_defensive_rebound_rate %></td>
             <td class="px-4 py-2"><%= ts.adj_free_throw_rate %></td>
-            <td class="px-4 py-2"><%= ts.adj_three_pt_attempt_rate %></td>
+            <td class="px-4 py-2"><%= ts.adj_three_pt_proficiency %></td>
+            <td class="px-4 py-2"><%= ts.adj_three_pt_proficiency_allowed %></td>
             <td class="px-4 py-2"><%= ts.adj_effective_fg_percentage %></td>
             <td class="px-4 py-2"><%= ts.adj_effective_fg_percentage_allowed %></td>
             <td class="px-4 py-2"><%= ts.offensive_efficiency %></td>

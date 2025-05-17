@@ -42,7 +42,7 @@
     </div>
 
     <div class="mt-8">
-      <h2 class="text-xl font-semibold text-gray-900 mb-4">Adjusted Four Factors</h2>
+      <h2 class="text-xl font-semibold text-gray-900 mb-4">Adjusted Five Factors</h2>
       <% if @snapshots.last %>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
           <!-- Offense -->
@@ -75,6 +75,13 @@
                 <p class="text-lg font-semibold text-gray-900">
                   <%= @snapshots.last.adj_free_throw_rate.round(3) %>
                   <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.adj_free_throw_rate_rank %></span>
+                </p>
+              </div>
+              <div>
+                <p class="text-gray-600">3PT Proficiency</p>
+                <p class="text-lg font-semibold text-gray-900">
+                  <%= @snapshots.last.adj_three_pt_proficiency.round(3) %>
+                  <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.adj_three_pt_proficiency_rank %></span>
                 </p>
               </div>
             </div>
@@ -110,6 +117,13 @@
                 <p class="text-lg font-semibold text-gray-900">
                   <%= @snapshots.last.adj_free_throw_rate_allowed.round(3) %>
                   <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.adj_free_throw_rate_allowed_rank %></span>
+                </p>
+              </div>
+              <div>
+                <p class="text-gray-600">3PT Proficiency Allowed</p>
+                <p class="text-lg font-semibold text-gray-900">
+                  <%= @snapshots.last.adj_three_pt_proficiency_allowed.round(3) %>
+                  <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.adj_three_pt_proficiency_allowed_rank %></span>
                 </p>
               </div>
             </div>

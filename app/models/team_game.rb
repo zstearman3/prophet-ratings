@@ -35,6 +35,7 @@
 #  three_pt_attempted       :integer
 #  three_pt_made            :integer
 #  three_pt_percentage      :decimal(6, 5)
+#  three_pt_proficiency     :decimal(6, 5)
 #  true_shooting_percentage :decimal(6, 5)
 #  turnover_rate            :decimal(6, 5)
 #  turnovers                :integer
@@ -88,6 +89,7 @@ class TeamGame < ApplicationRecord
       two_pt_percentage: calculated_two_pt_percentage,
       three_pt_percentage: calculated_three_pt_percentage,
       field_goals_percentage: calculated_field_goals_percentage,
+      three_pt_proficiency: calculated_three_pt_proficiency,
       free_throws_percentage: calculated_free_throws_percentage,
       true_shooting_percentage: calculated_true_shooting_percentage,
       effective_fg_percentage: calculated_effective_fg_percentage,

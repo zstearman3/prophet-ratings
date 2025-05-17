@@ -12,6 +12,11 @@ module ProphetRatings
         return nil if fga.zero?
 
         (fgm + (0.5 * three_pm)) / fga.to_f
+      },
+      three_pt_proficiency: lambda { |fga:, three_pm:, three_pa:|
+        nil if fga.zero?
+
+        ((2 * (three_pm.to_f / three_pa)) + (three_pa.to_f / fga)) / 3.0
       }
     }.freeze
 
@@ -72,8 +77,10 @@ module ProphetRatings
       fgm = team_season.team_games.sum(&:field_goals_made)
       fga = team_season.team_games.sum(&:field_goals_attempted)
       three_pm = team_season.team_games.sum(&:three_pt_made)
+      three_pa = team_season.team_games.sum(&:three_pt_attempted)
 
       aggregates[:effective_fg_percentage] = DERIVED_STATS[:effective_fg_percentage].call(fgm:, fga:, three_pm:)
+      aggregates[:three_pt_proficiency] = DERIVED_STATS[:three_pt_proficiency].call(fga:, three_pm:, three_pa:)
 
       aggregates
     end
@@ -163,7 +170,7 @@ module ProphetRatings
       games = team_season.team_games
                          .includes(:game)
                          .where(game: { status: Game.statuses[:final], start_time: ..as_of })
-    
+
       wins, losses = games.partition do |tg|
         game = tg.game
         if tg.home?
@@ -172,7 +179,7 @@ module ProphetRatings
           game.away_team_score > game.home_team_score
         end
       end
-    
+
       { wins: wins.size, losses: losses.size }
     end
   end

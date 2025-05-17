@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2025_05_13_034726) do
+ActiveRecord::Schema[7.1].define(version: 2025_05_14_035512) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -176,6 +176,8 @@ ActiveRecord::Schema[7.1].define(version: 2025_05_13_034726) do
     t.decimal "stddev_adj_defensive_rebound_rate", precision: 6, scale: 5
     t.decimal "avg_adj_free_throw_rate_allowed", precision: 6, scale: 5
     t.decimal "stddev_adj_free_throw_rate_allowed", precision: 6, scale: 5
+    t.decimal "avg_adj_three_pt_proficiency", precision: 6, scale: 5
+    t.decimal "stddev_adj_three_pt_proficiency", precision: 6, scale: 5
     t.index ["year"], name: "index_seasons_on_year", unique: true
   end
 
@@ -222,6 +224,7 @@ ActiveRecord::Schema[7.1].define(version: 2025_05_13_034726) do
     t.datetime "updated_at", null: false
     t.bigint "team_season_id", null: false
     t.bigint "opponent_team_season_id"
+    t.decimal "three_pt_proficiency", precision: 6, scale: 5
     t.index ["game_id", "home"], name: "index_team_games_on_game_id_and_home", unique: true
     t.index ["game_id"], name: "index_team_games_on_game_id"
     t.index ["opponent_team_season_id"], name: "index_team_games_on_opponent_team_season_id"
@@ -276,8 +279,6 @@ ActiveRecord::Schema[7.1].define(version: 2025_05_13_034726) do
     t.decimal "adj_defensive_rebound_rate", precision: 6, scale: 5
     t.decimal "adj_free_throw_rate", precision: 6, scale: 5
     t.decimal "adj_free_throw_rate_allowed", precision: 6, scale: 5
-    t.decimal "adj_three_pt_attempt_rate", precision: 6, scale: 5
-    t.decimal "adj_three_pt_attempt_rate_allowed", precision: 6, scale: 5
     t.decimal "home_offense_boost", precision: 6, scale: 3
     t.decimal "home_defense_boost", precision: 6, scale: 3
     t.decimal "away_offense_penalty", precision: 6, scale: 3
@@ -306,9 +307,12 @@ ActiveRecord::Schema[7.1].define(version: 2025_05_13_034726) do
     t.decimal "total_volatility", precision: 6, scale: 3
     t.integer "wins", default: 0
     t.integer "losses", default: 0
-    t.integer "adj_three_pt_attempt_rate_rank"
-    t.integer "adj_three_pt_attempt_rate_allowed_rank"
     t.integer "adj_pace_rank"
+    t.decimal "adj_three_pt_proficiency", precision: 6, scale: 5
+    t.decimal "adj_three_pt_proficiency_allowed", precision: 6, scale: 5
+    t.integer "adj_three_pt_proficiency_rank"
+    t.integer "adj_three_pt_proficiency_allowed_rank"
+    t.decimal "three_pt_proficiency", precision: 6, scale: 5
     t.index ["season_id"], name: "index_team_seasons_on_season_id"
     t.index ["team_id", "season_id"], name: "index_team_seasons_on_team_id_and_season_id", unique: true
     t.index ["team_id"], name: "index_team_seasons_on_team_id"

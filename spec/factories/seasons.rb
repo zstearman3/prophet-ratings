@@ -15,6 +15,7 @@
 #  avg_adj_free_throw_rate_allowed            :decimal(6, 5)
 #  avg_adj_offensive_efficiency               :decimal(6, 3)
 #  avg_adj_offensive_rebound_rate             :decimal(6, 5)
+#  avg_adj_three_pt_proficiency               :decimal(6, 5)
 #  avg_adj_turnover_rate                      :decimal(6, 5)
 #  avg_adj_turnover_rate_forced               :decimal(6, 5)
 #  efficiency_std_deviation                   :decimal(6, 3)
@@ -29,6 +30,7 @@
 #  stddev_adj_free_throw_rate_allowed         :decimal(6, 5)
 #  stddev_adj_offensive_efficiency            :decimal(6, 3)
 #  stddev_adj_offensive_rebound_rate          :decimal(6, 5)
+#  stddev_adj_three_pt_proficiency            :decimal(6, 5)
 #  stddev_adj_turnover_rate                   :decimal(6, 5)
 #  stddev_adj_turnover_rate_forced            :decimal(6, 5)
 #  year                                       :integer          not null
