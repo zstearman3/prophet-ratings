@@ -6,7 +6,15 @@
       ["Adj ORtg", "adj_offensive_efficiency"],
       ["Adj DRtg", "adj_defensive_efficiency"],
       ["Adj Pace", "adj_pace"],
-      ["3PT Proficiency", "adj_three_pt_proficiency"]
+      ["Adj 3PT Proficiency", "adj_three_pt_proficiency"],
+      ["Adj DRB Rate", "adj_defensive_rebound_rate"],
+      ["Adj ORB Rate", "adj_offensive_rebound_rate"],
+      ["Adj eFG%", "adj_effective_fg_percentage"],
+      ["Adj eFG% Allowed", "adj_effective_fg_percentage_allowed"],
+      ["Adj TO Rate", "adj_turnover_rate"],
+      ["Adj TO Rate Forced", "adj_turnover_rate_forced"],
+      ["Adj FTR", "adj_free_throw_rate"],
+      ["Adj FTR Allowed", "adj_free_throw_rate_allowed"]
     ], selected: selected_stat || "rating"), {}, {
       class: "border rounded px-2 py-1 text-sm",
       onchange: "this.form.requestSubmit();"
@@ -16,22 +24,33 @@
 
 <%
   values = chart_data.map { |d| d[1] }.compact
-  if values.present?
-    min_val = values.min
-    max_val = values.max
-    range = max_val - min_val
-    # Round down min and up max to nearest multiple of 5
-    y_min = ((min_val - range * 0.1) / 5.0).floor * 5
-    y_max = ((max_val + range * 0.1) / 5.0).ceil * 5
-    y_axis_opts = { min: y_min, max: y_max }
+  avg_values = defined?(avg_line) && avg_line ? avg_line.map { |d| d[1] }.compact : []
+  all_values = values + avg_values
+  if all_values.present?
+      min_val = all_values.min
+      max_val = all_values.max
+      range = max_val - min_val
+      # Round down min and up max to nearest multiple of 5
+      y_min = ((min_val - range * 0.1) / 5.0).floor * 5
+      y_max = ((max_val + range * 0.1) / 5.0).ceil * 5
+      y_axis_opts = { min: y_min, max: y_max }
   else
     y_axis_opts = {}
   end
 %>
 <div class="my-4">
-  <%= line_chart chart_data,
-      xtitle: "Date",
-      ytitle: selected_stat_title || "Rating",
-      points: false,
-      library: { tension: 0.3, scales: { y: y_axis_opts } } %>
+  <%= line_chart [
+      { name: selected_stat_title || "Rating", data: chart_data },
+      { name: "League Avg", data: avg_line, color: "#888", stroke: { dash: [4, 4] } },
+      { name: "+1 Std Dev", data: upper_line, color: "#ccc", stroke: { dash: [2, 4] } },
+      { name: "-1 Std Dev", data: lower_line, color: "#ccc", stroke: { dash: [2, 4] } }
+    ],
+    xtitle: "Date",
+    ytitle: selected_stat_title || "Rating",
+    points: false,
+    library: {
+      tension: 0.3,
+      scales: { y: y_axis_opts }
+    }
+  %>
 </div>
