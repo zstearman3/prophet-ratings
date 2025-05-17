@@ -13,7 +13,11 @@ Rails.application.routes.draw do
   mount GoodJob::Engine => 'good_job'
 
   root "team_seasons#ratings"
-  resources :games, only: [:index, :show]
+  resources :games, only: [:index, :show] do
+    collection do
+      get :schedule
+    end
+  end
   resource :matchup, only: [:show] do
     post :submit, on: :collection
   end

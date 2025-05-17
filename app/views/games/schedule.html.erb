@@ -1,0 +1,74 @@
+<h1 class="text-xl font-bold mb-4">Schedule for <%= @date.strftime('%B %d, %Y') %></h1>
+
+<%= form_with url: schedule_games_path, method: :get, local: true, class: "mb-4 flex gap-2" do |form| %>
+  <%= form.label :date, "Date:", class: "font-semibold" %>
+  <%= form.date_field :date, value: @date, class: "border rounded px-2 py-1" %>
+  <%= form.submit "Go", class: "bg-gray-900 hover:bg-gray-800 text-white font-bold py-2 px-4 rounded inline-flex items-center space-x-2" %>
+<% end %>
+
+<table class="table-auto w-full border">
+  <thead>
+    <tr class="bg-gray-100">
+      <th class="px-4 py-2 text-left">Matchup</th>
+      <th class="px-4 py-2 text-left">Status</th>
+      <th class="px-4 py-2 text-left">Score</th>
+      <th class="px-4 py-2 text-left">Prediction</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% @games.each do |game| %>
+      <tr class="border-t">
+        <td class="px-4 py-2 font-semibold">
+          <%= link_to "#{game.away_team_name} @ #{game.home_team_name}", game_path(game),
+            class: "text-gray-800 hover:text-blue-600" %>
+        </td>
+        <td class="px-4 py-2">
+          <% status = game.status_string.upcase %>
+          <% badge_class, badge_label = case
+            when status.include?("FINAL")
+              ["bg-green-100 text-green-700", game.status_string]
+            when status.include?("SCHEDULED")
+              ["bg-gray-100 text-gray-600", "Scheduled"]
+            when status.include?("CANCELED")
+              ["bg-red-100 text-red-700", "Canceled"]
+            else
+              ["bg-gray-100 text-gray-600", game.status_string]
+          end %>
+          <span class="text-xs px-2 py-0.5 rounded <%= badge_class %>"><%= badge_label %></span>
+        </td>
+        <td class="px-4 py-2">
+          <% if game.final? %>
+            <%= game.away_team_score %> - <%= game.home_team_score %>
+          <% else %>
+            --
+          <% end %>
+        </td>
+        <td class="px-4 py-2">
+          <%# Helper to get the latest snapshot for a team_season_id up to a date %>
+          <% def latest_snapshot_for(ts_id, date)
+               snaps = @snapshots_by_team_season_and_date[ts_id]
+               return nil unless snaps
+               snaps.select { |d, _| d <= date }.values.max_by { |snap| snap.snapshot_date }
+             end %>
+          <% home_snapshot = latest_snapshot_for(game.home_team_game&.team_season_id, game.start_time.to_date) %>
+          <% away_snapshot = latest_snapshot_for(game.away_team_game&.team_season_id, game.start_time.to_date) %>
+          <% prediction = game.predictions.find do |p|
+               p.home_team_snapshot_id == home_snapshot&.id &&
+               p.away_team_snapshot_id == away_snapshot&.id
+             end %>
+          <% if prediction.present? %>
+            <span class="block"><%= prediction.predicted_score_string %></span>
+            <span class="text-xs text-gray-500">Home win: <%= number_to_percentage(prediction.home_win_probability * 100, precision: 1) %></span>
+          <% else %>
+            <span class="text-xs text-gray-400">No prediction</span>
+          <% end %>
+        </td>
+      </tr>
+    <% end %>
+    <% if @games.empty? %>
+      <tr>
+        <td colspan="4" class="text-center text-gray-400 py-4">No games scheduled for this date.</td>
+      </tr>
+    <% end %>
+  </tbody>
+</table>

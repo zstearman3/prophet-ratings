@@ -74,12 +74,12 @@ class Prediction < ApplicationRecord
   def predicted_score_string
     if home_score.round == away_score.round
       if home_score > away_score
-        "#{home_score.round + 1} - #{away_score.round}"
+        "#{away_score.round} - #{home_score.round + 1}"
       else
-        "#{home_score.round} - #{away_score.round + 1}"
+        "#{away_score.round + 1} - #{home_score.round}"
       end
     else
-      "#{home_score.round} - #{away_score.round}"
+      "#{away_score.round} - #{home_score.round}"
     end
   end
 
