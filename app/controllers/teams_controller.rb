@@ -12,7 +12,18 @@ class TeamsController < ApplicationController
                              .where(ratings_config_version: @config)
                              .order(:snapshot_date)
 
-    @chart_data = @snapshots.map { |s| [s.snapshot_date, s.rating] }
+    # Stat selection for chart
+    stat_param = params[:stat].presence || 'rating'
+    stat_options = {
+      'rating' => 'Rating',
+      'adj_offensive_efficiency' => 'Adj ORtg',
+      'adj_defensive_efficiency' => 'Adj DRtg',
+      'adj_pace' => 'Adj Pace',
+      'adj_three_pt_proficiency' => '3PT Proficiency'
+    }
+    @selected_stat = stat_param
+    @selected_stat_title = stat_options[@selected_stat] || 'Rating'
+    @chart_data = @snapshots.map { |s| [s.snapshot_date, s[@selected_stat] || s.rating] }
 
     @team_games = @team_season.team_games
                               .includes(
@@ -32,19 +43,21 @@ class TeamsController < ApplicationController
       .where('snapshot_date <= ?', @team_games.map(&:game).map(&:start_time).max.to_date)
       .group_by(&:team_season_id)
 
-      @predictions_by_game = {}
+    @predictions_by_game = {}
 
     @team_games.each do |tg|
       game = tg.game
-    
       latest_snapshot_date = @snapshots.last&.snapshot_date
       next unless latest_snapshot_date
-    
       prediction = game.predictions.find do |p|
-          p.home_team_snapshot.ratings_config_version_id == @config.id
+        p.home_team_snapshot.ratings_config_version_id == @config.id
       end
-    
       @predictions_by_game[game.id] = prediction
+    end
+
+    respond_to do |format|
+      format.html
+      format.turbo_stream if turbo_frame_request?
     end
   end
 end

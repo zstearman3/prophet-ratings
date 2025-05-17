@@ -1,0 +1,37 @@
+<%= form_with url: team_path(team), method: :get, data: { turbo_frame: "chart" }, local: false do |f| %>
+  <div class="flex items-center space-x-2 mb-4">
+    <%= f.label :stat, "Stat:", class: "text-sm text-gray-700" %>
+    <%= f.select :stat, options_for_select([
+      ["Rating", "rating"],
+      ["Adj ORtg", "adj_offensive_efficiency"],
+      ["Adj DRtg", "adj_defensive_efficiency"],
+      ["Adj Pace", "adj_pace"],
+      ["3PT Proficiency", "adj_three_pt_proficiency"]
+    ], selected: selected_stat || "rating"), {}, {
+      class: "border rounded px-2 py-1 text-sm",
+      onchange: "this.form.requestSubmit();"
+    } %>
+  </div>
+<% end %>
+
+<%
+  values = chart_data.map { |d| d[1] }.compact
+  if values.present?
+    min_val = values.min
+    max_val = values.max
+    range = max_val - min_val
+    # Round down min and up max to nearest multiple of 5
+    y_min = ((min_val - range * 0.1) / 5.0).floor * 5
+    y_max = ((max_val + range * 0.1) / 5.0).ceil * 5
+    y_axis_opts = { min: y_min, max: y_max }
+  else
+    y_axis_opts = {}
+  end
+%>
+<div class="my-4">
+  <%= line_chart chart_data,
+      xtitle: "Date",
+      ytitle: selected_stat_title || "Rating",
+      points: false,
+      library: { tension: 0.3, scales: { y: y_axis_opts } } %>
+</div>
