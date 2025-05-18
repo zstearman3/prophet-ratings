@@ -153,8 +153,7 @@ class Game < ApplicationRecord
   def calculated_neutrality
     return unless home_team&.location
 
-    location.exclude?(home_team&.location)
-    # && (location != home_team.probable_home_venue)
+    location.exclude?(home_team.location) && (location != home_team.home_venue)
   end
 
   def calculate_possessions

@@ -8,8 +8,10 @@
 #  home_venue     :string
 #  location       :string
 #  nickname       :string
+#  primary_color  :string
 #  school         :string
 #  secondary_name :string
+#  short_name     :string
 #  slug           :string
 #  url            :string
 #  created_at     :datetime         not null

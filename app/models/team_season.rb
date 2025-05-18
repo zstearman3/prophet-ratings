@@ -79,7 +79,6 @@ class TeamSeason < ApplicationRecord
   has_many :games, through: :team_games
   has_many :team_rating_snapshots, dependent: :destroy
   has_many :predictions, through: :team_rating_snapshots
-  has_many :season_ratings, dependent: :destroy
 
   scope :current, -> { where(season: Season.current) }
 
