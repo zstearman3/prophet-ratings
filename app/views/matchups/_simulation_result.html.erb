@@ -1,8 +1,20 @@
 <% if result %>
-  <div class="bg-green-50 p-4 rounded-lg mt-6">
-    <h2 class="text-lg font-semibold text-gray-800 mb-4">Simulation Results</h2>
-    <p><strong>Home Wins:</strong> <%= result.home_wins %></p>
-    <p><strong>Away Wins:</strong> <%= result.away_wins %></p>
-    <p><strong>Total Sims:</strong> <%= result.total %></p>
+  <div class="bg-indigo-50 p-4 rounded-lg mt-6">
+    <h2 class="text-lg font-semibold text-gray-800 mb-4">Simulated Result</h2>
+
+    <div class="mb-2">
+      <p><strong>Home:</strong> <%= result[:home_team] %> — <%= number_with_precision(result[:home_score], precision: 1) %> pts</p>
+      <p><strong>Away:</strong> <%= result[:away_team] %> — <%= number_with_precision(result[:away_score], precision: 1) %> pts</p>
+    </div>
+
+    <div class="mt-2 font-medium text-gray-700">
+      <% if result[:home_score] > result[:away_score] %>
+        🏠 <%= result[:home_team] %> wins
+      <% elsif result[:away_score] > result[:home_score] %>
+        🚗 <%= result[:away_team] %> wins
+      <% else %>
+        🤝 Tie game
+      <% end %>
+    </div>
   </div>
 <% end %>

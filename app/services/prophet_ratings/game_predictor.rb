@@ -17,11 +17,15 @@ module ProphetRatings
       @call ||= build_prediction_hash
     end
 
-    def simulated_scores
+    def simulate
+      home_team = @home_rating_snapshot.team.school
+      away_team = @away_rating_snapshot.team.school
       pace = Gaussian.new(expected_pace, total_pace_volatility).rand
       home_ortg = Gaussian.new(home_expected_ortg, total_home_volatility).rand
       away_ortg = Gaussian.new(away_expected_ortg, total_away_volatility).rand
       {
+        home_team:,
+        away_team:,
         home_score: (pace * (home_ortg / 100.0)).round(2),
         away_score: (pace * (away_ortg / 100.0)).round(2)
       }

@@ -1,15 +1,15 @@
 # frozen_string_literal: true
 
 module ApplicationHelper
-  def icon_button(form, text:, icon_svg:, **options)
+  def icon_button(form, text:, icon_svg:, title:, **options)
     name  = options.delete(:name)
     value = options.delete(:value)
     css   = options.delete(:class)
     data  = options.delete(:data)
-  
+
     icon = icon_svg.respond_to?(:html_safe) ? icon_svg.html_safe : icon_svg
-  
-    form.button name: name, value: value, class: css, data: data, type: :submit do
+
+    form.button name:, value:, title:, class: css, data:, type: :submit do
       "#{icon}<span>#{text}</span>".html_safe
     end
   end
@@ -24,7 +24,7 @@ module ApplicationHelper
       </svg>
     SVG
   end
-  
+
   def lucide_dice
     <<~SVG
       <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
@@ -36,5 +36,5 @@ module ApplicationHelper
         <circle cx="15.5" cy="15.5" r="1.25" fill="currentColor"/>
       </svg>
     SVG
-  end  
+  end
 end
