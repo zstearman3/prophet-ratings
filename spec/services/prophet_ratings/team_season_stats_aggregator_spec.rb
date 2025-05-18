@@ -27,10 +27,13 @@ RSpec.describe ProphetRatings::TeamSeasonStatsAggregator, type: :service do
                                assists: 12,
                                steals: 5,
                                blocks: 3)
+      team_games.each do |tg|
+        tg.game.update!(home_team_score: 70, away_team_score: 65)
+      end
 
       team_games.each(&:calculate_game_stats)
 
-      described_class.new(season).run
+      described_class.new(season: season).run
       team_season.reload
     end
 

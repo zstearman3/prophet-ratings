@@ -6,6 +6,7 @@ ruby '3.2.2'
 gem 'activerecord-import'
 gem 'chartkick'
 gem 'cssbundling-rails'
+gem 'devise'
 gem 'enumerable-statistics'
 gem 'good_job', '~> 3.23'
 gem 'groupdate'
@@ -15,6 +16,7 @@ gem 'jsbundling-rails'
 gem 'pg', '~> 1.1'
 gem 'puma', '>= 5.0'
 gem 'rails', '~> 7.1.3'
+gem 'rails_admin'
 gem 'redis', '>= 4.0.1'
 gem 'sprockets-rails'
 gem 'stimulus-rails'
@@ -61,4 +63,6 @@ group :test do
   # Use system testing [https://guides.rubyonrails.org/testing.html#system-testing]
   gem 'capybara'
   gem 'selenium-webdriver'
+  gem 'faker'
 end
+gem "sassc-rails"

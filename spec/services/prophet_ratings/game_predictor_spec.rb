@@ -38,10 +38,13 @@ RSpec.describe ProphetRatings::GamePredictor do
     end
 
     it 'returns expected prediction structure' do
+      config = create(:ratings_config_version)
+      home_snapshot = create(:team_rating_snapshot, team_season: home_team_season, ratings_config_version: config)
+      away_snapshot = create(:team_rating_snapshot, team_season: away_team_season, ratings_config_version: config)
       result = described_class.new(
-        home_team_season:,
-        away_team_season:,
-        season:
+        home_rating_snapshot: home_snapshot,
+        away_rating_snapshot: away_snapshot,
+        season: season
       ).call
 
       expect(result).to include(

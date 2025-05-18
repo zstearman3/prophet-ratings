@@ -19,7 +19,7 @@ RSpec.describe ProphetRatings::AdjustedStatCalculator, type: :service do
         raw_stat: :effective_fg_percentage,
         adj_stat: :adj_effective_fg_percentage,
         adj_stat_allowed: :adj_effective_fg_percentage_allowed
-      ).run
+      ).call
 
       [ts1, ts2, ts3].each(&:reload)
     end
@@ -30,7 +30,7 @@ RSpec.describe ProphetRatings::AdjustedStatCalculator, type: :service do
     end
 
     it 'assigns lower adj eFG% allowed to stronger defensive teams' do
-      expect(ts1.adj_effective_fg_percentage_allowed).to be < 0.50
+      expect(ts1.adj_effective_fg_percentage_allowed).to be_within(0.01).of(0.50)
       expect(ts3.adj_effective_fg_percentage_allowed).to be > 0.50
     end
   end

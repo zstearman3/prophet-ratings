@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -e
+
+echo "== Preparing ProphetRatings data =="
+
+echo "--- Running DB setup (if needed) ---"
+bin/rails db:prepare
+
+echo "--- Importing base models ---"
+bin/rails import:teams
+bin/rails import:conferences
+bin/rails import:seasons
+bin/rails import:team_seasons
+bin/rails import:team_conferences
+bin/rails import:logos
+
+echo "--- Cleaning up school names ---"
+bin/rails import:normalize_school_names
+
+echo "--- Importing games and stats ---"
+bin/rails import:games
+bin/rails import:team_games
+
+echo "--- Running prediction backfill ---"
+bin/rails predictions:backfill
+
+echo "== ✅ Setup complete =="

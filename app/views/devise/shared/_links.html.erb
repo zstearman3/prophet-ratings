@@ -1,0 +1,5 @@
+<!-- app/views/devise/shared/_links.html.erb -->
+<%# Remove the sign-up link since you don't allow registration %>
+<% if controller_name != 'sessions' %>
+  <%= link_to "Log in", new_session_path(resource_name) %><br />
+<% end %>

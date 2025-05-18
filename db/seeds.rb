@@ -1,17 +1,19 @@
+#frozen_string_literal: true
+
 require 'csv'
 
-# teams_file = File.join(Rails.root, 'db', 'seeds', 'scraped_teams.csv')
+teams_file = File.join(Rails.root, 'db', 'seeds', 'scraped_teams.csv')
 
-# CSV.foreach(teams_file, headers: true) do |row|
-#   Team.upsert({
-#     school: row["school"],
-#     nickname: row["nickname"],
-#     url: row["url"],
-#     location: row["location"],
-#     secondary_name: row["secondary_name"]},
-#     unique_by: :school
-#   )
-# end
+CSV.foreach(teams_file, headers: true) do |row|
+  Team.upsert({
+    school: row["school"],
+    nickname: row["nickname"],
+    url: row["url"],
+    location: row["location"],
+    secondary_name: row["secondary_name"]},
+    unique_by: :school
+  )
+end
 
 Season.find_or_create_by(
   year: 2024, 
