@@ -9,6 +9,7 @@
 #  away_team_score :integer
 #  home_team_name  :string           not null
 #  home_team_score :integer
+#  in_conference   :boolean          default(FALSE)
 #  location        :string
 #  minutes         :integer
 #  neutral         :boolean
@@ -93,6 +94,7 @@ class Game < ApplicationRecord
     calculate_possessions
     calculate_neutrality
     calculate_minutes
+    calculate_conference
 
     home_team_game&.calculate_game_stats
     away_team_game&.calculate_game_stats
@@ -165,6 +167,10 @@ class Game < ApplicationRecord
 
   def calculate_minutes
     update(minutes: calculated_minutes)
+  end
+
+  def calculate_conference
+    update(in_conference: home_team_season&.conference == away_team_season&.conference)
   end
 
   def home_rating_snapshot

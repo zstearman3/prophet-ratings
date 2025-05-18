@@ -34,6 +34,8 @@ class Team < ApplicationRecord
   has_many :games, through: :team_games
   has_many :home_games, through: :home_team_games, source: :game
   has_many :away_games, through: :away_team_games, source: :game
+  has_many :team_conferences, dependent: :destroy
+  has_many :conferences, through: :team_conferences
 
   scope :search, lambda { |name|
     where('school = :name OR nickname = :name OR secondary_name = :name', name:)
@@ -43,6 +45,17 @@ class Team < ApplicationRecord
 
   def to_param
     slug
+  end
+
+  def conference_for(season)
+    team_conferences.find do |tc|
+      season.year >= tc.start_season.year &&
+        (tc.end_season.nil? || season.year <= tc.end_season.year)
+    end&.conference
+  end
+
+  def current_conference
+    conference_for(Season.current)
   end
 
   private

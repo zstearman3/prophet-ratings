@@ -171,6 +171,8 @@ module ProphetRatings
                          .includes(:game)
                          .where(game: { status: Game.statuses[:final], start_time: ..as_of })
 
+      conference_games = games.select { |tg| tg.game.in_conference? }
+
       wins, losses = games.partition do |tg|
         game = tg.game
         if tg.home?
@@ -180,7 +182,20 @@ module ProphetRatings
         end
       end
 
-      { wins: wins.size, losses: losses.size }
+      conference_wins, conference_losses = conference_games.partition do |tg|
+        game = tg.game
+
+        if tg.home?
+          game.home_team_score > game.away_team_score
+        else
+          game.away_team_score > game.home_team_score
+        end
+      end
+
+      { wins: wins.size,
+        losses: losses.size,
+        conference_wins: conference_wins.size,
+        conference_losses: conference_losses.size }
     end
   end
 end

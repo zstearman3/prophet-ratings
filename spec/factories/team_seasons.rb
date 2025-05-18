@@ -33,6 +33,8 @@
 #  adj_turnover_rate_rank                   :integer
 #  away_defense_penalty                     :decimal(6, 3)
 #  away_offense_penalty                     :decimal(6, 3)
+#  conference_losses                        :integer          default(0)
+#  conference_wins                          :integer          default(0)
 #  defensive_efficiency                     :decimal(6, 3)
 #  defensive_efficiency_std_dev             :decimal(6, 3)
 #  defensive_efficiency_volatility          :decimal(6, 3)

@@ -10,9 +10,19 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2025_05_14_035512) do
+ActiveRecord::Schema[7.1].define(version: 2025_05_18_022216) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
+
+  create_table "conferences", force: :cascade do |t|
+    t.string "name", null: false
+    t.string "abbreviation"
+    t.string "slug"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_conferences_on_name"
+    t.index ["slug"], name: "index_conferences_on_slug"
+  end
 
   create_table "games", force: :cascade do |t|
     t.string "url", null: false
@@ -29,6 +39,7 @@ ActiveRecord::Schema[7.1].define(version: 2025_05_14_035512) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.integer "minutes"
+    t.boolean "in_conference", default: false
     t.index ["season_id"], name: "index_games_on_season_id"
   end
 
@@ -181,6 +192,20 @@ ActiveRecord::Schema[7.1].define(version: 2025_05_14_035512) do
     t.index ["year"], name: "index_seasons_on_year", unique: true
   end
 
+  create_table "team_conferences", force: :cascade do |t|
+    t.bigint "team_id", null: false
+    t.bigint "conference_id", null: false
+    t.bigint "start_season_id", null: false
+    t.bigint "end_season_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["conference_id"], name: "index_team_conferences_on_conference_id"
+    t.index ["end_season_id"], name: "index_team_conferences_on_end_season_id"
+    t.index ["start_season_id"], name: "index_team_conferences_on_start_season_id"
+    t.index ["team_id", "start_season_id", "end_season_id"], name: "index_team_conferences_on_team_and_season_range", unique: true
+    t.index ["team_id"], name: "index_team_conferences_on_team_id"
+  end
+
   create_table "team_games", force: :cascade do |t|
     t.bigint "team_id", null: false
     t.bigint "game_id", null: false
@@ -313,6 +338,8 @@ ActiveRecord::Schema[7.1].define(version: 2025_05_14_035512) do
     t.integer "adj_three_pt_proficiency_rank"
     t.integer "adj_three_pt_proficiency_allowed_rank"
     t.decimal "three_pt_proficiency", precision: 6, scale: 5
+    t.integer "conference_wins", default: 0
+    t.integer "conference_losses", default: 0
     t.index ["season_id"], name: "index_team_seasons_on_season_id"
     t.index ["team_id", "season_id"], name: "index_team_seasons_on_team_id_and_season_id", unique: true
     t.index ["team_id"], name: "index_team_seasons_on_team_id"
@@ -334,6 +361,10 @@ ActiveRecord::Schema[7.1].define(version: 2025_05_14_035512) do
 
   add_foreign_key "predictions", "team_rating_snapshots", column: "away_team_snapshot_id"
   add_foreign_key "predictions", "team_rating_snapshots", column: "home_team_snapshot_id"
+  add_foreign_key "team_conferences", "conferences"
+  add_foreign_key "team_conferences", "seasons", column: "end_season_id"
+  add_foreign_key "team_conferences", "seasons", column: "start_season_id"
+  add_foreign_key "team_conferences", "teams"
   add_foreign_key "team_games", "team_seasons", column: "opponent_team_season_id"
   add_foreign_key "team_rating_snapshots", "ratings_config_versions"
   add_foreign_key "team_rating_snapshots", "seasons"
