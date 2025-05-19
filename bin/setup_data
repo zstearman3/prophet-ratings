@@ -13,6 +13,6 @@ echo "--- Importing games and stats ---"
 bin/rails import:games
 
 echo "--- Running prediction backfill ---"
-bin/rails predictions:backfill
+bin/rails ratings:backfill_all
 
 echo "== ✅ Setup complete =="

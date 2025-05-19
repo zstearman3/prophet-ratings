@@ -90,9 +90,9 @@ class Season < ApplicationRecord
     )
   end
 
-  def set_current
-    Season.each { |s| s.update(current: false) }
-    update(current: true)
+  def set_current!
+    Season.find_each { |s| s.update!(current: false) }
+    update!(current: true)
   end
 
   private

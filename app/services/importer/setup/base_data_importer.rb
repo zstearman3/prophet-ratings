@@ -53,7 +53,8 @@ module Importer
                         start_date: Date.new(2024, 11, 1),
                         end_date: Date.new(2025, 4, 10),
                         average_efficiency: 105.5,
-                        average_pace: 69.0
+                        average_pace: 69.0,
+                        current: true
                       }, unique_by: :year)
       end
 
