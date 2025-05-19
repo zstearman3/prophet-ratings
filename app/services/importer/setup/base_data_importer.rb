@@ -19,6 +19,7 @@ module Importer
 
       private
 
+      # rubocop:disable Rails/SkipsModelValidations
       def import_teams
         path = Rails.root.join('db/seeds/scraped_teams.csv')
         CSV.foreach(path, headers: true) do |row|
@@ -37,21 +38,23 @@ module Importer
       end
 
       def import_seasons
-        Season.find_or_create_by!(
-          year: 2024,
-          start_date: Date.new(2023, 11, 6),
-          end_date: Date.new(2024, 4, 8),
-          average_efficiency: 105.5,
-          average_pace: 69.0
-        )
+        Season.upsert({
+                        name: '2023-24',
+                        year: 2024,
+                        start_date: Date.new(2023, 11, 6),
+                        end_date: Date.new(2024, 4, 8),
+                        average_efficiency: 105.5,
+                        average_pace: 69.0
+                      }, unique_by: :year)
 
-        Season.find_or_create_by!(
-          year: 2025,
-          start_date: Date.new(2024, 11, 1),
-          end_date: Date.new(2025, 4, 10),
-          average_efficiency: 105.5,
-          average_pace: 69.0
-        )
+        Season.upsert({
+                        name: '2024-05',
+                        year: 2025,
+                        start_date: Date.new(2024, 11, 1),
+                        end_date: Date.new(2025, 4, 10),
+                        average_efficiency: 105.5,
+                        average_pace: 69.0
+                      }, unique_by: :year)
       end
 
       def import_team_seasons
@@ -87,6 +90,7 @@ module Importer
           )
         end
       end
+      # rubocop:enable Rails/SkipsModelValidations
     end
   end
 end

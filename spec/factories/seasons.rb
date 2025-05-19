@@ -18,8 +18,10 @@
 #  avg_adj_three_pt_proficiency               :decimal(6, 5)
 #  avg_adj_turnover_rate                      :decimal(6, 5)
 #  avg_adj_turnover_rate_forced               :decimal(6, 5)
+#  current                                    :boolean          default(FALSE)
 #  efficiency_std_deviation                   :decimal(6, 3)
 #  end_date                                   :date             not null
+#  name                                       :string
 #  pace_std_deviation                         :decimal(6, 3)
 #  start_date                                 :date             not null
 #  stddev_adj_defensive_efficiency            :decimal(6, 3)
@@ -39,7 +41,8 @@
 #
 # Indexes
 #
-#  index_seasons_on_year  (year) UNIQUE
+#  index_seasons_on_current  (current) UNIQUE WHERE (current IS TRUE)
+#  index_seasons_on_year     (year) UNIQUE
 #
 FactoryBot.define do
   factory :season do

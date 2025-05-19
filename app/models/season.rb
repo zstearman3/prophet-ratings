@@ -18,8 +18,10 @@
 #  avg_adj_three_pt_proficiency               :decimal(6, 5)
 #  avg_adj_turnover_rate                      :decimal(6, 5)
 #  avg_adj_turnover_rate_forced               :decimal(6, 5)
+#  current                                    :boolean          default(FALSE)
 #  efficiency_std_deviation                   :decimal(6, 3)
 #  end_date                                   :date             not null
+#  name                                       :string
 #  pace_std_deviation                         :decimal(6, 3)
 #  start_date                                 :date             not null
 #  stddev_adj_defensive_efficiency            :decimal(6, 3)
@@ -39,18 +41,18 @@
 #
 # Indexes
 #
-#  index_seasons_on_year  (year) UNIQUE
+#  index_seasons_on_current  (current) UNIQUE WHERE (current IS TRUE)
+#  index_seasons_on_year     (year) UNIQUE
 #
 class Season < ApplicationRecord
   validates :year, presence: true, uniqueness: true
+  validate :only_one_current_season, if: :current?
 
   has_many :games, dependent: :destroy
   has_many :team_seasons, dependent: :destroy
   has_many :predictions, through: :games
 
-  def self.current
-    order(year: :desc).first
-  end
+  scope :current, -> { find_by(current: true) }
 
   def update_average_ratings
     update!(
@@ -74,7 +76,7 @@ class Season < ApplicationRecord
       avg_adj_defensive_rebound_rate: team_seasons.average(:adj_defensive_rebound_rate),
       avg_adj_free_throw_rate: team_seasons.average(:adj_free_throw_rate),
       avg_adj_free_throw_rate_allowed: team_seasons.average(:adj_free_throw_rate_allowed),
-  
+
       stddev_adj_offensive_efficiency: stddev(:adj_offensive_efficiency),
       stddev_adj_defensive_efficiency: stddev(:adj_defensive_efficiency),
       stddev_adj_effective_fg_percentage: stddev(:adj_effective_fg_percentage),
@@ -86,6 +88,11 @@ class Season < ApplicationRecord
       stddev_adj_free_throw_rate: stddev(:adj_free_throw_rate),
       stddev_adj_free_throw_rate_allowed: stddev(:adj_free_throw_rate_allowed)
     )
+  end
+
+  def set_current
+    Season.each { |s| s.update(current: false) }
+    update(current: true)
   end
 
   private
@@ -108,5 +115,11 @@ class Season < ApplicationRecord
 
   def stddev(column)
     team_seasons.pick(Arel.sql("STDDEV_POP(#{column})"))
+  end
+
+  def only_one_current_season
+    return unless current? && Season.where(current: true).where.not(id:).exists?
+
+    errors.add(:current, 'can only be set on one season at a time')
   end
 end

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2025_05_18_190953) do
+ActiveRecord::Schema[7.1].define(version: 2025_05_19_011042) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -189,6 +189,9 @@ ActiveRecord::Schema[7.1].define(version: 2025_05_18_190953) do
     t.decimal "stddev_adj_free_throw_rate_allowed", precision: 6, scale: 5
     t.decimal "avg_adj_three_pt_proficiency", precision: 6, scale: 5
     t.decimal "stddev_adj_three_pt_proficiency", precision: 6, scale: 5
+    t.boolean "current", default: false
+    t.string "name"
+    t.index ["current"], name: "index_seasons_on_current", unique: true, where: "(current IS TRUE)"
     t.index ["year"], name: "index_seasons_on_year", unique: true
   end
 
@@ -256,6 +259,20 @@ ActiveRecord::Schema[7.1].define(version: 2025_05_18_190953) do
     t.index ["team_id", "game_id"], name: "index_team_games_on_team_id_and_game_id", unique: true
     t.index ["team_id"], name: "index_team_games_on_team_id"
     t.index ["team_season_id"], name: "index_team_games_on_team_season_id"
+  end
+
+  create_table "team_offseason_profiles", force: :cascade do |t|
+    t.bigint "team_season_id", null: false
+    t.integer "recruiting_class_rank"
+    t.float "recruiting_score"
+    t.float "returning_minutes_pct"
+    t.float "returning_bpm_total"
+    t.integer "lost_starters"
+    t.boolean "coaching_change"
+    t.float "manual_adjustment"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["team_season_id"], name: "index_team_offseason_profiles_on_team_season_id"
   end
 
   create_table "team_rating_snapshots", force: :cascade do |t|
