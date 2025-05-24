@@ -18,6 +18,7 @@ gem 'puma', '>= 5.0'
 gem 'rails', '~> 7.1.3'
 gem 'rails_admin'
 gem 'redis', '>= 4.0.1'
+gem 'sassc'
 gem 'sprockets-rails'
 gem 'stimulus-rails'
 gem 'tailwindcss-rails'
@@ -65,4 +66,3 @@ group :test do
   gem 'selenium-webdriver'
   gem 'faker'
 end
-gem "sassc-rails"

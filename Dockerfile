@@ -2,7 +2,7 @@
 
 # Make sure RUBY_VERSION matches the Ruby version in .ruby-version and Gemfile
 ARG RUBY_VERSION=3.2.2
-FROM registry.docker.com/library/ruby:$RUBY_VERSION-slim as base
+FROM registry.docker.com/library/ruby:$RUBY_VERSION-slim AS base
 
 # Rails app lives here
 WORKDIR /rails
@@ -15,11 +15,13 @@ ENV RAILS_ENV="production" \
 
 
 # Throw-away build stage to reduce size of final image
-FROM base as build
+FROM base AS build
 
 # Install packages needed to build gems and node modules
 RUN apt-get update -qq && \
-    apt-get install --no-install-recommends -y build-essential curl git libpq-dev libvips node-gyp pkg-config python-is-python3
+    apt-get install --no-install-recommends -y \
+    build-essential curl git libpq-dev libvips node-gyp pkg-config python-is-python3 \
+    imagemagick libmagickwand-dev
 
 # Install JavaScript dependencies
 ARG NODE_VERSION=18.16.0
@@ -47,7 +49,8 @@ COPY . .
 RUN bundle exec bootsnap precompile app/ lib/
 
 # Precompiling assets for production without requiring secret RAILS_MASTER_KEY
-RUN SECRET_KEY_BASE_DUMMY=1 ./bin/rails assets:precompile
+ENV RAILS_ENV=production
+RUN SECRET_KEY_BASE_DUMMY=1 DATABASE_URL=postgresql://localhost/dummy ./bin/rails assets:precompile
 
 
 # Final stage for app image
