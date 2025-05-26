@@ -19,6 +19,13 @@ namespace :ratings do
 
     puts "Backfilling ratings for season: #{season.year}"
     ProphetRatings::PreseasonRatingsCalculator.new(season).call
+    season.team_seasons.each do |ts|
+      ts.update(
+        adj_offensive_efficiency: ts.preseason_adj_offensive_efficiency,
+        adj_defensive_efficiency: ts.preseason_adj_defensive_efficiency,
+        adj_pace: ts.preseason_adj_pace
+      )
+    end
 
     (start_date..season.end_date).each do |date|
       puts "Backfilling for #{date}..."

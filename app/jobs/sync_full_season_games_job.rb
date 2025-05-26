@@ -17,12 +17,12 @@ class SyncFullSeasonGamesJob < ApplicationJob
       rescue StandardError => e
         if retry_count < MAX_RETRIES
           delay = BASE_DELAY_SECONDS * (2**retry_count)
-          Rails.logger.warn { "Failed to import games for #{d}: #{e.message}. Retrying in #{delay} seconds..." }
+          Rails.logger.warn { "Failed to import games for #{date}: #{e.message}. Retrying in #{delay} seconds..." }
           sleep delay
           retry_count += 1
           retry
         else
-          Rails.logger.error { "Failed to import games for #{d} after #{MAX_RETRIES} attempts: #{e.message}" }
+          Rails.logger.error { "Failed to import games for #{date} after #{MAX_RETRIES} attempts: #{e.message}" }
         end
       end
     end

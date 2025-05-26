@@ -3,6 +3,8 @@ set -e
 
 echo "== Preparing ProphetRatings data =="
 
+export RAILS_ENV=${RAILS_ENV:-production}
+
 echo "--- Running DB setup (if needed) ---"
 bin/rails db:prepare
 
@@ -16,3 +18,9 @@ echo "--- Running prediction backfill ---"
 bin/rails ratings:backfill_all
 
 echo "== ✅ Setup complete =="
+
+TEAM_COUNT=$(bin/rails runner "puts Team.count")
+if [ "$TEAM_COUNT" -eq "0" ]; then
+  echo "🚨 No teams found after setup. Something failed."
+  exit 1
+fi

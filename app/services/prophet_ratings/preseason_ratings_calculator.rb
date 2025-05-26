@@ -4,7 +4,7 @@ module ProphetRatings
   class PreseasonRatingsCalculator
     def initialize(season = Season.current)
       @season = season
-      @previous_season = Season.find_by(year: season.year - 1)
+      @previous_season = Season.find_by(year: @season.year - 1)
     end
 
     def call

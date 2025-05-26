@@ -19,8 +19,10 @@ module ProphetRatings
     def call(as_of: [Time.current, Season.current.end_date].min)
       TeamSeasonStatsAggregator.new(season: @season, as_of:).run
       @season.update_average_ratings
-      run_least_squares_adjustments(as_of:) if (as_of.to_date - @season.start_date) > 14
-      recalculate_all_aggregate_ratings
+      if (as_of.to_date - @season.start_date) > 14
+        run_least_squares_adjustments(as_of:)
+        recalculate_all_aggregate_ratings
+      end
       TeamRatingSnapshotService.new(season: @season, as_of:).call
       @season.update_adjusted_averages
     end

@@ -32,7 +32,7 @@ module StatisticsUtils
     require 'open3'
     require 'json'
 
-    ridge_alpha = Rails.application.config_for(:ratings).dig('ridge', 'alpha') || 0.0
+    ridge_alpha = Rails.application.config_for(:ratings).dig(:ridge, :alpha) || 0.0
     weights ||= Array.new(b_vector.length, 1.0)
 
     unless weights.size == b_vector.size
