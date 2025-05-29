@@ -86,9 +86,15 @@ class TeamSeason < ApplicationRecord
   def rank(as_of: nil)
     bundle_name = Rails.application.config_for(:ratings).bundle_name
     config = RatingsConfigVersion.find_by(name: bundle_name)
+    season = if as_of.present?
+               Season.find_by('start_date <= ? AND end_date >= ?', as_of, as_of)
+             else
+               Season.current
+             end
 
     snapshot_scope = TeamRatingSnapshot
                      .where(ratings_config_version: config)
+                     .where(season:)
                      .order(:team_season_id, snapshot_date: :desc)
 
     snapshot_scope = snapshot_scope.where('snapshot_date <= ?', as_of) if as_of.present?

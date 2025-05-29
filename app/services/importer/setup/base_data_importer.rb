@@ -39,15 +39,6 @@ module Importer
 
       def import_seasons
         Season.upsert({
-                        name: '2023-24',
-                        year: 2024,
-                        start_date: Date.new(2023, 11, 6),
-                        end_date: Date.new(2024, 4, 8),
-                        average_efficiency: 105.5,
-                        average_pace: 69.0
-                      }, unique_by: :year)
-
-        Season.upsert({
                         name: '2024-05',
                         year: 2025,
                         start_date: Date.new(2024, 11, 1),
