@@ -18,6 +18,15 @@ services:
       - "3000:3000"
     env_file:
       - .env.docker
+    command: ["./bin/rails", "server", "-b", "0.0.0.0"]
+
+  worker:
+    build: .
+    depends_on:
+      - db
+    env_file:
+      - .env.docker
+    command: ["bundle", "exec", "good_job", "start"]
 
 volumes:
   pgdata:
