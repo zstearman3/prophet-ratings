@@ -1,4 +1,4 @@
 //= link_tree ../images
 //= link_tree ../builds
 //= link_tree ../../javascript .js
-//= link tailwind.css
+//= link application.tailwind.css
