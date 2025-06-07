@@ -2,7 +2,7 @@
   <div class="py-6">
     <div class="flex items-center">
       <span class="text-md text-gray-600 mr-2">#<%= @team_season.rank %></span>
-      <h1 class="text-2xl font-bold text-gray-900"><%= @team.school %></h1>
+      <h1 class="text-2xl font-bold text-prophet-black"><%= @team.school %></h1>
       <span class="text-2xl text-gray-600 ml-2"><%= @team.nickname %></span>
     </div>
     <div class="flex items-center">
@@ -13,30 +13,30 @@
     </div>
 
     <div class="mt-8">
-      <h2 class="text-xl font-semibold text-gray-900 mb-4">Adjusted Stats</h2>
+      <h2 class="text-xl font-semibold text-prophet-black mb-4">Adjusted Stats</h2>
       <% if @snapshots.last %>
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div class="bg-white p-4 rounded-lg shadow">
             <p class="text-sm text-gray-600">Rating</p>
-            <p class="text-lg font-semibold text-gray-900"><%= @snapshots.last.rating.round(1) %>
+            <p class="text-lg font-semibold text-prophet-black"><%= @snapshots.last.rating.round(1) %>
               <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.overall_rank %></span>
             </p>
           </div>
           <div class="bg-white p-4 rounded-lg shadow">
             <p class="text-sm text-gray-600">Adj ORtg</p>
-            <p class="text-lg font-semibold text-gray-900"><%= @snapshots.last.adj_offensive_efficiency.round(1) %>
+            <p class="text-lg font-semibold text-prophet-black"><%= @snapshots.last.adj_offensive_efficiency.round(1) %>
               <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.adj_offensive_efficiency_rank %></span>
             </p>
           </div>
           <div class="bg-white p-4 rounded-lg shadow">
             <p class="text-sm text-gray-600">Adj DRtg</p>
-            <p class="text-lg font-semibold text-gray-900"><%= @snapshots.last.adj_defensive_efficiency.round(1) %>
+            <p class="text-lg font-semibold text-prophet-black"><%= @snapshots.last.adj_defensive_efficiency.round(1) %>
               <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.adj_defensive_efficiency_rank %></span>
             </p>
           </div>
           <div class="bg-white p-4 rounded-lg shadow">
             <p class="text-sm text-gray-600">Adj Pace</p>
-            <p class="text-lg font-semibold text-gray-900"><%= @snapshots.last.adj_pace.round(1) %>
+            <p class="text-lg font-semibold text-prophet-black"><%= @snapshots.last.adj_pace.round(1) %>
               <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.adj_pace_rank %></span>
             </p>
           </div>
@@ -45,7 +45,7 @@
     </div>
 
     <div class="mt-8">
-      <h2 class="text-xl font-semibold text-gray-900 mb-4">Adjusted Five Factors</h2>
+      <h2 class="text-xl font-semibold text-prophet-black mb-4">Adjusted Five Factors</h2>
       <% if @snapshots.last %>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
           <!-- Offense -->
@@ -54,35 +54,35 @@
             <div class="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <p class="text-gray-600">eFG%</p>
-                <p class="text-lg font-semibold text-gray-900">
+                <p class="text-lg font-semibold text-prophet-black">
                   <%= @snapshots.last.adj_effective_fg_percentage.round(3) %>
                   <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.adj_effective_fg_percentage_rank %></span>
                 </p>
               </div>
               <div>
                 <p class="text-gray-600">TO%</p>
-                <p class="text-lg font-semibold text-gray-900">
+                <p class="text-lg font-semibold text-prophet-black">
                   <%= @snapshots.last.adj_turnover_rate.round(3) %>
                   <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.adj_turnover_rate_rank %></span>
                 </p>
               </div>
               <div>
                 <p class="text-gray-600">ORB%</p>
-                <p class="text-lg font-semibold text-gray-900">
+                <p class="text-lg font-semibold text-prophet-black">
                   <%= @snapshots.last.adj_offensive_rebound_rate.round(3) %>
                   <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.adj_offensive_rebound_rate_rank %></span>
                 </p>
               </div>
               <div>
                 <p class="text-gray-600">FT Rate</p>
-                <p class="text-lg font-semibold text-gray-900">
+                <p class="text-lg font-semibold text-prophet-black">
                   <%= @snapshots.last.adj_free_throw_rate.round(3) %>
                   <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.adj_free_throw_rate_rank %></span>
                 </p>
               </div>
               <div>
                 <p class="text-gray-600">3PT Proficiency</p>
-                <p class="text-lg font-semibold text-gray-900">
+                <p class="text-lg font-semibold text-prophet-black">
                   <%= @snapshots.last.adj_three_pt_proficiency.round(3) %>
                   <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.adj_three_pt_proficiency_rank %></span>
                 </p>
@@ -96,35 +96,35 @@
             <div class="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <p class="text-gray-600">eFG% Allowed</p>
-                <p class="text-lg font-semibold text-gray-900">
+                <p class="text-lg font-semibold text-prophet-black">
                   <%= @snapshots.last.adj_effective_fg_percentage_allowed.round(3) %>
                   <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.adj_effective_fg_percentage_allowed_rank %></span>
                 </p>
               </div>
               <div>
                 <p class="text-gray-600">TO% Forced</p>
-                <p class="text-lg font-semibold text-gray-900">
+                <p class="text-lg font-semibold text-prophet-black">
                   <%= @snapshots.last.adj_turnover_rate_forced.round(3) %>
                   <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.adj_turnover_rate_forced_rank %></span>
                 </p>
               </div>
               <div>
                 <p class="text-gray-600">DReb%</p>
-                <p class="text-lg font-semibold text-gray-900">
+                <p class="text-lg font-semibold text-prophet-black">
                   <%= @snapshots.last.adj_defensive_rebound_rate.round(3) %>
                   <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.adj_defensive_rebound_rate_rank %></span>
                 </p>
               </div>
               <div>
                 <p class="text-gray-600">FT Rate Allowed</p>
-                <p class="text-lg font-semibold text-gray-900">
+                <p class="text-lg font-semibold text-prophet-black">
                   <%= @snapshots.last.adj_free_throw_rate_allowed.round(3) %>
                   <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.adj_free_throw_rate_allowed_rank %></span>
                 </p>
               </div>
               <div>
                 <p class="text-gray-600">3PT Proficiency Allowed</p>
-                <p class="text-lg font-semibold text-gray-900">
+                <p class="text-lg font-semibold text-prophet-black">
                   <%= @snapshots.last.adj_three_pt_proficiency_allowed.round(3) %>
                   <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.adj_three_pt_proficiency_allowed_rank %></span>
                 </p>
@@ -136,7 +136,7 @@
     </div>
 
     <div class="mt-8">
-      <h2 class="text-xl font-semibold text-gray-900 mb-4">Rating Over Time</h2>
+      <h2 class="text-xl font-semibold text-prophet-black mb-4">Rating Over Time</h2>
       <turbo-frame id="chart">
         <%= render partial: "teams/chart", locals: {
           team: @team,
@@ -153,7 +153,7 @@
     </div>
 
     <div class="mt-8">
-      <h2 class="text-xl font-semibold text-gray-900 mb-4">Season Games</h2>
+      <h2 class="text-xl font-semibold text-prophet-black mb-4">Season Games</h2>
       <div class="table-responsive">
         <table class="min-w-full divide-y divide-gray-200">
           <thead class="bg-gray-50">
@@ -174,18 +174,18 @@
               <% opponent = opponent_game.team %>
               <tr>
                 <td class="px-6 py-4 whitespace-nowrap">
-                  <%= link_to game.start_time.to_date, game_path(game), class: "text-sm text-gray-900 hover:text-blue-600" %>
+                  <%= link_to game.start_time.to_date, game_path(game), class: "text-sm text-prophet-black hover:text-blue-600" %>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
-                  <%= link_to opponent.school, team_path(opponent.slug), class: "text-sm text-gray-900 hover:text-blue-600" %>
+                  <%= link_to opponent.school, team_path(opponent.slug), class: "text-sm text-prophet-black hover:text-blue-600" %>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-prophet-black">
                   <%= game.winning_team == @team ? 'W' : 'L' %>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-prophet-black">
                   <%= game.home_team_score %>–<%= game.away_team_score %>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-prophet-black">
                   <% prediction = @predictions_by_game[game.id] %>
                   <% if prediction %>
                     <%= prediction.predicted_score_string %>

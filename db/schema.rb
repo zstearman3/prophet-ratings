@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2025_05_19_011042) do
+ActiveRecord::Schema[7.1].define(version: 2025_06_05_134826) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -374,8 +374,10 @@ ActiveRecord::Schema[7.1].define(version: 2025_05_19_011042) do
     t.string "slug"
     t.string "primary_color"
     t.string "short_name"
+    t.string "the_odds_api_team_id"
     t.index ["school"], name: "index_teams_on_school", unique: true
     t.index ["slug"], name: "index_teams_on_slug", unique: true
+    t.index ["the_odds_api_team_id"], name: "index_teams_on_the_odds_api_team_id", unique: true
   end
 
   create_table "users", force: :cascade do |t|

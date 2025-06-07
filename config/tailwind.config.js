@@ -1,23 +1,28 @@
-const defaultTheme = require('tailwindcss/defaultTheme')
+console.log("✅ Tailwind config loaded");
+
+const defaultTheme = require('tailwindcss/defaultTheme');
 
 module.exports = {
-  safelist: [
-    'bg-gray-900',
-    'bg-red-900',
-    'hover:bg-gray-800',
-  ],
   content: [
-    './public/*.html',
-    './app/helpers/**/*.rb',
+    './app/views/**/*.html.erb',
+    './app/components/**/*.html.erb',
     './app/javascript/**/*.js',
-    './app/views/**/*.{erb,haml,html,slim}',
-    './app/assets/stylesheets/**/*.css',
-    './app/components/**/*.{html.erb,erb}',
+    './app/helpers/**/*.rb',
+    './app/assets/stylesheets/**/*.css'
   ],
   theme: {
     extend: {
       fontFamily: {
         sans: ['Inter var', ...defaultTheme.fontFamily.sans],
+      },
+      colors: {
+        prophet: {
+          indigo: '#6627D3',
+          pink: '#FB7185',
+          cyan: '#06B6D4',
+          black: '111827',
+          seasalt: 'F8FAFC',
+        },
       },
     },
   },
@@ -26,5 +31,5 @@ module.exports = {
     require('@tailwindcss/aspect-ratio'),
     require('@tailwindcss/typography'),
     require('@tailwindcss/container-queries'),
-  ]
-}
+  ],
+};

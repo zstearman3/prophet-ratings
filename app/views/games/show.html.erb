@@ -5,20 +5,20 @@
         <div class="flex flex-col items-center">
           <div class="flex items-center">
             <span class="text-sm text-gray-600 mr-2">#<%= @away_team_game.team_season&.rank %></span>
-            <h1 class="text-2xl font-bold text-gray-900">
+            <h1 class="text-2xl font-bold text-prophet-black">
               <%= link_to @away_team_game.team.school, team_path(@away_team_game.team), class: "hover:text-blue-600" %>
             </h1>
           </div>
-          <span class="text-2xl font-bold text-gray-900 mt-2"><%= @away_team_game.points %></span>
+          <span class="text-2xl font-bold text-prophet-black mt-2"><%= @away_team_game.points %></span>
         </div>
         <div class="flex flex-col items-center">
           <div class="flex items-center">
             <span class="text-sm text-gray-600 mr-2">#<%= @home_team_game.team_season&.rank %></span>
-            <h1 class="text-2xl font-bold text-gray-900">
+            <h1 class="text-2xl font-bold text-prophet-black">
               <%= link_to @home_team_game.team.school, team_path(@home_team_game.team), class: "hover:text-blue-600" %>
             </h1>
           </div>
-          <span class="text-2xl font-bold text-gray-900 mt-2"><%= @home_team_game.points %></span>
+          <span class="text-2xl font-bold text-prophet-black mt-2"><%= @home_team_game.points %></span>
         </div>
       </div>
     </div>
@@ -31,7 +31,7 @@
     </div>
 
     <div class="mt-8">
-      <h2 class="text-xl font-semibold text-gray-900 mb-4">Box Score</h2>
+      <h2 class="text-xl font-semibold text-prophet-black mb-4">Box Score</h2>
       <div class="bg-white rounded-lg shadow overflow-hidden">
         <div class="overflow-x-auto">
           <table class="min-w-full divide-y divide-gray-200">
@@ -60,54 +60,54 @@
               <td class="px-3 py-2 whitespace-nowrap">
                 <div class="flex items-center">
                   <span class="text-sm text-gray-600 mr-2">#<%= @away_team_game.team_season&.rank %></span>
-                  <span class="text-sm font-medium text-gray-900">
+                  <span class="text-sm font-medium text-prophet-black">
                     <%= link_to @away_team_game.team.school, team_path(@away_team_game.team), class: "hover:text-blue-600" %>
                   </span>
                 </div>
               </td>
-              <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+              <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
                 <%= @away_team_game&.field_goals_made&.then { |m| "#{m}/#{@away_team_game&.field_goals_attempted}" } || 'N/A' %>
               </td>
-              <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+              <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
                 <%= @away_team_game&.three_pt_made&.then { |m| "#{m}/#{@away_team_game&.three_pt_attempted}" } || 'N/A' %>
               </td>
-              <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+              <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
                 <%= @away_team_game&.free_throws_made&.then { |m| "#{m}/#{@away_team_game&.free_throws_attempted}" } || 'N/A' %>
               </td>
-              <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+              <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
                 <%= @away_team_game&.rebounds || 'N/A' %>
               </td>
-              <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+              <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
                 <%= @away_team_game&.assists || 'N/A' %>
               </td>
-              <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+              <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
                 <%= @away_team_game&.steals || 'N/A' %>
               </td>
-              <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+              <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
                 <%= @away_team_game&.blocks || 'N/A' %>
               </td>
-              <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+              <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
                 <%= @away_team_game&.turnovers || 'N/A' %>
               </td>
-              <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+              <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
                 <%= @away_team_game&.field_goals_percentage&.then { |p| number_with_precision(p * 100, precision: 1) } || 'N/A' %>%
               </td>
-              <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+              <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
                 <%= @away_team_game&.three_pt_percentage&.then { |p| number_with_precision(p * 100, precision: 1) } || 'N/A' %>%
               </td>
-              <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+              <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
                 <%= @away_team_game&.free_throws_percentage&.then { |p| number_with_precision(p * 100, precision: 1) } || 'N/A' %>%
               </td>
-              <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+              <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
                 <%= @away_team_game&.offensive_rebounds || 'N/A' %>
               </td>
-              <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+              <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
                 <%= @away_team_game&.defensive_rebounds || 'N/A' %>
               </td>
-              <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+              <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
                 <%= @away_team_game&.offensive_rating || 'N/A' %>
               </td>
-              <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+              <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
                 <%= @away_team_game&.defensive_rating || 'N/A' %>
               </td>
             </tr>
@@ -115,54 +115,54 @@
               <td class="px-3 py-2 whitespace-nowrap">
                 <div class="flex items-center">
                   <span class="text-sm text-gray-600 mr-2">#<%= @home_team_game.team_season&.rank %></span>
-                  <span class="text-sm font-medium text-gray-900">
+                  <span class="text-sm font-medium text-prophet-black">
                     <%= link_to @home_team_game.team.school, team_path(@home_team_game.team), class: "hover:text-blue-600" %>
                   </span>
                 </div>
               </td>
-              <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+              <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
                 <%= @home_team_game&.field_goals_made&.then { |m| "#{m}/#{@home_team_game&.field_goals_attempted}" } || 'N/A' %>
               </td>
-              <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+              <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
                 <%= @home_team_game&.three_pt_made&.then { |m| "#{m}/#{@home_team_game&.three_pt_attempted}" } || 'N/A' %>
               </td>
-              <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+              <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
                 <%= @home_team_game&.free_throws_made&.then { |m| "#{m}/#{@home_team_game&.free_throws_attempted}" } || 'N/A' %>
               </td>
-              <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+              <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
                 <%= @home_team_game&.rebounds || 'N/A' %>
               </td>
-              <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+              <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
                 <%= @home_team_game&.assists || 'N/A' %>
               </td>
-              <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+              <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
                 <%= @home_team_game&.steals || 'N/A' %>
               </td>
-              <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+              <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
                 <%= @home_team_game&.blocks || 'N/A' %>
               </td>
-              <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+              <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
                 <%= @home_team_game&.turnovers || 'N/A' %>
               </td>
-              <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+              <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
                 <%= @home_team_game&.field_goals_percentage&.then { |p| number_with_precision(p * 100, precision: 1) } || 'N/A' %>%
               </td>
-              <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+              <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
                 <%= @home_team_game&.three_pt_percentage&.then { |p| number_with_precision(p * 100, precision: 1) } || 'N/A' %>%
               </td>
-              <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+              <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
                 <%= @home_team_game&.free_throws_percentage&.then { |p| number_with_precision(p * 100, precision: 1) } || 'N/A' %>%
               </td>
-              <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+              <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
                 <%= @home_team_game&.offensive_rebounds || 'N/A' %>
               </td>
-              <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+              <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
                 <%= @home_team_game&.defensive_rebounds || 'N/A' %>
               </td>
-              <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+              <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
                 <%= @home_team_game&.offensive_rating || 'N/A' %>
               </td>
-              <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+              <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
                 <%= @home_team_game&.defensive_rating || 'N/A' %>
               </td>
             </tr>
@@ -173,12 +173,12 @@
     </div>
 
     <div class="mt-8">
-      <h2 class="text-xl font-semibold text-gray-900 mb-4">Prediction Analysis</h2>
+      <h2 class="text-xl font-semibold text-prophet-black mb-4">Prediction Analysis</h2>
       <% if @prediction %>
         <div class="bg-white p-6 rounded-lg shadow">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <h3 class="text-lg font-semibold text-gray-900 mb-2">Predicted Outcome</h3>
+              <h3 class="text-lg font-semibold text-prophet-black mb-2">Predicted Outcome</h3>
               <div class="space-y-2">
                 <div class="flex justify-between">
                   <span class="text-gray-600">Favorite:</span>
@@ -202,7 +202,7 @@
             </div>
 
             <div>
-              <h3 class="text-lg font-semibold text-gray-900 mb-2">Actual Outcome</h3>
+              <h3 class="text-lg font-semibold text-prophet-black mb-2">Actual Outcome</h3>
               <div class="space-y-2">
                 <div class="flex justify-between">
                   <span class="text-gray-600">Winning Team:</span>
