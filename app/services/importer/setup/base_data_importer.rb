@@ -23,17 +23,18 @@ module Importer
       def import_teams
         path = Rails.root.join('db/seeds/scraped_teams.csv')
         CSV.foreach(path, headers: true) do |row|
-          Team.upsert({
-                        school: row['school'],
-                        nickname: row['nickname'],
-                        url: row['url'],
-                        location: row['location'],
-                        slug: row['slug'],
-                        secondary_name: row['secondary_name'],
-                        primary_color: row['primary_color'],
-                        short_name: row['short_name'],
-                        home_venue: row['home_venue']
-                      }, unique_by: :school)
+          team = Team.upsert({
+                               school: row['school'],
+                               nickname: row['nickname'],
+                               url: row['url'],
+                               location: row['location'],
+                               slug: row['slug'],
+                               primary_color: row['primary_color'],
+                               short_name: row['short_name'],
+                               home_venue: row['home_venue']
+                             }, unique_by: :school)
+
+          TeamAlias.create(team:, value: row['secondary_name'], source: 'sports-reference') if row['secondary_name'].present?
         end
       end
 

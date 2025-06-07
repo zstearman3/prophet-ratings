@@ -63,7 +63,9 @@ module Scraper
         team_names = game_div.css('table.teams tr td:first-child a').filter_map(&:text)
 
         # Only keep games where both teams are matched in the database
-        next unless team_names.include?(team.school) || team_names.include?(team.secondary_name)
+        aliases = team.team_aliases.pluck(:value)
+        all_names = [team.school] + aliases
+        next unless team_names.any? { |name| all_names.include?(name) }
 
         # Extract the actual game link
         gamelink = game_div.at_css('td.gamelink a')

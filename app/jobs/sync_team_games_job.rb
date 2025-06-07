@@ -19,9 +19,11 @@ class SyncTeamGamesJob < ApplicationJob
       data = scraper.to_json_for_team(team)
 
       # Keep only games where this team is involved
+      aliases = team.team_aliases.pluck(:value)
       team_data = data.select do |row|
         row[:home_team] == team.school || row[:away_team] == team.school ||
-          row[:home_team] == team.secondary_name || row[:away_team] == team.secondary_name
+          aliases.include?(row[:home_team]) ||
+          aliases.include?(row[:away_team])
       end
 
       Importer::GamesImporter.import(team_data)

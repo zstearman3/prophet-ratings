@@ -10,7 +10,6 @@
 #  nickname             :string
 #  primary_color        :string
 #  school               :string
-#  secondary_name       :string
 #  short_name           :string
 #  slug                 :string
 #  url                  :string
@@ -40,12 +39,11 @@ class Team < ApplicationRecord
   has_many :away_games, through: :away_team_games, source: :game
   has_many :team_conferences, dependent: :destroy
   has_many :conferences, through: :team_conferences
+  has_many :team_aliases, dependent: :destroy
 
   scope :search, lambda { |name|
-    where('school = :name OR nickname = :name OR secondary_name = :name', name:)
+    where('school = :name OR nickname = :name OR team_aliases.value = :name', name:)
   }
-
-  scope :missing_secondary_name, -> { includes(:team_games).where(team_games: { id: nil }, secondary_name: nil) }
 
   def to_param
     slug

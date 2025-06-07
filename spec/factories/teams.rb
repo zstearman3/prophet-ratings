@@ -10,7 +10,6 @@
 #  nickname             :string
 #  primary_color        :string
 #  school               :string
-#  secondary_name       :string
 #  short_name           :string
 #  slug                 :string
 #  url                  :string

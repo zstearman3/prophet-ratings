@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2025_06_05_134826) do
+ActiveRecord::Schema[7.1].define(version: 2025_06_07_034959) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -195,6 +195,16 @@ ActiveRecord::Schema[7.1].define(version: 2025_06_05_134826) do
     t.index ["year"], name: "index_seasons_on_year", unique: true
   end
 
+  create_table "team_aliases", force: :cascade do |t|
+    t.bigint "team_id", null: false
+    t.string "value", null: false
+    t.string "source"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["team_id"], name: "index_team_aliases_on_team_id"
+    t.index ["value", "source"], name: "index_team_aliases_on_value_and_source", unique: true
+  end
+
   create_table "team_conferences", force: :cascade do |t|
     t.bigint "team_id", null: false
     t.bigint "conference_id", null: false
@@ -369,7 +379,6 @@ ActiveRecord::Schema[7.1].define(version: 2025_06_05_134826) do
     t.string "location"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.string "secondary_name"
     t.string "home_venue"
     t.string "slug"
     t.string "primary_color"
@@ -395,6 +404,7 @@ ActiveRecord::Schema[7.1].define(version: 2025_06_05_134826) do
 
   add_foreign_key "predictions", "team_rating_snapshots", column: "away_team_snapshot_id"
   add_foreign_key "predictions", "team_rating_snapshots", column: "home_team_snapshot_id"
+  add_foreign_key "team_aliases", "teams"
   add_foreign_key "team_conferences", "conferences"
   add_foreign_key "team_conferences", "seasons", column: "end_season_id"
   add_foreign_key "team_conferences", "seasons", column: "start_season_id"
