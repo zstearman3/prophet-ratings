@@ -9,11 +9,8 @@
     "chartkick": "^5.0.1",
     "esbuild": "^0.19.12"
   },
-  "devDependencies": {
-    "tailwindcss": "^4.1.8"
-  },
   "scripts": {
     "build": "esbuild app/javascript/*.* --bundle --sourcemap --format=esm --outdir=app/assets/builds --public-path=/assets",
-    "build:css": "npx tailwindcss -c ./config/tailwind.config.js -i ./app/assets/stylesheets/application.tailwind.css -o ./app/assets/builds/application.css"
+    "build:css": "bin/rails tailwindcss:watch"
   }
 }
