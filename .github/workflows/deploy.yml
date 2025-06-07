@@ -56,14 +56,6 @@ jobs:
           }
           EOL
 
-      - name: Deploy to ECS
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
-        with:
-          task-definition: ecs-task-def.json
-          service: prophet-ratings-web
-          cluster: prophet-cluster
-          wait-for-service-stability: true
-
       - name: Run database migrations
         run: |
           aws ecs run-task \
@@ -77,15 +69,17 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Deploy to ECS
-        uses: aws-actions/amazon-ecs-deploy-service@v1.0.4
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
         with:
-          cluster: prophet-cluster
+          task-definition: ecs-task-def.json
           service: prophet-ratings-web
-          force-new-deployment: true
-
-      - name: Redeploy worker app
-        uses: aws-actions/amazon-ecs-deploy-service@v1.0.4
-        with:
           cluster: prophet-cluster
+          wait-for-service-stability: true
+
+      - name: Deploy Worker to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ecs-task-def.json
           service: prophet-ratings-worker
-          force-new-deployment: true
+          cluster: prophet-cluster
+          wait-for-service-stability: true
