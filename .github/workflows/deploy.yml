@@ -31,9 +31,8 @@ jobs:
           docker push $IMAGE_URI
 
       - name: Deploy to ECS
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        uses: aws-actions/amazon-ecs-deploy-service@v1
         with:
           cluster: prophet-cluster
           service: prophet-ratings-web
-          task-definition: prophet-ratings-web
-          wait-for-service-stability: true
+          force-new-deployment: true
