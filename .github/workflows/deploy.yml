@@ -30,6 +30,40 @@ jobs:
           docker build -t $IMAGE_URI .
           docker push $IMAGE_URI
 
+      - name: Render ECS task definition
+        run: |
+          cat > ecs-task-def.json <<EOL
+          {
+            "family": "prophet-ratings-task",
+            "networkMode": "awsvpc",
+            "requiresCompatibilities": ["FARGATE"],
+            "cpu": "256",
+            "memory": "512",
+            "containerDefinitions": [
+              {
+                "name": "prophet-ratings-app",
+                "image": "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/prophet-ratings-app:latest",
+                "essential": true,
+                "portMappings": [
+                  {
+                    "containerPort": 3000,
+                    "hostPort": 3000,
+                    "protocol": "tcp"
+                  }
+                ]
+              }
+            ]
+          }
+          EOL
+
+      - name: Deploy to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ecs-task-def.json
+          service: prophet-ratings-web
+          cluster: prophet-cluster
+          wait-for-service-stability: true
+
       - name: Run database migrations
         run: |
           aws ecs run-task \
