@@ -30,9 +30,28 @@ jobs:
           docker build -t $IMAGE_URI .
           docker push $IMAGE_URI
 
+      - name: Run database migrations
+        run: |
+          aws ecs run-task \
+            --cluster prophet-cluster \
+            --launch-type FARGATE \
+            --task-definition prophet-ratings-db-migrate \
+            --network-configuration "awsvpcConfiguration={subnets=[subnet-01836bc842023c03e],securityGroups=[sg-0eb40816fc008ff2e],assignPublicIp=ENABLED}" \
+            --region us-east-1
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
       - name: Deploy to ECS
-        uses: aws-actions/amazon-ecs-deploy-service@v1
+        uses: aws-actions/amazon-ecs-deploy-service@v1.0.4
         with:
           cluster: prophet-cluster
           service: prophet-ratings-web
+          force-new-deployment: true
+
+      - name: Redeploy worker app
+        uses: aws-actions/amazon-ecs-deploy-service@v1.0.4
+        with:
+          cluster: prophet-cluster
+          service: prophet-ratings-worker
           force-new-deployment: true
