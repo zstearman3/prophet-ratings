@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # == Schema Information
 #
 # Table name: conferences
@@ -13,9 +15,6 @@
 #
 #  index_conferences_on_name  (name)
 #  index_conferences_on_slug  (slug)
-#
 FactoryBot.define do
-  factory :conference do
-    
-  end
+  factory :conference
 end

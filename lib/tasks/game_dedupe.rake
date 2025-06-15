@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 namespace :games do
   desc 'Deduplicate games by home_team_name, away_team_name, and start_time::date, deleting duplicates and their associations.'
   task dedupe: :environment do

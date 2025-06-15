@@ -15,7 +15,7 @@ module Scraper
     end
 
     def to_json_for_team(team)
-      set_game_urls_for_team(team)
+      game_urls_for_team!(team)
       scrape_day
     end
 
@@ -53,7 +53,7 @@ module Scraper
       @game_urls ||= set_game_urls
     end
 
-    def set_game_urls_for_team(team)
+    def game_urls_for_team!(team)
       sleep(SLEEP_COUNT)
 
       response = HTTParty.get(schedule_url(@date))

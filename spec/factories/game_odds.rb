@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # == Schema Information
 #
 # Table name: game_odds
@@ -25,7 +27,5 @@
 #  fk_rails_...  (game_id => games.id)
 #
 FactoryBot.define do
-  factory :game_odd do
-    
-  end
+  factory :game_odd
 end

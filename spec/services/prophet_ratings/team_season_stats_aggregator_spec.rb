@@ -11,29 +11,42 @@ RSpec.describe ProphetRatings::TeamSeasonStatsAggregator, type: :service do
     let(:team_season) { create(:team_season, team:, season:) }
 
     before do
-      team_games = create_list(:team_game, 3,
-                               team:,
-                               team_season:,
-                               field_goals_made: 20,
-                               field_goals_attempted: 40,
-                               three_pt_made: 10,
-                               three_pt_attempted: 18,
-                               two_pt_made: 10,
-                               two_pt_attempted: 22,
-                               offensive_rebounds: 8,
-                               free_throws_attempted: 12,
-                               turnovers: 10,
-                               minutes: 200,
-                               assists: 12,
-                               steals: 5,
-                               blocks: 3)
+      opponents = create_list(:team, 3)
+      games = [
+        create(:game, season:, start_time: Time.zone.now.change(hour: 12, min: 0, sec: 0), home_team_name: team.school,
+                      away_team_name: opponents[0].school),
+        create(:game, season:, start_time: Time.zone.now.change(hour: 15, min: 0, sec: 0), home_team_name: team.school,
+                      away_team_name: opponents[1].school),
+        create(:game, season:, start_time: Time.zone.now.change(hour: 18, min: 0, sec: 0), home_team_name: team.school,
+                      away_team_name: opponents[2].school)
+      ]
+      team_games = games.each_with_index.map do |game, i|
+        create(:team_game,
+               team:,
+               team_season:,
+               game:,
+               opponent_team_season: create(:team_season, team: opponents[i], season:),
+               field_goals_made: 20,
+               field_goals_attempted: 40,
+               three_pt_made: 10,
+               three_pt_attempted: 18,
+               two_pt_made: 10,
+               two_pt_attempted: 22,
+               offensive_rebounds: 8,
+               free_throws_attempted: 12,
+               turnovers: 10,
+               minutes: 200,
+               assists: 12,
+               steals: 5,
+               blocks: 3)
+      end
       team_games.each do |tg|
         tg.game.update!(home_team_score: 70, away_team_score: 65)
       end
 
       team_games.each(&:calculate_game_stats)
 
-      described_class.new(season: season).run
+      described_class.new(season:).run
       team_season.reload
     end
 

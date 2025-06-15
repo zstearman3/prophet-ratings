@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # == Schema Information
 #
 # Table name: conferences
@@ -16,6 +18,6 @@
 #
 require 'rails_helper'
 
-RSpec.describe Conference, type: :model do
+RSpec.describe Conference do
   pending "add some examples to (or delete) #{__FILE__}"
 end

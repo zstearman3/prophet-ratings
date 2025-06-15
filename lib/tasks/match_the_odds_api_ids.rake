@@ -1,10 +1,12 @@
+# frozen_string_literal: true
+
 namespace :teams do
   desc 'Match and update the_odds_api_team_id from external mapping'
   task match_the_odds_api_ids: :environment do
     require 'json'
     require_relative '../../app/services/team_matcher'
 
-    json_path = Rails.root.join('db', 'data', 'the-odds-api-team-map.json')
+    json_path = Rails.root.join('db/data/the-odds-api-team-map.json')
     data = JSON.parse(File.read(json_path))
     matcher = TeamMatcher.new
 

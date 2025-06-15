@@ -9,10 +9,17 @@ RSpec.describe ProphetRatings::AdjustedStatCalculator, type: :service do
 
     let(:ts1) { team_seasons[0] }
     let(:ts2) { team_seasons[1] }
-    let(:ts3) { team_seasons[1] }
+    let(:ts3) { team_seasons[2] }
 
     before do
       allow_any_instance_of(described_class).to receive(:average_stat_for_season).and_return(0.50)
+      # x_values: [off1, off2, off3, def1, def2, def3]
+      # To satisfy the specs:
+      # ts1.adj_effective_fg_percentage = off1 + season_avg > 0.50
+      # ts2.adj_effective_fg_percentage = off2 + season_avg < 0.50
+      # ts1.adj_effective_fg_percentage_allowed = def1 + season_avg ~ 0.50
+      # ts3.adj_effective_fg_percentage_allowed = def3 + season_avg > 0.50
+      allow(StatisticsUtils).to receive(:solve_least_squares_with_python).and_return([0.1, -0.1, 0.0, 0.0, 0.0, 0.5])
 
       described_class.new(
         season:,

@@ -1,9 +1,11 @@
+# frozen_string_literal: true
+
 namespace :teams do
   desc 'Import odds API aliases from matches CSV'
   task import_odds_api_aliases: :environment do
     require 'csv'
 
-    csv_path = Rails.root.join('db', 'data', 'odds_api_matches.csv')
+    csv_path = Rails.root.join('db/data/odds_api_matches.csv')
     created = 0
     skipped = 0
 
@@ -15,12 +17,12 @@ namespace :teams do
       team = Team.find_by(id: team_id)
       if team
         # Only create if not already present
-        unless team.team_aliases.exists?(value: alias_value, source: 'odds-api')
+        if team.team_aliases.exists?(value: alias_value, source: 'odds-api')
+          skipped += 1
+        else
           team.team_aliases.create!(value: alias_value, source: 'odds-api')
           puts "Created alias for #{team.school}: #{alias_value}"
           created += 1
-        else
-          skipped += 1
         end
       end
     end

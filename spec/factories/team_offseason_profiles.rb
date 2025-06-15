@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # == Schema Information
 #
 # Table name: team_offseason_profiles
@@ -19,7 +21,5 @@
 #  index_team_offseason_profiles_on_team_season_id  (team_season_id)
 #
 FactoryBot.define do
-  factory :team_offseason_profile do
-    
-  end
+  factory :team_offseason_profile
 end

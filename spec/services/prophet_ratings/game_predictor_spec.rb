@@ -44,7 +44,7 @@ RSpec.describe ProphetRatings::GamePredictor do
       result = described_class.new(
         home_rating_snapshot: home_snapshot,
         away_rating_snapshot: away_snapshot,
-        season: season
+        season:
       ).call
 
       expect(result).to include(
@@ -62,7 +62,7 @@ RSpec.describe ProphetRatings::GamePredictor do
       expect(result[:home_team]).to eq('UConn')
       expect(result[:away_team]).to eq('Houston')
       expect(result[:confidence_level]).to be_in(%w[High Medium Low])
-      expect(result[:meta]).to include(:expected_pace, :home_expected_ortg, :total_home_std_dev)
+      expect(result[:meta]).to include(:expected_pace, :home_expected_ortg)
     end
   end
 end

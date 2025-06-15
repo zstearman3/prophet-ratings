@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 namespace :db do
   desc 'Update slugs for all teams'
   task update_team_slugs: :environment do

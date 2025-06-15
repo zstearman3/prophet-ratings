@@ -36,8 +36,6 @@
 #
 #  fk_rails_...  (away_team_snapshot_id => team_rating_snapshots.id)
 #  fk_rails_...  (home_team_snapshot_id => team_rating_snapshots.id)
-#
 FactoryBot.define do
-  factory :prediction do
-  end
+  factory :prediction
 end

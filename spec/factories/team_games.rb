@@ -66,7 +66,7 @@ FactoryBot.define do
   factory :team_game do
     team
     team_season
-    game
+    sequence(:game) { |n| association(:game, start_time: Time.zone.now.change(hour: 12 + n, min: 0, sec: 0)) }
     home { false }
     minutes { 200 }
   end

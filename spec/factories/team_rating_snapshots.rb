@@ -37,6 +37,8 @@
 FactoryBot.define do
   factory :team_rating_snapshot do
     team_season
+    team { team_season&.team || association(:team) }
+    season { team_season&.season || association(:season) }
     ratings_config_version
     snapshot_date { Time.zone.now }
     adj_offensive_efficiency { 100.0 }

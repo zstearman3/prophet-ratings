@@ -112,7 +112,7 @@ class TeamRatingSnapshot < ApplicationRecord
     adj_free_throw_rate_allowed_rank
     adj_three_pt_proficiency_rank
     adj_three_pt_proficiency_allowed_rank
-  ]
+  ].freeze
 
   STORED_STATS.each do |attr|
     define_method(attr) do

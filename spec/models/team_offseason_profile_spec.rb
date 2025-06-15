@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # == Schema Information
 #
 # Table name: team_offseason_profiles
@@ -20,6 +22,6 @@
 #
 require 'rails_helper'
 
-RSpec.describe TeamOffseasonProfile, type: :model do
+RSpec.describe TeamOffseasonProfile do
   pending "add some examples to (or delete) #{__FILE__}"
 end

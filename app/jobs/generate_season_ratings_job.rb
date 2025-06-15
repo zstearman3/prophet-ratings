@@ -12,6 +12,7 @@ class GenerateSeasonRatingsJob < ApplicationJob
     ProphetRatings::PreseasonRatingsCalculator.new(season).call
     season.team_seasons.each do |ts|
       ts.update(
+        rating: ts.preseason_adj_offensive_efficiency - ts.preseason_adj_defensive_efficiency,
         adj_offensive_efficiency: ts.preseason_adj_offensive_efficiency,
         adj_defensive_efficiency: ts.preseason_adj_defensive_efficiency,
         adj_pace: ts.preseason_adj_pace

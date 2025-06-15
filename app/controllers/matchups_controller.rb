@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class MatchupsController < ApplicationController
   def show
     @team_options = TeamSeason.includes(:team).where(season: Season.current)
@@ -23,16 +25,26 @@ class MatchupsController < ApplicationController
       neutral: @neutral
     )
 
-    case params[:action_type]
-    when 'predict'
-      @prediction = @predictor.call
-    when 'simulate'
-      @simulation = @predictor.simulate
-    end
+    begin
+      case params[:action_type]
+      when 'predict'
+        @prediction = @predictor.call
+      when 'simulate'
+        @simulation = @predictor.simulate
+      end
 
-    respond_to do |format|
-      format.turbo_stream
-      format.html { redirect_to matchup_path, alert: 'Turbo not supported. Please use a compatible browser.' }
+      respond_to do |format|
+        format.turbo_stream
+        format.html { redirect_to matchup_path, alert: 'Turbo not supported. Please use a compatible browser.' }
+      end
+    rescue ArgumentError => e
+      respond_to do |format|
+        format.turbo_stream do
+          render turbo_stream: turbo_stream.replace('matchup_form', partial: 'shared/error', locals: { message: e.message }),
+                 status: :unprocessable_entity
+        end
+        format.html { redirect_to matchup_path, alert: e.message, status: :unprocessable_entity }
+      end
     end
   end
 

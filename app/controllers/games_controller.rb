@@ -16,30 +16,29 @@ class GamesController < ApplicationController
   end
 
   def schedule
-    unless params[:date].present?
-      redirect_to schedule_games_path(date: Date.current.to_s), notice: 'Date is required.' and return
-    end
+    redirect_to schedule_games_path(date: Date.current.to_s), notice: 'Date is required.' and return if params[:date].blank?
+
     begin
       date = Date.parse(params[:date])
     rescue ArgumentError
       redirect_to schedule_games_path(date: Date.current.to_s), alert: 'Invalid date.' and return
     end
     @date = date
-    @games = Game.where(start_time: date.beginning_of_day..date.end_of_day)
+    @games = Game.where(start_time: date.all_day)
                  .order(:start_time)
                  .includes(:predictions, { home_team_game: :team_season }, { away_team_game: :team_season })
 
     @ratings_config_version = RatingsConfigVersion.current
     team_season_ids = @games.map { |g| g.home_team_game&.team_season_id } +
-                     @games.map { |g| g.away_team_game&.team_season_id }
+                      @games.map { |g| g.away_team_game&.team_season_id }
     team_season_ids.compact!
     team_season_ids.uniq!
 
     # Preload all snapshots for these team_season_ids, config version, and <= date
     snapshots = TeamRatingSnapshot
-      .where(team_season_id: team_season_ids, ratings_config_version: @ratings_config_version)
-      .where('snapshot_date <= ?', @date)
-      .order(:team_season_id, snapshot_date: :desc)
+                .where(team_season_id: team_season_ids, ratings_config_version: @ratings_config_version)
+                .where('snapshot_date <= ?', @date)
+                .order(:team_season_id, snapshot_date: :desc)
 
     # Build a hash: { [team_season_id, date] => snapshot }
     @snapshots_by_team_season_and_date = {}

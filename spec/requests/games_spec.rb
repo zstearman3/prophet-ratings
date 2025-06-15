@@ -7,9 +7,10 @@ RSpec.describe 'Games' do
     it 'returns http success' do
       season = create(:season)
       team = create(:team)
-      team_season = create(:team_season, team: team, season: season)
-      game = create(:game, start_time: Date.current.beginning_of_day + 12.hours, status: :final, minutes: 40, home_team_score: 70, away_team_score: 65, location: 'Arena')
-      create(:team_game, game: game, team: team, team_season: team_season)
+      team_season = create(:team_season, team:, season:)
+      game = create(:game, start_time: Date.current.beginning_of_day + 12.hours, status: :final, minutes: 40, home_team_score: 70,
+                           away_team_score: 65, location: 'Arena')
+      create(:team_game, game:, team:, team_season:)
       get '/games/schedule', params: { date: Date.current.to_s }
       expect(response).to have_http_status(:success)
     end

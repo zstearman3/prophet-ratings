@@ -24,15 +24,18 @@ module FactoryHelpers
     ts2 = create(:team_season, team: t2, season:)
     ts3 = create(:team_season, team: t3, season:)
 
-    g1 = create(:game, season:)
+    g1 = create(:game, season:, start_time: Time.zone.now.change(hour: 12, min: 0, sec: 0), home_team_name: t1.school,
+                       away_team_name: t2.school)
     create(:team_game, game: g1, team: t1, team_season: ts1, opponent_team_season: ts2, stat => 0.60, home: true)
     create(:team_game, game: g1, team: t2, team_season: ts2, opponent_team_season: ts1, stat => 0.45, home: false)
 
-    g2 = create(:game, season:)
+    g2 = create(:game, season:, start_time: Time.zone.now.change(hour: 15, min: 0, sec: 0), home_team_name: t2.school,
+                       away_team_name: t3.school)
     create(:team_game, game: g2, team: t2, team_season: ts2, opponent_team_season: ts3, stat => 0.55, home: true)
     create(:team_game, game: g2, team: t3, team_season: ts3, opponent_team_season: ts2, stat => 0.50, home: false)
 
-    g3 = create(:game, season:)
+    g3 = create(:game, season:, start_time: Time.zone.now.change(hour: 18, min: 0, sec: 0), home_team_name: t3.school,
+                       away_team_name: t1.school)
     create(:team_game, game: g3, team: t3, team_season: ts3, opponent_team_season: ts1, stat => 0.52, home: true)
     create(:team_game, game: g3, team: t1, team_season: ts1, opponent_team_season: ts3, stat => 0.58, home: false)
 

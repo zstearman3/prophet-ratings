@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # == Schema Information
 #
 # Table name: team_aliases
@@ -21,7 +23,7 @@
 FactoryBot.define do
   factory :team_alias do
     team { nil }
-    value { "MyString" }
-    source { "MyString" }
+    value { 'MyString' }
+    source { 'MyString' }
   end
 end

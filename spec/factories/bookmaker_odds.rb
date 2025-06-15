@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # == Schema Information
 #
 # Table name: bookmaker_odds
@@ -21,9 +23,6 @@
 # Foreign Keys
 #
 #  fk_rails_...  (game_id => games.id)
-#
 FactoryBot.define do
-  factory :bookmaker_odd do
-    
-  end
+  factory :bookmaker_odd
 end
