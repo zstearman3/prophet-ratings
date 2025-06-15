@@ -52,7 +52,7 @@ RUN bundle exec bootsnap precompile app/ lib/
 ENV RAILS_ENV=production
 
 # Install Tailwind if needed
-RUN SECRET_KEY_BASE_DUMMY=1 DATABASE_URL=postgresql://localhost/dummybundle exec rails tailwindcss:install
+RUN SECRET_KEY_BASE_DUMMY=1 DATABASE_URL=postgresql://localhost/dummy bundle exec rails tailwindcss:install
 
 # Optional but explicit
 RUN SECRET_KEY_BASE_DUMMY=1 DATABASE_URL=postgresql://localhost/dummy bundle exec rails tailwindcss:build
