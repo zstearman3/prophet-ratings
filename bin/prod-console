@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+CLUSTER="prophet-cluster"
+SERVICE="prophet-ratings-web"
+CONTAINER="web"
+REGION="us-east-1"
+
+echo "🔍 Finding running task for $SERVICE..."
+
+TASK_ARN=$(aws ecs list-tasks \
+  --cluster "$CLUSTER" \
+  --service-name "$SERVICE" \
+  --desired-status RUNNING \
+  --region "$REGION" \
+  --query 'taskArns[0]' \
+  --output text)
+
+if [ "$TASK_ARN" = "None" ]; then
+  echo "❌ No running task found for $SERVICE"
+  exit 1
+fi
+
+TASK_ID=$(basename "$TASK_ARN")
+
+echo "✅ Found task $TASK_ID. Launching console..."
+
+aws ecs execute-command \
+  --cluster "$CLUSTER" \
+  --task "$TASK_ID" \
+  --container "$CONTAINER" \
+  --command "bin/rails console" \
+  --interactive \
+  --region "$REGION"
