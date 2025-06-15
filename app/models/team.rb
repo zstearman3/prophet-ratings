@@ -41,9 +41,11 @@ class Team < ApplicationRecord
   has_many :conferences, through: :team_conferences
   has_many :team_aliases, dependent: :destroy
 
-  scope :search, lambda { |name|
-    where('school = :name OR nickname = :name OR team_aliases.value = :name', name:)
-  }
+  def self.search(name)
+    joins(:team_aliases)
+      .where('teams.school = :name OR teams.nickname = :name OR team_aliases.value = :name', name:)
+      .first || (Rails.logger.warn("Team not found for: #{name}") && nil)
+  end
 
   def to_param
     slug
