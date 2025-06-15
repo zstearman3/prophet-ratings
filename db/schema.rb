@@ -10,9 +10,23 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2025_06_07_034959) do
+ActiveRecord::Schema[7.1].define(version: 2025_06_08_042707) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
+
+  create_table "bookmaker_odds", force: :cascade do |t|
+    t.bigint "game_id", null: false
+    t.string "bookmaker", null: false
+    t.datetime "fetched_at", null: false
+    t.string "market", null: false
+    t.string "team_name"
+    t.string "team_side"
+    t.decimal "value"
+    t.integer "odds"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["game_id"], name: "index_bookmaker_odds_on_game_id"
+  end
 
   create_table "conferences", force: :cascade do |t|
     t.string "name", null: false
@@ -22,6 +36,22 @@ ActiveRecord::Schema[7.1].define(version: 2025_06_07_034959) do
     t.datetime "updated_at", null: false
     t.index ["name"], name: "index_conferences_on_name"
     t.index ["slug"], name: "index_conferences_on_slug"
+  end
+
+  create_table "game_odds", force: :cascade do |t|
+    t.bigint "game_id", null: false
+    t.datetime "fetched_at", null: false
+    t.integer "moneyline_home"
+    t.integer "moneyline_away"
+    t.decimal "spread_point"
+    t.integer "spread_home_odds"
+    t.integer "spread_away_odds"
+    t.decimal "total_points"
+    t.integer "total_over_odds"
+    t.integer "total_under_odds"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["game_id"], name: "index_game_odds_on_game_id"
   end
 
   create_table "games", force: :cascade do |t|
@@ -402,6 +432,8 @@ ActiveRecord::Schema[7.1].define(version: 2025_06_07_034959) do
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
   end
 
+  add_foreign_key "bookmaker_odds", "games"
+  add_foreign_key "game_odds", "games"
   add_foreign_key "predictions", "team_rating_snapshots", column: "away_team_snapshot_id"
   add_foreign_key "predictions", "team_rating_snapshots", column: "home_team_snapshot_id"
   add_foreign_key "team_aliases", "teams"

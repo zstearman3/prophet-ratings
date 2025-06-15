@@ -50,7 +50,16 @@ RUN bundle exec bootsnap precompile app/ lib/
 
 # Precompiling assets for production
 ENV RAILS_ENV=production
+
+# Install Tailwind if needed
+RUN bundle exec rails tailwindcss:install
+
+# Optional but explicit
+RUN bundle exec rails tailwindcss:build
+
 RUN SECRET_KEY_BASE_DUMMY=1 DATABASE_URL=postgresql://localhost/dummy ./bin/rails assets:precompile
+
+RUN ls -la app/assets/builds
 
 # Final stage for app image
 FROM base

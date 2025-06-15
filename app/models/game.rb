@@ -29,6 +29,25 @@ class Game < ApplicationRecord
   validates :url, presence: true
   validates :start_time, presence: true
 
+  validate :unique_game_per_teams_and_date
+
+  private
+
+  # Prevents duplicate games for the same teams and date (ignores time part)
+  def unique_game_per_teams_and_date
+    return unless home_team_name.present? && away_team_name.present? && start_time.present?
+
+    # Find other games with same teams and same date
+    date = start_time.to_date
+    existing = Game.where(home_team_name: home_team_name, away_team_name: away_team_name)
+                   .where('DATE(start_time) = ?', date)
+                   .where.not(id: id)
+
+    if existing.exists?
+      errors.add(:base, "Game with these teams already exists on #{date}. If this is a double header, please ensure start_time is unique.")
+    end
+  end
+
   belongs_to :season
   has_one :home_team_game, -> { where(home: true) }, inverse_of: :game, class_name: 'TeamGame', dependent: :destroy
   has_one :away_team_game, -> { where(home: false) }, inverse_of: :game, class_name: 'TeamGame', dependent: :destroy

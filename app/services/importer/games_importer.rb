@@ -11,6 +11,12 @@ module Importer
 
       private
 
+      def find_game_by_teams_and_date(home_team_name, away_team_name, date)
+        Game.where(home_team_name:, away_team_name:)
+            .where('DATE(start_time) = ?', date)
+            .first
+      end
+
       def find_or_create_team_game(game, team_season, home:)
         return nil unless team_season&.team
 
@@ -45,11 +51,9 @@ module Importer
         home_team_season = home_team ? TeamSeason.find_by(season:, team: home_team) : nil
         away_team_season = away_team ? TeamSeason.find_by(season:, team: away_team) : nil
 
-        game = Game.find_or_initialize_by(
-          home_team_name: row[:home_team],
-          away_team_name: row[:away_team],
-          start_time: row[:date]
-        )
+        date = row[:date].to_date
+        game = find_game_by_teams_and_date(row[:home_team], row[:away_team], date) ||
+               Game.new(home_team_name: row[:home_team], away_team_name: row[:away_team], start_time: row[:date])
 
         game.update(
           season:,
