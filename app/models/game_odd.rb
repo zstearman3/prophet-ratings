@@ -27,4 +27,6 @@
 #  fk_rails_...  (game_id => games.id)
 #
 class GameOdd < ApplicationRecord
+  belongs_to :game
+  validates :game_id, uniqueness: true
 end

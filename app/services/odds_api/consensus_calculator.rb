@@ -30,33 +30,33 @@ module OddsApi
     end
 
     def average_spread_odds(team_name)
-      entries = extract_market('spreads').select { |o| o[:name] == team_name }
-      average(entries.pluck(:price))
+      entries = extract_market('spreads').compact.select { |o| o['name'] == team_name }
+      average(entries.pluck('price'))
     end
 
     def consensus_spread_point
-      points = extract_market('spreads').pluck(:point).compact
+      points = extract_market('spreads').compact.pluck('point').compact
       mode(points)
     end
 
     def average_total_odds(name)
-      entries = extract_market('totals').select { |o| o[:name] == name }
-      average(entries.pluck(:price))
+      entries = extract_market('totals').compact.select { |o| o['name'] == name }
+      average(entries.pluck('price'))
     end
 
     def consensus_total_point
-      points = extract_market('totals').pluck(:point).compact
+      points = extract_market('totals').compact.pluck('point').compact
       mode(points)
     end
 
     def extract_prices(market_key, team_name)
-      extract_market(market_key).select { |o| o[:name] == team_name }.pluck(:price)
+      extract_market(market_key).compact.select { |o| o['name'] == team_name }.pluck('price')
     end
 
     def extract_market(market_key)
       @bookmakers.flat_map do |book|
-        market = book[:markets].find { |m| m[:key] == market_key }
-        market ? market[:outcomes] : []
+        market = (book['markets'] || []).find { |m| m['key'] == market_key }
+        market ? market['outcomes'] : []
       end
     end
 

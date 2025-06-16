@@ -54,6 +54,8 @@ class Game < ApplicationRecord
   has_one :home_team_season, through: :home_team_game, source: :team_season
   has_one :away_team_season, through: :away_team_game, source: :team_season
   has_many :predictions, dependent: :destroy
+  has_one :game_odd, dependent: :destroy
+  has_many :bookmaker_odds, dependent: :destroy
 
   enum status: { scheduled: 0, final: 1, canceled: 2 }
 
