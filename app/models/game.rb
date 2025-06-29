@@ -69,7 +69,10 @@ class Game < ApplicationRecord
   end
 
   def current_prediction
-    predictions.find_by(ratings_config_version: { current: true })
+    current_config_id = RatingsConfigVersion.current&.id
+    return nil unless current_config_id
+
+    predictions.find_by(ratings_config_version_id: current_config_id)
   end
 
   def winning_team

@@ -18,6 +18,9 @@ class BetRecommendationGenerator
   def call
     prediction = game.current_prediction
     game_odd = game.game_odd
+
+    return [] if prediction.nil? || game_odd.nil?
+
     recs = []
 
     recs << generate_spread_recommendation(prediction, game_odd)
@@ -61,13 +64,13 @@ class BetRecommendationGenerator
       game_odd_id: game_odd.id,
       ratings_config_version_id: prediction.ratings_config_version_id,
       ratings_config_version_current: prediction.ratings_config_version.current,
-      team: team,
+      team:,
       vegas_line: recommend_home ? line : -line,
       vegas_odds: odds,
       model_value: model_margin.round(2),
       confidence: confidence.round(3),
       ev: ev.round(4),
-      recommended: recommended
+      recommended:
     )
   end
 
@@ -94,13 +97,13 @@ class BetRecommendationGenerator
       game_odd_id: game_odd.id,
       ratings_config_version_id: prediction.ratings_config_version_id,
       ratings_config_version_current: prediction.ratings_config_version.current,
-      team: team,
+      team:,
       vegas_line: nil,
       vegas_odds: odds,
       model_value: prob_home_wins.round(3),
       confidence: confidence.round(3),
       ev: ev.round(4),
-      recommended: recommended
+      recommended:
     )
   end
 
@@ -139,7 +142,7 @@ class BetRecommendationGenerator
       model_value: model_total.round(2),
       confidence: prob.round(3),
       ev: ev.round(4),
-      recommended: recommended
+      recommended:
     )
   end
 
