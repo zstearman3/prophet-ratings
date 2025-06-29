@@ -5,7 +5,7 @@ class CreateBetRecommendations < ActiveRecord::Migration[7.1]
       t.references :prediction, null: false, foreign_key: true
       t.references :game_odd, null: false, foreign_key: true
       t.string  :bet_type, null: false, comment: "'moneyline', 'spread', or 'total'"
-      t.string  :team, null: false, comment: "'home', 'away', 'over', 'under'"
+      t.string  :team, comment: "'home', 'away', 'over', 'under'"
       t.float   :vegas_line, comment: 'point spread or total; nil for moneyline'
       t.integer :vegas_odds, null: false, comment: 'payout in American odds (e.g. -110, +150)'
       t.float   :model_value, null: false, comment: 'model-predicted value (spread, total, or win %)' 
