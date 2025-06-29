@@ -29,4 +29,5 @@
 class GameOdd < ApplicationRecord
   belongs_to :game
   validates :game_id, uniqueness: true
+  has_many :bet_recommendations, dependent: :destroy
 end

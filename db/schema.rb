@@ -10,9 +10,34 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2025_06_08_042707) do
+ActiveRecord::Schema[7.1].define(version: 2025_06_28_192143) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
+
+  create_table "bet_recommendations", force: :cascade do |t|
+    t.bigint "game_id", null: false
+    t.bigint "prediction_id", null: false
+    t.bigint "game_odd_id", null: false
+    t.string "bet_type", null: false, comment: "'moneyline', 'spread', or 'total'"
+    t.string "team", null: false, comment: "'home', 'away', 'over', 'under'"
+    t.float "vegas_line", comment: "point spread or total; nil for moneyline"
+    t.integer "vegas_odds", null: false, comment: "payout in American odds (e.g. -110, +150)"
+    t.float "model_value", null: false, comment: "model-predicted value (spread, total, or win %)"
+    t.float "ev", null: false, comment: "expected value (unit-neutral, e.g. +0.07 = +7%)"
+    t.float "confidence", comment: "optional: model confidence (0.0–1.0 or 0–100 scale)"
+    t.boolean "recommended", default: false, null: false, comment: "whether the bet is actionable"
+    t.string "result", comment: "'win', 'loss', 'push'"
+    t.float "payout", comment: "net return in units, e.g. +0.91, -1.00"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "ratings_config_version_id"
+    t.boolean "current", default: false
+    t.index ["current"], name: "index_bet_recommendations_on_current", unique: true, where: "(current IS TRUE)"
+    t.index ["game_id"], name: "index_bet_recommendations_on_game_id"
+    t.index ["game_odd_id"], name: "index_bet_recommendations_on_game_odd_id"
+    t.index ["prediction_id"], name: "index_bet_recommendations_on_prediction_id"
+    t.index ["ratings_config_version_id"], name: "index_bet_recommendations_on_ratings_config_version_id"
+  end
 
   create_table "bookmaker_odds", force: :cascade do |t|
     t.bigint "game_id", null: false
@@ -173,9 +198,11 @@ ActiveRecord::Schema[7.1].define(version: 2025_06_08_042707) do
     t.decimal "home_win_probability", precision: 5, scale: 4
     t.decimal "vegas_spread", precision: 6, scale: 3
     t.decimal "vegas_total", precision: 6, scale: 3
+    t.bigint "ratings_config_version_id"
     t.index ["away_team_snapshot_id"], name: "index_predictions_on_away_team_snapshot_id"
     t.index ["game_id"], name: "index_predictions_on_game_id"
     t.index ["home_team_snapshot_id"], name: "index_predictions_on_home_team_snapshot_id"
+    t.index ["ratings_config_version_id"], name: "index_predictions_on_ratings_config_version_id"
   end
 
   create_table "ratings_config_versions", force: :cascade do |t|
@@ -184,6 +211,8 @@ ActiveRecord::Schema[7.1].define(version: 2025_06_08_042707) do
     t.string "name", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.boolean "current", default: false
+    t.index ["current"], name: "index_ratings_config_versions_on_current", unique: true, where: "(current IS TRUE)"
     t.index ["name"], name: "index_ratings_config_versions_on_name", unique: true
   end
 
@@ -432,8 +461,13 @@ ActiveRecord::Schema[7.1].define(version: 2025_06_08_042707) do
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
   end
 
+  add_foreign_key "bet_recommendations", "game_odds"
+  add_foreign_key "bet_recommendations", "games"
+  add_foreign_key "bet_recommendations", "predictions"
+  add_foreign_key "bet_recommendations", "ratings_config_versions"
   add_foreign_key "bookmaker_odds", "games"
   add_foreign_key "game_odds", "games"
+  add_foreign_key "predictions", "ratings_config_versions"
   add_foreign_key "predictions", "team_rating_snapshots", column: "away_team_snapshot_id"
   add_foreign_key "predictions", "team_rating_snapshots", column: "home_team_snapshot_id"
   add_foreign_key "team_aliases", "teams"

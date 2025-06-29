@@ -1,0 +1,63 @@
+<h1 class="text-xl font-bold mb-4">Betting Recommendations</h1>
+
+<%= form_with url: betting_games_path, method: :get, local: true, class: "mb-4 flex gap-2" do |form| %>
+  <%= form.label :date, "Date:", class: "font-semibold" %>
+  <%= form.date_field :date, value: @date, class: "border rounded px-2 py-1" %>
+  <%= form.submit "Go", class: "bg-prophet-indigo hover:bg-prophet-indigo/80 text-white font-bold py-2 px-4 rounded inline-flex items-center space-x-2" %>
+<% end %>
+
+<table class="table-auto w-full border">
+  <thead>
+    <tr class="bg-gray-100">
+      <th class="px-4 py-2 text-left">Matchup</th>
+      <th class="px-4 py-2 text-left">Status</th>
+      <th class="px-4 py-2 text-left">Score</th>
+      <th class="px-4 py-2 text-left">Odds</th>
+      <th class="px-4 py-2 text-left">Recommendation</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% @games.each do |game| %>
+      <tr class="border-t">
+        <td class="px-4 py-2 font-semibold">
+          <%= link_to "#{game.away_team_name} @ #{game.home_team_name}", game_path(game),
+            class: "text-gray-800 hover:text-blue-600" %>
+        </td>
+        <td class="px-4 py-2">
+          <% status = game.status_string.upcase %>
+          <% badge_class, badge_label = case
+            when status.include?("FINAL")
+              ["bg-green-100 text-green-700", game.status_string]
+            when status.include?("SCHEDULED")
+              ["bg-gray-100 text-gray-600", "Scheduled"]
+            when status.include?("CANCELED")
+              ["bg-red-100 text-red-700", "Canceled"]
+            else
+              ["bg-gray-100 text-gray-600", game.status_string]
+          end %>
+          <span class="text-xs px-2 py-0.5 rounded <%= badge_class %>"><%= badge_label %></span>
+        </td>
+        <td class="px-4 py-2">
+          <% if game.final? %>
+            <%= game.away_team_score %> - <%= game.home_team_score %>
+          <% else %>
+            --
+          <% end %>
+        </td>
+        <td class="px-4 py-2">
+          <%# Odds display placeholder %>
+          <%= game.odds.present? ? game.odds : content_tag(:span, 'No odds', class: 'text-xs text-gray-400') %>
+        </td>
+        <td class="px-4 py-2">
+          <%# Recommendation display placeholder %>
+          <%= game.recommendation.present? ? game.recommendation : content_tag(:span, 'No recommendation', class: 'text-xs text-gray-400') %>
+        </td>
+      </tr>
+    <% end %>
+    <% if @games.empty? %>
+      <tr>
+        <td colspan="5" class="text-center text-gray-400 py-4">No games with odds available for this date.</td>
+      </tr>
+    <% end %>
+  </tbody>
+</table>

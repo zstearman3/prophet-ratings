@@ -25,25 +25,30 @@
 #  away_team_snapshot_id           :bigint
 #  game_id                         :bigint           not null
 #  home_team_snapshot_id           :bigint
+#  ratings_config_version_id       :bigint
 #
 # Indexes
 #
-#  index_predictions_on_away_team_snapshot_id  (away_team_snapshot_id)
-#  index_predictions_on_game_id                (game_id)
-#  index_predictions_on_home_team_snapshot_id  (home_team_snapshot_id)
+#  index_predictions_on_away_team_snapshot_id      (away_team_snapshot_id)
+#  index_predictions_on_game_id                    (game_id)
+#  index_predictions_on_home_team_snapshot_id      (home_team_snapshot_id)
+#  index_predictions_on_ratings_config_version_id  (ratings_config_version_id)
 #
 # Foreign Keys
 #
 #  fk_rails_...  (away_team_snapshot_id => team_rating_snapshots.id)
 #  fk_rails_...  (home_team_snapshot_id => team_rating_snapshots.id)
+#  fk_rails_...  (ratings_config_version_id => ratings_config_versions.id)
 #
 class Prediction < ApplicationRecord
   belongs_to :game
   belongs_to :home_team_snapshot, class_name: 'TeamRatingSnapshot'
   belongs_to :away_team_snapshot, class_name: 'TeamRatingSnapshot'
+  belongs_to :ratings_config_version
   has_one :home_team_game, through: :game
   has_one :away_team_game, through: :game
   has_one :season, through: :game
+  has_many :bet_recommendations, dependent: :destroy
 
   validates :game, uniqueness: { scope: %i[home_team_snapshot_id away_team_snapshot_id] }
   validate :snapshots_must_have_same_ratings_version

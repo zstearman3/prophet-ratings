@@ -18,6 +18,7 @@ Rails.application.routes.draw do
   resources :games, only: [:index, :show] do
     collection do
       get :schedule
+      get :betting
     end
   end
   resource :matchup, only: [:show] do
