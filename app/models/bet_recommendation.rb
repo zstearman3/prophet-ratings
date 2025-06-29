@@ -13,7 +13,7 @@
 #  payout(net return in units, e.g. +0.91, -1.00)                    :float
 #  recommended(whether the bet is actionable)                        :boolean          default(FALSE), not null
 #  result('win', 'loss', 'push')                                     :string
-#  team('home', 'away', 'over', 'under')                             :string           not null
+#  team('home', 'away', 'over', 'under')                             :string
 #  vegas_line(point spread or total; nil for moneyline)              :float
 #  vegas_odds(payout in American odds (e.g. -110, +150))             :integer          not null
 #  created_at                                                        :datetime         not null
@@ -25,7 +25,6 @@
 #
 # Indexes
 #
-#  index_bet_recommendations_on_current                    (current) UNIQUE WHERE (current IS TRUE)
 #  index_bet_recommendations_on_game_id                    (game_id)
 #  index_bet_recommendations_on_game_odd_id                (game_odd_id)
 #  index_bet_recommendations_on_prediction_id              (prediction_id)
@@ -44,7 +43,7 @@ class BetRecommendation < ApplicationRecord
   belongs_to :prediction
   belongs_to :game_odd
 
-  validates :game, uniqueness: { scope: %i[bet_type] }
+  validates :bet_type, uniqueness: { scope: %i[prediction_id game_odd_id] }
   validates :bet_type, inclusion: { in: ->(rec) { rec.class.bet_types.keys } }
   validates :team, inclusion: { in: ->(rec) { rec.class.teams.keys } }, allow_nil: true
 

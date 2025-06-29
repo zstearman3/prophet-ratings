@@ -97,6 +97,19 @@ class Prediction < ApplicationRecord
     Math.sqrt(var_home + var_away)
   end
 
+  def total_std_deviation
+    pace_factor = (pace**2) / 10_000.0
+
+    total_var = (
+      home_team_snapshot.team_season.offensive_efficiency_std_dev**2 +
+      home_team_snapshot.team_season.defensive_efficiency_std_dev**2 +
+      away_team_snapshot.team_season.offensive_efficiency_std_dev**2 +
+      away_team_snapshot.team_season.defensive_efficiency_std_dev**2
+    )
+
+    Math.sqrt(total_var) * pace_factor
+  end
+
   private
 
   def snapshots_must_have_same_ratings_version

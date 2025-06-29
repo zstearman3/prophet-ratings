@@ -100,9 +100,9 @@ module ProphetRatings
     end
 
     def expected_pace
-      ((home_rating_snapshot&.adj_pace || 0) - (season.respond_to?(:average_pace) ? season.average_pace : 0)) +
-        ((away_rating_snapshot&.adj_pace || 0) - (season.respond_to?(:average_pace) ? season.average_pace : 0)) +
-        (season.respond_to?(:average_pace) ? season.average_pace : 0)
+      @expected_pace ||= ((home_rating_snapshot&.adj_pace || 0) - (season.respond_to?(:average_pace) ? season.average_pace : 0)) +
+                         ((away_rating_snapshot&.adj_pace || 0) - (season.respond_to?(:average_pace) ? season.average_pace : 0)) +
+                         (season.respond_to?(:average_pace) ? season.average_pace : 0)
     end
 
     def home_expected_score
@@ -115,7 +115,12 @@ module ProphetRatings
 
     def win_probability_home
       score_diff = home_expected_score - away_expected_score
-      volatility = Math.sqrt((total_home_volatility**2) + (total_away_volatility**2))
+      eff_to_score_scale = (expected_pace**2) / 10_000.0
+
+      home_score_volatility = total_home_volatility * eff_to_score_scale
+      away_score_volatility = total_away_volatility * eff_to_score_scale
+
+      volatility = Math.sqrt((home_score_volatility**2) + (away_score_volatility**2))
       probability = StatisticsUtils.normal_cdf(score_diff / volatility)
       probability.round(4)
     end
@@ -160,11 +165,11 @@ module ProphetRatings
     end
 
     def total_home_volatility
-      ((home_offensive_volatility + away_defensive_volatility) / 2.0) * @upset_modifier.to_f
+      Math.sqrt((home_offensive_volatility**2) + (away_defensive_volatility**2)) * @upset_modifier.to_f
     end
 
     def total_away_volatility
-      ((away_offensive_volatility + home_defensive_volatility) / 2.0) * @upset_modifier.to_f
+      Math.sqrt((away_offensive_volatility**2) + (home_defensive_volatility**2)) * @upset_modifier.to_f
     end
 
     def home_pace_volatility

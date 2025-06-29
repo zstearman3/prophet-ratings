@@ -3,7 +3,7 @@
 module ProphetRatings
   class PredictionEvaluator
     def initialize(
-      ratings_config_version: RatingsConfigVersion.current,
+      ratings_config_version: RatingsConfigVersion.ensure_current!,
       date_range: Season.current.start_date..Season.current.end_date
     )
 
@@ -32,6 +32,7 @@ module ProphetRatings
       plot_efficiency_error_histograms
       plot_win_prob_calibration
       export_team_residuals_to_csv
+      plot_margin_z_scores_histogram
     end
 
     private
@@ -253,6 +254,43 @@ module ProphetRatings
       end
 
       Rails.logger.debug { "📁 Exported team residuals to #{path}" }
+    end
+
+    def plot_margin_z_scores_histogram
+      require 'gruff'
+
+      z_scores = predictions.filter_map do |p|
+        next unless p.home_score && p.away_score &&
+                    p.game&.home_team_score && p.game&.away_team_score &&
+                    p.margin_std_deviation
+
+        predicted_margin = p.home_score - p.away_score
+        actual_margin = p.game.home_team_score - p.game.away_team_score
+        stddev = p.margin_std_deviation
+
+        next if stddev.zero? || stddev.nan?
+
+        (actual_margin - predicted_margin) / stddev.to_f
+      end
+
+      # Bin and count
+      buckets = z_scores.group_by { |z| (z * 2).round / 2.0 } # half-point bins
+      sorted = buckets.sort_by(&:first)
+
+      labels = {}
+      counts = []
+      sorted.each_with_index do |(bucket, values), i|
+        labels[i] = bucket
+        counts << values.size
+      end
+
+      g = Gruff::Bar.new
+      g.title = 'Z-score Distribution of Margin Predictions'
+      g.labels = labels
+      g.data(:ZScores, counts)
+      g.write('tmp/z_score_histogram.png')
+
+      Rails.logger.info '📊 Saved Z-score histogram to tmp/z_score_histogram.png'
     end
   end
 end

@@ -32,7 +32,6 @@ ActiveRecord::Schema[7.1].define(version: 2025_06_28_192143) do
     t.datetime "updated_at", null: false
     t.bigint "ratings_config_version_id"
     t.boolean "current", default: false
-    t.index ["current"], name: "index_bet_recommendations_on_current", unique: true, where: "(current IS TRUE)"
     t.index ["game_id"], name: "index_bet_recommendations_on_game_id"
     t.index ["game_odd_id"], name: "index_bet_recommendations_on_game_odd_id"
     t.index ["prediction_id"], name: "index_bet_recommendations_on_prediction_id"
