@@ -69,9 +69,7 @@ class Game < ApplicationRecord
   end
 
   def current_prediction
-    predictions.find do |prediction|
-      prediction.home_team_snapshot == home_rating_snapshot
-    end
+    predictions.find_by(ratings_config_version: { current: true })
   end
 
   def winning_team

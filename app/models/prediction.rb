@@ -88,6 +88,15 @@ class Prediction < ApplicationRecord
     end
   end
 
+  def margin_std_deviation
+    pace_factor = (pace**2) / 10_000.0
+
+    var_home = pace_factor * ((home_team_snapshot.team_season.stddev_off**2) + (away_team_snapshot.team_season.stddev_def**2))
+    var_away = pace_factor * ((away_team_snapshot.team_season.stddev_off**2) + (home_team_snapshot.team_season.stddev_def**2))
+
+    Math.sqrt(var_home + var_away)
+  end
+
   private
 
   def snapshots_must_have_same_ratings_version
