@@ -34,7 +34,9 @@ class RatingsConfigVersion < ApplicationRecord
 
     transaction do
       update_all(current: false)
-      find_or_create_by_config(config_hash).update!(current: true)
+      config = find_or_create_by_config(config_hash)
+      config.update!(current: true)
+      config
     end
   end
 

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # == Schema Information
 #
 # Table name: bet_recommendations
@@ -41,15 +43,15 @@ FactoryBot.define do
     game { nil }
     prediction { nil }
     game_odd { nil }
-    bet_type { "MyString" }
-    team { "MyString" }
+    bet_type { 'MyString' }
+    team { 'MyString' }
     vegas_line { 1.5 }
     vegas_odds { 1 }
     model_value { 1.5 }
     ev { 1.5 }
     confidence { 1.5 }
     recommended { false }
-    result { "MyString" }
+    result { 'MyString' }
     payout { 1.5 }
   end
 end

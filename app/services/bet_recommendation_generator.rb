@@ -14,9 +14,9 @@ class BetRecommendationGenerator
     # Moneyline (home)
     if game_odd.moneyline_home && prediction.home_win_probability
       recs << create_recommendation(
-        game: game,
-        prediction: prediction,
-        game_odd: game_odd,
+        game:,
+        prediction:,
+        game_odd:,
         bet_type: 'moneyline',
         team: 'home',
         vegas_line: nil,
@@ -31,9 +31,9 @@ class BetRecommendationGenerator
     # Moneyline (away)
     if game_odd.moneyline_away && prediction.home_win_probability
       recs << create_recommendation(
-        game: game,
-        prediction: prediction,
-        game_odd: game_odd,
+        game:,
+        prediction:,
+        game_odd:,
         bet_type: 'moneyline',
         team: 'away',
         vegas_line: nil,
@@ -49,9 +49,9 @@ class BetRecommendationGenerator
     if game_odd.spread_point && game_odd.spread_home_odds && prediction.home_score && prediction.away_score
       model_spread = prediction.home_score - prediction.away_score
       recs << create_recommendation(
-        game: game,
-        prediction: prediction,
-        game_odd: game_odd,
+        game:,
+        prediction:,
+        game_odd:,
         bet_type: 'spread',
         team: 'home',
         vegas_line: game_odd.spread_point.to_f,
@@ -67,9 +67,9 @@ class BetRecommendationGenerator
     if game_odd.spread_point && game_odd.spread_away_odds && prediction.home_score && prediction.away_score
       model_spread = prediction.away_score - prediction.home_score
       recs << create_recommendation(
-        game: game,
-        prediction: prediction,
-        game_odd: game_odd,
+        game:,
+        prediction:,
+        game_odd:,
         bet_type: 'spread',
         team: 'away',
         vegas_line: -game_odd.spread_point.to_f,
@@ -84,9 +84,9 @@ class BetRecommendationGenerator
     # Total (over)
     if game_odd.total_points && game_odd.total_over_odds && prediction.total
       recs << create_recommendation(
-        game: game,
-        prediction: prediction,
-        game_odd: game_odd,
+        game:,
+        prediction:,
+        game_odd:,
         bet_type: 'total',
         team: 'over',
         vegas_line: game_odd.total_points.to_f,
@@ -101,9 +101,9 @@ class BetRecommendationGenerator
     # Total (under)
     if game_odd.total_points && game_odd.total_under_odds && prediction.total
       recs << create_recommendation(
-        game: game,
-        prediction: prediction,
-        game_odd: game_odd,
+        game:,
+        prediction:,
+        game_odd:,
         bet_type: 'total',
         team: 'under',
         vegas_line: game_odd.total_points.to_f,
@@ -122,8 +122,8 @@ class BetRecommendationGenerator
   # win_prob: model probability of winning (0-1)
   # odds: American odds
   def self.expected_value(win_prob, odds)
-    payout = odds > 0 ? odds / 100.0 : 100.0 / odds.abs
-    ev = win_prob * payout - (1 - win_prob)
+    payout = odds.positive? ? odds / 100.0 : 100.0 / odds.abs
+    ev = (win_prob * payout) - (1 - win_prob)
     ev.round(4)
   end
 

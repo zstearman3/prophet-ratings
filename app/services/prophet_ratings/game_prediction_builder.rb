@@ -21,7 +21,7 @@ module ProphetRatings
         home_team_snapshot: home_snapshot,
         away_team_snapshot: away_snapshot,
         ratings_config_version:,
-        game: self
+        game:
       ).tap do |prediction|
         prediction.home_offensive_efficiency = result[:meta][:home_expected_ortg]
         prediction.away_offensive_efficiency = result[:meta][:away_expected_ortg]

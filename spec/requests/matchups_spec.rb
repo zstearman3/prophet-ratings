@@ -20,7 +20,7 @@ RSpec.describe 'Matchups' do
       team2 = create(:team)
       ts1 = create(:team_season, team: team1, season:)
       ts2 = create(:team_season, team: team2, season:)
-      config = RatingsConfigVersion.current
+      config = RatingsConfigVersion.ensure_current!
       create(:team_rating_snapshot, team_season: ts1, ratings_config_version: config)
       create(:team_rating_snapshot, team_season: ts2, ratings_config_version: config)
       post '/matchup/submit', params: { home_team_id: ts1.id, away_team_id: ts2.id, neutral: '0', action_type: 'predict' },

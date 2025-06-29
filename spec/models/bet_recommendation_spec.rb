@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # == Schema Information
 #
 # Table name: bet_recommendations
@@ -38,6 +40,6 @@
 #
 require 'rails_helper'
 
-RSpec.describe BetRecommendation, type: :model do
+RSpec.describe BetRecommendation do
   pending "add some examples to (or delete) #{__FILE__}"
 end

@@ -49,5 +49,6 @@ FactoryBot.define do
     sequence(:year) { |n| 2020 + n }
     start_date { Date.new(year, 11, 1) }
     end_date { Date.new(year + 1, 4, 1) }
+    average_efficiency { 100.0 }
   end
 end

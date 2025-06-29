@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # lib/tasks/seed_fake_odds.rake
 # WARNING: This task is for LOCAL DEVELOPMENT ONLY. DO NOT RUN IN PRODUCTION.
 # It seeds fake odds for all existing games.
@@ -16,7 +18,7 @@ namespace :fake_odds do
       # Create a GameOdd if one doesn't exist for this game
       unless game.game_odd
         GameOdd.create!(
-          game: game,
+          game:,
           fetched_at: Time.current,
           moneyline_away: Faker::Number.between(from: -200, to: 200),
           moneyline_home: Faker::Number.between(from: -200, to: 200),
@@ -34,10 +36,10 @@ namespace :fake_odds do
         %w[moneyline spread total].each do |market|
           %w[home away].each do |side|
             BookmakerOdd.create!(
-              game: game,
-              bookmaker: bookmaker,
+              game:,
+              bookmaker:,
               fetched_at: Time.current,
-              market: market,
+              market:,
               odds: Faker::Number.between(from: -200, to: 200),
               team_name: side == 'home' ? game.home_team.try(:name) : game.away_team.try(:name),
               team_side: side,
