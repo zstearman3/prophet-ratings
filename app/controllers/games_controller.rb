@@ -64,13 +64,12 @@ class GamesController < ApplicationController
     @date = date
     @games = Game.where(start_time: date.all_day)
                  .order(:start_time)
-                 .includes(:predictions, :game_odd, { home_team_game: :team_season }, { away_team_game: :team_season })
-
-    # Odds and recommendation logic (placeholder, adjust as needed)
-    @games.each do |game|
-      # Example: odds and recommendation methods/fields on Game
-      game.define_singleton_method(:odds) { respond_to?(:vegas_odds) ? vegas_odds : nil }
-      game.define_singleton_method(:recommendation) { respond_to?(:betting_recommendation) ? betting_recommendation : nil }
-    end
+                 .includes(
+                   :predictions,
+                   :game_odd,
+                   :current_bet_recommendations,
+                   { home_team_game: :team_season },
+                   { away_team_game: :team_season }
+                 )
   end
 end

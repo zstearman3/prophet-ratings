@@ -88,6 +88,18 @@ class Prediction < ApplicationRecord
     end
   end
 
+  def predicted_score_with_teams
+    if home_score.round == away_score.round
+      if home_score > away_score
+        "#{game.away_team_name} #{away_score.round} - #{game.home_team_name} #{home_score.round + 1}"
+      else
+        "#{game.away_team_name} #{away_score.round + 1} - #{game.home_team_name} #{home_score.round}"
+      end
+    else
+      "#{game.away_team_name} #{away_score.round} - #{game.home_team_name} #{home_score.round}"
+    end
+  end
+
   def margin_std_deviation
     pace_factor = (pace**2) / 10_000.0
 
@@ -108,6 +120,14 @@ class Prediction < ApplicationRecord
     )
 
     Math.sqrt(total_var) * pace_factor
+  end
+
+  def favorite_line
+    if home_score > away_score
+      "#{game.home_team_name} #{away_score.round - home_score.round}"
+    else
+      "#{game.away_team_name} #{home_score.round - away_score.round}"
+    end
   end
 
   private

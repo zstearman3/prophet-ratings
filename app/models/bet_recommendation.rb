@@ -59,4 +59,27 @@ class BetRecommendation < ApplicationRecord
     over: 'over',
     under: 'under'
   }, _suffix: true
+
+  def recommendation
+    return "No play" unless recommended
+
+    case team
+    when 'home'
+      if bet_type == 'spread'
+        "#{game.home_team_name} #{game_odd.formatted_home_line}"
+      else
+        "#{game.home_team_name} #{game_odd.formatted_home_moneyline}"
+      end
+    when 'away'
+      if bet_type == 'spread'
+        "#{game.away_team_name} #{game_odd.formatted_away_line}"
+      else
+        "#{game.away_team_name} #{game_odd.formatted_away_moneyline}"
+      end
+    when 'over'
+      "Over #{game_odd.total_points}"
+    when 'under'
+      "Under #{game_odd.total_points}"
+    end
+  end
 end

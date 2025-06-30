@@ -30,4 +30,42 @@ class GameOdd < ApplicationRecord
   belongs_to :game
   validates :game_id, uniqueness: true
   has_many :bet_recommendations, dependent: :destroy
+
+  def formatted_home_line
+    format_odds(spread_point)
+  end
+
+  def formatted_away_line
+    format_odds(-spread_point)
+  end
+
+  def formatted_home_odds
+    format_odds(spread_home_odds)
+  end
+
+  def formatted_away_odds
+    format_odds(spread_away_odds)
+  end
+
+  def formatted_home_moneyline
+    format_odds(moneyline_home)
+  end
+
+  def formatted_away_moneyline
+    format_odds(moneyline_away)
+  end
+
+  def formatted_favorite_line
+    if spread_point < 0
+      "#{game.home_team_name} #{format_odds(spread_point)}"
+    else
+      "#{game.away_team_name} #{format_odds(-spread_point)}"
+    end
+  end
+
+  private
+
+  def format_odds(odds)
+    odds > 0 ? "+#{odds}" : odds
+  end
 end

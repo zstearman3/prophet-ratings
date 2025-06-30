@@ -9,3 +9,6 @@ application.register("hello", HelloController)
 
 import NavbarController from "./navbar_controller"
 application.register("navbar", NavbarController)
+
+import BettingExpandController from "./betting_expand_controller"
+application.register("betting-expand", BettingExpandController)

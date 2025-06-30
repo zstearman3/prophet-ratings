@@ -57,6 +57,7 @@ class Game < ApplicationRecord
   has_one :game_odd, dependent: :destroy
   has_many :bookmaker_odds, dependent: :destroy
   has_many :bet_recommendations, dependent: :destroy
+  has_many :current_bet_recommendations, -> { where(current: true) }, class_name: 'BetRecommendation'
 
   enum status: { scheduled: 0, final: 1, canceled: 2 }
 

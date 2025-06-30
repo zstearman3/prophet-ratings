@@ -43,7 +43,7 @@ class BetRecommendationGenerator
 
     prob_home_covers = cover_probability(
       model_margin:,
-      vegas_line: line,
+      vegas_line: -line,
       margin_std_deviation: stddev
     )
 
@@ -161,6 +161,8 @@ class BetRecommendationGenerator
   end
 
   def create_recommendation(**attrs)
+    BetRecommendation.where(game: @game, bet_type: attrs[:bet_type]).update_all(current: false) if attrs[:ratings_config_version_current]
+
     rec = BetRecommendation.find_or_initialize_by(
       bet_type: attrs[:bet_type],
       prediction_id: attrs[:prediction_id],
@@ -175,15 +177,9 @@ class BetRecommendationGenerator
       model_value: attrs[:model_value],
       confidence: attrs[:confidence],
       ev: attrs[:ev],
-      recommended: attrs[:recommended]
+      recommended: attrs[:recommended],
+      current: attrs[:ratings_config_version_current]
     )
-    if attrs[:ratings_config_version_current]
-      # Unset current for all recommendations for this game and bet_type
-      BetRecommendation.where(game: @game, bet_type: attrs[:bet_type]).update_all(current: false)
-      rec.current = true
-    else
-      rec.current = false
-    end
     rec.save!
     rec
   end

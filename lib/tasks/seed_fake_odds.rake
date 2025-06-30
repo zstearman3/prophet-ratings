@@ -15,36 +15,38 @@ namespace :fake_odds do
     require 'faker'
 
     Game.find_each do |game|
-      # Create a GameOdd if one doesn't exist for this game
-      unless game.game_odd
-        GameOdd.create!(
-          game:,
-          fetched_at: Time.current,
-          moneyline_away: Faker::Number.between(from: -200, to: 200),
-          moneyline_home: Faker::Number.between(from: -200, to: 200),
-          spread_away_odds: Faker::Number.between(from: -120, to: 120),
-          spread_home_odds: Faker::Number.between(from: -120, to: 120),
-          spread_point: Faker::Number.decimal(l_digits: 1, r_digits: 1),
-          total_over_odds: Faker::Number.between(from: -120, to: 120),
-          total_points: Faker::Number.decimal(l_digits: 2, r_digits: 1),
-          total_under_odds: Faker::Number.between(from: -120, to: 120)
-        )
-      end
+      game_odd = GameOdd.find_or_initialize_by(game:)
+      home_moneyline = Faker::Number.between(from: -50, to: 50) * 10
+      away_moneyline = -home_moneyline
+      spread_home_odds = Faker::Number.between(from: -12, to: -10) * 10
+      spread_away_odds = spread_home_odds
+      total_points = Faker::Number.between(from: 100, to: 200)
+      total_over_odds = Faker::Number.between(from: -12, to: -10) * 10
+      total_under_odds = total_over_odds
+
+      game_odd.fetched_at = Time.current
+      game_odd.moneyline_away = away_moneyline
+      game_odd.moneyline_home = home_moneyline
+      game_odd.spread_away_odds = spread_away_odds
+      game_odd.spread_home_odds = spread_home_odds
+      game_odd.spread_point = Faker::Number.decimal(l_digits: 1, r_digits: 1)
+      game_odd.total_over_odds = total_over_odds
+      game_odd.total_points = total_points
+      game_odd.total_under_odds = total_under_odds
+      game_odd.save!
 
       # Create a few BookmakerOdds for each game
       %w[DraftKings FanDuel BetMGM].each do |bookmaker|
         %w[moneyline spread total].each do |market|
           %w[home away].each do |side|
-            BookmakerOdd.create!(
-              game:,
-              bookmaker:,
-              fetched_at: Time.current,
-              market:,
-              odds: Faker::Number.between(from: -200, to: 200),
-              team_name: side == 'home' ? game.home_team.try(:name) : game.away_team.try(:name),
-              team_side: side,
-              value: Faker::Number.decimal(l_digits: 2, r_digits: 1)
-            )
+            BookmakerOdd.find_or_initialize_by(game:, bookmaker:, market:) do |bookmaker_odd|
+              bookmaker_odd.team_name = side == 'home' ? game.home_team.try(:name) : game.away_team.try(:name)
+              bookmaker_odd.team_side = side
+              bookmaker_odd.fetched_at = Time.current
+              bookmaker_odd.odds = Faker::Number.between(from: -200, to: 200)
+              bookmaker_odd.value = Faker::Number.decimal(l_digits: 2, r_digits: 1)
+              bookmaker_odd.save!
+            end
           end
         end
       end

@@ -23,6 +23,12 @@ module.exports = {
           black: '111827',
           seasalt: 'F8FAFC',
         },
+        betting: { 
+          green: '#059669',
+          yellow: '#D97706',
+          red: '#DC2626',
+          blue: '#0284C7',
+        },
       },
     },
   },
