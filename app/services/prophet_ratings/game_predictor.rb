@@ -122,6 +122,7 @@ module ProphetRatings
 
       volatility = Math.sqrt((home_score_volatility**2) + (away_score_volatility**2))
       probability = StatisticsUtils.normal_cdf(score_diff / volatility)
+
       probability.round(4)
     end
 

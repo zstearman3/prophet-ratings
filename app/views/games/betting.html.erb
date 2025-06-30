@@ -6,20 +6,38 @@
   <%= form.submit "Go", class: "bg-prophet-indigo hover:bg-prophet-indigo/80 text-white font-bold py-2 px-4 rounded inline-flex items-center space-x-2" %>
 <% end %>
 
-<table class="table-auto w-full border">
+<table class="table-auto w-full border" data-controller="betting-sort">
   <thead>
     <tr class="bg-gray-100">
       <th class="px-4 py-2 text-left">Matchup</th>
-      <th class="px-4 py-2 text-left">Spread</th>
-      <th class="px-4 py-2 text-left">Moneyline</th>
-      <th class="px-4 py-2 text-left">Total</th>
+      <th class="px-4 py-2 text-left">
+        <button type="button" data-action="click->betting-sort#sort" data-column="spread" class="flex items-center gap-1">
+          Spread
+          <span class="text-xs">⇅</span>
+        </button>
+      </th>
+      <th class="px-4 py-2 text-left">
+        <button type="button" data-action="click->betting-sort#sort" data-column="moneyline" class="flex items-center gap-1">
+          Moneyline
+          <span class="text-xs">⇅</span>
+        </button>
+      </th>
+      <th class="px-4 py-2 text-left">
+        <button type="button" data-action="click->betting-sort#sort" data-column="total" class="flex items-center gap-1">
+          Total
+          <span class="text-xs">⇅</span>
+        </button>
+      </th>
     </tr>
   </thead>
   <tbody>
     <% @games.each do |game| %>
       <% recommendations = game.current_bet_recommendations.index_by(&:bet_type) %>
       
-      <tr class="border-t tr-hoverable cursor-pointer" data-controller="betting-expand" data-action="click->betting-expand#toggle">
+      <tr class="border-t tr-hoverable cursor-pointer" data-controller="betting-expand" data-action="click->betting-expand#toggle" data-betting-sort-target="row"
+        data-ev-for-spread="<%= recommendations["spread"]&.ev || -999 %>"
+        data-ev-for-moneyline="<%= recommendations["moneyline"]&.ev || -999 %>"
+        data-ev-for-total="<%= recommendations["total"]&.ev || -999 %>">
         <td class="px-4 py-2 font-semibold">
           <%= link_to "#{game.away_team_name} @ #{game.home_team_name}", game_path(game),
             class: "text-gray-800 hover:text-blue-600" %>

@@ -103,8 +103,8 @@ class Prediction < ApplicationRecord
   def margin_std_deviation
     pace_factor = (pace**2) / 10_000.0
 
-    var_home = pace_factor * ((home_team_snapshot.team_season.offensive_efficiency_std_dev**2) + (away_team_snapshot.team_season.defensive_efficiency_std_dev**2))
-    var_away = pace_factor * ((away_team_snapshot.team_season.offensive_efficiency_std_dev**2) + (home_team_snapshot.team_season.defensive_efficiency_std_dev**2))
+    var_home = pace_factor * ((home_team_snapshot.team_season.offensive_efficiency_volatility**2) + (away_team_snapshot.team_season.defensive_efficiency_volatility**2))
+    var_away = pace_factor * ((away_team_snapshot.team_season.offensive_efficiency_volatility**2) + (home_team_snapshot.team_season.defensive_efficiency_volatility**2))
 
     Math.sqrt(var_home + var_away)
   end
@@ -113,10 +113,10 @@ class Prediction < ApplicationRecord
     pace_factor = (pace**2) / 10_000.0
 
     total_var = (
-      home_team_snapshot.team_season.offensive_efficiency_std_dev**2 +
-      home_team_snapshot.team_season.defensive_efficiency_std_dev**2 +
-      away_team_snapshot.team_season.offensive_efficiency_std_dev**2 +
-      away_team_snapshot.team_season.defensive_efficiency_std_dev**2
+      home_team_snapshot.team_season.offensive_efficiency_volatility**2 +
+      home_team_snapshot.team_season.defensive_efficiency_volatility**2 +
+      away_team_snapshot.team_season.offensive_efficiency_volatility**2 +
+      away_team_snapshot.team_season.defensive_efficiency_volatility**2
     )
 
     Math.sqrt(total_var) * pace_factor

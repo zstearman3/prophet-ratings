@@ -5,6 +5,10 @@ class GenerateSeasonRatingsJob < ApplicationJob
 
   def perform(season_id)
     season = Season.find(season_id)
+    ratings_config_version = RatingsConfigVersion.current
+    season.bet_recommendations.where(ratings_config_version:).destroy_all
+    season.predictions.where(ratings_config_version:).destroy_all
+    season.team_rating_snapshots.where(ratings_config_version:).destroy_all
 
     start_date = season.start_date
 
@@ -24,7 +28,7 @@ class GenerateSeasonRatingsJob < ApplicationJob
       games = Game.where(start_time: date.all_day)
       ProphetRatings::OverallRatingsCalculator.new(season).call(as_of: date)
       games.each(&:generate_prediction!)
-      games.each { |game| game.finalize_prediction! if game.final? }
+      games.each { |game| game.finalize if game.final? }
     end
 
     Rails.logger.info { "✅ Done backfilling ratings for season #{season.year}" }

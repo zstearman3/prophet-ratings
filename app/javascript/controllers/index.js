@@ -12,3 +12,6 @@ application.register("navbar", NavbarController)
 
 import BettingExpandController from "./betting_expand_controller"
 application.register("betting-expand", BettingExpandController)
+
+import BettingSortController from "./betting_sort_controller"
+application.register("betting-sort", BettingSortController)

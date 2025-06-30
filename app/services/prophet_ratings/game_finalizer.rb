@@ -31,8 +31,8 @@ module ProphetRatings
 
     def finalize_prediction!
       prediction = game.predictions.find_by(
-        home_team_snapshot: game.home_team_game&.team_snapshot,
-        away_team_snapshot: game.away_team_game&.team_snapshot
+        home_team_snapshot: home_snapshot,
+        away_team_snapshot: away_snapshot
       )
       return unless prediction
 
@@ -64,6 +64,22 @@ module ProphetRatings
       return unless arr.any?
 
       arr.sum / (5 * arr.size)
+    end
+
+    def home_snapshot
+      @home_snapshot ||= latest_snapshot(game.home_team_season)
+    end
+
+    def away_snapshot
+      @away_snapshot ||= latest_snapshot(game.away_team_season)
+    end
+
+    def latest_snapshot(team_season)
+      TeamRatingSnapshot
+        .where(team_season:, ratings_config_version: RatingsConfigVersion.current)
+        .where('snapshot_date <= ?', game.start_time.to_date)
+        .order(snapshot_date: :desc)
+        .first
     end
   end
 end

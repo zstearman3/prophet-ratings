@@ -50,10 +50,25 @@ module StatisticsUtils
     stderr_output = ''
     time = Benchmark.realtime do
       Open3.popen3('python3 lib/python/adjusted_stat_solver.py') do |stdin, stdout, stderr, _wait_thr|
-        stdin.puts input_data.to_json
-        stdin.close
+        # Start stderr capture in a thread immediately
+        stderr_output = ''
+        stderr_thread = Thread.new { stderr_output = stderr.read }
+
+        begin
+          stdin.write(input_data.to_json)
+          stdin.close
+        rescue Errno::EPIPE
+          Rails.logger.error('Broken pipe writing to Python solver.')
+          stderr_thread.join
+          Rails.logger.error("Python STDERR: #{stderr_output}")
+          raise
+        end
+
         output = stdout.read
-        stderr_output = stderr.read
+        stderr_thread.join
+
+        Rails.logger.debug { "Solver STDOUT: #{output}" }
+        Rails.logger.debug { "Solver STDERR: #{stderr_output}" } unless stderr_output.empty?
       end
     end
 
