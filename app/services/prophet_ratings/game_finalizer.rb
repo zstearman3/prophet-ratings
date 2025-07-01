@@ -39,8 +39,8 @@ module ProphetRatings
       prediction.update!(
         home_offensive_efficiency_error: game.home_team_game.offensive_efficiency - prediction.home_offensive_efficiency,
         away_offensive_efficiency_error: game.away_team_game.offensive_efficiency - prediction.away_offensive_efficiency,
-        home_defensive_efficiency_error: game.away_team_game.offensive_efficiency - prediction.away_defensive_efficiency,
-        away_defensive_efficiency_error: game.home_team_game.offensive_efficiency - prediction.away_defensive_efficiency,
+        home_defensive_efficiency_error: game.away_team_game.offensive_efficiency - prediction.away_offensive_efficiency,
+        away_defensive_efficiency_error: game.home_team_game.offensive_efficiency - prediction.home_offensive_efficiency,
         pace_error: game.pace - prediction.pace
       )
     end

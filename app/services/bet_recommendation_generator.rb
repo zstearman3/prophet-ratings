@@ -41,7 +41,6 @@ class BetRecommendationGenerator
     stddev = prediction.margin_std_deviation
     line = game_odd.spread_point
 
-    debugger
     prob_home_covers = cover_probability(
       model_margin:,
       vegas_line: -line,
