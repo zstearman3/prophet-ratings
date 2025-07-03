@@ -150,15 +150,22 @@ module ProphetRatings
       home_preds = (home_preds_by_season[team_season.id] || []).reject { |p| p.game.neutral? }
       return { home_offense_boost: baseline, home_defense_boost: -baseline } if home_preds.empty?
 
-      off_deltas = home_preds.filter_map(&:home_offensive_efficiency_error)
-      def_deltas = home_preds.filter_map(&:home_defensive_efficiency_error)
+      off_deltas = home_preds.filter_map do |p|
+        used_boost = p.home_team_snapshot.home_offense_boost || baseline
+        p.home_offensive_efficiency_error - (used_boost - baseline)
+      end
+
+      def_deltas = home_preds.filter_map do |p|
+        used_boost = p.home_team_snapshot.home_defense_boost || baseline
+        p.home_defensive_efficiency_error - (used_boost + baseline)
+      end
 
       avg_off = StatisticsUtils.average(off_deltas)
       avg_def = StatisticsUtils.average(def_deltas)
       weight = [(home_preds.size / 16.0), 0.50].min.round(4)
 
-      blended_off = (weight * (avg_off + baseline)) + ((1.0 - weight) * baseline)
-      blended_def = (weight * (avg_def - baseline)) - ((1.0 - weight) * baseline)
+      blended_off = baseline - (weight * avg_off)
+      blended_def = -baseline + (weight * avg_def)
 
       {
         home_offense_boost: [blended_off, 0.0].max.round(3),
