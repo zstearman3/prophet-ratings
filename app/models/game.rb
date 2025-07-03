@@ -61,14 +61,22 @@ class Game < ApplicationRecord
 
   enum status: { scheduled: 0, final: 1, canceled: 2 }
 
+  ##
+  # Generates a prediction for the game using the external prediction builder service.
   def generate_prediction!
     ProphetRatings::GamePredictionBuilder.new(self).call
   end
 
+  ##
+  # Finalizes the game by delegating to the external game finalizer service.
+  # This typically updates the game's status and related statistics.
   def finalize
     ProphetRatings::GameFinalizer.new(self).call
   end
 
+  ##
+  # Returns the prediction for the game associated with the current ratings configuration version, or nil if none exists.
+  # @return [Prediction, nil] The current prediction or nil if not found.
   def current_prediction
     current_config_id = RatingsConfigVersion.current&.id
     return nil unless current_config_id
@@ -76,6 +84,9 @@ class Game < ApplicationRecord
     predictions.find_by(ratings_config_version_id: current_config_id)
   end
 
+  ##
+  # Returns the team with the higher score.
+  # @return [Team, nil] The home or away team with the higher score, or nil if scores are equal or teams are missing.
   def winning_team
     home_team_score > away_team_score ? home_team : away_team
   end
@@ -92,6 +103,9 @@ class Game < ApplicationRecord
     overtimes.positive?
   end
 
+  ##
+  # Returns a formatted string representing the game's status, indicating overtime if applicable.
+  # @return [String] The status string, such as "Final", "Final OT", "Final 2OT", or the uppercase status.
   def status_string
     if final? && overtime?
       overtimes == 1 ? 'Final OT' : "Final #{overtimes}OT"

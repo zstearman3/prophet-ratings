@@ -8,13 +8,19 @@ class BetRecommendationGenerator
     new(game).call
   end
 
+  ##
+  # Initializes a new BetRecommendationGenerator for the specified game.
+  # @param [Game] game - The game for which to generate bet recommendations.
   def initialize(game)
     @game = game
   end
 
   # Generates bet recommendations for a given game
   # @param game [Game] the game to generate recommendations for
-  # @return [Array<BetRecommendation>] created recommendations
+  ##
+  # Generates bet recommendations for the game based on its current prediction and odds.
+  # Returns an array of created recommendations for spread, moneyline, and total bet types.
+  # @return [Array<BetRecommendation>] The generated bet recommendations (may include nils if data is insufficient).
   def call
     prediction = game.current_prediction
     game_odd = game.game_odd
@@ -34,6 +40,15 @@ class BetRecommendationGenerator
 
   attr_reader :game
 
+  ##
+  # Generates a spread bet recommendation for the given prediction and game odds.
+  #
+  # Calculates the probability and expected value for the home and away teams covering the spread,
+  # recommends the side with probability ≥ 0.5, and flags the recommendation if the expected value meets the configured threshold.
+  # Returns a BetRecommendation record or nil if spread data is unavailable.
+  # @param prediction [Prediction] The prediction object containing model scores and standard deviation.
+  # @param game_odd [GameOdd] The odds object containing spread line and odds.
+  # @return [BetRecommendation, nil] The created or updated spread bet recommendation, or nil if insufficient data.
   def generate_spread_recommendation(prediction, game_odd)
     return unless game_odd.spread_point
 
@@ -74,6 +89,13 @@ class BetRecommendationGenerator
     )
   end
 
+  ##
+  # Generates a moneyline bet recommendation for the given prediction and game odds.
+  #
+  # Compares expected values for home and away moneyline bets based on the model's predicted home win probability and the available odds.
+  # Recommends the side with the higher expected value, and flags the recommendation if the expected value meets or exceeds the configured threshold.
+  # Returns a BetRecommendation record or nil if neither moneyline odds are available.
+  # @return [BetRecommendation, nil] The generated moneyline bet recommendation, or nil if insufficient odds are present.
   def generate_moneyline_recommendation(prediction, game_odd)
     return unless game_odd.moneyline_home || game_odd.moneyline_away
 
@@ -107,6 +129,10 @@ class BetRecommendationGenerator
     )
   end
 
+  ##
+  # Generates a bet recommendation for the total points (over/under) market based on the model's predicted total, standard deviation, and available odds.
+  # Returns a BetRecommendation record if sufficient data is present; otherwise, returns nil.
+  # The recommendation includes selection ("over" or "under"), line, odds, model value, confidence, expected value, and recommendation status.
   def generate_total_recommendation(prediction, game_odd)
     return unless game_odd.total_points
 
@@ -146,12 +172,24 @@ class BetRecommendationGenerator
     )
   end
 
+  ##
+  # Calculates the probability that the model margin exceeds the Vegas line using the normal distribution.
+  # @param [Float] model_margin - The predicted margin from the model.
+  # @param [Float] vegas_line - The Vegas betting line for the margin.
+  # @param [Float] margin_std_deviation - The standard deviation of the predicted margin.
+  # @return [Float] The probability that the model margin covers the Vegas line.
   def cover_probability(model_margin:, vegas_line:, margin_std_deviation:)
     z_score = (model_margin - vegas_line) / margin_std_deviation
 
     StatisticsUtils.normal_cdf(z_score)
   end
 
+  ##
+  # Calculates the expected value of a bet given the win probability and American odds.
+  # Returns 0 if either value is missing or odds is zero.
+  # @param [Float] win_prob - The probability of winning the bet (between 0 and 1).
+  # @param [Integer] odds - The American odds for the bet.
+  # @return [Float] The expected value, rounded to four decimal places.
   def expected_value(win_prob, odds)
     return 0 unless odds && win_prob && odds != 0
 
@@ -160,6 +198,11 @@ class BetRecommendationGenerator
     ev.round(4)
   end
 
+  ##
+  # Creates or updates a bet recommendation record for the current game and bet type with the provided attributes.
+  # Marks existing recommendations of the same bet type as not current if the ratings configuration version is current.
+  # @param attrs [Hash] Attributes for the recommendation, including bet type, prediction and odds IDs, team, line, odds, model value, confidence, expected value, recommendation status, and ratings config version.
+  # @return [BetRecommendation] The created or updated bet recommendation record.
   def create_recommendation(**attrs)
     BetRecommendation.where(game: @game, bet_type: attrs[:bet_type]).update_all(current: false) if attrs[:ratings_config_version_current]
 

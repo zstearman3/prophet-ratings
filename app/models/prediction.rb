@@ -76,6 +76,9 @@ class Prediction < ApplicationRecord
     predicted_home_win == actual_home_win
   end
 
+  ##
+  # Returns a string representation of the predicted score, adjusting to avoid displaying a tie by incrementing one team's score if the rounded scores are equal but the raw scores differ.
+  # @return [String] The formatted predicted score as "away - home".
   def predicted_score_string
     if home_score.round == away_score.round
       if home_score > away_score
@@ -88,6 +91,9 @@ class Prediction < ApplicationRecord
     end
   end
 
+  ##
+  # Returns a formatted string showing the predicted scores for both teams with their names, adjusting the display to avoid ties by incrementing one team's score if the rounded scores are equal but the raw scores differ.
+  # @return [String] The predicted score string with team names.
   def predicted_score_with_teams
     if home_score.round == away_score.round
       if home_score > away_score
@@ -100,6 +106,10 @@ class Prediction < ApplicationRecord
     end
   end
 
+  ##
+  # Calculates the standard deviation of the predicted margin between home and away teams.
+  # Uses the pace factor and the offensive and defensive efficiency volatilities from both teams' seasons.
+  # @return [Float] The standard deviation of the predicted margin.
   def margin_std_deviation
     pace_factor = (pace**2) / 10_000.0
 
@@ -109,6 +119,9 @@ class Prediction < ApplicationRecord
     Math.sqrt(var_home + var_away)
   end
 
+  ##
+  # Calculates the standard deviation of the predicted total score based on the pace factor and the offensive and defensive efficiency volatilities of both teams' seasons.
+  # @return [Float] The estimated standard deviation of the total predicted score.
   def total_std_deviation
     pace_factor = (pace**2) / 10_000.0
 
@@ -122,6 +135,10 @@ class Prediction < ApplicationRecord
     Math.sqrt(total_var) * pace_factor
   end
 
+  ##
+  # Returns a string indicating the favorite team and the predicted point spread based on rounded scores.
+  # The point spread is negative if the home team is favored, positive if the away team is favored.
+  # @return [String] The favorite team's name followed by the point spread.
   def favorite_line
     if home_score > away_score
       "#{game.home_team_name} #{away_score.round - home_score.round}"
@@ -132,6 +149,9 @@ class Prediction < ApplicationRecord
 
   private
 
+  ##
+  # Validates that the home and away team snapshots reference the same ratings configuration version.
+  # Adds a validation error if the snapshots use different ratings config versions.
   def snapshots_must_have_same_ratings_version
     return if home_team_snapshot.nil? || away_team_snapshot.nil?
 
