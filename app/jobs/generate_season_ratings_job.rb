@@ -9,8 +9,7 @@ class GenerateSeasonRatingsJob < ApplicationJob
   # @param [Integer] season_id - The ID of the season to process.
   def perform(season_id)
     season = Season.find(season_id)
-    ratings_config_version = RatingsConfigVersion.current
-    season.bet_recommendations.where(ratings_config_version:).destroy_all
+    ratings_config_version = RatingsConfigVersion.ensure_current!
     season.predictions.where(ratings_config_version:).destroy_all
     season.team_rating_snapshots.where(ratings_config_version:).destroy_all
 

@@ -9,24 +9,27 @@
 <table class="table-auto w-full border" data-controller="betting-sort">
   <thead>
     <tr class="bg-gray-100">
-      <th class="px-4 py-2 text-left">Matchup</th>
-      <th class="px-4 py-2 text-left">
-        <button type="button" data-action="click->betting-sort#sort" data-column="spread" class="flex items-center gap-1">
-          Spread
-          <span class="text-xs">⇅</span>
-        </button>
+      <th class="px-4 py-2 whitespace-nowrap text-gray-700 uppercase bg-gray-50 sticky top-0 z-20 text-left">Matchup</th>
+      <th class="px-4 py-2 whitespace-nowrap text-gray-700 uppercase bg-gray-50 sticky top-0 z-20 text-left">
+        <% direction = params[:direction] == "asc" ? "desc" : "asc" %>
+        <%= link_to "Spread", betting_games_path(date: @date, sort: "spread", direction: direction), class: "hover:underline text-gray-700" %>
+        <% if params[:sort] == "spread" %>
+          <%= params[:direction] == "asc" ? "▲" : "▼" %>
+        <% end %>
       </th>
-      <th class="px-4 py-2 text-left">
-        <button type="button" data-action="click->betting-sort#sort" data-column="moneyline" class="flex items-center gap-1">
-          Moneyline
-          <span class="text-xs">⇅</span>
-        </button>
+            <th class="px-4 py-2 whitespace-nowrap text-gray-700 uppercase bg-gray-50 sticky top-0 z-20 text-left">
+        <% direction = params[:direction] == "asc" ? "desc" : "asc" %>
+        <%= link_to "Moneyline", betting_games_path(date: @date, sort: "moneyline", direction: direction), class: "hover:underline text-gray-700" %>
+        <% if params[:sort] == "moneyline" %>
+          <%= params[:direction] == "asc" ? "▲" : "▼" %>
+        <% end %>
       </th>
-      <th class="px-4 py-2 text-left">
-        <button type="button" data-action="click->betting-sort#sort" data-column="total" class="flex items-center gap-1">
-          Total
-          <span class="text-xs">⇅</span>
-        </button>
+            <th class="px-4 py-2 whitespace-nowrap text-gray-700 uppercase bg-gray-50 sticky top-0 z-20 text-left">
+        <% direction = params[:direction] == "asc" ? "desc" : "asc" %>
+        <%= link_to "Total", betting_games_path(date: @date, sort: "total", direction: direction), class: "hover:underline text-gray-700" %>
+        <% if params[:sort] == "total" %>
+          <%= params[:direction] == "asc" ? "▲" : "▼" %>
+        <% end %>
       </th>
     </tr>
   </thead>

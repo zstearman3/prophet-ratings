@@ -73,6 +73,7 @@ describe BetRecommendationGenerator do
       expect(spread_rec.ev).to be_a(Float)
       expect([true, false]).to include(spread_rec.recommended)
     end
+
     it 'generates a moneyline recommendation with expected attributes' do
       recs = described_class.call(game:)
       moneyline_rec = recs.find { |rec| rec.bet_type == 'moneyline' }

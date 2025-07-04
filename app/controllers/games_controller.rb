@@ -69,7 +69,9 @@ class GamesController < ApplicationController
     rescue ArgumentError
       redirect_to betting_games_path(date: Date.current.to_s), alert: 'Invalid date.' and return
     end
+
     @date = date
+    @sort = params[:sort]
     @games = Game.where(start_time: date.all_day)
                  .order(:start_time)
                  .includes(
@@ -79,5 +81,27 @@ class GamesController < ApplicationController
                    { home_team_game: :team_season },
                    { away_team_game: :team_season }
                  )
+
+    @games = sort_games(@games, @sort)
+  end
+
+  private
+
+  def sort_games(games, _sort)
+    direction = params[:direction] == 'asc' ? 'asc' : 'desc'
+    case params[:sort]
+    when 'spread'
+      @games = games.to_a.sort_by { |g| g.current_bet_recommendations.find { |r| r.bet_type == 'spread' }&.ev || -999 }
+      @games.reverse! if direction == 'desc'
+    when 'moneyline'
+      @games = games.to_a.sort_by { |g| g.current_bet_recommendations.find { |r| r.bet_type == 'moneyline' }&.ev || -999 }
+      @games.reverse! if direction == 'desc'
+    when 'total'
+      @games = games.to_a.sort_by { |g| g.current_bet_recommendations.find { |r| r.bet_type == 'total' }&.ev || -999 }
+      @games.reverse! if direction == 'desc'
+    else
+      @games = games.sort_by(&:start_time)
+    end
+    @games
   end
 end

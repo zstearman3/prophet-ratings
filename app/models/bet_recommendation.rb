@@ -64,7 +64,7 @@ class BetRecommendation < ApplicationRecord
   # Returns a formatted string describing the recommended bet, including team name and odds or line, or "No play" if not recommended.
   # @return [String] The bet recommendation description or "No play".
   def recommendation
-    return "No play" unless recommended
+    return 'No play' unless recommended && team.present?
 
     case team
     when 'home'

@@ -126,10 +126,10 @@ class Prediction < ApplicationRecord
     pace_factor = (pace**2) / 10_000.0
 
     total_var = (
-      home_team_snapshot.team_season.offensive_efficiency_volatility**2 +
-      home_team_snapshot.team_season.defensive_efficiency_volatility**2 +
-      away_team_snapshot.team_season.offensive_efficiency_volatility**2 +
-      away_team_snapshot.team_season.defensive_efficiency_volatility**2
+      (home_team_snapshot.team_season.offensive_efficiency_volatility**2) +
+      (home_team_snapshot.team_season.defensive_efficiency_volatility**2) +
+      (away_team_snapshot.team_season.offensive_efficiency_volatility**2) +
+      (away_team_snapshot.team_season.defensive_efficiency_volatility**2)
     )
 
     Math.sqrt(total_var) * pace_factor

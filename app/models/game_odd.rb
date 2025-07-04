@@ -75,7 +75,7 @@ class GameOdd < ApplicationRecord
   # The favorite is determined by the sign of the spread point: if negative, the home team is favored; otherwise, the away team is favored.
   # @return [String] The favorite team's name followed by its formatted spread line.
   def formatted_favorite_line
-    if spread_point < 0
+    if spread_point.negative?
       "#{game.home_team_name} #{format_odds(spread_point)}"
     else
       "#{game.away_team_name} #{format_odds(-spread_point)}"
@@ -89,6 +89,6 @@ class GameOdd < ApplicationRecord
   # @param [Integer] odds - The odds value to format.
   # @return [String, Integer] The formatted odds as a string with a plus sign for positive values, or the original value for zero or negative odds.
   def format_odds(odds)
-    odds > 0 ? "+#{odds}" : odds
+    odds.positive? ? "+#{odds}" : odds
   end
 end
