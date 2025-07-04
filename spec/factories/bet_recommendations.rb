@@ -39,18 +39,31 @@
 #
 FactoryBot.define do
   factory :bet_recommendation do
-    game { nil }
-    prediction { nil }
-    game_odd { nil }
-    bet_type { 'MyString' }
-    team { 'MyString' }
-    vegas_line { 1.5 }
-    vegas_odds { 1 }
+  factory :bet_recommendation do
+    association :game
+    association :prediction
+    association :game_odd
+    bet_type    { 'spread' }
+    team        { 'home' }
+    vegas_line  { 1.5 }
+    vegas_odds  { -110 }
     model_value { 1.5 }
-    ev { 1.5 }
-    confidence { 1.5 }
+    ev          { 1.5 }
+    confidence  { 1.5 }
     recommended { false }
-    result { 'MyString' }
-    payout { 1.5 }
+    result      { nil }
+    payout      { 1.5 }
+
+    trait :moneyline do
+      bet_type   { 'moneyline' }
+      vegas_line { nil }
+      vegas_odds { 150 }
+    end
+
+    trait :total do
+      bet_type   { 'total' }
+      team       { 'over' }
+      vegas_line { 145.5 }
+    end
   end
 end
