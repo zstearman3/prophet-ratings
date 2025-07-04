@@ -3,6 +3,10 @@
 class GenerateSeasonRatingsJob < ApplicationJob
   queue_as :default
 
+  ##
+  # Generates and backfills ratings, predictions, and related data for a given season.
+  # Removes existing ratings data for the current ratings configuration version, recalculates preseason and daily ratings, updates team season metrics, generates predictions for each game, and finalizes completed games throughout the season.
+  # @param [Integer] season_id - The ID of the season to process.
   def perform(season_id)
     season = Season.find(season_id)
     ratings_config_version = RatingsConfigVersion.current

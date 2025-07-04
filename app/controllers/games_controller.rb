@@ -15,6 +15,10 @@ class GamesController < ApplicationController
     @config = RatingsConfigVersion.current
   end
 
+  ##
+  # Displays the schedule of games for a specified date, including associated predictions, team season data, and the latest team rating snapshots for each team season as of that date.
+  # Redirects to the current date with a notice if the date parameter is missing or invalid.
+  # Sets instance variables for the selected date, games, ratings configuration version, and a hash of team rating snapshots grouped by team season and snapshot date.
   def schedule
     redirect_to schedule_games_path(date: Date.current.to_s), notice: 'Date is required.' and return if params[:date].blank?
 
@@ -53,6 +57,10 @@ class GamesController < ApplicationController
     end
   end
 
+  ##
+  # Retrieves games scheduled for a specific date with associated betting data.
+  # Redirects to the current date with a notice if the date parameter is missing or invalid.
+  # Assigns the parsed date and the list of games, including predictions, odds, bet recommendations, and team season data, to instance variables for use in the view.
   def betting
     redirect_to betting_games_path(date: Date.current.to_s), notice: 'Date is required.' and return if params[:date].blank?
 

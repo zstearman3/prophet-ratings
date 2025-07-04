@@ -28,6 +28,14 @@ module StatisticsUtils
     0.5 * (1 + Math.erf(x / Math.sqrt(2)))
   end
 
+  ##
+  # Solves a weighted least squares problem with optional ridge regularization by invoking an external Python script.
+  # Raises an ArgumentError if the weights array length does not match the b_vector length.
+  # Returns the parsed JSON result from the Python solver.
+  # @param [Array<Array<Numeric>>] a_rows - The coefficient matrix as an array of rows.
+  # @param [Array<Numeric>] b_vector - The target vector.
+  # @param [Array<Numeric>, nil] weights - Optional weights for each observation; defaults to all ones if not provided.
+  # @return [Hash] The result parsed from the Python solver's JSON output.
   def solve_least_squares_with_python(a_rows, b_vector, weights = nil)
     require 'open3'
     require 'json'

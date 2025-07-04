@@ -145,6 +145,12 @@ module ProphetRatings
       }
     end
 
+    ##
+    # Calculates the home court offensive and defensive efficiency boosts for a team season.
+    #
+    # Computes average home advantage deltas from prediction errors, adjusts them relative to the baseline, and blends with a baseline home court advantage value weighted by sample size. Returns baseline values if there are no non-neutral home predictions.
+    # @param team_season [TeamSeason] The team season for which to calculate home court advantages.
+    # @return [Hash] A hash with :home_offense_boost (non-negative) and :home_defense_boost (non-positive), both rounded to three decimals.
     def calculate_home_advantages(team_season)
       baseline = Rails.application.config_for(:ratings).home_court_advantage.to_f
       home_preds = (home_preds_by_season[team_season.id] || []).reject { |p| p.game.neutral? }

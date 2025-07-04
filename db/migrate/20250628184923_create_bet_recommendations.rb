@@ -1,4 +1,7 @@
 class CreateBetRecommendations < ActiveRecord::Migration[7.1]
+  ##
+  # Creates the bet_recommendations table with columns for storing betting recommendations, associated metadata, and results.
+  # Defines foreign key relationships, data types, constraints, and descriptive comments for each column.
   def change
     create_table :bet_recommendations do |t|
       t.references :game, null: false, foreign_key: true
