@@ -1,0 +1,131 @@
+<h1 class="text-xl font-bold mb-4">Betting Recommendations</h1>
+
+<%= form_with url: betting_games_path, method: :get, local: true, class: "mb-4 flex gap-2" do |form| %>
+  <%= form.label :date, "Date:", class: "font-semibold" %>
+  <%= form.date_field :date, value: @date, class: "border rounded px-2 py-1" %>
+  <%= form.submit "Go", class: "bg-prophet-indigo hover:bg-prophet-indigo/80 text-white font-bold py-2 px-4 rounded inline-flex items-center space-x-2" %>
+<% end %>
+
+<table class="table-auto w-full border" data-controller="betting-sort">
+  <thead>
+    <tr class="bg-gray-100">
+      <th class="px-4 py-2 whitespace-nowrap text-gray-700 uppercase bg-gray-50 sticky top-0 z-20 text-left">Matchup</th>
+      <th class="px-4 py-2 whitespace-nowrap text-gray-700 uppercase bg-gray-50 sticky top-0 z-20 text-left">
+        <% direction = params[:direction] == "asc" ? "desc" : "asc" %>
+        <%= link_to "Spread", betting_games_path(date: @date, sort: "spread", direction: direction), class: "hover:underline text-gray-700" %>
+        <% if params[:sort] == "spread" %>
+          <%= params[:direction] == "asc" ? "▲" : "▼" %>
+        <% end %>
+      </th>
+            <th class="px-4 py-2 whitespace-nowrap text-gray-700 uppercase bg-gray-50 sticky top-0 z-20 text-left">
+        <% direction = params[:direction] == "asc" ? "desc" : "asc" %>
+        <%= link_to "Moneyline", betting_games_path(date: @date, sort: "moneyline", direction: direction), class: "hover:underline text-gray-700" %>
+        <% if params[:sort] == "moneyline" %>
+          <%= params[:direction] == "asc" ? "▲" : "▼" %>
+        <% end %>
+      </th>
+            <th class="px-4 py-2 whitespace-nowrap text-gray-700 uppercase bg-gray-50 sticky top-0 z-20 text-left">
+        <% direction = params[:direction] == "asc" ? "desc" : "asc" %>
+        <%= link_to "Total", betting_games_path(date: @date, sort: "total", direction: direction), class: "hover:underline text-gray-700" %>
+        <% if params[:sort] == "total" %>
+          <%= params[:direction] == "asc" ? "▲" : "▼" %>
+        <% end %>
+      </th>
+    </tr>
+  </thead>
+  <tbody>
+    <% @games.each do |game| %>
+      <% recommendations = game.current_bet_recommendations.index_by(&:bet_type) %>
+      
+      <tr class="border-t tr-hoverable cursor-pointer" data-controller="betting-expand" data-action="click->betting-expand#toggle" data-betting-sort-target="row"
+        data-ev-for-spread="<%= recommendations["spread"]&.ev || -999 %>"
+        data-ev-for-moneyline="<%= recommendations["moneyline"]&.ev || -999 %>"
+        data-ev-for-total="<%= recommendations["total"]&.ev || -999 %>">
+        <td class="px-4 py-2 font-semibold">
+          <%= link_to "#{game.away_team_name} @ #{game.home_team_name}", game_path(game),
+            class: "text-gray-800 hover:text-blue-600" %>
+        </td>
+        <td class="px-4 py-2">
+          <% if recommendations["spread"] %>
+            <% spread = recommendations["spread"] %>
+            <% spread_classes = if spread.ev && spread.ev > 0.2
+                'pick-recommended'
+              elsif spread.recommended?
+                ''
+              else
+                'pick-no-play'
+              end %>
+            <span class="<%= spread_classes %>"><%= spread.recommendation %></span>
+          <% else %>
+            <span class="text-xs text-gray-400 pick-no-play">No recommendation</span>
+          <% end %>
+        </td>
+        <td class="px-4 py-2">
+          <% if recommendations["moneyline"] %>
+            <% ml = recommendations["moneyline"] %>
+            <% ml_classes = if ml.vegas_odds > 100 && ml.ev > 0.2
+              'pick-underdog'
+            elsif ml.recommended?
+              ''
+            else
+              'pick-no-play'
+            end %>
+            <span class="<%= ml_classes %>"><%= ml.recommendation %></span>
+          <% else %>
+            <span class="text-xs text-gray-400 pick-no-play">No recommendation</span>
+          <% end %>
+        </td>
+        <td class="px-4 py-2">
+          <% if recommendations["total"] %>
+            <% total = recommendations["total"] %>
+            <% total_classes = if total.team == "over" && total.ev > 0.2
+              'pick-total-over'
+            elsif total.team == "under" && total.ev > 0.2
+              'pick-total-under'
+            else
+              'pick-no-play'
+            end %>
+            <span class="<%= total_classes %>"><%= total.recommendation %></span>
+          <% else %>
+            <span class="text-xs text-gray-400 pick-no-play">No recommendation</span>
+          <% end %>
+        </td>
+      </tr>
+      <tr class="expandable-row hidden bg-gray-50 text-sm border-t">
+        <td class="px-4 py-3 align-top">
+          <% if game.current_prediction %>
+            <div><span class="font-semibold">Predicted Score:</span> <%= game.current_prediction.predicted_score_with_teams rescue nil %></div>
+          <% end %>
+        </td>
+        <td class="px-4 py-3 align-top">
+          <% if recommendations["spread"] %>
+            <div><span class="font-semibold">Vegas Line:</span> <%= recommendations["spread"].game_odd&.formatted_favorite_line || '-' %></div>
+            <div><span class="font-semibold">Model Value:</span> <%= recommendations["spread"].prediction.favorite_line || '-' %></div>
+            <div><span class="font-semibold">EV:</span> <%= (recommendations["spread"].ev * 100).round(1) %>%</div>
+            <div><span class="font-semibold">Confidence:</span> <%= (recommendations["spread"].confidence * 100).round(1) %>%</div>
+          <% end %>
+        </td>
+        <td class="px-4 py-3 align-top">
+          <% if recommendations["moneyline"] %>
+            <div><span class="font-semibold">Vegas Odds:</span> <%= recommendations["moneyline"].game_odd&.formatted_home_moneyline || '-' %></div>
+            <div><span class="font-semibold">EV:</span> <%= (recommendations["moneyline"].ev * 100).round(1) %>%</div>
+            <div><span class="font-semibold">Confidence:</span> <%= (recommendations["moneyline"].confidence * 100).round(1) %>%</div>
+          <% end %>
+        </td>
+        <td class="px-4 py-3 align-top">
+          <% if recommendations["total"] %>
+            <div><span class="font-semibold">Vegas Total:</span> <%= recommendations["total"].game_odd&.total_points || '-' %></div>
+            <div><span class="font-semibold">Predicted Total:</span> <%= recommendations["total"].model_value || '-' %></div>
+            <div><span class="font-semibold">EV:</span> <%= (recommendations["total"].ev * 100).round(1) %>%</div>
+            <div><span class="font-semibold">Confidence:</span> <%= (recommendations["total"].confidence * 100).round(1) %>%</div>
+          <% end %>
+        </td>
+      </tr>
+    <% end %>
+    <% if @games.empty? %>
+      <tr>
+        <td colspan="5" class="text-center text-gray-400 py-4">No games with odds available for this date.</td>
+      </tr>
+    <% end %>
+  </tbody>
+</table>

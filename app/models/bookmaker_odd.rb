@@ -25,4 +25,5 @@
 #  fk_rails_...  (game_id => games.id)
 #
 class BookmakerOdd < ApplicationRecord
+  belongs_to :game
 end

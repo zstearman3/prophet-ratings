@@ -54,77 +54,39 @@ class Game < ApplicationRecord
   has_one :home_team_season, through: :home_team_game, source: :team_season
   has_one :away_team_season, through: :away_team_game, source: :team_season
   has_many :predictions, dependent: :destroy
+  has_one :game_odd, dependent: :destroy
+  has_many :bookmaker_odds, dependent: :destroy
+  has_many :bet_recommendations, dependent: :destroy
+  has_many :current_bet_recommendations, -> { where(current: true) }, class_name: 'BetRecommendation'
 
   enum status: { scheduled: 0, final: 1, canceled: 2 }
 
+  ##
+  # Generates a prediction for the game using the external prediction builder service.
   def generate_prediction!
-    return unless home_rating_snapshot && away_rating_snapshot
-
-    prediction_hash = ProphetRatings::GamePredictor.new(
-      home_rating_snapshot:,
-      away_rating_snapshot:,
-      neutral:,
-      season:
-    ).call
-
-    Prediction.find_or_initialize_by(
-      home_team_snapshot: home_rating_snapshot,
-      away_team_snapshot: away_rating_snapshot,
-      game: self
-    ).tap do |prediction|
-      prediction.home_offensive_efficiency = prediction_hash[:meta][:home_expected_ortg]
-      prediction.away_offensive_efficiency = prediction_hash[:meta][:away_expected_ortg]
-      prediction.home_defensive_efficiency = prediction_hash[:meta][:away_expected_ortg]
-      prediction.away_defensive_efficiency = prediction_hash[:meta][:home_expected_ortg]
-      prediction.home_score = prediction_hash[:home_expected_score]
-      prediction.away_score = prediction_hash[:away_expected_score]
-      prediction.home_win_probability = prediction_hash[:win_probability_home]
-      prediction.pace = prediction_hash[:meta][:expected_pace]
-
-      prediction.save!
-    end
+    ProphetRatings::GamePredictionBuilder.new(self).call
   end
 
-  def finalize_prediction!
-    return unless home_rating_snapshot && away_rating_snapshot
-
-    prediction = Prediction.find_by(
-      home_team_snapshot: home_rating_snapshot,
-      away_team_snapshot: away_rating_snapshot,
-      game: self
-    )
-
-    return unless prediction
-
-    prediction.home_offensive_efficiency_error = home_team_game.offensive_efficiency - prediction.home_offensive_efficiency
-    prediction.away_offensive_efficiency_error = away_team_game.offensive_efficiency - prediction.away_offensive_efficiency
-    prediction.home_defensive_efficiency_error = away_team_game.offensive_efficiency - prediction.away_offensive_efficiency
-    prediction.away_defensive_efficiency_error = home_team_game.offensive_efficiency - prediction.home_offensive_efficiency
-    prediction.pace_error = pace - prediction.pace
-
-    prediction.save!
-  end
-
+  ##
+  # Finalizes the game by delegating to the external game finalizer service.
+  # This typically updates the game's status and related statistics.
   def finalize
-    final!
-
-    calculate_possessions
-    calculate_neutrality
-    calculate_minutes
-    calculate_conference
-
-    home_team_game&.calculate_game_stats
-    away_team_game&.calculate_game_stats
-
-    finalize_prediction!
+    ProphetRatings::GameFinalizer.new(self).call
   end
 
+  ##
+  # Returns the prediction for the game associated with the current ratings configuration version, or nil if none exists.
+  # @return [Prediction, nil] The current prediction or nil if not found.
   def current_prediction
-    predictions.find do |prediction|
-      prediction.home_team_snapshot == home_rating_snapshot
-    end
+    current_config_id = RatingsConfigVersion.current&.id
+    return nil unless current_config_id
+
+    predictions.find_by(ratings_config_version_id: current_config_id)
   end
 
+  ##
+  # Returns the team with the higher score.
+  # @return [Team, nil] The home or away team with the higher score, or nil if scores are equal or teams are missing.
   def winning_team
     home_team_score > away_team_score ? home_team : away_team
   end
@@ -141,69 +103,14 @@ class Game < ApplicationRecord
     overtimes.positive?
   end
 
+  ##
+  # Returns a formatted string representing the game's status, indicating overtime if applicable.
+  # @return [String] The status string, such as "Final", "Final OT", "Final 2OT", or the uppercase status.
   def status_string
     if final? && overtime?
       overtimes == 1 ? 'Final OT' : "Final #{overtimes}OT"
     else
       status.upcase
     end
-  end
-
-  private
-
-  def calculated_possessions
-    arr = [home_team_game&.calculated_possessions, away_team_game&.calculated_possessions].compact
-
-    return unless arr.size.positive?
-
-    (arr.sum / arr.size)
-  end
-
-  def calculated_minutes
-    arr = [home_team_game&.minutes, away_team_game&.minutes].compact
-
-    return unless arr.size.positive?
-
-    (arr.sum / (5 * arr.size))
-  end
-
-  def calculated_neutrality
-    return unless home_team&.location
-
-    location.exclude?(home_team.location) && (location != home_team.home_venue)
-  end
-
-  def calculate_possessions
-    update(possessions: calculated_possessions)
-  end
-
-  def calculate_neutrality
-    update(neutral: calculated_neutrality)
-  end
-
-  def calculate_minutes
-    update(minutes: calculated_minutes)
-  end
-
-  def calculate_conference
-    update(in_conference: home_team_season&.conference == away_team_season&.conference)
-  end
-
-  def home_rating_snapshot
-    ratings_config_version = RatingsConfigVersion.current
-    TeamRatingSnapshot
-      .where(team_season: home_team_season, ratings_config_version:)
-      .where('snapshot_date <= ?', start_time.to_date)
-      .order(snapshot_date: :desc)
-      .first
-  end
-
-  def away_rating_snapshot
-    ratings_config_version = RatingsConfigVersion.current
-    TeamRatingSnapshot
-      .where(team_season: away_team_season, ratings_config_version:)
-      .where('snapshot_date <= ?', start_time.to_date)
-      .order(snapshot_date: :desc)
-      .first
   end
 end

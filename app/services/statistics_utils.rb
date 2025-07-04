@@ -28,6 +28,14 @@ module StatisticsUtils
     0.5 * (1 + Math.erf(x / Math.sqrt(2)))
   end
 
+  ##
+  # Solves a weighted least squares problem with optional ridge regularization by invoking an external Python script.
+  # Raises an ArgumentError if the weights array length does not match the b_vector length.
+  # Returns the parsed JSON result from the Python solver.
+  # @param [Array<Array<Numeric>>] a_rows - The coefficient matrix as an array of rows.
+  # @param [Array<Numeric>] b_vector - The target vector.
+  # @param [Array<Numeric>, nil] weights - Optional weights for each observation; defaults to all ones if not provided.
+  # @return [Hash] The result parsed from the Python solver's JSON output.
   def solve_least_squares_with_python(a_rows, b_vector, weights = nil)
     require 'open3'
     require 'json'
@@ -50,10 +58,25 @@ module StatisticsUtils
     stderr_output = ''
     time = Benchmark.realtime do
       Open3.popen3('python3 lib/python/adjusted_stat_solver.py') do |stdin, stdout, stderr, _wait_thr|
-        stdin.puts input_data.to_json
-        stdin.close
+        # Start stderr capture in a thread immediately
+        stderr_output = ''
+        stderr_thread = Thread.new { stderr_output = stderr.read }
+
+        begin
+          stdin.write(input_data.to_json)
+          stdin.close
+        rescue Errno::EPIPE
+          Rails.logger.error('Broken pipe writing to Python solver.')
+          stderr_thread.join
+          Rails.logger.error("Python STDERR: #{stderr_output}")
+          raise
+        end
+
         output = stdout.read
-        stderr_output = stderr.read
+        stderr_thread.join
+
+        Rails.logger.debug { "Solver STDOUT: #{output}" }
+        Rails.logger.debug { "Solver STDERR: #{stderr_output}" } unless stderr_output.empty?
       end
     end
 

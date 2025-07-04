@@ -1,0 +1,11 @@
+default: &default
+  recommended_ev_threshold: 0.05
+
+development:
+  <<: *default
+
+test:
+  <<: *default
+
+production:
+  <<: *default

@@ -38,3 +38,10 @@
 !/app/assets/builds/.keep
 
 /node_modules
+
+# Ignore project.md
+/project.md
+
+# Ignore macOS system files
+.DS_Store
+

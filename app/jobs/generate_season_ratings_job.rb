@@ -3,8 +3,15 @@
 class GenerateSeasonRatingsJob < ApplicationJob
   queue_as :default
 
+  ##
+  # Generates and backfills ratings, predictions, and related data for a given season.
+  # Removes existing ratings data for the current ratings configuration version, recalculates preseason and daily ratings, updates team season metrics, generates predictions for each game, and finalizes completed games throughout the season.
+  # @param [Integer] season_id - The ID of the season to process.
   def perform(season_id)
     season = Season.find(season_id)
+    ratings_config_version = RatingsConfigVersion.ensure_current!
+    season.predictions.where(ratings_config_version:).destroy_all
+    season.team_rating_snapshots.where(ratings_config_version:).destroy_all
 
     start_date = season.start_date
 
@@ -24,7 +31,7 @@ class GenerateSeasonRatingsJob < ApplicationJob
       games = Game.where(start_time: date.all_day)
       ProphetRatings::OverallRatingsCalculator.new(season).call(as_of: date)
       games.each(&:generate_prediction!)
-      games.each { |game| game.finalize_prediction! if game.final? }
+      games.each { |game| game.finalize if game.final? }
     end
 
     Rails.logger.info { "✅ Done backfilling ratings for season #{season.year}" }
