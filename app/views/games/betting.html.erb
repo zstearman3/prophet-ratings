@@ -94,7 +94,7 @@
       <tr class="expandable-row hidden bg-gray-50 text-sm border-t">
         <td class="px-4 py-3 align-top">
           <% if game.current_prediction %>
-            <div><span class="font-semibold">Predicted Score:</span> <%= game.current_prediction.predicted_score_with_teams rescue nil %></div>
+            <div><span class="font-semibold">Predicted Score:</span> <%= game.current_prediction.predicted_score_with_teams %></div>
           <% end %>
         </td>
         <td class="px-4 py-3 align-top">

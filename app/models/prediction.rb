@@ -77,33 +77,41 @@ class Prediction < ApplicationRecord
   end
 
   ##
-  # Returns a string representation of the predicted score, adjusting to avoid displaying a tie by incrementing one team's score if the rounded scores are equal but the raw scores differ.
+  # Returns a string representation of the predicted score,
+  # adjusting to avoid displaying a tie by incrementing one team's score if the rounded scores are equal but the raw scores differ.
   # @return [String] The formatted predicted score as "away - home".
   def predicted_score_string
-    if home_score.round == away_score.round
+    away, home = adjusted_predicted_scores
+    "#{away} - #{home}"
+  end
+
+  # Returns a formatted string showing the predicted scores for both teams with their names,
+  # using the same tie-breaking logic as predicted_score_string.
+  # @return [String] The predicted score string with team names.
+  def predicted_score_with_teams
+    away, home = adjusted_predicted_scores
+    "#{game.away_team_name} #{away} - #{game.home_team_name} #{home}"
+  end
+
+  private
+
+  # Returns [away_score, home_score] as integers, using tie-breaking logic if needed.
+  def adjusted_predicted_scores
+    home_score_rounded = home_score.round
+    away_score_rounded = away_score.round
+    if home_score_rounded == away_score_rounded
       if home_score > away_score
-        "#{away_score.round} - #{home_score.round + 1}"
+        [away_score_rounded, home_score_rounded + 1]
       else
-        "#{away_score.round + 1} - #{home_score.round}"
+        [away_score_rounded + 1, home_score_rounded]
       end
     else
-      "#{away_score.round} - #{home_score.round}"
+      [away_score_rounded, home_score_rounded]
     end
   end
 
-  ##
-  # Returns a formatted string showing the predicted scores for both teams with their names, adjusting the display to avoid ties by incrementing one team's score if the rounded scores are equal but the raw scores differ.
-  # @return [String] The predicted score string with team names.
-  def predicted_score_with_teams
-    if home_score.round == away_score.round
-      if home_score > away_score
-        "#{game.away_team_name} #{away_score.round} - #{game.home_team_name} #{home_score.round + 1}"
-      else
-        "#{game.away_team_name} #{away_score.round + 1} - #{game.home_team_name} #{home_score.round}"
-      end
-    else
-      "#{game.away_team_name} #{away_score.round} - #{game.home_team_name} #{home_score.round}"
-    end
+  def pace_factor
+    (pace**2) / 10_000.0
   end
 
   ##
@@ -111,20 +119,31 @@ class Prediction < ApplicationRecord
   # Uses the pace factor and the offensive and defensive efficiency volatilities from both teams' seasons.
   # @return [Float] The standard deviation of the predicted margin.
   def margin_std_deviation
-    pace_factor = (pace**2) / 10_000.0
+    Math.sqrt(
+      home_margin_variability +
+      away_margin_variability
+    )
+  end
 
-    var_home = pace_factor * ((home_team_snapshot.team_season.offensive_efficiency_volatility**2) + (away_team_snapshot.team_season.defensive_efficiency_volatility**2))
-    var_away = pace_factor * ((away_team_snapshot.team_season.offensive_efficiency_volatility**2) + (home_team_snapshot.team_season.defensive_efficiency_volatility**2))
+  def home_margin_variability
+    pace_factor * (
+      (home_team_snapshot.team_season.offensive_efficiency_volatility**2) +
+      (away_team_snapshot.team_season.defensive_efficiency_volatility**2)
+    )
+  end
 
-    Math.sqrt(var_home + var_away)
+  def away_margin_variability
+    pace_factor * (
+      (away_team_snapshot.team_season.offensive_efficiency_volatility**2) +
+      (home_team_snapshot.team_season.defensive_efficiency_volatility**2)
+    )
   end
 
   ##
-  # Calculates the standard deviation of the predicted total score based on the pace factor and the offensive and defensive efficiency volatilities of both teams' seasons.
+  # Calculates the standard deviation of the predicted total score based on the pace factor
+  # and the offensive and defensive efficiency volatilities of both teams' seasons.
   # @return [Float] The estimated standard deviation of the total predicted score.
   def total_std_deviation
-    pace_factor = (pace**2) / 10_000.0
-
     total_var = (
       (home_team_snapshot.team_season.offensive_efficiency_volatility**2) +
       (home_team_snapshot.team_season.defensive_efficiency_volatility**2) +
@@ -146,8 +165,6 @@ class Prediction < ApplicationRecord
       "#{game.away_team_name} #{home_score.round - away_score.round}"
     end
   end
-
-  private
 
   ##
   # Validates that the home and away team snapshots reference the same ratings configuration version.

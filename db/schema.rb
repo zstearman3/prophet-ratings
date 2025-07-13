@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2025_06_28_192143) do
+ActiveRecord::Schema[7.1].define(version: 2025_07_13_142057) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -34,6 +34,7 @@ ActiveRecord::Schema[7.1].define(version: 2025_06_28_192143) do
     t.boolean "current", default: false
     t.index ["game_id"], name: "index_bet_recommendations_on_game_id"
     t.index ["game_odd_id"], name: "index_bet_recommendations_on_game_odd_id"
+    t.index ["prediction_id", "game_odd_id", "bet_type"], name: "index_bet_recommendations_on_prediction_game_odd_bet_type", unique: true
     t.index ["prediction_id"], name: "index_bet_recommendations_on_prediction_id"
     t.index ["ratings_config_version_id"], name: "index_bet_recommendations_on_ratings_config_version_id"
   end

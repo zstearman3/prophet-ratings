@@ -44,7 +44,7 @@ class TeamsController < ApplicationController
                        .where(team_season_id: @team_games.map(&:game).flat_map do |g|
                                                 [g.home_team_season&.id, g.away_team_season&.id]
                                               end.uniq)
-                       .where('snapshot_date <= ?', @team_games.map(&:game).map(&:start_time).max.to_date)
+                       .where(snapshot_date: ..@team_games.map { |tg| tg.game.start_time }.max.to_date)
                        .group_by(&:team_season_id)
 
     @predictions_by_game = {}

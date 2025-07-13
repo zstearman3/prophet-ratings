@@ -80,15 +80,21 @@ module ProphetRatings
     end
 
     def home_expected_ortg
-      @home_expected_ortg ||= (home_rating_snapshot&.adj_offensive_efficiency || 0) - (season.respond_to?(:average_efficiency) ? season.average_efficiency : 0) +
-                              (away_rating_snapshot&.adj_defensive_efficiency || 0) - (season.respond_to?(:average_efficiency) ? season.average_efficiency : 0) +
-                              (season.respond_to?(:average_efficiency) ? season.average_efficiency : 0) + home_offense_boost
+      return unless home_rating_snapshot && away_rating_snapshot
+
+      @home_expected_ortg ||=
+        (home_rating_snapshot.adj_offensive_efficiency - season.average_efficiency) +
+        (away_rating_snapshot.adj_defensive_efficiency - season.average_efficiency) +
+        home_offense_boost
     end
 
     def away_expected_ortg
-      @away_expected_ortg ||= (away_rating_snapshot&.adj_offensive_efficiency || 0) - (season.respond_to?(:average_efficiency) ? season.average_efficiency : 0) +
-                              (home_rating_snapshot&.adj_defensive_efficiency || 0) - (season.respond_to?(:average_efficiency) ? season.average_efficiency : 0) +
-                              (season.respond_to?(:average_efficiency) ? season.average_efficiency : 0) + home_defense_boost
+      return unless home_rating_snapshot && away_rating_snapshot
+
+      @away_expected_ortg ||=
+        (away_rating_snapshot.adj_offensive_efficiency - season.average_efficiency) +
+        (home_rating_snapshot.adj_defensive_efficiency - season.average_efficiency) +
+        home_defense_boost
     end
 
     def home_expected_drtg
@@ -162,46 +168,56 @@ module ProphetRatings
     end
 
     def home_offensive_volatility
-      home_rating_snapshot&.offensive_efficiency_volatility || (season.respond_to?(:efficiency_std_deviation) ? season.efficiency_std_deviation : 1.0)
+      home_rating_snapshot&.offensive_efficiency_volatility ||
+        (season.respond_to?(:efficiency_std_deviation) ? season.efficiency_std_deviation : 1.0)
     end
 
     def away_offensive_volatility
-      away_rating_snapshot&.offensive_efficiency_volatility || (season.respond_to?(:efficiency_std_deviation) ? season.efficiency_std_deviation : 1.0)
+      away_rating_snapshot&.offensive_efficiency_volatility ||
+        (season.respond_to?(:efficiency_std_deviation) ? season.efficiency_std_deviation : 1.0)
     end
 
     def home_defensive_volatility
-      home_rating_snapshot&.defensive_efficiency_volatility || (season.respond_to?(:efficiency_std_deviation) ? season.efficiency_std_deviation : 1.0)
+      home_rating_snapshot&.defensive_efficiency_volatility ||
+        (season.respond_to?(:efficiency_std_deviation) ? season.efficiency_std_deviation : 1.0)
     end
 
     ##
-    # Returns the defensive efficiency volatility for the away team, using the rating snapshot if available, or falling back to the season's efficiency standard deviation or 1.0.
+    # Returns the defensive efficiency volatility for the away team, using the rating snapshot if available,
+    # or falling back to the season's efficiency standard deviation or 1.0.
     def away_defensive_volatility
-      away_rating_snapshot&.defensive_efficiency_volatility || (season.respond_to?(:efficiency_std_deviation) ? season.efficiency_std_deviation : 1.0)
+      away_rating_snapshot&.defensive_efficiency_volatility ||
+        (season.respond_to?(:efficiency_std_deviation) ? season.efficiency_std_deviation : 1.0)
     end
 
     ##
-    # Calculates the total volatility for the home team as the root-sum-square of home offensive and away defensive volatilities, scaled by the upset modifier.
+    # Calculates the total volatility for the home team as the root-sum-square of home offensive and away defensive volatilities,
+    # scaled by the upset modifier.
     # @return [Float] The aggregated volatility value for the home team.
     def total_home_volatility
       Math.sqrt((home_offensive_volatility**2) + (away_defensive_volatility**2)) * @upset_modifier.to_f
     end
 
     ##
-    # Calculates the total volatility for the away team by combining its offensive volatility with the home team's defensive volatility, scaled by the upset modifier.
+    # Calculates the total volatility for the away team by combining its offensive volatility with the home team's defensive volatility,
+    # scaled by the upset modifier.
     # @return [Float] The aggregated volatility value for the away team.
     def total_away_volatility
       Math.sqrt((away_offensive_volatility**2) + (home_defensive_volatility**2)) * @upset_modifier.to_f
     end
 
     ##
-    # Returns the home team's pace volatility, using the rating snapshot if available, or falling back to the season's pace standard deviation or 1.0 if not present.
+    # Returns the home team's pace volatility, using the rating snapshot if available,
+    # or falling back to the season's pace standard deviation or 1.0 if not present.
     # @return [Float] The volatility value representing the variability in the home team's pace.
     def home_pace_volatility
-      home_rating_snapshot&.pace_volatility || (season.respond_to?(:pace_std_deviation) ? season.pace_std_deviation : 1.0)
+      home_rating_snapshot&.pace_volatility ||
+        (season.respond_to?(:pace_std_deviation) ? season.pace_std_deviation : 1.0)
     end
 
     def away_pace_volatility
-      away_rating_snapshot&.pace_volatility || (season.respond_to?(:pace_std_deviation) ? season.pace_std_deviation : 1.0)
+      away_rating_snapshot&.pace_volatility ||
+        (season.respond_to?(:pace_std_deviation) ? season.pace_std_deviation : 1.0)
     end
 
     def total_pace_volatility
