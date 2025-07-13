@@ -25,10 +25,11 @@
 #
 # Indexes
 #
-#  index_bet_recommendations_on_game_id                    (game_id)
-#  index_bet_recommendations_on_game_odd_id                (game_odd_id)
-#  index_bet_recommendations_on_prediction_id              (prediction_id)
-#  index_bet_recommendations_on_ratings_config_version_id  (ratings_config_version_id)
+#  index_bet_recommendations_on_game_id                       (game_id)
+#  index_bet_recommendations_on_game_odd_id                   (game_odd_id)
+#  index_bet_recommendations_on_prediction_game_odd_bet_type  (prediction_id,game_odd_id,bet_type) UNIQUE
+#  index_bet_recommendations_on_prediction_id                 (prediction_id)
+#  index_bet_recommendations_on_ratings_config_version_id     (ratings_config_version_id)
 #
 # Foreign Keys
 #
@@ -38,7 +39,6 @@
 #  fk_rails_...  (ratings_config_version_id => ratings_config_versions.id)
 #
 FactoryBot.define do
-  factory :bet_recommendation do
   factory :bet_recommendation do
     association :game
     association :prediction

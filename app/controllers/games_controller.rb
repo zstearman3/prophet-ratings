@@ -16,9 +16,11 @@ class GamesController < ApplicationController
   end
 
   ##
-  # Displays the schedule of games for a specified date, including associated predictions, team season data, and the latest team rating snapshots for each team season as of that date.
+  # Displays the schedule of games for a specified date, including associated predictions, team season data,
+  # and the latest team rating snapshots for each team season as of that date.
   # Redirects to the current date with a notice if the date parameter is missing or invalid.
-  # Sets instance variables for the selected date, games, ratings configuration version, and a hash of team rating snapshots grouped by team season and snapshot date.
+  # Sets instance variables for the selected date, games, ratings configuration version,
+  # and a hash of team rating snapshots grouped by team season and snapshot date.
   def schedule
     redirect_to schedule_games_path(date: Date.current.to_s), notice: 'Date is required.' and return if params[:date].blank?
 
@@ -41,7 +43,7 @@ class GamesController < ApplicationController
     # Preload all snapshots for these team_season_ids, config version, and <= date
     snapshots = TeamRatingSnapshot
                 .where(team_season_id: team_season_ids, ratings_config_version: @ratings_config_version)
-                .where('snapshot_date <= ?', @date)
+                .where(snapshot_date: ..@date)
                 .order(:team_season_id, snapshot_date: :desc)
 
     # Build a hash: { [team_season_id, date] => snapshot }
@@ -60,7 +62,8 @@ class GamesController < ApplicationController
   ##
   # Retrieves games scheduled for a specific date with associated betting data.
   # Redirects to the current date with a notice if the date parameter is missing or invalid.
-  # Assigns the parsed date and the list of games, including predictions, odds, bet recommendations, and team season data, to instance variables for use in the view.
+  # Assigns the parsed date and the list of games, including predictions, odds, bet recommendations,
+  # and team season data, to instance variables for use in the view.
   def betting
     redirect_to betting_games_path(date: Date.current.to_s), notice: 'Date is required.' and return if params[:date].blank?
 
@@ -87,21 +90,20 @@ class GamesController < ApplicationController
 
   private
 
-  def sort_games(games, _sort)
+  def sort_games(games, sort_type)
     direction = params[:direction] == 'asc' ? 'asc' : 'desc'
-    case params[:sort]
-    when 'spread'
-      @games = games.to_a.sort_by { |g| g.current_bet_recommendations.find { |r| r.bet_type == 'spread' }&.ev || -999 }
-      @games.reverse! if direction == 'desc'
-    when 'moneyline'
-      @games = games.to_a.sort_by { |g| g.current_bet_recommendations.find { |r| r.bet_type == 'moneyline' }&.ev || -999 }
-      @games.reverse! if direction == 'desc'
-    when 'total'
-      @games = games.to_a.sort_by { |g| g.current_bet_recommendations.find { |r| r.bet_type == 'total' }&.ev || -999 }
-      @games.reverse! if direction == 'desc'
-    else
-      @games = games.sort_by(&:start_time)
-    end
+    @games = if %w[spread moneyline total].include?(sort_type)
+               sort_by_bet_type(games, sort_type, direction)
+             else
+               games.sort_by(&:start_time)
+             end
     @games
+  end
+
+  def sort_by_bet_type(games, bet_type, direction)
+    sorted_games = games.to_a.sort_by do |game|
+      game.current_bet_recommendations.find { |r| r.bet_type == bet_type }&.ev || -999
+    end
+    direction == 'desc' ? sorted_games.reverse : sorted_games
   end
 end

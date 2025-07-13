@@ -97,7 +97,7 @@ class TeamSeason < ApplicationRecord
                      .where(season:)
                      .order(:team_season_id, snapshot_date: :desc)
 
-    snapshot_scope = snapshot_scope.where('snapshot_date <= ?', as_of) if as_of.present?
+    snapshot_scope = snapshot_scope.where(snapshot_date: ..as_of) if as_of.present?
 
     # DISTINCT ON requires ordering by the same column(s)
     snapshots = snapshot_scope.select('DISTINCT ON (team_season_id) *').to_a

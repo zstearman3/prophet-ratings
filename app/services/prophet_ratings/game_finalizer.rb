@@ -38,7 +38,8 @@ module ProphetRatings
 
     ##
     # Updates the prediction record for the game with calculated errors based on actual game results.
-    # If a matching prediction is found using the latest team rating snapshots, updates its offensive and defensive efficiency errors and pace error by comparing predicted values to actual game statistics.
+    # If a matching prediction is found using the latest team rating snapshots, updates its offensive
+    # and defensive efficiency errors and pace error by comparing predicted values to actual game statistics.
     def finalize_prediction!
       prediction = game.predictions.find_by(
         home_team_snapshot: home_snapshot,
@@ -49,8 +50,8 @@ module ProphetRatings
       prediction.update!(
         home_offensive_efficiency_error: prediction.home_offensive_efficiency - game.home_team_game.offensive_efficiency,
         away_offensive_efficiency_error: prediction.away_offensive_efficiency - game.away_team_game.offensive_efficiency,
-        home_defensive_efficiency_error: prediction.away_offensive_efficiency - game.away_team_game.offensive_efficiency,
-        away_defensive_efficiency_error: prediction.home_offensive_efficiency - game.home_team_game.offensive_efficiency,
+        home_defensive_efficiency_error: prediction.home_defensive_efficiency - game.home_team_game.defensive_efficiency,
+        away_defensive_efficiency_error: prediction.away_defensive_efficiency - game.away_team_game.defensive_efficiency,
         pace_error: prediction.pace - game.pace
       )
     end
@@ -67,7 +68,8 @@ module ProphetRatings
 
     ##
     # Determines if the game was played at a neutral location.
-    # @return [Boolean, nil] True if the game location excludes the home team's location and is not the home team's home venue, false otherwise, or nil if the home team's location is unavailable.
+    # @return [Boolean, nil] True if the game location excludes the home team's location and is not the home team's home venue,
+    # false otherwise, or nil if the home team's location is unavailable.
     def calculated_neutrality
       return unless game.home_team&.location
 
@@ -86,27 +88,30 @@ module ProphetRatings
     end
 
     ##
-    # Returns the latest team rating snapshot for the home team's season as of the game start date, using the current ratings configuration version.
+    # Returns the latest team rating snapshot for the home team's season as of the game start date,
+    # using the current ratings configuration version.
     # @return [TeamRatingSnapshot, nil] The latest snapshot for the home team season, or nil if none exists.
     def home_snapshot
       @home_snapshot ||= latest_snapshot(game.home_team_season)
     end
 
     ##
-    # Returns the latest team rating snapshot for the away team's season as of the game start date, using the current ratings configuration version.
+    # Returns the latest team rating snapshot for the away team's season as of the game start date,
+    # using the current ratings configuration version.
     # @return [TeamRatingSnapshot, nil] The latest snapshot for the away team season, or nil if none exists.
     def away_snapshot
       @away_snapshot ||= latest_snapshot(game.away_team_season)
     end
 
     ##
-    # Returns the most recent team rating snapshot for the given team season and current ratings configuration version, as of the game's start date.
+    # Returns the most recent team rating snapshot for the given team season and current ratings configuration version,
+    # as of the game's start date.
     # @param [TeamSeason] team_season - The team season for which to retrieve the snapshot.
     # @return [TeamRatingSnapshot, nil] The latest applicable snapshot, or nil if none exists.
     def latest_snapshot(team_season)
       TeamRatingSnapshot
         .where(team_season:, ratings_config_version: RatingsConfigVersion.current)
-        .where('snapshot_date <= ?', game.start_time.to_date)
+        .where(snapshot_date: ..game.start_time.to_date)
         .order(snapshot_date: :desc)
         .first
     end

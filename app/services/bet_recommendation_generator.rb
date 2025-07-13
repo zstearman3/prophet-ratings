@@ -93,7 +93,8 @@ class BetRecommendationGenerator
   # Generates a moneyline bet recommendation for the given prediction and game odds.
   #
   # Compares expected values for home and away moneyline bets based on the model's predicted home win probability and the available odds.
-  # Recommends the side with the higher expected value, and flags the recommendation if the expected value meets or exceeds the configured threshold.
+  # Recommends the side with the higher expected value, and flags the recommendation
+  # if the expected value meets or exceeds the configured threshold.
   # Returns a BetRecommendation record or nil if neither moneyline odds are available.
   # @return [BetRecommendation, nil] The generated moneyline bet recommendation, or nil if insufficient odds are present.
   def generate_moneyline_recommendation(prediction, game_odd)
@@ -130,9 +131,11 @@ class BetRecommendationGenerator
   end
 
   ##
-  # Generates a bet recommendation for the total points (over/under) market based on the model's predicted total, standard deviation, and available odds.
+  # Generates a bet recommendation for the total points (over/under) market based on the model's predicted total,
+  # standard deviation, and available odds.
   # Returns a BetRecommendation record if sufficient data is present; otherwise, returns nil.
-  # The recommendation includes selection ("over" or "under"), line, odds, model value, confidence, expected value, and recommendation status.
+  # The recommendation includes selection ("over" or "under"), line, odds, model value, confidence, expected value,
+  # and recommendation status.
   def generate_total_recommendation(prediction, game_odd)
     return unless game_odd.total_points
 
@@ -201,7 +204,8 @@ class BetRecommendationGenerator
   ##
   # Creates or updates a bet recommendation record for the current game and bet type with the provided attributes.
   # Marks existing recommendations of the same bet type as not current if the ratings configuration version is current.
-  # @param attrs [Hash] Attributes for the recommendation, including bet type, prediction and odds IDs, team, line, odds, model value, confidence, expected value, recommendation status, and ratings config version.
+  # @param attrs [Hash] Attributes for the recommendation, including bet type, prediction and odds IDs, team, line, odds,
+  # model value, confidence, expected value, recommendation status, and ratings config version.
   # @return [BetRecommendation] The created or updated bet recommendation record.
   def create_recommendation(**attrs)
     BetRecommendation.where(game: @game, bet_type: attrs[:bet_type]).update_all(current: false) if attrs[:ratings_config_version_current]

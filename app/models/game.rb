@@ -59,7 +59,7 @@ class Game < ApplicationRecord
   has_many :bet_recommendations, dependent: :destroy
   has_many :current_bet_recommendations, -> { where(current: true) }, class_name: 'BetRecommendation'
 
-  enum status: { scheduled: 0, final: 1, canceled: 2 }
+  enum :status, { scheduled: 0, final: 1, canceled: 2 }
 
   ##
   # Generates a prediction for the game using the external prediction builder service.
