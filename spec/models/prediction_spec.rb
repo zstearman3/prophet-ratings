@@ -25,17 +25,20 @@
 #  away_team_snapshot_id           :bigint
 #  game_id                         :bigint           not null
 #  home_team_snapshot_id           :bigint
+#  ratings_config_version_id       :bigint
 #
 # Indexes
 #
-#  index_predictions_on_away_team_snapshot_id  (away_team_snapshot_id)
-#  index_predictions_on_game_id                (game_id)
-#  index_predictions_on_home_team_snapshot_id  (home_team_snapshot_id)
+#  index_predictions_on_away_team_snapshot_id      (away_team_snapshot_id)
+#  index_predictions_on_game_id                    (game_id)
+#  index_predictions_on_home_team_snapshot_id      (home_team_snapshot_id)
+#  index_predictions_on_ratings_config_version_id  (ratings_config_version_id)
 #
 # Foreign Keys
 #
 #  fk_rails_...  (away_team_snapshot_id => team_rating_snapshots.id)
 #  fk_rails_...  (home_team_snapshot_id => team_rating_snapshots.id)
+#  fk_rails_...  (ratings_config_version_id => ratings_config_versions.id)
 #
 require 'rails_helper'
 

@@ -95,16 +95,25 @@ module ProphetRatings
       away_expected_ortg
     end
 
+    ##
+    # Returns the expected defensive rating for the away team, defined as the home team's expected offensive rating.
+    # @return [Float] The away team's expected defensive rating.
     def away_expected_drtg
       home_expected_ortg
     end
 
+    ##
+    # Calculates the expected pace for the game based on both teams' adjusted pace ratings and the season average.
+    # @return [Float] The estimated number of possessions per team for the game.
     def expected_pace
-      ((home_rating_snapshot&.adj_pace || 0) - (season.respond_to?(:average_pace) ? season.average_pace : 0)) +
-        ((away_rating_snapshot&.adj_pace || 0) - (season.respond_to?(:average_pace) ? season.average_pace : 0)) +
-        (season.respond_to?(:average_pace) ? season.average_pace : 0)
+      @expected_pace ||= ((home_rating_snapshot&.adj_pace || 0) - (season.respond_to?(:average_pace) ? season.average_pace : 0)) +
+                         ((away_rating_snapshot&.adj_pace || 0) - (season.respond_to?(:average_pace) ? season.average_pace : 0)) +
+                         (season.respond_to?(:average_pace) ? season.average_pace : 0)
     end
 
+    ##
+    # Calculates the expected score for the home team based on its offensive rating and the predicted game pace.
+    # @return [Float] The expected home team score, rounded to two decimal places.
     def home_expected_score
       @home_expected_score ||= ((home_expected_ortg * expected_pace) / 100.0).round(2)
     end
@@ -113,10 +122,19 @@ module ProphetRatings
       @away_expected_score ||= ((away_expected_ortg * expected_pace) / 100.0).round(2)
     end
 
+    ##
+    # Calculates the probability that the home team wins based on expected scores and combined volatilities.
+    # @return [Float] The probability (between 0 and 1) that the home team wins, rounded to four decimal places.
     def win_probability_home
       score_diff = home_expected_score - away_expected_score
-      volatility = Math.sqrt((total_home_volatility**2) + (total_away_volatility**2))
+      eff_to_score_scale = (expected_pace**2) / 10_000.0
+
+      home_score_volatility = total_home_volatility * eff_to_score_scale
+      away_score_volatility = total_away_volatility * eff_to_score_scale
+
+      volatility = Math.sqrt((home_score_volatility**2) + (away_score_volatility**2))
       probability = StatisticsUtils.normal_cdf(score_diff / volatility)
+
       probability.round(4)
     end
 
@@ -155,18 +173,29 @@ module ProphetRatings
       home_rating_snapshot&.defensive_efficiency_volatility || (season.respond_to?(:efficiency_std_deviation) ? season.efficiency_std_deviation : 1.0)
     end
 
+    ##
+    # Returns the defensive efficiency volatility for the away team, using the rating snapshot if available, or falling back to the season's efficiency standard deviation or 1.0.
     def away_defensive_volatility
       away_rating_snapshot&.defensive_efficiency_volatility || (season.respond_to?(:efficiency_std_deviation) ? season.efficiency_std_deviation : 1.0)
     end
 
+    ##
+    # Calculates the total volatility for the home team as the root-sum-square of home offensive and away defensive volatilities, scaled by the upset modifier.
+    # @return [Float] The aggregated volatility value for the home team.
     def total_home_volatility
-      ((home_offensive_volatility + away_defensive_volatility) / 2.0) * @upset_modifier.to_f
+      Math.sqrt((home_offensive_volatility**2) + (away_defensive_volatility**2)) * @upset_modifier.to_f
     end
 
+    ##
+    # Calculates the total volatility for the away team by combining its offensive volatility with the home team's defensive volatility, scaled by the upset modifier.
+    # @return [Float] The aggregated volatility value for the away team.
     def total_away_volatility
-      ((away_offensive_volatility + home_defensive_volatility) / 2.0) * @upset_modifier.to_f
+      Math.sqrt((away_offensive_volatility**2) + (home_defensive_volatility**2)) * @upset_modifier.to_f
     end
 
+    ##
+    # Returns the home team's pace volatility, using the rating snapshot if available, or falling back to the season's pace standard deviation or 1.0 if not present.
+    # @return [Float] The volatility value representing the variability in the home team's pace.
     def home_pace_volatility
       home_rating_snapshot&.pace_volatility || (season.respond_to?(:pace_std_deviation) ? season.pace_std_deviation : 1.0)
     end

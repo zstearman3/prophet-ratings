@@ -51,6 +51,8 @@ class Season < ApplicationRecord
   has_many :games, dependent: :destroy
   has_many :team_seasons, dependent: :destroy
   has_many :predictions, through: :games
+  has_many :team_rating_snapshots, dependent: :destroy
+  has_many :bet_recommendations, through: :games
 
   scope :current, -> { find_by(current: true) }
 

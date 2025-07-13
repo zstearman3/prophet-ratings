@@ -41,7 +41,8 @@ RSpec.describe Importer::GamesImporter do
     end.not_to change(Game, :count)
   end
 
-  xit 'creates a second game for a true double header (same teams, same day, different time)', 'double headers not supported due to uniqueness validation' do
+  xit 'creates a second game for a true double header (same teams, same day, different time)',
+      'double headers not supported due to uniqueness validation' do
     # This is currently not supported due to strict uniqueness validation by teams and date.
     # If double header support is needed, update the model validation and remove this skip.
     row2 = row.merge(date: date.to_datetime.change({ hour: 20 }))

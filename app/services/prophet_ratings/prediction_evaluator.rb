@@ -2,8 +2,13 @@
 
 module ProphetRatings
   class PredictionEvaluator
+    ##
+    # Initializes the evaluator by loading predictions for games within the specified date range and ratings configuration version.
+    # Filters predictions to those matching the given ratings configuration and game start times.
+    # @param ratings_config_version [RatingsConfigVersion] The ratings configuration version to filter predictions by.
+    # @param date_range [Range<Date>] The date range of games to include.
     def initialize(
-      ratings_config_version: RatingsConfigVersion.current,
+      ratings_config_version: RatingsConfigVersion.ensure_current!,
       date_range: Season.current.start_date..Season.current.end_date
     )
 
@@ -28,10 +33,13 @@ module ProphetRatings
       plot_residuals_vs_predicted_pace
     end
 
+    ##
+    # Generates and saves diagnostic plots and exports related to offensive efficiency predictions, including error histograms, win probability calibration, team residuals CSV, and margin z-score histogram.
     def generate_efficiency_diagnostics
       plot_efficiency_error_histograms
       plot_win_prob_calibration
       export_team_residuals_to_csv
+      plot_margin_z_scores_histogram
     end
 
     private
@@ -225,6 +233,10 @@ module ProphetRatings
       g.write('tmp/win_prob_calibration.png')
     end
 
+    ##
+    # Exports average and standard deviation of pace residuals per team to a CSV file.
+    # Each team's residuals are aggregated from all games in the predictions, with home teams receiving positive residuals and away teams negative.
+    # @param [String] path The file path where the CSV will be saved. Defaults to 'tmp/team_residuals.csv'.
     def export_team_residuals_to_csv(path: 'tmp/team_residuals.csv')
       team_data = Hash.new { |h, k| h[k] = [] }
 
@@ -253,6 +265,46 @@ module ProphetRatings
       end
 
       Rails.logger.debug { "📁 Exported team residuals to #{path}" }
+    end
+
+    ##
+    # Generates and saves a histogram of z-scores for margin predictions, illustrating the distribution of standardized residuals between actual and predicted game margins.
+    # Z-scores are binned in half-point intervals, and the resulting bar chart is saved as 'tmp/z_score_histogram.png'.
+    def plot_margin_z_scores_histogram
+      require 'gruff'
+
+      z_scores = predictions.filter_map do |p|
+        next unless p.home_score && p.away_score &&
+                    p.game&.home_team_score && p.game&.away_team_score &&
+                    p.margin_std_deviation
+
+        predicted_margin = p.home_score - p.away_score
+        actual_margin = p.game.home_team_score - p.game.away_team_score
+        stddev = p.margin_std_deviation
+
+        next if stddev.zero? || stddev.nan?
+
+        (actual_margin - predicted_margin) / stddev.to_f
+      end
+
+      # Bin and count
+      buckets = z_scores.group_by { |z| (z * 2).round / 2.0 } # half-point bins
+      sorted = buckets.sort_by(&:first)
+
+      labels = {}
+      counts = []
+      sorted.each_with_index do |(bucket, values), i|
+        labels[i] = bucket
+        counts << values.size
+      end
+
+      g = Gruff::Bar.new
+      g.title = 'Z-score Distribution of Margin Predictions'
+      g.labels = labels
+      g.data(:ZScores, counts)
+      g.write('tmp/z_score_histogram.png')
+
+      Rails.logger.info '📊 Saved Z-score histogram to tmp/z_score_histogram.png'
     end
   end
 end
