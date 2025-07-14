@@ -13,11 +13,11 @@ RSpec.describe ProphetRatings::TeamSeasonStatsAggregator, type: :service do
     before do
       opponents = create_list(:team, 3)
       games = [
-        create(:game, season:, start_time: Time.zone.now.change(hour: 12, min: 0, sec: 0), home_team_name: team.school,
+        create(:game, season:, start_time: season.end_date - 12.days, home_team_name: team.school,
                       away_team_name: opponents[0].school),
-        create(:game, season:, start_time: Time.zone.now.change(hour: 15, min: 0, sec: 0), home_team_name: team.school,
+        create(:game, season:, start_time: season.end_date - 9.days, home_team_name: team.school,
                       away_team_name: opponents[1].school),
-        create(:game, season:, start_time: Time.zone.now.change(hour: 18, min: 0, sec: 0), home_team_name: team.school,
+        create(:game, season:, start_time: season.end_date - 6.days, home_team_name: team.school,
                       away_team_name: opponents[2].school)
       ]
       team_games = games.each_with_index.map do |game, i|

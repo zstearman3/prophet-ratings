@@ -63,7 +63,7 @@
 #  fk_rails_...  (opponent_team_season_id => team_seasons.id)
 #
 class TeamGame < ApplicationRecord
-  include BasketballCalculations::Calculations
+  include BasketballCalculations::StatFormulae
 
   belongs_to :game
   belongs_to :team

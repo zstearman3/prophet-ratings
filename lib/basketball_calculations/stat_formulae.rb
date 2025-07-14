@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module BasketballCalculations
-  module Calculations
+  module StatFormulae
     def calculated_two_pt_percentage
       (two_pt_made.to_f / two_pt_attempted).round(5)
     end

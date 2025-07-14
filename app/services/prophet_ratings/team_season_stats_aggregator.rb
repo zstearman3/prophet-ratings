@@ -14,7 +14,7 @@ module ProphetRatings
         (fgm + (0.5 * three_pm)) / fga.to_f
       },
       three_pt_proficiency: lambda { |fga:, three_pm:, three_pa:|
-        nil if fga.zero?
+        return nil if fga.zero?
 
         ((2 * (three_pm.to_f / three_pa)) + (three_pa.to_f / fga)) / 3.0
       }
@@ -27,8 +27,9 @@ module ProphetRatings
 
     def run
       preload_predictions
+
       TeamSeason
-        .includes(team_games: :game)
+        .joins(team_games: :game)
         .where(season_id: @season.id)
         .where(game: { status: Game.statuses[:final], start_time: ..@as_of })
         .find_each do |team_season|

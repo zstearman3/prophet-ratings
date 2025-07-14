@@ -9,28 +9,14 @@ class MatchupsController < ApplicationController
   end
 
   def submit
-    home_team_season = TeamSeason.find_by(id: matchup_params[:home_team_id])
-    away_team_season = TeamSeason.find_by(id: matchup_params[:away_team_id])
-    config = RatingsConfigVersion.current
-
-    @home_snapshot = TeamRatingSnapshot.where(team_season: home_team_season, ratings_config_version: config)
-                                       .order(snapshot_date: :desc).first
-    @away_snapshot = TeamRatingSnapshot.where(team_season: away_team_season, ratings_config_version: config)
-                                       .order(snapshot_date: :desc).first
-    @neutral = matchup_params[:neutral] == '1'
-    @upset_modifier = matchup_params[:upset_modifier].presence&.to_f || 1.0
-    @predictor = ProphetRatings::GamePredictor.new(
-      home_rating_snapshot: @home_snapshot,
-      away_rating_snapshot: @away_snapshot,
-      neutral: @neutral
-    )
+    set_prediction_params
 
     begin
       case params[:action_type]
       when 'predict'
-        @prediction = @predictor.call
+        @prediction = predict_outcome
       when 'simulate'
-        @simulation = @predictor.simulate
+        @prediction = simulate_outcome
       end
 
       respond_to do |format|
@@ -49,6 +35,37 @@ class MatchupsController < ApplicationController
   end
 
   private
+
+  def set_prediction_params
+    home_team_season = TeamSeason.find_by(id: matchup_params[:home_team_id])
+    away_team_season = TeamSeason.find_by(id: matchup_params[:away_team_id])
+    config = RatingsConfigVersion.current
+
+    @home_snapshot = TeamRatingSnapshot.where(team_season: home_team_season, ratings_config_version: config)
+                                       .order(snapshot_date: :desc).first
+    @away_snapshot = TeamRatingSnapshot.where(team_season: away_team_season, ratings_config_version: config)
+                                       .order(snapshot_date: :desc).first
+    @neutral = matchup_params[:neutral] == '1'
+    @upset_modifier = matchup_params[:upset_modifier].presence&.to_f || 1.0
+  end
+
+  def predict_outcome
+    ProphetRatings::GamePredictor.new(
+      home_rating_snapshot: @home_snapshot,
+      away_rating_snapshot: @away_snapshot,
+      neutral: @neutral,
+      upset_modifier: @upset_modifier
+    ).call
+  end
+
+  def simulate_outcome
+    ProphetRatings::GameSimulator.new(
+      home_rating_snapshot: @home_snapshot,
+      away_rating_snapshot: @away_snapshot,
+      neutral: @neutral,
+      upset_modifier: @upset_modifier
+    ).call
+  end
 
   def matchup_params
     params.permit(

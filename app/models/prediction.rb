@@ -93,6 +93,32 @@ class Prediction < ApplicationRecord
     "#{game.away_team_name} #{away} - #{game.home_team_name} #{home}"
   end
 
+  ##
+  # Calculates the standard deviation of the predicted margin between home and away teams.
+  # Uses the pace factor and the offensive and defensive efficiency volatilities from both teams' seasons.
+  # @return [Float] The standard deviation of the predicted margin.
+  def margin_std_deviation
+    Math.sqrt(
+      home_margin_variability +
+      away_margin_variability
+    )
+  end
+
+  ##
+  # Calculates the standard deviation of the predicted total score based on the pace factor
+  # and the offensive and defensive efficiency volatilities of both teams' seasons.
+  # @return [Float] The estimated standard deviation of the total predicted score.
+  def total_std_deviation
+    total_var = (
+      (home_team_snapshot.team_season.offensive_efficiency_volatility**2) +
+      (home_team_snapshot.team_season.defensive_efficiency_volatility**2) +
+      (away_team_snapshot.team_season.offensive_efficiency_volatility**2) +
+      (away_team_snapshot.team_season.defensive_efficiency_volatility**2)
+    )
+
+    Math.sqrt(total_var) * pace_factor
+  end
+
   private
 
   # Returns [away_score, home_score] as integers, using tie-breaking logic if needed.
@@ -114,17 +140,6 @@ class Prediction < ApplicationRecord
     (pace**2) / 10_000.0
   end
 
-  ##
-  # Calculates the standard deviation of the predicted margin between home and away teams.
-  # Uses the pace factor and the offensive and defensive efficiency volatilities from both teams' seasons.
-  # @return [Float] The standard deviation of the predicted margin.
-  def margin_std_deviation
-    Math.sqrt(
-      home_margin_variability +
-      away_margin_variability
-    )
-  end
-
   def home_margin_variability
     pace_factor * (
       (home_team_snapshot.team_season.offensive_efficiency_volatility**2) +
@@ -137,21 +152,6 @@ class Prediction < ApplicationRecord
       (away_team_snapshot.team_season.offensive_efficiency_volatility**2) +
       (home_team_snapshot.team_season.defensive_efficiency_volatility**2)
     )
-  end
-
-  ##
-  # Calculates the standard deviation of the predicted total score based on the pace factor
-  # and the offensive and defensive efficiency volatilities of both teams' seasons.
-  # @return [Float] The estimated standard deviation of the total predicted score.
-  def total_std_deviation
-    total_var = (
-      (home_team_snapshot.team_season.offensive_efficiency_volatility**2) +
-      (home_team_snapshot.team_season.defensive_efficiency_volatility**2) +
-      (away_team_snapshot.team_season.offensive_efficiency_volatility**2) +
-      (away_team_snapshot.team_season.defensive_efficiency_volatility**2)
-    )
-
-    Math.sqrt(total_var) * pace_factor
   end
 
   ##
