@@ -1,0 +1,13 @@
+default: &default
+  season_defaults:
+    average_pace: 70.0
+    average_efficiency: 105.0
+
+development:
+  <<: *default
+
+test:
+  <<: *default
+
+production:
+  <<: *default

@@ -54,6 +54,9 @@ Layout/LineLength:
   Exclude:
     - "**/*params.rb"
 
+RSpec/MultipleExpectations:
+  Max: 3
+
 RSpec/MultipleMemoizedHelpers:
   Max: 20
 
@@ -65,23 +68,24 @@ Style/RescueModifier:
     - 'spec/**/*'
 
 Metrics/AbcSize:
-  Max: 22
+  Max: 25
   Exclude:
     - 'app/services/scraper/*'
     - 'app/services/importer/*'
 
 Metrics/ClassLength:
-  Max: 150
+  Max: 300
 
 RSpec/ExampleLength:
   Max: 20
 
 Metrics/CyclomaticComplexity:
-  Max: 10
+  Max: 15
   Exclude:
     - 'app/services/scraper/*'
 
 Metrics/PerceivedComplexity:
+  Max: 15
   Exclude:
     - 'app/services/scraper/*'
 

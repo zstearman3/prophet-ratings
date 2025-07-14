@@ -23,9 +23,9 @@ module StatisticsUtils
     values.compact.sum(&:abs) / values.compact.size.to_f
   end
 
-  def normal_cdf(x)
+  def normal_cdf(value)
     # Approximation of the standard normal CDF using the error function
-    0.5 * (1 + Math.erf(x / Math.sqrt(2)))
+    0.5 * (1 + Math.erf(value / Math.sqrt(2)))
   end
 
   ##

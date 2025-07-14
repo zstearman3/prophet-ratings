@@ -1,10 +1,9 @@
 # frozen_string_literal: true
 
 module ProphetRatings
-  class GamePredictor
-    PREDICTION_CONFIG = Rails.application.config_for(:prediction).deep_symbolize_keys
-    CONFIDENCE_LEVELS = PREDICTION_CONFIG[:confidence_levels]
+  DEFAULTS = Rails.application.config_for(:defaults).deep_symbolize_keys
 
+  class GamePredictor
     def initialize(home_rating_snapshot:, away_rating_snapshot:, upset_modifier: 1.0, neutral: false, season: Season.current)
       @home_rating_snapshot = home_rating_snapshot
       @away_rating_snapshot = away_rating_snapshot
@@ -14,23 +13,9 @@ module ProphetRatings
     end
 
     def call
-      @call ||= build_prediction_hash
-    end
-
-    def simulate
       raise ArgumentError, 'Missing home or away rating snapshot' unless @home_rating_snapshot && @away_rating_snapshot
 
-      home_team = @home_rating_snapshot.team.school
-      away_team = @away_rating_snapshot.team.school
-      pace = Gaussian.new(expected_pace, total_pace_volatility).rand
-      home_ortg = Gaussian.new(home_expected_ortg, total_home_volatility).rand
-      away_ortg = Gaussian.new(away_expected_ortg, total_away_volatility).rand
-      {
-        home_team:,
-        away_team:,
-        home_score: (pace * (home_ortg / 100.0)).round(2),
-        away_score: (pace * (away_ortg / 100.0)).round(2)
-      }
+      @call ||= build_prediction_hash
     end
 
     private
@@ -38,26 +23,13 @@ module ProphetRatings
     attr_reader :prediction_hash, :home_rating_snapshot, :away_rating_snapshot, :season
 
     def build_prediction_hash
-      margin = (home_expected_score - away_expected_score).round(2)
-
-      home_volatility = total_home_volatility
-      away_volatility = total_away_volatility
-      volatility_gap = (home_volatility - away_volatility).abs
-
-      confidence_level =
-        if volatility_gap < CONFIDENCE_LEVELS[:high_max]
-          'High'
-        elsif volatility_gap < CONFIDENCE_LEVELS[:medium_max]
-          'Medium'
-        else
-          'Low'
-        end
-
       raise ArgumentError, 'Missing home or away rating snapshot' unless @home_rating_snapshot && @away_rating_snapshot
 
+      margin = home_expected_score - away_expected_score.round(2)
+
       {
-        home_team: @home_rating_snapshot.team.school,
-        away_team: @away_rating_snapshot.team.school,
+        home_team: home_rating_snapshot.team.school,
+        away_team: away_rating_snapshot.team.school,
         favorite:,
         home_expected_score:,
         away_expected_score:,
@@ -66,16 +38,19 @@ module ProphetRatings
         confidence_level:,
         explanation: 'Based on adjusted efficiencies, expected pace, and volatility, ' \
                      "#{favorite} is favored by #{margin.abs} points.",
-        meta: {
-          expected_pace: expected_pace.round(2),
-          home_expected_ortg: home_expected_ortg.round(2),
-          away_expected_ortg: away_expected_ortg.round(2),
-          home_offensive_volatility: home_offensive_volatility.round(2),
-          away_offensive_volatility: away_offensive_volatility.round(2),
-          home_defensive_volatility: home_defensive_volatility.round(2),
-          away_defensive_volatility: away_defensive_volatility.round(2)
+        meta: hash_metadata
+      }
+    end
 
-        }
+    def hash_metadata
+      {
+        expected_pace: expected_pace.round(2),
+        home_expected_ortg: home_expected_ortg.round(2),
+        away_expected_ortg: away_expected_ortg.round(2),
+        home_offensive_volatility: home_offensive_volatility.round(2),
+        away_offensive_volatility: away_offensive_volatility.round(2),
+        home_defensive_volatility: home_defensive_volatility.round(2),
+        away_defensive_volatility: away_defensive_volatility.round(2)
       }
     end
 
@@ -83,8 +58,8 @@ module ProphetRatings
       return unless home_rating_snapshot && away_rating_snapshot
 
       @home_expected_ortg ||=
-        (home_rating_snapshot.adj_offensive_efficiency - season.average_efficiency) +
-        (away_rating_snapshot.adj_defensive_efficiency - season.average_efficiency) +
+        (home_rating_snapshot.adj_offensive_efficiency - season_average_efficiency) +
+        (away_rating_snapshot.adj_defensive_efficiency - season_average_efficiency) +
         home_offense_boost
     end
 
@@ -92,8 +67,8 @@ module ProphetRatings
       return unless home_rating_snapshot && away_rating_snapshot
 
       @away_expected_ortg ||=
-        (away_rating_snapshot.adj_offensive_efficiency - season.average_efficiency) +
-        (home_rating_snapshot.adj_defensive_efficiency - season.average_efficiency) +
+        (away_rating_snapshot.adj_offensive_efficiency - season_average_efficiency) +
+        (home_rating_snapshot.adj_defensive_efficiency - season_average_efficiency) +
         home_defense_boost
     end
 
@@ -112,9 +87,9 @@ module ProphetRatings
     # Calculates the expected pace for the game based on both teams' adjusted pace ratings and the season average.
     # @return [Float] The estimated number of possessions per team for the game.
     def expected_pace
-      @expected_pace ||= ((home_rating_snapshot&.adj_pace || 0) - (season.respond_to?(:average_pace) ? season.average_pace : 0)) +
-                         ((away_rating_snapshot&.adj_pace || 0) - (season.respond_to?(:average_pace) ? season.average_pace : 0)) +
-                         (season.respond_to?(:average_pace) ? season.average_pace : 0)
+      @expected_pace ||= (home_rating_snapshot.adj_pace - season.average_pace) +
+                         (away_rating_snapshot.adj_pace - season.average_pace) +
+                         season.average_pace
     end
 
     ##
@@ -144,6 +119,10 @@ module ProphetRatings
       probability.round(4)
     end
 
+    def confidence_level
+      volatility_calculator.confidence_level
+    end
+
     def favorite
       favored_team_season = home_expected_score > away_expected_score ? home_rating_snapshot : away_rating_snapshot
       raise ArgumentError, 'Missing home or away rating snapshot' unless favored_team_season&.team&.school
@@ -167,61 +146,42 @@ module ProphetRatings
       @default_home_boost ||= Rails.application.config_for(:ratings).home_court_advantage
     end
 
+    def season_average_efficiency
+      season.average_efficiency || DEFAULTS[:season_defaults][:average_efficiency]
+    end
+
     def home_offensive_volatility
-      home_rating_snapshot&.offensive_efficiency_volatility ||
-        (season.respond_to?(:efficiency_std_deviation) ? season.efficiency_std_deviation : 1.0)
+      volatility_calculator.home_offensive_volatility
     end
 
     def away_offensive_volatility
-      away_rating_snapshot&.offensive_efficiency_volatility ||
-        (season.respond_to?(:efficiency_std_deviation) ? season.efficiency_std_deviation : 1.0)
+      volatility_calculator.away_offensive_volatility
     end
 
     def home_defensive_volatility
-      home_rating_snapshot&.defensive_efficiency_volatility ||
-        (season.respond_to?(:efficiency_std_deviation) ? season.efficiency_std_deviation : 1.0)
+      volatility_calculator.home_defensive_volatility
     end
 
-    ##
-    # Returns the defensive efficiency volatility for the away team, using the rating snapshot if available,
-    # or falling back to the season's efficiency standard deviation or 1.0.
     def away_defensive_volatility
-      away_rating_snapshot&.defensive_efficiency_volatility ||
-        (season.respond_to?(:efficiency_std_deviation) ? season.efficiency_std_deviation : 1.0)
+      volatility_calculator.away_defensive_volatility
     end
 
-    ##
-    # Calculates the total volatility for the home team as the root-sum-square of home offensive and away defensive volatilities,
-    # scaled by the upset modifier.
-    # @return [Float] The aggregated volatility value for the home team.
     def total_home_volatility
-      Math.sqrt((home_offensive_volatility**2) + (away_defensive_volatility**2)) * @upset_modifier.to_f
+      volatility_calculator.total_home_volatility
     end
 
-    ##
-    # Calculates the total volatility for the away team by combining its offensive volatility with the home team's defensive volatility,
-    # scaled by the upset modifier.
-    # @return [Float] The aggregated volatility value for the away team.
     def total_away_volatility
-      Math.sqrt((away_offensive_volatility**2) + (home_defensive_volatility**2)) * @upset_modifier.to_f
+      volatility_calculator.total_away_volatility
     end
 
-    ##
-    # Returns the home team's pace volatility, using the rating snapshot if available,
-    # or falling back to the season's pace standard deviation or 1.0 if not present.
-    # @return [Float] The volatility value representing the variability in the home team's pace.
-    def home_pace_volatility
-      home_rating_snapshot&.pace_volatility ||
-        (season.respond_to?(:pace_std_deviation) ? season.pace_std_deviation : 1.0)
-    end
-
-    def away_pace_volatility
-      away_rating_snapshot&.pace_volatility ||
-        (season.respond_to?(:pace_std_deviation) ? season.pace_std_deviation : 1.0)
-    end
-
-    def total_pace_volatility
-      Math.sqrt((home_pace_volatility**2) + (away_pace_volatility**2))
+    def volatility_calculator
+      @volatility_calculator ||= ProphetRatings::VolatilityCalculator.new(
+        home_rating_snapshot: home_rating_snapshot,
+        away_rating_snapshot: away_rating_snapshot,
+        season: season,
+        upset_modifier: @upset_modifier,
+        neutral: @neutral
+      )
     end
   end
 end
