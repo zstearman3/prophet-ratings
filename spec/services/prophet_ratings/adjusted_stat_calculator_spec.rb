@@ -4,7 +4,7 @@ require 'rails_helper'
 
 RSpec.describe ProphetRatings::AdjustedStatCalculator, type: :service do
   describe '#run' do
-    let(:season) { create(:season) }
+    let(:season) { create(:season, :current) }
     let!(:team_seasons) { create_three_team_round_robin(season:, stat: :effective_fg_percentage) }
 
     let(:ts1) { team_seasons[0] }

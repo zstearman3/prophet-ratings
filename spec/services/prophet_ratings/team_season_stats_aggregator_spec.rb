@@ -7,7 +7,7 @@ RSpec.describe ProphetRatings::TeamSeasonStatsAggregator, type: :service do
 
   describe '#run' do
     let(:team) { create(:team) }
-    let(:season) { create(:season) }
+    let(:season) { create(:season, :current) }
     let(:team_season) { create(:team_season, team:, season:) }
 
     before do

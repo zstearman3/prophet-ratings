@@ -3,7 +3,7 @@
 require 'rails_helper'
 
 describe BetRecommendationGenerator do
-  let(:season) { create(:season, average_efficiency: 100.0, average_pace: 70.0) }
+  let(:season) { create(:season, :current, average_efficiency: 100.0, average_pace: 70.0) }
   let(:ratings_config_version) { create(:ratings_config_version, current: true) }
   let(:game) { create(:game, season:, start_time: Time.zone.today) }
   let(:home_team_season) { create(:team_season, season:, offensive_efficiency_std_dev: 5.0, defensive_efficiency_std_dev: 5.0) }
