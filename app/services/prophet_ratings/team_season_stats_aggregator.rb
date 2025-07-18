@@ -30,6 +30,7 @@ module ProphetRatings
 
       TeamSeason
         .joins(team_games: :game)
+        .includes(team_games: :game)
         .where(season_id: @season.id)
         .where(game: { status: Game.statuses[:final], start_time: ..@as_of })
         .find_each do |team_season|

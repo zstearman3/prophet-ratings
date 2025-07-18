@@ -6,6 +6,7 @@ RSpec.describe ProphetRatings::GamePredictor do
   describe '#call' do
     let(:season) do
       create(:season,
+             :current,
              average_efficiency: 105.0,
              average_pace: 68.0,
              pace_std_deviation: 3.5,

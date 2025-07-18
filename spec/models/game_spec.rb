@@ -28,7 +28,7 @@
 require 'rails_helper'
 
 RSpec.describe Game do
-  let(:season) { create(:season, average_efficiency: 100.0, average_pace: 70.0) }
+  let(:season) { create(:season, :current, average_efficiency: 100.0, average_pace: 70.0) }
   let(:game) { create(:game, season:, start_time: Time.zone.today) }
   let(:home_team_season) { create(:team_season, season:) }
   let(:away_team_season) { create(:team_season, season:) }
