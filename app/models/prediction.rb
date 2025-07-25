@@ -87,7 +87,9 @@ class Prediction < ApplicationRecord
 
   # Returns a formatted string showing the predicted scores for both teams with their names,
   # using the same tie-breaking logic as predicted_score_string.
-  # @return [String] The predicted score string with team names.
+  ##
+  # Returns a formatted string showing each team's name and its predicted score, using tie-breaking logic to avoid displaying a tie when raw predicted scores differ.
+  # @return [String] Predicted scores with team names, formatted as "AwayTeam score - HomeTeam score".
   def predicted_score_with_teams
     away, home = adjusted_predicted_scores
     "#{game.away_team_name} #{away} - #{game.home_team_name} #{home}"
@@ -96,6 +98,8 @@ class Prediction < ApplicationRecord
   ##
   # Calculates the standard deviation of the predicted margin between home and away teams.
   # Uses the pace factor and the offensive and defensive efficiency volatilities from both teams' seasons.
+  ##
+  # Calculates the standard deviation of the predicted margin between home and away teams.
   # @return [Float] The standard deviation of the predicted margin.
   def margin_std_deviation
     Math.sqrt(
@@ -107,6 +111,8 @@ class Prediction < ApplicationRecord
   ##
   # Calculates the standard deviation of the predicted total score based on the pace factor
   # and the offensive and defensive efficiency volatilities of both teams' seasons.
+  ##
+  # Calculates the estimated standard deviation of the predicted total score based on the offensive and defensive efficiency volatilities of both teams' seasons and the pace factor.
   # @return [Float] The estimated standard deviation of the total predicted score.
   def total_std_deviation
     total_var = (
@@ -136,10 +142,16 @@ class Prediction < ApplicationRecord
     end
   end
 
+  ##
+  # Calculates the pace factor as the square of the pace divided by 10,000.
+  # @return [Float] The computed pace factor.
   def pace_factor
     (pace**2) / 10_000.0
   end
 
+  ##
+  # Calculates the variance contribution to the predicted margin from the home team's offensive and the away team's defensive efficiency volatilities, scaled by the pace factor.
+  # @return [Float] The variance component for the home team's margin.
   def home_margin_variability
     pace_factor * (
       (home_team_snapshot.team_season.offensive_efficiency_volatility**2) +
@@ -147,6 +159,9 @@ class Prediction < ApplicationRecord
     )
   end
 
+  ##
+  # Calculates the variance contribution to the predicted margin from the away team's offensive and the home team's defensive efficiency volatilities, scaled by the pace factor.
+  # @return [Float] The variance component for the away team's margin.
   def away_margin_variability
     pace_factor * (
       (away_team_snapshot.team_season.offensive_efficiency_volatility**2) +

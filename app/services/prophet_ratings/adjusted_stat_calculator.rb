@@ -118,6 +118,10 @@ module ProphetRatings
       (weight * preseason_value) + ((1 - weight) * observed_value)
     end
 
+    ##
+    # Calculates the current weight to apply to preseason values based on the number of days since the season started.
+    # The weight decays linearly over a configured number of days and is bounded by a minimum threshold.
+    # @return [Float] The preseason weight, between the configured minimum and 1.0.
     def preseason_weight
       start_date = season.start_date
       days_since_start = (as_of.to_date - start_date).to_i
@@ -126,6 +130,15 @@ module ProphetRatings
       [1.0 - (days_since_start.to_f / decay_days), min_weight].max.round(4)
     end
 
+    ##
+    # Computes and returns adjusted statistics for a team based on the solution vector and season average.
+    # Blends with preseason values for certain statistics when available.
+    # @param team_season [TeamSeason] The team season record containing preseason adjustment values.
+    # @param x_values [Array<Float>] The solution vector from the least squares adjustment.
+    # @param season_avg [Float] The average value of the raw statistic for the season.
+    # @param idx [Integer] The index of the team in the solution vector.
+    # @param num_teams [Integer] The total number of teams in the season.
+    # @return [Hash] A hash mapping adjusted stat keys to their computed values for the team.
     def build_stats_to_write(team_season, x_values, season_avg, idx, num_teams)
       offense_value = x_values[idx] + season_avg
       defense_value = x_values[num_teams + idx] + season_avg
