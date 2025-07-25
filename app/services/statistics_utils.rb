@@ -17,12 +17,21 @@ module StatisticsUtils
     Math.sqrt(sum_of_squares / (values.size - 1))
   end
 
+  ##
+  # Calculates the mean absolute error (MAE) of the given values.
+  # Returns nil if the input is empty or nil.
+  # @param [Array<Numeric>] values - The array of values to compute the MAE for.
+  # @return [Float, nil] The mean absolute error, or nil if input is blank.
   def mae(values)
     return nil if values.blank?
 
     values.compact.sum(&:abs) / values.compact.size.to_f
   end
 
+  ##
+  # Approximates the cumulative distribution function (CDF) of the standard normal distribution at the given value.
+  # @param [Numeric] value - The point at which to evaluate the CDF.
+  # @return [Float] The probability that a standard normal variable is less than or equal to the given value.
   def normal_cdf(value)
     # Approximation of the standard normal CDF using the error function
     0.5 * (1 + Math.erf(value / Math.sqrt(2)))

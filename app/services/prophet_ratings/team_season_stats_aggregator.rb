@@ -25,6 +25,10 @@ module ProphetRatings
       @as_of = as_of
     end
 
+    ##
+    # Aggregates and updates statistical metrics for all team seasons in the specified season up to the cutoff date.
+    #
+    # For each team season with finalized games before the cutoff, computes average stats, efficiency standard deviations, volatility metrics, home court advantages, and win/loss counts, then updates the corresponding record with the results.
     def run
       preload_predictions
 
