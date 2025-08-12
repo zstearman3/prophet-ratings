@@ -161,7 +161,7 @@ GEM
       thor (>= 0.14.1)
     groupdate (6.7.0)
       activesupport (>= 7.1)
-    gruff (0.27.0)
+    gruff (0.29.0)
       bigdecimal (>= 3.0)
       histogram
       rmagick (>= 5.5)
@@ -335,7 +335,7 @@ GEM
     reverse_markdown (3.0.0)
       nokogiri
     rexml (3.4.1)
-    rmagick (6.1.1)
+    rmagick (6.1.2)
       observer (~> 0.1)
       pkg-config (~> 1.4)
     rspec-core (3.13.5)
