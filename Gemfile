@@ -59,6 +59,11 @@ group :development do
 
   # Speed up commands on slow machines / big apps [https://github.com/rails/spring]
   # gem "spring"
+
+  # Git hooks manager for running checks like RuboCop/RSpec/Brakeman before commit
+  gem 'overcommit'
+  # Static analysis security scanner for Ruby on Rails
+  gem 'brakeman', require: false
 end
 
 group :test do

@@ -97,7 +97,7 @@ RSpec.describe ProphetRatings::GamePredictor do
         season:
       ).call
       expect(result[:win_probability_home]).to be_between(0.0, 1.0)
-      expect(%w[High Medium Low]).to include(result[:confidence_level])
+      expect(result[:confidence_level]).to be_in(%w[High Medium Low])
     end
 
     it 'assigns explanation and meta as correct types' do
