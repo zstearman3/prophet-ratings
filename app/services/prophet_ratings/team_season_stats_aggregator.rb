@@ -14,7 +14,7 @@ module ProphetRatings
         (fgm + (0.5 * three_pm)) / fga.to_f
       },
       three_pt_proficiency: lambda { |fga:, three_pm:, three_pa:|
-        nil if fga.zero?
+        return nil if fga.zero?
 
         ((2 * (three_pm.to_f / three_pa)) + (three_pa.to_f / fga)) / 3.0
       }
@@ -25,9 +25,15 @@ module ProphetRatings
       @as_of = as_of
     end
 
+    ##
+    # Aggregates and updates statistical metrics for all team seasons in the specified season up to the cutoff date.
+    #
+    # For each team season with finalized games before the cutoff, computes average stats, efficiency standard deviations, volatility metrics, home court advantages, and win/loss counts, then updates the corresponding record with the results.
     def run
       preload_predictions
+
       TeamSeason
+        .joins(team_games: :game)
         .includes(team_games: :game)
         .where(season_id: @season.id)
         .where(game: { status: Game.statuses[:final], start_time: ..@as_of })

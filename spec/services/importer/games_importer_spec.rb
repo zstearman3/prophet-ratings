@@ -6,8 +6,8 @@ RSpec.describe Importer::GamesImporter do
   let(:season) { Season.create!(year: 2025, start_date: '2024-11-01', end_date: '2025-04-10', name: '2024-25') }
   let(:home_team) { Team.create!(school: 'Home School', nickname: 'Home', slug: 'home', url: 'http://home.com') }
   let(:away_team) { Team.create!(school: 'Away School', nickname: 'Away', slug: 'away', url: 'http://away.com') }
-  let!(:home_team_season) { TeamSeason.create!(team: home_team, season:) }
-  let!(:away_team_season) { TeamSeason.create!(team: away_team, season:) }
+  let(:home_team_season) { TeamSeason.create!(team: home_team, season:) }
+  let(:away_team_season) { TeamSeason.create!(team: away_team, season:) }
   let(:date) { Date.new(2025, 1, 1) }
 
   let(:row) do
@@ -20,7 +20,8 @@ RSpec.describe Importer::GamesImporter do
       location: 'Home Arena',
       url: 'http://example.com/game',
       home_team_stats: {},
-      away_team_stats: {}
+      away_team_stats: {},
+      season_id: season.id
     }
   end
 
@@ -28,6 +29,10 @@ RSpec.describe Importer::GamesImporter do
     expect do
       described_class.import([row])
     end.to change(Game, :count).by(1)
+  end
+
+  it 'assigns correct attributes to the new game' do
+    described_class.import([row])
     game = Game.last
     expect(game.home_team_name).to eq home_team.school
     expect(game.away_team_name).to eq away_team.school
@@ -41,8 +46,8 @@ RSpec.describe Importer::GamesImporter do
     end.not_to change(Game, :count)
   end
 
-  xit 'creates a second game for a true double header (same teams, same day, different time)',
-      'double headers not supported due to uniqueness validation' do
+  it 'creates a second game for a true double header (same teams, same day, different time)' do
+    skip('double header logic not implemented yet')
     # This is currently not supported due to strict uniqueness validation by teams and date.
     # If double header support is needed, update the model validation and remove this skip.
     row2 = row.merge(date: date.to_datetime.change({ hour: 20 }))

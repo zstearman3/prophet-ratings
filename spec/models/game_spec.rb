@@ -28,7 +28,7 @@
 require 'rails_helper'
 
 RSpec.describe Game do
-  let(:season) { create(:season, average_efficiency: 100.0, average_pace: 70.0) }
+  let(:season) { create(:season, :current, average_efficiency: 100.0, average_pace: 70.0) }
   let(:game) { create(:game, season:, start_time: Time.zone.today) }
   let(:home_team_season) { create(:team_season, season:) }
   let(:away_team_season) { create(:team_season, season:) }
@@ -63,6 +63,10 @@ RSpec.describe Game do
       expect do
         game.generate_prediction!
       end.to change(Prediction, :count).by(1)
+    end
+
+    it 'assigns correct attributes to the prediction' do
+      game.generate_prediction!
       prediction = Prediction.last
       expect(prediction.game).to eq(game)
       expect(prediction.home_team_snapshot).to eq(home_snapshot)
@@ -73,9 +77,11 @@ RSpec.describe Game do
   describe '#finalize' do
     it 'delegates to ProphetRatings::GameFinalizer' do
       finalizer_double = instance_double(ProphetRatings::GameFinalizer)
-      expect(ProphetRatings::GameFinalizer).to receive(:new).with(game).and_return(finalizer_double)
-      expect(finalizer_double).to receive(:call)
+      allow(ProphetRatings::GameFinalizer).to receive(:new).with(game).and_return(finalizer_double)
+      allow(finalizer_double).to receive(:call)
       game.finalize
+      expect(ProphetRatings::GameFinalizer).to have_received(:new).with(game)
+      expect(finalizer_double).to have_received(:call)
     end
   end
 end

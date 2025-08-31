@@ -16,7 +16,7 @@ gem 'jbuilder'
 gem 'jsbundling-rails'
 gem 'pg', '~> 1.1'
 gem 'puma', '>= 5.0'
-gem 'rails', '~> 7.1.3'
+gem 'rails', '~> 7.1.5'
 gem 'rails_admin'
 gem 'redis', '>= 4.0.1'
 gem 'sassc'
@@ -59,6 +59,11 @@ group :development do
 
   # Speed up commands on slow machines / big apps [https://github.com/rails/spring]
   # gem "spring"
+
+  # Git hooks manager for running checks like RuboCop/RSpec/Brakeman before commit
+  gem 'overcommit'
+  # Static analysis security scanner for Ruby on Rails
+  gem 'brakeman', require: false
 end
 
 group :test do

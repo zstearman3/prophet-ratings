@@ -70,7 +70,7 @@ require 'rails_helper'
 RSpec.describe TeamGame do
   describe '#calculate_game_stats' do
     let(:team) { create(:team) }
-    let(:season) { create(:season) }
+    let(:season) { create(:season, :current) }
     let(:team_season) { create(:team_season, team:, season:) }
     let(:opponent_team_season) { create(:team_season, season:) }
     let(:game) { create(:game, season:) }

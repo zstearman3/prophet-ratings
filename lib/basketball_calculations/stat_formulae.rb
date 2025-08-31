@@ -1,7 +1,10 @@
 # frozen_string_literal: true
 
 module BasketballCalculations
-  module Calculations
+  module StatFormulae
+    ##
+    # Calculates the two-point field goal percentage, rounded to five decimal places.
+    # @return [Float] The ratio of two-point shots made to attempted, or NaN if no attempts.
     def calculated_two_pt_percentage
       (two_pt_made.to_f / two_pt_attempted).round(5)
     end

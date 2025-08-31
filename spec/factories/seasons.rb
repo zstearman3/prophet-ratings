@@ -46,9 +46,17 @@
 #
 FactoryBot.define do
   factory :season do
-    sequence(:year) { |n| 2020 + n }
+    year { 2024 }
     start_date { Date.new(year, 11, 1) }
     end_date { Date.new(year + 1, 4, 1) }
     average_efficiency { 100.0 }
+    current { false }
+    efficiency_std_deviation { 1.0 }
+    pace_std_deviation { 1.0 }
+    average_pace { 60.0 }
+
+    trait :current do
+      current { true }
+    end
   end
 end
