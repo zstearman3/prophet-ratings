@@ -10,7 +10,14 @@ class TeamSeasonsController < ApplicationController
     @team_seasons = TeamSeason
                     .includes(:team)
                     .where(season: @season)
-                    .order(ActiveRecord::Base.sanitize_sql_for_order("#{sort_column} #{direction.upcase}"))
+    @team_seasons =
+      if sort_column == 'team.school'
+        # Order by associated teams.school using Arel to avoid SQL interpolation
+        @team_seasons.references(:team).order(Team.arel_table[:school].public_send(direction))
+      else
+        # Order by whitelisted TeamSeason column using hash syntax
+        @team_seasons.order(sort_column.to_sym => direction.to_sym)
+      end
   end
 
   private
