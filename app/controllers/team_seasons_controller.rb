@@ -10,7 +10,7 @@ class TeamSeasonsController < ApplicationController
     @team_seasons = TeamSeason
                     .includes(:team)
                     .where(season: @season)
-                    .order("#{sort_column} #{direction}")
+                    .order(ActiveRecord::Base.sanitize_sql_for_order("#{sort_column} #{direction.upcase}"))
   end
 
   private
