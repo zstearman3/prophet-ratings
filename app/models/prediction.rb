@@ -30,6 +30,7 @@
 # Indexes
 #
 #  index_predictions_on_away_team_snapshot_id      (away_team_snapshot_id)
+#  index_predictions_on_game_and_snapshots         (game_id,home_team_snapshot_id,away_team_snapshot_id) UNIQUE
 #  index_predictions_on_game_id                    (game_id)
 #  index_predictions_on_home_team_snapshot_id      (home_team_snapshot_id)
 #  index_predictions_on_ratings_config_version_id  (ratings_config_version_id)
@@ -125,8 +126,6 @@ class Prediction < ApplicationRecord
     Math.sqrt(total_var) * pace_factor
   end
 
-  private
-
   # Returns [away_score, home_score] as integers, using tie-breaking logic if needed.
   def adjusted_predicted_scores
     home_score_rounded = home_score.round
@@ -180,6 +179,8 @@ class Prediction < ApplicationRecord
       "#{game.away_team_name} #{home_score.round - away_score.round}"
     end
   end
+
+  private
 
   ##
   # Validates that the home and away team snapshots reference the same ratings configuration version.
