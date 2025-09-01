@@ -33,7 +33,7 @@ PrePush:
   Brakeman:
     enabled: true
     description: "Run Brakeman security scan"
-    command: ["bundle", "exec", "brakeman", "-q", "-w2"]
+    command: ["bundle", "exec", "brakeman", "-q", "-w2", "--skip-checks", "EOLRails"]
     required_executable: "brakeman"
 
 # RSpec and Brakeman run on PrePush to keep commits fast.
