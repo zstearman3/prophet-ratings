@@ -20,7 +20,6 @@
 #
 # Indexes
 #
-#  index_game_odds_on_game_id         (game_id)
 #  index_game_odds_on_game_id_unique  (game_id) UNIQUE
 #
 # Foreign Keys

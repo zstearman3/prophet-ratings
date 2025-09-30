@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2025_09_01_143700) do
+ActiveRecord::Schema[7.1].define(version: 2025_09_30_015506) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -76,7 +76,6 @@ ActiveRecord::Schema[7.1].define(version: 2025_09_01_143700) do
     t.integer "total_under_odds"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index ["game_id"], name: "index_game_odds_on_game_id"
     t.index ["game_id"], name: "index_game_odds_on_game_id_unique", unique: true
   end
 
@@ -363,7 +362,6 @@ ActiveRecord::Schema[7.1].define(version: 2025_09_01_143700) do
     t.index ["ratings_config_version_id"], name: "index_team_rating_snapshots_on_ratings_config_version_id"
     t.index ["season_id"], name: "index_team_rating_snapshots_on_season_id"
     t.index ["team_id", "season_id", "snapshot_date", "ratings_config_version_id"], name: "idx_trs_on_team_season_date_rcv_unique", unique: true
-    t.index ["team_id", "season_id", "snapshot_date"], name: "idx_on_team_id_season_id_snapshot_date_8de7607130"
     t.index ["team_id"], name: "index_team_rating_snapshots_on_team_id"
     t.index ["team_season_id"], name: "index_team_rating_snapshots_on_team_season_id"
   end
