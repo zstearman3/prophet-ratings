@@ -30,6 +30,7 @@
 # Indexes
 #
 #  index_predictions_on_away_team_snapshot_id      (away_team_snapshot_id)
+#  index_predictions_on_game_and_snapshots         (game_id,home_team_snapshot_id,away_team_snapshot_id) UNIQUE
 #  index_predictions_on_game_id                    (game_id)
 #  index_predictions_on_home_team_snapshot_id      (home_team_snapshot_id)
 #  index_predictions_on_ratings_config_version_id  (ratings_config_version_id)

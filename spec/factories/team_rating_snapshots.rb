@@ -20,7 +20,7 @@
 #
 # Indexes
 #
-#  idx_on_team_id_season_id_snapshot_date_8de7607130         (team_id,season_id,snapshot_date)
+#  idx_trs_on_team_season_date_rcv_unique                    (team_id,season_id,snapshot_date,ratings_config_version_id) UNIQUE
 #  index_team_rating_snapshots_on_rating_and_snapshot_date   (rating,snapshot_date)
 #  index_team_rating_snapshots_on_ratings_config_version_id  (ratings_config_version_id)
 #  index_team_rating_snapshots_on_season_id                  (season_id)
