@@ -7,6 +7,9 @@ namespace :season do
     abort('YEAR must be a positive integer') unless year.positive?
 
     sync_games = env_bool('SYNC_GAMES', default: true)
+    sync_resume = env_bool('SYNC_RESUME', default: false)
+    sync_start_date = parse_date_env('SYNC_START_DATE')
+    sync_end_date = parse_date_env('SYNC_END_DATE')
     dedupe_games = env_bool('DEDUPE_GAMES', default: true)
     run_preseason = env_bool('RUN_PRESEASON', default: true)
     run_ratings = env_bool('RUN_RATINGS', default: true)
@@ -18,7 +21,14 @@ namespace :season do
     ratings_config = RatingsConfigVersion.ensure_current!
     run_preseason_ratings_for(season) if run_preseason
 
-    SyncFullSeasonGamesJob.perform_now(season) if sync_games
+    if sync_games
+      SyncFullSeasonGamesJob.perform_now(
+        season,
+        start_date: sync_start_date,
+        end_date: sync_end_date,
+        resume: sync_resume
+      )
+    end
 
     if dedupe_games
       Rake::Task['games:dedupe'].reenable
@@ -38,8 +48,35 @@ namespace :season do
     puts "Season current?: #{season.current?}"
     puts "TeamSeasons created: #{created_team_seasons} (total: #{season.team_seasons.count})"
     puts "Games in season: #{season.games.count}"
+    puts "Games sync window override: #{sync_start_date || 'default'}..#{sync_end_date || 'default'}"
+    puts "Games sync resume mode: #{sync_resume}"
     puts "Preseason initialized: #{run_preseason}"
     puts "Current ratings config: #{ratings_config.name} (id=#{ratings_config.id})"
+  end
+
+  desc 'Sync games for an existing season. Supports SYNC_RESUME=true and SYNC_START_DATE/SYNC_END_DATE.'
+  task sync_games: :environment do
+    year = ENV.fetch('YEAR', Season.current&.year || Date.current.year).to_i
+    abort('YEAR must be a positive integer') unless year.positive?
+
+    season = Season.find_by(year:)
+    abort("No season found for year=#{year}. Run season:bootstrap first.") unless season
+
+    sync_resume = env_bool('SYNC_RESUME', default: true)
+    sync_start_date = parse_date_env('SYNC_START_DATE')
+    sync_end_date = parse_date_env('SYNC_END_DATE')
+
+    SyncFullSeasonGamesJob.perform_now(
+      season,
+      start_date: sync_start_date,
+      end_date: sync_end_date,
+      resume: sync_resume
+    )
+
+    puts "Games sync complete for #{season.name} (year=#{season.year})"
+    puts "Games in season: #{season.games.count}"
+    puts "Games sync window override: #{sync_start_date || 'default'}..#{sync_end_date || 'default'}"
+    puts "Games sync resume mode: #{sync_resume}"
   end
 
   def env_bool(key, default:)

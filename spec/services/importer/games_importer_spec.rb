@@ -8,7 +8,55 @@ RSpec.describe Importer::GamesImporter do
   let(:away_team) { Team.create!(school: 'Away School', nickname: 'Away', slug: 'away', url: 'http://away.com') }
   let(:home_team_season) { TeamSeason.create!(team: home_team, season:) }
   let(:away_team_season) { TeamSeason.create!(team: away_team, season:) }
+  let(:home_alias) { TeamAlias.create!(team: home_team, value: home_team.school, source: 'sports_reference') }
+  let(:away_alias) { TeamAlias.create!(team: away_team, value: away_team.school, source: 'sports_reference') }
   let(:date) { Date.new(2025, 1, 1) }
+
+  let(:home_team_stats) do
+    {
+      minutes: 200,
+      field_goals_made: 35,
+      field_goals_attempted: 68,
+      two_pt_made: 24,
+      two_pt_attempted: 40,
+      three_pt_made: 11,
+      three_pt_attempted: 28,
+      free_throws_made: 19,
+      free_throws_attempted: 24,
+      offensive_rebounds: 9,
+      defensive_rebounds: 26,
+      rebounds: 35,
+      assists: 16,
+      steals: 7,
+      blocks: 4,
+      turnovers: 11,
+      fouls: 17,
+      points: 100
+    }
+  end
+
+  let(:away_team_stats) do
+    {
+      minutes: 200,
+      field_goals_made: 31,
+      field_goals_attempted: 65,
+      two_pt_made: 21,
+      two_pt_attempted: 39,
+      three_pt_made: 10,
+      three_pt_attempted: 26,
+      free_throws_made: 18,
+      free_throws_attempted: 22,
+      offensive_rebounds: 10,
+      defensive_rebounds: 24,
+      rebounds: 34,
+      assists: 14,
+      steals: 6,
+      blocks: 3,
+      turnovers: 12,
+      fouls: 19,
+      points: 90
+    }
+  end
 
   let(:row) do
     {
@@ -23,6 +71,20 @@ RSpec.describe Importer::GamesImporter do
       away_team_stats: {},
       season_id: season.id
     }
+  end
+
+  let(:completed_row) do
+    row.merge(
+      home_team_stats: home_team_stats,
+      away_team_stats: away_team_stats
+    )
+  end
+
+  before do
+    home_team_season
+    away_team_season
+    home_alias
+    away_alias
   end
 
   it 'creates a new game for unique teams and date' do
@@ -44,6 +106,39 @@ RSpec.describe Importer::GamesImporter do
     expect do
       described_class.import([row])
     end.not_to change(Game, :count)
+  end
+
+  it 'keeps incomplete games scheduled' do
+    described_class.import([row])
+    expect(Game.last).to be_scheduled
+  end
+
+  it 'finalizes complete games' do
+    described_class.import([completed_row])
+    game = Game.last
+    expect(game).to be_final
+    expect(game.minutes).to be_present
+  end
+
+  it 'does not downgrade an existing final game when an incomplete row is imported later' do
+    described_class.import([completed_row])
+    game = Game.last
+
+    described_class.import([row.merge(home_team_score: nil, away_team_score: nil)])
+
+    expect(game.reload).to be_final
+    expect(game.home_team_score).to eq(100)
+    expect(game.away_team_score).to eq(90)
+  end
+
+  it 'downgrades a broken legacy final game to scheduled when incoming data is incomplete' do
+    described_class.import([completed_row])
+    game = Game.last
+    game.update!(minutes: nil, possessions: nil) # simulate bad historical finalization
+
+    described_class.import([row.merge(home_team_score: nil, away_team_score: nil)])
+
+    expect(game.reload).to be_scheduled
   end
 
   it 'creates a second game for a true double header (same teams, same day, different time)' do

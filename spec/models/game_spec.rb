@@ -84,4 +84,16 @@ RSpec.describe Game do
       expect(finalizer_double).to have_received(:call)
     end
   end
+
+  describe '#pace' do
+    it 'returns nil when required values are missing' do
+      game.update!(minutes: nil, possessions: nil)
+      expect(game.pace).to be_nil
+    end
+
+    it 'calculates pace when minutes and possessions are present' do
+      game.update!(minutes: 40, possessions: 70.0)
+      expect(game.pace).to eq(70.0)
+    end
+  end
 end
