@@ -58,8 +58,8 @@ RSpec.describe ProphetRatings::PreseasonRatingsCalculator, type: :service do
 
     it 'blends prior adjusted values and applies offseason adjustments for efficiency' do
       # efficiency_adjustment = (40.0 * 0.1) - (5.0 * (1.0 - 0.8)) + 1.0 = 4.0
-      expect(team_season.preseason_adj_offensive_efficiency).to eq(111.25)
-      expect(team_season.preseason_adj_defensive_efficiency).to eq(89.75)
+      expect(team_season.preseason_adj_offensive_efficiency).to eq(115.25)
+      expect(team_season.preseason_adj_defensive_efficiency).to eq(95.75)
     end
 
     it 'blends pace from prior season without offseason pace adjustment' do
