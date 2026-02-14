@@ -8,6 +8,7 @@ namespace :season do
 
     sync_games = env_bool('SYNC_GAMES', default: true)
     dedupe_games = env_bool('DEDUPE_GAMES', default: true)
+    run_preseason = env_bool('RUN_PRESEASON', default: true)
     run_ratings = env_bool('RUN_RATINGS', default: true)
 
     season = upsert_season_for_year(year)
@@ -15,6 +16,7 @@ namespace :season do
 
     created_team_seasons = ensure_team_seasons_for(season)
     ratings_config = RatingsConfigVersion.ensure_current!
+    run_preseason_ratings_for(season) if run_preseason
 
     SyncFullSeasonGamesJob.perform_now(season) if sync_games
 
@@ -23,12 +25,20 @@ namespace :season do
       Rake::Task['games:dedupe'].invoke
     end
 
-    GenerateSeasonRatingsJob.perform_now(season.id) if run_ratings
+    if run_ratings
+      if season.games.exists?
+        GenerateSeasonRatingsJob.perform_now(season.id, run_preseason: false)
+      else
+        puts 'Skipping ratings backfill: no games found for this season. ' \
+             'Run with SYNC_GAMES=true first, then rerun RUN_RATINGS=true.'
+      end
+    end
 
     puts "Season bootstrap complete for #{season.name} (year=#{season.year})"
     puts "Season current?: #{season.current?}"
     puts "TeamSeasons created: #{created_team_seasons} (total: #{season.team_seasons.count})"
     puts "Games in season: #{season.games.count}"
+    puts "Preseason initialized: #{run_preseason}"
     puts "Current ratings config: #{ratings_config.name} (id=#{ratings_config.id})"
   end
 
@@ -94,5 +104,9 @@ namespace :season do
     end
 
     created
+  end
+
+  def run_preseason_ratings_for(season)
+    ProphetRatings::PreseasonInitializer.new(season).call
   end
 end

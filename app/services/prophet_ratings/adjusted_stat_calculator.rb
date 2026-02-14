@@ -14,6 +14,7 @@ module ProphetRatings
       @as_of = as_of
     end
 
+    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
     def call
       Rails.logger.info("Starting adjustment: #{raw_stat} → #{adj_stat} / #{adj_stat_allowed}")
       season_avg = average_stat_for_season
@@ -28,6 +29,11 @@ module ProphetRatings
       team_ids = qualified_team_seasons.map(&:team_id)
       team_index = team_ids.each_with_index.to_h
       num_teams = team_ids.size
+
+      if num_teams.zero?
+        Rails.logger.warn("No qualified teams found for #{raw_stat}; skipping adjustment")
+        return
+      end
 
       rows, b, weights, row_metadata = build_matrix_components(team_index, num_teams, season_avg)
 
@@ -76,6 +82,7 @@ module ProphetRatings
 
       Rails.logger.info("Adjustment complete for #{raw_stat}")
     end
+    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 
     private
 
@@ -158,6 +165,7 @@ module ProphetRatings
       end
     end
 
+    # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     def build_matrix_components(team_index, num_teams, season_avg)
       rows = []
       b = []
@@ -219,5 +227,6 @@ module ProphetRatings
 
       [rows, b, weights, row_metadata]
     end
+    # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
   end
 end
