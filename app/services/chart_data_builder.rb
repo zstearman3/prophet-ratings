@@ -68,7 +68,7 @@ class ChartDataBuilder
   private
 
   def season_average(avg_attr)
-    return @season.avg_adj_offensive_efficiency - @season.avg_adj_defensive_efficiency if avg_attr == 'rating'
+    return (@season.avg_adj_offensive_efficiency || 0).to_f - (@season.avg_adj_defensive_efficiency || 0).to_f if avg_attr == 'rating'
 
     @season.try(avg_attr) || 0
   end
