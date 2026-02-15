@@ -1,0 +1,39 @@
+# Overcommit configuration for prophet-ratings
+# Runs fast linters plus full RSpec and Brakeman before allowing a commit.
+# You can bypass hooks with: git commit --no-verify
+
+CommitMsg:
+  TrailingPeriod:
+    enabled: true
+  TextWidth:
+    enabled: false
+
+PreCommit:
+  # Basic hygiene
+  TrailingWhitespace:
+    enabled: true
+  YamlSyntax:
+    enabled: true
+  JsonSyntax:
+    enabled: true
+  MergeConflicts:
+    enabled: true
+
+  # Ruby/Rails checks
+  RuboCop:
+    enabled: true
+    description: "Run RuboCop"
+    command: ["bundle", "exec", "rubocop"]
+
+PrePush:
+  RSpec:
+    enabled: true
+    description: "Run RSpec test suite"
+    command: ["bundle", "exec", "rspec"]
+  Brakeman:
+    enabled: true
+    description: "Run Brakeman security scan"
+    command: ["bundle", "exec", "brakeman", "-q", "-w2", "-x", "EOLRails"]
+    required_executable: "brakeman"
+
+# RSpec and Brakeman run on PrePush to keep commits fast.

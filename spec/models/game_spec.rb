@@ -28,7 +28,7 @@
 require 'rails_helper'
 
 RSpec.describe Game do
-  let(:season) { create(:season, average_efficiency: 100.0, average_pace: 70.0) }
+  let(:season) { create(:season, :current, average_efficiency: 100.0, average_pace: 70.0) }
   let(:game) { create(:game, season:, start_time: Time.zone.today) }
   let(:home_team_season) { create(:team_season, season:) }
   let(:away_team_season) { create(:team_season, season:) }
@@ -63,6 +63,10 @@ RSpec.describe Game do
       expect do
         game.generate_prediction!
       end.to change(Prediction, :count).by(1)
+    end
+
+    it 'assigns correct attributes to the prediction' do
+      game.generate_prediction!
       prediction = Prediction.last
       expect(prediction.game).to eq(game)
       expect(prediction.home_team_snapshot).to eq(home_snapshot)
@@ -72,8 +76,24 @@ RSpec.describe Game do
 
   describe '#finalize' do
     it 'delegates to ProphetRatings::GameFinalizer' do
-      expect_any_instance_of(ProphetRatings::GameFinalizer).to receive(:call).and_call_original
+      finalizer_double = instance_double(ProphetRatings::GameFinalizer)
+      allow(ProphetRatings::GameFinalizer).to receive(:new).with(game).and_return(finalizer_double)
+      allow(finalizer_double).to receive(:call)
       game.finalize
+      expect(ProphetRatings::GameFinalizer).to have_received(:new).with(game)
+      expect(finalizer_double).to have_received(:call)
+    end
+  end
+
+  describe '#pace' do
+    it 'returns nil when required values are missing' do
+      game.update!(minutes: nil, possessions: nil)
+      expect(game.pace).to be_nil
+    end
+
+    it 'calculates pace when minutes and possessions are present' do
+      game.update!(minutes: 40, possessions: 70.0)
+      expect(game.pace).to eq(70.0)
     end
   end
 end

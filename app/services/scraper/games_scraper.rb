@@ -76,6 +76,8 @@ module Scraper
     end
 
     def parse_team_stats(row)
+      return {} unless row
+
       {
         minutes: row.css("td[data-stat='mp']")&.text,
         field_goals_made: row.css("td[data-stat='fg']")&.text,

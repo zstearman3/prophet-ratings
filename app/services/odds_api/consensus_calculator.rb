@@ -79,7 +79,8 @@ module OddsApi
     ##
     # Extracts all outcome entries for a given market key from each bookmaker.
     # @param [String] market_key - The key identifying the market to extract (e.g., 'spreads', 'totals').
-    # @return [Array<Hash>] An array of outcome hashes from all matching markets across bookmakers. Returns an empty array if no outcomes are found.
+    # @return [Array<Hash>] An array of outcome hashes from all matching markets across bookmakers.
+    # Returns an empty array if no outcomes are found.
     def extract_market(market_key)
       @bookmakers.flat_map do |book|
         market = (book['markets'] || []).find { |m| m['key'] == market_key }

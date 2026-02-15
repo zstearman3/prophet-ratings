@@ -25,10 +25,11 @@
 #
 # Indexes
 #
-#  index_bet_recommendations_on_game_id                    (game_id)
-#  index_bet_recommendations_on_game_odd_id                (game_odd_id)
-#  index_bet_recommendations_on_prediction_id              (prediction_id)
-#  index_bet_recommendations_on_ratings_config_version_id  (ratings_config_version_id)
+#  index_bet_recommendations_on_game_id                       (game_id)
+#  index_bet_recommendations_on_game_odd_id                   (game_odd_id)
+#  index_bet_recommendations_on_prediction_game_odd_bet_type  (prediction_id,game_odd_id,bet_type) UNIQUE
+#  index_bet_recommendations_on_prediction_id                 (prediction_id)
+#  index_bet_recommendations_on_ratings_config_version_id     (ratings_config_version_id)
 #
 # Foreign Keys
 #
@@ -47,18 +48,18 @@ class BetRecommendation < ApplicationRecord
   validates :bet_type, inclusion: { in: ->(rec) { rec.class.bet_types.keys } }
   validates :team, inclusion: { in: ->(rec) { rec.class.teams.keys } }, allow_nil: true
 
-  enum bet_type: {
+  enum :bet_type, {
     moneyline: 'moneyline',
     spread: 'spread',
     total: 'total'
-  }, _suffix: true
+  }, suffix: true
 
-  enum team: {
+  enum :team, {
     home: 'home',
     away: 'away',
     over: 'over',
     under: 'under'
-  }, _suffix: true
+  }, suffix: true
 
   ##
   # Returns a formatted string describing the recommended bet, including team name and odds or line, or "No play" if not recommended.

@@ -14,6 +14,7 @@ module ProphetRatings
       @as_of = as_of
     end
 
+    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
     def call
       Rails.logger.info("Starting adjustment: #{raw_stat} → #{adj_stat} / #{adj_stat_allowed}")
       season_avg = average_stat_for_season
@@ -28,6 +29,11 @@ module ProphetRatings
       team_ids = qualified_team_seasons.map(&:team_id)
       team_index = team_ids.each_with_index.to_h
       num_teams = team_ids.size
+
+      if num_teams.zero?
+        Rails.logger.warn("No qualified teams found for #{raw_stat}; skipping adjustment")
+        return
+      end
 
       rows, b, weights, row_metadata = build_matrix_components(team_index, num_teams, season_avg)
 
@@ -76,6 +82,7 @@ module ProphetRatings
 
       Rails.logger.info("Adjustment complete for #{raw_stat}")
     end
+    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 
     private
 
@@ -118,6 +125,10 @@ module ProphetRatings
       (weight * preseason_value) + ((1 - weight) * observed_value)
     end
 
+    ##
+    # Calculates the current weight to apply to preseason values based on the number of days since the season started.
+    # The weight decays linearly over a configured number of days and is bounded by a minimum threshold.
+    # @return [Float] The preseason weight, between the configured minimum and 1.0.
     def preseason_weight
       start_date = season.start_date
       days_since_start = (as_of.to_date - start_date).to_i
@@ -126,17 +137,26 @@ module ProphetRatings
       [1.0 - (days_since_start.to_f / decay_days), min_weight].max.round(4)
     end
 
-    def build_stats_to_write(ts, x_values, season_avg, idx, num_teams)
+    ##
+    # Computes and returns adjusted statistics for a team based on the solution vector and season average.
+    # Blends with preseason values for certain statistics when available.
+    # @param team_season [TeamSeason] The team season record containing preseason adjustment values.
+    # @param x_values [Array<Float>] The solution vector from the least squares adjustment.
+    # @param season_avg [Float] The average value of the raw statistic for the season.
+    # @param idx [Integer] The index of the team in the solution vector.
+    # @param num_teams [Integer] The total number of teams in the season.
+    # @return [Hash] A hash mapping adjusted stat keys to their computed values for the team.
+    def build_stats_to_write(team_season, x_values, season_avg, idx, num_teams)
       offense_value = x_values[idx] + season_avg
       defense_value = x_values[num_teams + idx] + season_avg
 
       case raw_stat
       when :possessions
-        { adj_stat => blend_with_preseason(ts.preseason_adj_pace, offense_value) }
+        { adj_stat => blend_with_preseason(team_season.preseason_adj_pace, offense_value) }
       when :offensive_efficiency
         {
-          adj_stat => blend_with_preseason(ts.preseason_adj_offensive_efficiency, offense_value),
-          adj_stat_allowed => blend_with_preseason(ts.preseason_adj_defensive_efficiency, defense_value)
+          adj_stat => blend_with_preseason(team_season.preseason_adj_offensive_efficiency, offense_value),
+          adj_stat_allowed => blend_with_preseason(team_season.preseason_adj_defensive_efficiency, defense_value)
         }
       when :offensive_rebound_rate
         { adj_stat => offense_value, adj_stat_allowed => (1.0 - defense_value) }
@@ -145,6 +165,7 @@ module ProphetRatings
       end
     end
 
+    # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     def build_matrix_components(team_index, num_teams, season_avg)
       rows = []
       b = []
@@ -206,5 +227,6 @@ module ProphetRatings
 
       [rows, b, weights, row_metadata]
     end
+    # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
   end
 end

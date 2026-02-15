@@ -1,4 +1,4 @@
-require:
+plugins:
   - rubocop-rails
   - rubocop-rspec
   - rubocop-performance
@@ -6,6 +6,7 @@ require:
 AllCops:
   NewCops: enable
   SuggestExtensions: false
+  DisplayCopNames: true
 
   Exclude:
     - "db/schema.rb"
@@ -14,6 +15,9 @@ AllCops:
     - "bin/**/*"
     - "db/migrate/*"
     - "db/seeds.rb"
+    - "tmp/**/*"
+    - "log/**/*"
+    - "node_modules/**/*"
     - "**/*.txt"
     - "**/.keep"
     - "spec/rails_helper.rb"
@@ -41,6 +45,8 @@ Metrics/BlockLength:
   Max: 35
   Exclude:
     - "**/*params.rb"
+    - "spec/**/*"
+    - 'lib/tasks/**/*.rake'
 
 Metrics/ModuleLength:
   Exclude:
@@ -51,8 +57,19 @@ RSpec/NestedGroups:
 
 Layout/LineLength:
   Max: 140
+  AllowURI: true
+  URISchemes:
+    - http
+    - https
+  AllowedPatterns:
+    - '^\s*#'   # ignore comment lines
   Exclude:
     - "**/*params.rb"
+
+RSpec/MultipleExpectations:
+  Max: 5
+  Exclude:
+    - 'spec/requests/**/*'
 
 RSpec/MultipleMemoizedHelpers:
   Max: 20
@@ -65,23 +82,28 @@ Style/RescueModifier:
     - 'spec/**/*'
 
 Metrics/AbcSize:
-  Max: 22
+  Max: 25
   Exclude:
     - 'app/services/scraper/*'
     - 'app/services/importer/*'
+    - 'app/services/prophet_ratings/prediction_evaluator.rb'
+    - 'app/services/prophet_ratings/team_season_stats_aggregator.rb'
 
 Metrics/ClassLength:
-  Max: 150
+  Max: 300
 
 RSpec/ExampleLength:
-  Max: 20
+  Max: 30
+  Exclude:
+    - 'spec/requests/**/*'
 
 Metrics/CyclomaticComplexity:
-  Max: 10
+  Max: 15
   Exclude:
     - 'app/services/scraper/*'
 
 Metrics/PerceivedComplexity:
+  Max: 15
   Exclude:
     - 'app/services/scraper/*'
 

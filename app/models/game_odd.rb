@@ -20,7 +20,7 @@
 #
 # Indexes
 #
-#  index_game_odds_on_game_id  (game_id)
+#  index_game_odds_on_game_id_unique  (game_id) UNIQUE
 #
 # Foreign Keys
 #
@@ -87,7 +87,8 @@ class GameOdd < ApplicationRecord
   ##
   # Formats an odds value by prefixing a plus sign if the value is positive.
   # @param [Integer] odds - The odds value to format.
-  # @return [String, Integer] The formatted odds as a string with a plus sign for positive values, or the original value for zero or negative odds.
+  # @return [String, Integer] The formatted odds as a string with a plus sign for positive values,
+  # or the original value for zero or negative odds.
   def format_odds(odds)
     odds.positive? ? "+#{odds}" : odds
   end

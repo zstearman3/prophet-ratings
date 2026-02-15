@@ -1,7 +1,3 @@
-console.log("✅ Tailwind config loaded");
-
-const defaultTheme = require('tailwindcss/defaultTheme');
-
 module.exports = {
   content: [
     './app/views/**/*.html.erb',
@@ -13,17 +9,17 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Inter var', ...defaultTheme.fontFamily.sans],
+        sans: ['Inter var', 'ui-sans-serif', 'system-ui', 'sans-serif'],
       },
       colors: {
         prophet: {
           indigo: '#6627D3',
           pink: '#FB7185',
           cyan: '#06B6D4',
-          black: '111827',
-          seasalt: 'F8FAFC',
+          black: '#111827',
+          seasalt: '#F8FAFC',
         },
-        betting: { 
+        betting: {
           green: '#059669',
           yellow: '#D97706',
           red: '#DC2626',
@@ -32,10 +28,5 @@ module.exports = {
       },
     },
   },
-  plugins: [
-    require('@tailwindcss/forms'),
-    require('@tailwindcss/aspect-ratio'),
-    require('@tailwindcss/typography'),
-    require('@tailwindcss/container-queries'),
-  ],
+  plugins: [],
 };

@@ -36,9 +36,12 @@ namespace :fake_odds do
       game_odd.save!
 
       # Create a few BookmakerOdds for each game
-      %w[DraftKings FanDuel BetMGM].each do |bookmaker|
-        %w[moneyline spread total].each do |market|
-          %w[home away].each do |side|
+      bookmakers = %w[DraftKings FanDuel BetMGM]
+      markets = %w[moneyline spread total]
+      sides = %w[home away]
+      bookmakers.each do |bookmaker|
+        markets.each do |market|
+          sides.each do |side|
             BookmakerOdd.find_or_initialize_by(game:, bookmaker:, market:) do |bookmaker_odd|
               bookmaker_odd.team_name = side == 'home' ? game.home_team.try(:name) : game.away_team.try(:name)
               bookmaker_odd.team_side = side

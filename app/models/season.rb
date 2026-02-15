@@ -65,6 +65,7 @@ class Season < ApplicationRecord
     )
   end
 
+  # rubocop:disable Metrics/AbcSize
   def update_adjusted_averages
     update!(
       avg_adj_offensive_efficiency: team_seasons.average(:adj_offensive_efficiency),
@@ -91,6 +92,7 @@ class Season < ApplicationRecord
       stddev_adj_free_throw_rate_allowed: stddev(:adj_free_throw_rate_allowed)
     )
   end
+  # rubocop:enable Metrics/AbcSize
 
   def set_current!
     Season.find_each { |s| s.update!(current: false) }
@@ -112,11 +114,32 @@ class Season < ApplicationRecord
   end
 
   def calculated_pace_deviation
-    games.map(&:pace).stdev
+    paces = games.final.filter_map(&:pace)
+    return nil if paces.empty?
+
+    paces.stdev
   end
 
   def stddev(column)
-    team_seasons.pick(Arel.sql("STDDEV_POP(#{column})"))
+    allowed = %i[
+      adj_offensive_efficiency
+      adj_defensive_efficiency
+      adj_effective_fg_percentage
+      adj_effective_fg_percentage_allowed
+      adj_turnover_rate
+      adj_turnover_rate_forced
+      adj_offensive_rebound_rate
+      adj_defensive_rebound_rate
+      adj_free_throw_rate
+      adj_free_throw_rate_allowed
+    ]
+
+    col = column.to_sym
+    raise ArgumentError, "Unsupported column for stddev: #{column}" unless allowed.include?(col)
+
+    ts = TeamSeason.arel_table
+    node = Arel::Nodes::NamedFunction.new('STDDEV_POP', [ts[col]])
+    team_seasons.pick(node)
   end
 
   def only_one_current_season

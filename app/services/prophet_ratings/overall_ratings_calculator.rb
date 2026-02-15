@@ -19,7 +19,7 @@ module ProphetRatings
     def call(as_of: [Time.current, Season.current.end_date].min)
       TeamSeasonStatsAggregator.new(season: @season, as_of:).run
       @season.update_average_ratings
-      if (as_of.to_date - @season.start_date) > 14
+      if (as_of.to_date - @season.start_date) > 14 && enough_finalized_data_for_adjustments?(as_of:)
         run_least_squares_adjustments(as_of:)
         recalculate_all_aggregate_ratings
       end
@@ -29,6 +29,7 @@ module ProphetRatings
 
     private
 
+    # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     def recalculate_all_aggregate_ratings
       team_seasons = TeamSeason.where(season: @season).to_a
 
@@ -84,14 +85,17 @@ module ProphetRatings
         ]
       }
     end
+    # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
 
     def run_least_squares_adjustments(as_of: nil)
       # Set default values for adj efficiency/pace before solving
+      # rubocop:disable Rails/SkipsModelValidations
       TeamSeason.where(season: @season).update_all(
         adj_offensive_efficiency: @season.average_efficiency,
         adj_defensive_efficiency: @season.average_efficiency,
         adj_pace: @season.average_pace
       )
+      # rubocop:enable Rails/SkipsModelValidations
 
       ADJUSTED_STATS.each do |raw_stat, (adj_stat, adj_stat_allowed)|
         ProphetRatings::AdjustedStatCalculator.new(
@@ -108,6 +112,18 @@ module ProphetRatings
       sorted = records.sort_by { |r| r.send(attr) }
       sorted.reverse! if direction == :desc
       sorted.each_with_index { |r, i| r.send(:"#{rank_attr}=", i + 1) }
+    end
+
+    def enough_finalized_data_for_adjustments?(as_of:)
+      TeamGame
+        .joins(:game)
+        .where(team_seasons: { season_id: @season.id })
+        .where(games: { status: Game.statuses[:final], start_time: ..as_of })
+        .group(:team_season_id)
+        .having('COUNT(*) >= 2')
+        .limit(2)
+        .count
+        .size >= 2
     end
   end
 end

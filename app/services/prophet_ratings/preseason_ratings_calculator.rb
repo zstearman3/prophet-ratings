@@ -49,8 +49,12 @@ module ProphetRatings
 
     def average_for_stat(stat_key)
       case stat_key
-      when :adj_offensive_efficiency, :adj_defensive_efficiency
-        @previous_season&.average_efficiency || 105.5
+      when :adj_offensive_efficiency
+        @previous_season&.avg_adj_offensive_efficiency ||
+          @previous_season&.average_efficiency || 105.5
+      when :adj_defensive_efficiency
+        @previous_season&.avg_adj_defensive_efficiency ||
+          @previous_season&.average_efficiency || 105.5
       when :adj_pace
         @previous_season&.average_pace || 69.5
       end

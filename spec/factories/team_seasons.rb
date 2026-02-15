@@ -76,5 +76,7 @@ FactoryBot.define do
   factory :team_season do
     team
     season
+    offensive_efficiency_volatility { 1.0 }
+    defensive_efficiency_volatility { 1.0 }
   end
 end

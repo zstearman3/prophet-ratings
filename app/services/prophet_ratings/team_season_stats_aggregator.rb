@@ -14,7 +14,7 @@ module ProphetRatings
         (fgm + (0.5 * three_pm)) / fga.to_f
       },
       three_pt_proficiency: lambda { |fga:, three_pm:, three_pa:|
-        nil if fga.zero?
+        return nil if fga.zero?
 
         ((2 * (three_pm.to_f / three_pa)) + (three_pa.to_f / fga)) / 3.0
       }
@@ -25,9 +25,15 @@ module ProphetRatings
       @as_of = as_of
     end
 
+    ##
+    # Aggregates and updates statistical metrics for all team seasons in the specified season up to the cutoff date.
+    #
+    # For each team season with finalized games before the cutoff, computes average stats, efficiency standard deviations, volatility metrics, home court advantages, and win/loss counts, then updates the corresponding record with the results.
     def run
       preload_predictions
+
       TeamSeason
+        .joins(team_games: :game)
         .includes(team_games: :game)
         .where(season_id: @season.id)
         .where(game: { status: Game.statuses[:final], start_time: ..@as_of })
@@ -148,7 +154,10 @@ module ProphetRatings
     ##
     # Calculates the home court offensive and defensive efficiency boosts for a team season.
     #
-    # Computes average home advantage deltas from prediction errors, adjusts them relative to the baseline, and blends with a baseline home court advantage value weighted by sample size. Returns baseline values if there are no non-neutral home predictions.
+    # Computes average home advantage deltas from prediction errors.
+    # Adjusts them relative to the baseline.
+    # Blends with a baseline home court advantage value weighted by sample size.
+    # Returns baseline values if there are no non-neutral home predictions.
     # @param team_season [TeamSeason] The team season for which to calculate home court advantages.
     # @return [Hash] A hash with :home_offense_boost (non-negative) and :home_defense_boost (non-positive), both rounded to three decimals.
     def calculate_home_advantages(team_season)
