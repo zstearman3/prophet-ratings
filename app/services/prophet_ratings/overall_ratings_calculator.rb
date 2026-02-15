@@ -32,16 +32,36 @@ module ProphetRatings
     # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     def recalculate_all_aggregate_ratings
       team_seasons = TeamSeason.where(season: @season).to_a
+      ratings_config = Rails.application.config_for(:ratings).deep_symbolize_keys
+      default_home_boost = ratings_config[:home_court_advantage].to_f
+      default_efficiency_volatility = ratings_config.dig(:baseline_volatility, :efficiency_volatility).to_f
 
       team_seasons.each do |ts|
+        home_offense_boost = ts.home_offense_boost || default_home_boost
+        home_defense_boost = ts.home_defense_boost || -default_home_boost
+        offensive_volatility = ts.offensive_efficiency_volatility || default_efficiency_volatility
+        defensive_volatility = ts.defensive_efficiency_volatility || default_efficiency_volatility
+
+        ts.home_offense_boost = home_offense_boost
+        ts.home_defense_boost = home_defense_boost
+        ts.offensive_efficiency_volatility = offensive_volatility
+        ts.defensive_efficiency_volatility = defensive_volatility
         ts.rating = ts.adj_offensive_efficiency - ts.adj_defensive_efficiency
-        ts.total_home_boost = ts.home_offense_boost - ts.home_defense_boost
-        ts.total_volatility = (ts.offensive_efficiency_volatility + ts.defensive_efficiency_volatility) / 2.0
+        ts.total_home_boost = home_offense_boost - home_defense_boost
+        ts.total_volatility = (offensive_volatility + defensive_volatility) / 2.0
       end
 
       # Persist first round of updates
       TeamSeason.import team_seasons, on_duplicate_key_update: {
-        columns: %i[rating total_home_boost total_volatility]
+        columns: %i[
+          home_offense_boost
+          home_defense_boost
+          offensive_efficiency_volatility
+          defensive_efficiency_volatility
+          rating
+          total_home_boost
+          total_volatility
+        ]
       }
 
       # Refresh records from DB with updated fields (optional but ensures accuracy)
