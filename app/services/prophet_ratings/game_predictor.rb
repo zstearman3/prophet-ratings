@@ -79,8 +79,9 @@ module ProphetRatings
       return unless home_rating_snapshot && away_rating_snapshot
 
       @home_expected_ortg ||=
-        (home_rating_snapshot.adj_offensive_efficiency - season_average_efficiency) +
-        (away_rating_snapshot.adj_defensive_efficiency - season_average_efficiency) +
+        home_rating_snapshot.adj_offensive_efficiency +
+        away_rating_snapshot.adj_defensive_efficiency -
+        season_average_efficiency +
         home_offense_boost
     end
 
@@ -92,8 +93,9 @@ module ProphetRatings
       return unless home_rating_snapshot && away_rating_snapshot
 
       @away_expected_ortg ||=
-        (away_rating_snapshot.adj_offensive_efficiency - season_average_efficiency) +
-        (home_rating_snapshot.adj_defensive_efficiency - season_average_efficiency) +
+        away_rating_snapshot.adj_offensive_efficiency +
+        home_rating_snapshot.adj_defensive_efficiency -
+        season_average_efficiency +
         home_defense_boost
     end
 
