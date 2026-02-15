@@ -116,7 +116,7 @@ module ProphetRatings
 
     def enough_finalized_data_for_adjustments?(as_of:)
       TeamGame
-        .joins(:game)
+        .joins(:game, :team_season)
         .where(team_seasons: { season_id: @season.id })
         .where(games: { status: Game.statuses[:final], start_time: ..as_of })
         .group(:team_season_id)
