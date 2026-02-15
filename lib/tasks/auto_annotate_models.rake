@@ -3,7 +3,7 @@
 # NOTE: only doing this in development as some production environments (Heroku)
 # NOTE: are sensitive to local FS writes, and besides -- it's just not proper
 # NOTE: to have a dev-mode tool do its thing in production.
-if Rails.env.development?
+if Rails.env.development? && ENV['AUTO_ANNOTATE'] == 'true'
   require 'annotate'
   task set_annotation_options: :environment do
     # You can override any of these by setting an environment variable of the
@@ -41,7 +41,7 @@ if Rails.env.development?
       'ignore_unknown_models' => 'false',
       'hide_limit_column_types' => 'integer,bigint,boolean',
       'hide_default_column_types' => 'json,jsonb,hstore',
-      'skip_on_db_migrate' => 'false',
+      'skip_on_db_migrate' => 'true',
       'format_bare' => 'true',
       'format_rdoc' => 'false',
       'format_yard' => 'false',
