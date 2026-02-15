@@ -57,7 +57,9 @@ class Game < ApplicationRecord
   has_one :game_odd, dependent: :destroy
   has_many :bookmaker_odds, dependent: :destroy
   has_many :bet_recommendations, dependent: :destroy
+  # rubocop:disable Rails/HasManyOrHasOneDependent, Rails/InverseOf
   has_many :current_bet_recommendations, -> { where(current: true) }, class_name: 'BetRecommendation'
+  # rubocop:enable Rails/HasManyOrHasOneDependent, Rails/InverseOf
 
   enum :status, { scheduled: 0, final: 1, canceled: 2 }
 
@@ -92,11 +94,15 @@ class Game < ApplicationRecord
   end
 
   def pace
+    return nil if possessions.blank? || minutes.to_i <= 0
+
     ((possessions.to_f / minutes) * 40.0).to_f
   end
 
   def overtimes
-    ((minutes - 40) / 5).to_i
+    return 0 if minutes.to_i <= 40
+
+    ((minutes.to_i - 40) / 5).to_i
   end
 
   def overtime?

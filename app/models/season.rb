@@ -114,7 +114,10 @@ class Season < ApplicationRecord
   end
 
   def calculated_pace_deviation
-    games.map(&:pace).stdev
+    paces = games.final.filter_map(&:pace)
+    return nil if paces.empty?
+
+    paces.stdev
   end
 
   def stddev(column)
