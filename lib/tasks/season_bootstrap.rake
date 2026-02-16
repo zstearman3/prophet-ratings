@@ -112,15 +112,15 @@ namespace :season do
         start_date: ratings_start_date,
         end_date: ratings_end_date
       )
+
+      puts "Ratings resume complete for #{season.name} (year=#{season.year})"
+      puts "Games in season: #{season.games.count}"
+      puts "Preseason initialized: #{run_preseason}"
+      puts "Ratings window override: #{ratings_start_date || 'auto'}..#{ratings_end_date || 'season end'}"
     else
       puts 'Skipping ratings resume: no games found for this season. ' \
            'Run season:sync_games first.'
     end
-
-    puts "Ratings resume complete for #{season.name} (year=#{season.year})"
-    puts "Games in season: #{season.games.count}"
-    puts "Preseason initialized: #{run_preseason}"
-    puts "Ratings window override: #{ratings_start_date || 'auto'}..#{ratings_end_date || 'season end'}"
   end
 
   def env_bool(key, default:)
