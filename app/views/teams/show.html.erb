@@ -7,7 +7,7 @@
     </div>
     <div class="flex items-center">
       <span class="text-sm text-gray-600 mr-2">
-        <%= "#{@team_season.wins}-#{@team_season.losses} 
+        <%= "#{@team_season.wins}-#{@team_season.losses}
             (#{@team_season.conference_wins}-#{@team_season.conference_losses} in #{@team_season.conference.abbreviation})" %>
       </span>
     </div>
@@ -177,13 +177,14 @@
                   <%= link_to game.start_time.to_date, game_path(game), class: "text-sm text-prophet-black hover:text-blue-600" %>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
+                  <%= '@ ' unless tg.home? %>
                   <%= link_to opponent.school, team_path(opponent.slug), class: "text-sm text-prophet-black hover:text-blue-600" %>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-prophet-black">
                   <%= game.winning_team == @team ? 'W' : 'L' %>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-prophet-black">
-                  <%= game.home_team_score %>–<%= game.away_team_score %>
+                  <%= game.away_team_score %> - <%= game.home_team_score %>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-prophet-black">
                   <% prediction = @predictions_by_game[game.id] %>
