@@ -95,6 +95,36 @@ module ProphetRatings
         home_defense_boost
     end
 
+    def home_offense_boost
+      return 0 if @neutral
+
+      home_rating_snapshot&.home_offense_boost || default_home_boost
+    end
+
+    def home_defense_boost
+      return 0 if @neutral
+
+      home_rating_snapshot&.home_defense_boost || -default_home_boost
+    end
+
+    ##
+    # Retrieves the default home court advantage value from the ratings configuration.
+    # @return [Numeric] The configured home court advantage value.
+    def default_home_boost
+      @default_home_boost ||= Rails.application.config_for(:ratings).home_court_advantage
+    end
+
+    ##
+    # Returns the season's average efficiency, falling back to a default value if unavailable.
+    # @return [Float] The average efficiency for the season.
+    def season_average_efficiency
+      season.average_efficiency || default_season_average_efficiency
+    end
+
+    def default_season_average_efficiency
+      @default_season_average_efficiency ||= Rails.application.config_for(:defaults).dig('season_defaults', 'average_efficiency')
+    end
+
     ##
     # Returns the total volatility for the home team's offensive rating as calculated by the volatility calculator.
     # @return [Float] The total home offensive volatility value.
