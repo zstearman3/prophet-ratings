@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 module ProphetRatings
+  DEFAULTS = Rails.application.config_for(:defaults).deep_symbolize_keys unless const_defined?(:DEFAULTS)
+
   class GameSimulator
     ##
     # Initializes a new game simulator with team rating snapshots, upset modifier, neutral site flag, and season context.
@@ -122,7 +124,7 @@ module ProphetRatings
     end
 
     def default_season_average_efficiency
-      @default_season_average_efficiency ||= Rails.application.config_for(:defaults).dig('season_defaults', 'average_efficiency')
+      @default_season_average_efficiency ||= DEFAULTS[:season_defaults][:average_efficiency]
     end
 
     ##

@@ -39,7 +39,7 @@ class MatchupsController < ApplicationController
         render turbo_stream: turbo_stream.replace('matchup_form', partial: 'shared/error', locals: { message: e.message }),
                status: :unprocessable_entity
       end
-      format.html { redirect_to matchup_path, alert: e.message, status: :unprocessable_entity }
+      format.html { redirect_to matchup_path, alert: e.message, status: :see_other }
     end
   end
 
