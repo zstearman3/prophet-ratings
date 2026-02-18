@@ -2,6 +2,8 @@
 
 module ProphetRatings
   class GameFinalizer
+    class MissingDerivedStatsError < StandardError; end
+
     ##
     # Initializes a new GameFinalizer for the given game.
     # @param game The game record to be finalized.
@@ -12,18 +14,30 @@ module ProphetRatings
     ##
     # Finalizes the game by updating its status, derived fields, team game statistics, and prediction errors.
     def call
-      game.final!
-
-      update_derived_fields
-      game.home_team_game&.calculate_game_stats
-      game.away_team_game&.calculate_game_stats
-
-      finalize_prediction!
+      game.transaction do
+        update_derived_fields
+        validate_finalization_prerequisites!
+        game.home_team_game&.calculate_game_stats
+        game.away_team_game&.calculate_game_stats
+        finalize_prediction!
+        game.final!
+      end
     end
 
     private
 
     attr_reader :game
+
+    def validate_finalization_prerequisites!
+      return if game.pace.present?
+
+      missing = []
+      missing << 'minutes' if game.minutes.to_i <= 0
+      missing << 'possessions' if game.possessions.blank?
+
+      raise MissingDerivedStatsError,
+            "Cannot finalize game #{game.id}: missing valid #{missing.join(' and ')} required to compute pace"
+    end
 
     ##
     # Updates the game record with derived fields including possessions, neutrality, average minutes played, and in-conference status.
@@ -51,15 +65,22 @@ module ProphetRatings
     end
 
     def update_prediction_errors!(prediction)
-      prediction.update!(prediction_error_attributes(prediction))
+      error_attributes = prediction_error_attributes(prediction)
+      return unless error_attributes
+
+      prediction.update!(error_attributes)
     end
 
     def prediction_error_attributes(prediction)
+      home_game = game.home_team_game
+      away_game = game.away_team_game
+      return unless home_game && away_game
+
       {
-        home_offensive_efficiency_error: prediction.home_offensive_efficiency - game.home_team_game.offensive_efficiency,
-        away_offensive_efficiency_error: prediction.away_offensive_efficiency - game.away_team_game.offensive_efficiency,
-        home_defensive_efficiency_error: prediction.home_defensive_efficiency - game.home_team_game.defensive_efficiency,
-        away_defensive_efficiency_error: prediction.away_defensive_efficiency - game.away_team_game.defensive_efficiency,
+        home_offensive_efficiency_error: prediction.home_offensive_efficiency - home_game.offensive_efficiency,
+        away_offensive_efficiency_error: prediction.away_offensive_efficiency - away_game.offensive_efficiency,
+        home_defensive_efficiency_error: prediction.home_defensive_efficiency - home_game.defensive_efficiency,
+        away_defensive_efficiency_error: prediction.away_defensive_efficiency - away_game.defensive_efficiency,
         pace_error: prediction.pace - game.pace
       }
     end

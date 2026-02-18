@@ -1,6 +1,10 @@
 # frozen_string_literal: true
 
 class MatchupsController < ApplicationController
+  DEFAULT_UPSET_MODIFIER = 1.0
+  MIN_UPSET_MODIFIER = 0.1
+  MAX_UPSET_MODIFIER = 2.0
+
   ##
   # Prepares a list of team options for the current season, ordered alphabetically by school name.
   # @return [void]
@@ -18,26 +22,24 @@ class MatchupsController < ApplicationController
   def submit
     set_prediction_params
 
-    begin
-      case params[:action_type]
-      when 'predict'
-        @prediction = predict_outcome
-      when 'simulate'
-        @prediction = simulate_outcome
-      end
+    case params[:action_type]
+    when 'predict'
+      @prediction = predict_outcome
+    when 'simulate'
+      @simulation = simulate_outcome
+    end
 
-      respond_to do |format|
-        format.turbo_stream
-        format.html { redirect_to matchup_path, alert: 'Turbo not supported. Please use a compatible browser.' }
+    respond_to do |format|
+      format.turbo_stream
+      format.html { redirect_to matchup_path, alert: I18n.t('matchups.submit.turbo_not_supported') }
+    end
+  rescue ArgumentError => e
+    respond_to do |format|
+      format.turbo_stream do
+        render turbo_stream: turbo_stream.replace('matchup_form', partial: 'shared/error', locals: { message: e.message }),
+               status: :unprocessable_entity
       end
-    rescue ArgumentError => e
-      respond_to do |format|
-        format.turbo_stream do
-          render turbo_stream: turbo_stream.replace('matchup_form', partial: 'shared/error', locals: { message: e.message }),
-                 status: :unprocessable_entity
-        end
-        format.html { redirect_to matchup_path, alert: e.message, status: :unprocessable_entity }
-      end
+      format.html { redirect_to matchup_path, alert: e.message, status: :see_other }
     end
   end
 
@@ -56,7 +58,19 @@ class MatchupsController < ApplicationController
     @away_snapshot = TeamRatingSnapshot.where(team_season: away_team_season, ratings_config_version: config)
                                        .order(snapshot_date: :desc).first
     @neutral = matchup_params[:neutral] == '1'
-    @upset_modifier = matchup_params[:upset_modifier].presence&.to_f || 1.0
+    @upset_modifier = parse_upset_modifier(matchup_params[:upset_modifier])
+  end
+
+  def parse_upset_modifier(raw_value)
+    return DEFAULT_UPSET_MODIFIER if raw_value.blank?
+
+    value = Float(raw_value)
+  rescue TypeError, ArgumentError
+    raise ArgumentError, "Upset modifier must be a valid number between #{MIN_UPSET_MODIFIER} and #{MAX_UPSET_MODIFIER}"
+  else
+    return value if value.between?(MIN_UPSET_MODIFIER, MAX_UPSET_MODIFIER)
+
+    raise ArgumentError, "Upset modifier must be between #{MIN_UPSET_MODIFIER} and #{MAX_UPSET_MODIFIER}"
   end
 
   ##

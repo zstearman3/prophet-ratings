@@ -77,7 +77,7 @@ module Importer
             process_team_game(away_game, row[:away_team_stats], away_team_season, home_team_season)
           end
 
-          game.finalize
+          finalize_game_if_possible(game)
           return
         end
 
@@ -90,6 +90,13 @@ module Importer
           away_team_score: game.final? ? game.away_team_score : row[:away_team_score]
         )
         game.scheduled! unless game.final? && finalized_game_data_present?(game)
+      end
+
+      def finalize_game_if_possible(game)
+        game.finalize
+      rescue ProphetRatings::GameFinalizer::MissingDerivedStatsError => e
+        Rails.logger.warn("Skipping finalization for game #{game.id}: #{e.message}")
+        game.scheduled!
       end
 
       def game_complete?(row)

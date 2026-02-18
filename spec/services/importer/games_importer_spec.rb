@@ -120,6 +120,19 @@ RSpec.describe Importer::GamesImporter do
     expect(game.minutes).to be_present
   end
 
+  it 'keeps a game scheduled when derived pace cannot be computed' do
+    invalid_completed_row = completed_row.deep_dup
+    invalid_completed_row[:home_team_stats][:minutes] = 0
+    invalid_completed_row[:away_team_stats][:minutes] = 0
+
+    expect { described_class.import([invalid_completed_row]) }.not_to raise_error
+
+    game = Game.last
+    expect(game).to be_scheduled
+    expect(game.minutes).to be_nil
+    expect(game.pace).to be_nil
+  end
+
   it 'does not downgrade an existing final game when an incomplete row is imported later' do
     described_class.import([completed_row])
     game = Game.last

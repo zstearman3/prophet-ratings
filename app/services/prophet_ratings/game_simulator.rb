@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 module ProphetRatings
+  DEFAULTS = Rails.application.config_for(:defaults).deep_symbolize_keys unless const_defined?(:DEFAULTS)
+
   class GameSimulator
     ##
     # Initializes a new game simulator with team rating snapshots, upset modifier, neutral site flag, and season context.
@@ -93,6 +95,36 @@ module ProphetRatings
         home_rating_snapshot.adj_defensive_efficiency -
         season_average_efficiency +
         home_defense_boost
+    end
+
+    def home_offense_boost
+      return 0 if @neutral
+
+      home_rating_snapshot&.home_offense_boost || default_home_boost
+    end
+
+    def home_defense_boost
+      return 0 if @neutral
+
+      home_rating_snapshot&.home_defense_boost || -default_home_boost
+    end
+
+    ##
+    # Retrieves the default home court advantage value from the ratings configuration.
+    # @return [Numeric] The configured home court advantage value.
+    def default_home_boost
+      @default_home_boost ||= Rails.application.config_for(:ratings).home_court_advantage
+    end
+
+    ##
+    # Returns the season's average efficiency, falling back to a default value if unavailable.
+    # @return [Float] The average efficiency for the season.
+    def season_average_efficiency
+      season.average_efficiency || default_season_average_efficiency
+    end
+
+    def default_season_average_efficiency
+      @default_season_average_efficiency ||= DEFAULTS[:season_defaults][:average_efficiency]
     end
 
     ##

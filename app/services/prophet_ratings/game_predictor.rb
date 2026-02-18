@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module ProphetRatings
-  DEFAULTS = Rails.application.config_for(:defaults).deep_symbolize_keys
+  DEFAULTS = Rails.application.config_for(:defaults).deep_symbolize_keys unless const_defined?(:DEFAULTS)
 
   class GamePredictor
     ##
