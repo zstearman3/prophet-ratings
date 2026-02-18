@@ -61,6 +61,10 @@ module ProphetRatings
       )
       return unless prediction
 
+      update_prediction_errors!(prediction)
+    end
+
+    def update_prediction_errors!(prediction)
       error_attributes = prediction_error_attributes(prediction)
       return unless error_attributes
 
@@ -93,10 +97,12 @@ module ProphetRatings
 
     ##
     # Determines if the game was played at a neutral location.
-    # @return [Boolean, nil] True if the game location excludes the home team's location and is not the home team's home venue,
-    # false otherwise, or nil if the home team's location is unavailable.
+    # @return [Boolean] True if the game location excludes the home team's location and is not the home team's home venue,
+    # false otherwise. For unknown locations, defaults to false unless an explicit neutral override already exists.
     def calculated_neutrality
-      return unless game.home_team&.location
+      if game.location.blank? || game.home_team&.location.blank?
+        return game.neutral.nil? ? false : game.neutral
+      end
 
       game.location.exclude?(game.home_team.location) &&
         (game.location != game.home_team.home_venue)
