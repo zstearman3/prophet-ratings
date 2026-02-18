@@ -3,8 +3,11 @@
 class SyncFromLastGamesJob < ApplicationJob
   queue_as :default
 
-  def perform(*_args)
-    (start_date.to_date..end_date.to_date).each do |d|
+  def perform(season_id = nil, enqueue_rankings: true)
+    season = resolve_season(season_id)
+    return unless season
+
+    (start_date(season)..end_date(season)).each do |d|
       scraper = Scraper::GamesScraper.new(d)
       @url_position = 0
       @game_count = scraper.game_count
@@ -19,16 +22,27 @@ class SyncFromLastGamesJob < ApplicationJob
         @url_position = max_url_position
       end
     end
+
+    return unless enqueue_rankings
+
+    UpdateRankingsJob.perform_later(season.id)
   end
 
   private
 
-  def start_date
-    [Game.order(start_time: :desc).first.start_time, Season.last.start_date].max
+  def resolve_season(season_id)
+    return Season.find_by(id: season_id) if season_id.present?
+
+    Season.current || Season.last
   end
 
-  def end_date
-    [Season.last.end_date, Date.yesterday].min
+  def start_date(season)
+    latest_start_time = season.games.order(start_time: :desc).pick(:start_time)
+    [latest_start_time || season.start_date, season.start_date].max.to_date
+  end
+
+  def end_date(season)
+    [season.end_date, Date.yesterday].min
   end
 
   def max_url_position
