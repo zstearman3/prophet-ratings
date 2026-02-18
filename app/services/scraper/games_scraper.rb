@@ -43,8 +43,9 @@ module Scraper
       response = HTTParty.get(schedule_url(@date))
       document = Nokogiri::HTML(response.body)
 
-      urls = document.css('div.game_summaries div.gender-m')
-                     &.css('td.gamelink a')&.map { |link| link&.attribute('href')&.value }
+      urls = document.css('div.game_summaries div.gender-m').filter_map do |game_div|
+        parse_game_entry(game_div)
+      end
 
       @game_urls = urls
     end
@@ -58,21 +59,84 @@ module Scraper
 
       response = HTTParty.get(schedule_url(@date))
       document = Nokogiri::HTML(response.body)
+      aliases = team.team_aliases.pluck(:value)
+      all_names = [team.school] + aliases
 
       urls = document.css('div.game_summaries div.gender-m').filter_map do |game_div|
-        team_names = game_div.css('table.teams tr td:first-child a').filter_map(&:text)
+        team_names = game_rows(game_div).filter_map { |row| team_name_from_row(row) }
 
         # Only keep games where both teams are matched in the database
-        aliases = team.team_aliases.pluck(:value)
-        all_names = [team.school] + aliases
         next unless team_names.any? { |name| all_names.include?(name) }
 
-        # Extract the actual game link
-        gamelink = game_div.at_css('td.gamelink a')
-        gamelink&.attribute('href')&.value
+        parse_game_entry(game_div)
       end
 
       @game_urls = urls
+    end
+
+    def parse_game_entry(game_div)
+      gamelink = game_div.at_css('td.gamelink a')&.attribute('href')&.value
+      return gamelink if gamelink.present?
+
+      parse_scheduled_game(game_div)
+    end
+
+    def parse_scheduled_game(game_div)
+      rows = game_rows(game_div)
+      return nil unless rows.size >= 2
+
+      away_row = rows[0]
+      home_row = rows[1]
+      home_team = team_name_from_row(home_row)
+      away_team = team_name_from_row(away_row)
+      return nil if home_team.blank? || away_team.blank?
+
+      {
+        home_team:,
+        away_team:,
+        home_team_score: score_from_row(home_row),
+        away_team_score: score_from_row(away_row),
+        date: scheduled_start_time(time_from_rows(rows)),
+        location: nil,
+        away_team_stats: {},
+        home_team_stats: {},
+        url: schedule_url(@date)
+      }
+    end
+
+    def game_rows(game_div)
+      game_div.css('table.teams tr').select { |row| row.at_css('td:first-child a').present? }
+    end
+
+    def team_name_from_row(row)
+      return nil unless row
+
+      row.at_css('td:first-child a')&.text.to_s.strip
+    end
+
+    def score_from_row(row)
+      return nil unless row
+
+      score = row.css('td')[1]&.text.to_s.strip
+      return nil unless score.match?(/\A\d+\z/)
+
+      score.to_i
+    end
+
+    def time_from_rows(rows)
+      rows.filter_map { |row| row.css('td')[2]&.text.to_s.strip.presence }.first
+    end
+
+    def scheduled_start_time(time_text)
+      return @date if time_text.blank?
+
+      cleaned = time_text.strip.downcase.delete('. ')
+      cleaned = "#{cleaned}m" if cleaned.match?(/\A\d{1,2}:\d{2}[ap]\z/)
+
+      parsed_time = Time.zone.parse("#{@date} #{cleaned}")
+      parsed_time || @date
+    rescue StandardError
+      @date
     end
 
     def parse_team_stats(row)
@@ -131,7 +195,7 @@ module Scraper
     end
 
     def scrape_day
-      game_urls.map { |url| scrape_game(url) }
+      game_urls.map { |entry| scrape_entry(entry) }
     end
 
     def scrape_day_batch(start_at, batch_size)
@@ -140,7 +204,13 @@ module Scraper
 
       batch_urls = batch_urls[start_at..end_at]
 
-      batch_urls.map { |url| scrape_game(url) }
+      batch_urls.map { |entry| scrape_entry(entry) }
+    end
+
+    def scrape_entry(entry)
+      return entry if entry.is_a?(Hash)
+
+      scrape_game(entry)
     end
   end
 end
