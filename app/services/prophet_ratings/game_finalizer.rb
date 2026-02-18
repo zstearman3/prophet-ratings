@@ -61,15 +61,22 @@ module ProphetRatings
       )
       return unless prediction
 
-      prediction.update!(prediction_error_attributes(prediction))
+      error_attributes = prediction_error_attributes(prediction)
+      return unless error_attributes
+
+      prediction.update!(error_attributes)
     end
 
     def prediction_error_attributes(prediction)
+      home_game = game.home_team_game
+      away_game = game.away_team_game
+      return unless home_game && away_game
+
       {
-        home_offensive_efficiency_error: prediction.home_offensive_efficiency - game.home_team_game.offensive_efficiency,
-        away_offensive_efficiency_error: prediction.away_offensive_efficiency - game.away_team_game.offensive_efficiency,
-        home_defensive_efficiency_error: prediction.home_defensive_efficiency - game.home_team_game.defensive_efficiency,
-        away_defensive_efficiency_error: prediction.away_defensive_efficiency - game.away_team_game.defensive_efficiency,
+        home_offensive_efficiency_error: prediction.home_offensive_efficiency - home_game.offensive_efficiency,
+        away_offensive_efficiency_error: prediction.away_offensive_efficiency - away_game.offensive_efficiency,
+        home_defensive_efficiency_error: prediction.home_defensive_efficiency - home_game.defensive_efficiency,
+        away_defensive_efficiency_error: prediction.away_defensive_efficiency - away_game.defensive_efficiency,
         pace_error: prediction.pace - game.pace
       }
     end
