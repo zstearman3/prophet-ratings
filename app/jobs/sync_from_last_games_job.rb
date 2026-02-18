@@ -3,7 +3,7 @@
 class SyncFromLastGamesJob < ApplicationJob
   queue_as :default
 
-  def perform(season_id = nil, enqueue_ratings: true, run_preseason: false, enqueue_nightly_predictions: true)
+  def perform(season_id = nil, enqueue_rankings: true)
     season = resolve_season(season_id)
     return unless season
 
@@ -23,13 +23,9 @@ class SyncFromLastGamesJob < ApplicationJob
       end
     end
 
-    return unless enqueue_ratings
+    return unless enqueue_rankings
 
-    GenerateSeasonRatingsJob.perform_later(
-      season.id,
-      run_preseason:,
-      enqueue_nightly_predictions:
-    )
+    UpdateRankingsJob.perform_later(season.id)
   end
 
   private

@@ -17,22 +17,18 @@ RSpec.describe SyncFromLastGamesJob do
   before do
     season
     allow(Scraper::GamesScraper).to receive(:new).and_return(scraper)
-    allow(GenerateSeasonRatingsJob).to receive(:perform_later)
+    allow(UpdateRankingsJob).to receive(:perform_later)
   end
 
-  it 'enqueues ratings generation after syncing' do
+  it 'enqueues rankings generation after syncing' do
     described_class.perform_now(season.id)
 
-    expect(GenerateSeasonRatingsJob).to have_received(:perform_later).with(
-      season.id,
-      run_preseason: false,
-      enqueue_nightly_predictions: true
-    )
+    expect(UpdateRankingsJob).to have_received(:perform_later).with(season.id)
   end
 
-  it 'can skip enqueuing ratings generation' do
-    described_class.perform_now(season.id, enqueue_ratings: false)
+  it 'can skip enqueuing rankings generation' do
+    described_class.perform_now(season.id, enqueue_rankings: false)
 
-    expect(GenerateSeasonRatingsJob).not_to have_received(:perform_later)
+    expect(UpdateRankingsJob).not_to have_received(:perform_later)
   end
 end
