@@ -117,7 +117,11 @@ module Scraper
     def score_from_row(row)
       return nil unless row
 
-      score = row.css('td')[1]&.text.to_s.strip
+      parsed_score(row.css('td')[1]&.text)
+    end
+
+    def parsed_score(score_text)
+      score = score_text.to_s.strip
       return nil unless score.match?(/\A\d+\z/)
 
       score.to_i
@@ -128,15 +132,32 @@ module Scraper
     end
 
     def scheduled_start_time(time_text)
-      return @date if time_text.blank?
+      return fallback_start_time if time_text.blank?
 
-      cleaned = time_text.strip.downcase.delete('. ')
-      cleaned = "#{cleaned}m" if cleaned.match?(/\A\d{1,2}:\d{2}[ap]\z/)
+      cleaned = time_text.strip.downcase.delete('.')
+      time_token = cleaned[/\A\d{1,2}:\d{2}(?:\s*[ap]m?)?/]
+      return fallback_start_time if time_token.blank?
 
-      parsed_time = Time.zone.parse("#{@date} #{cleaned}")
-      parsed_time || @date
+      cleaned_time = time_token.delete(' ')
+      cleaned_time = "#{cleaned_time}m" if cleaned_time.match?(/\A\d{1,2}:\d{2}[ap]\z/)
+
+      parsed_time = Time.zone.parse("#{@date} #{cleaned_time}")
+      parsed_time || fallback_start_time
     rescue StandardError
-      @date
+      fallback_start_time
+    end
+
+    def completed_start_time(date_text)
+      return fallback_start_time if date_text.blank?
+
+      parsed_time = Time.zone.parse(date_text)
+      parsed_time || fallback_start_time
+    rescue StandardError
+      fallback_start_time
+    end
+
+    def fallback_start_time
+      @date.in_time_zone
     end
 
     def parse_team_stats(row)
@@ -174,9 +195,9 @@ module Scraper
       team_boxes = document.css('div.scorebox')&.xpath('./div')
       home_team = team_boxes[1]&.css('strong a')&.text
       away_team = team_boxes[0]&.css('strong a')&.text
-      home_team_score = team_boxes[1]&.css('div.score')&.text
-      away_team_score = team_boxes[0]&.css('div.score')&.text
-      date = document.css('div.scorebox_meta div')[0]&.text
+      home_team_score = parsed_score(team_boxes[1]&.css('div.score')&.text)
+      away_team_score = parsed_score(team_boxes[0]&.css('div.score')&.text)
+      date = completed_start_time(document.css('div.scorebox_meta div')[0]&.text)
       location = document.css('div.scorebox_meta div')[1]&.text
       away_team_line = document.css('table.stats_table tfoot tr')[0]
       home_team_line = document.css('table.stats_table tfoot tr')[2]

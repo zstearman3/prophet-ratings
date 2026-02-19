@@ -50,9 +50,9 @@ RSpec.describe Scraper::GamesScraper do
     {
       home_team: 'North Carolina',
       away_team: 'Duke',
-      home_team_score: '71',
-      away_team_score: '62',
-      date: 'February 18, 2026',
+      home_team_score: 71,
+      away_team_score: 62,
+      date: Time.zone.parse('February 18, 2026'),
       location: 'Chapel Hill, NC',
       away_team_stats: { minutes: '200' },
       home_team_stats: { minutes: '200' },
@@ -127,5 +127,52 @@ RSpec.describe Scraper::GamesScraper do
 
     expect(scraper.to_json).to eq([completed_game_payload])
     expect(scraper).to have_received(:scrape_game).once
+  end
+
+  it 'returns a time value for scheduled games when no tip time is provided' do
+    start_time = scraper.send(:scheduled_start_time, nil)
+
+    expect(start_time).to be_a(ActiveSupport::TimeWithZone)
+    expect(start_time.to_date).to eq(date)
+  end
+
+  it 'parses scheduled tip times that include timezone labels' do
+    start_time = scraper.send(:scheduled_start_time, '7:00p ET')
+
+    expect(start_time).to be_a(ActiveSupport::TimeWithZone)
+    expect(start_time.hour).to eq(19)
+  end
+
+  it 'returns a time value for completed games from scorebox metadata' do
+    completed_boxscore_html = <<~HTML
+      <div class="scorebox">
+        <div>
+          <strong><a>Duke</a></strong>
+          <div class="score">62</div>
+        </div>
+        <div>
+          <strong><a>North Carolina</a></strong>
+          <div class="score">71</div>
+        </div>
+      </div>
+      <div class="scorebox_meta">
+        <div>February 18, 2026</div>
+        <div>Chapel Hill, NC</div>
+      </div>
+      <table class="stats_table">
+        <tfoot>
+          <tr><td data-stat="mp">200</td></tr>
+          <tr></tr>
+          <tr><td data-stat="mp">200</td></tr>
+        </tfoot>
+      </table>
+    HTML
+    completed_response = instance_double(HTTParty::Response, body: completed_boxscore_html)
+    allow(HTTParty).to receive(:get).with(scraper.send(:game_url, completed_url)).and_return(completed_response)
+
+    game = scraper.send(:scrape_game, completed_url)
+
+    expect(game[:date]).to be_a(ActiveSupport::TimeWithZone)
+    expect(game[:date].to_date).to eq(date)
   end
 end
