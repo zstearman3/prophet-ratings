@@ -7,11 +7,7 @@ module Importer
                         defensive_rebounds rebounds assists steals blocks turnovers fouls points].freeze
 
     class << self
-      def import(data)
-        data.each do |row|
-          process_game(row)
-        end
-      end
+      def import(data) = data.each { |row| process_game(row) }
 
       private
 
@@ -69,15 +65,12 @@ module Importer
             url: row[:url]
           )
 
-          if (home_game = find_or_create_team_game(game, home_team_season, home: true))
-            process_team_game(home_game, row[:home_team_stats], home_team_season, away_team_season)
-          end
+          home_game = find_or_create_team_game(game, home_team_season, home: true)
+          away_game = find_or_create_team_game(game, away_team_season, home: false)
+          process_team_game(home_game, row[:home_team_stats], home_team_season, away_team_season) if home_game
+          process_team_game(away_game, row[:away_team_stats], away_team_season, home_team_season) if away_game
 
-          if (away_game = find_or_create_team_game(game, away_team_season, home: false))
-            process_team_game(away_game, row[:away_team_stats], away_team_season, home_team_season)
-          end
-
-          game.finalize
+          finalize_game_if_possible(game)
           return
         end
 
@@ -89,7 +82,18 @@ module Importer
           home_team_score: game.final? ? game.home_team_score : row[:home_team_score],
           away_team_score: game.final? ? game.away_team_score : row[:away_team_score]
         )
+        home_game = find_or_create_team_game(game, home_team_season, home: true)
+        away_game = find_or_create_team_game(game, away_team_season, home: false)
+        process_team_game(home_game, {}, home_team_season, away_team_season)
+        process_team_game(away_game, {}, away_team_season, home_team_season)
         game.scheduled! unless game.final? && finalized_game_data_present?(game)
+      end
+
+      def finalize_game_if_possible(game)
+        game.finalize
+      rescue ProphetRatings::GameFinalizer::MissingDerivedStatsError => e
+        Rails.logger.warn("Skipping finalization for game #{game.id}: #{e.message}")
+        game.scheduled!
       end
 
       def game_complete?(row)

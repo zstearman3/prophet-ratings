@@ -68,5 +68,24 @@ RSpec.describe ProphetRatings::TeamSeasonStatsAggregator, type: :service do
 
       expect(team_season.turnover_rate).to be_within(0.001).of(expected_avg)
     end
+
+    it 'sets baseline volatility and home boost values for teams with no finalized games' do
+      idle_team_season = create(
+        :team_season,
+        season:,
+        offensive_efficiency_volatility: nil,
+        defensive_efficiency_volatility: nil,
+        home_offense_boost: nil,
+        home_defense_boost: nil
+      )
+
+      described_class.new(season:).run
+      idle_team_season.reload
+
+      expect(idle_team_season.offensive_efficiency_volatility).to eq(11.5)
+      expect(idle_team_season.defensive_efficiency_volatility).to eq(11.5)
+      expect(idle_team_season.home_offense_boost).to eq(2.2)
+      expect(idle_team_season.home_defense_boost).to eq(-2.2)
+    end
   end
 end

@@ -29,3 +29,6 @@
 
 en:
   hello: "Hello world"
+  matchups:
+    submit:
+      turbo_not_supported: "Turbo not supported. Please use a compatible browser."

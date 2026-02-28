@@ -9,11 +9,11 @@
     <template>
       <%= render partial: "matchups/simulation_result", formats: [:html], locals: { result: @simulation } %>
     </template>
-  </turbo_stream>
+  </turbo-stream>
 <% else %>
   <turbo-stream target="prediction_result_frame" action="update">
     <template>
       <div class="text-red-600 font-semibold">No result generated.</div>
     </template>
-  </turbo_stream>
+  </turbo-stream>
 <% end %>

@@ -13,6 +13,9 @@ namespace :season do
     dedupe_games = env_bool('DEDUPE_GAMES', default: true)
     run_preseason = env_bool('RUN_PRESEASON', default: true)
     run_ratings = env_bool('RUN_RATINGS', default: true)
+    ratings_resume = env_bool('RATINGS_RESUME', default: false)
+    ratings_start_date = parse_date_env('RATINGS_START_DATE')
+    ratings_end_date = parse_date_env('RATINGS_END_DATE')
 
     season = upsert_season_for_year(year)
     season.set_current! unless season.current?
@@ -37,7 +40,16 @@ namespace :season do
 
     if run_ratings
       if season.games.exists?
-        GenerateSeasonRatingsJob.perform_now(season.id, run_preseason: false)
+        if ratings_resume
+          ResumeSeasonRatingsJob.perform_now(
+            season.id,
+            run_preseason: false,
+            start_date: ratings_start_date,
+            end_date: ratings_end_date
+          )
+        else
+          GenerateSeasonRatingsJob.perform_now(season.id, run_preseason: false)
+        end
       else
         puts 'Skipping ratings backfill: no games found for this season. ' \
              'Run with SYNC_GAMES=true first, then rerun RUN_RATINGS=true.'
@@ -51,6 +63,8 @@ namespace :season do
     puts "Games sync window override: #{sync_start_date || 'default'}..#{sync_end_date || 'default'}"
     puts "Games sync resume mode: #{sync_resume}"
     puts "Preseason initialized: #{run_preseason}"
+    puts "Ratings resume mode: #{ratings_resume}"
+    puts "Ratings window override: #{ratings_start_date || 'auto'}..#{ratings_end_date || 'season end'}"
     puts "Current ratings config: #{ratings_config.name} (id=#{ratings_config.id})"
   end
 
@@ -77,6 +91,36 @@ namespace :season do
     puts "Games in season: #{season.games.count}"
     puts "Games sync window override: #{sync_start_date || 'default'}..#{sync_end_date || 'default'}"
     puts "Games sync resume mode: #{sync_resume}"
+  end
+
+  desc 'Resume ratings backfill for an existing season. Supports RATINGS_START_DATE/RATINGS_END_DATE.'
+  task resume_ratings: :environment do
+    year = ENV.fetch('YEAR', Season.current&.year || Date.current.year).to_i
+    abort('YEAR must be a positive integer') unless year.positive?
+
+    season = Season.find_by(year:)
+    abort("No season found for year=#{year}. Run season:bootstrap first.") unless season
+
+    run_preseason = env_bool('RUN_PRESEASON', default: false)
+    ratings_start_date = parse_date_env('RATINGS_START_DATE')
+    ratings_end_date = parse_date_env('RATINGS_END_DATE')
+
+    if season.games.exists?
+      ResumeSeasonRatingsJob.perform_now(
+        season.id,
+        run_preseason:,
+        start_date: ratings_start_date,
+        end_date: ratings_end_date
+      )
+
+      puts "Ratings resume complete for #{season.name} (year=#{season.year})"
+      puts "Games in season: #{season.games.count}"
+      puts "Preseason initialized: #{run_preseason}"
+      puts "Ratings window override: #{ratings_start_date || 'auto'}..#{ratings_end_date || 'season end'}"
+    else
+      puts 'Skipping ratings resume: no games found for this season. ' \
+           'Run season:sync_games first.'
+    end
   end
 
   def env_bool(key, default:)

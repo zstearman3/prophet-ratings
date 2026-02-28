@@ -32,19 +32,21 @@ module ProphetRatings
     def run
       preload_predictions
 
-      TeamSeason
-        .joins(team_games: :game)
-        .includes(team_games: :game)
-        .where(season_id: @season.id)
-        .where(game: { status: Game.statuses[:final], start_time: ..@as_of })
-        .find_each do |team_season|
-        aggregates = calculate_average_stats(team_season)
-        aggregates.merge!(calculate_efficiency_stddevs(team_season))
+      team_seasons = TeamSeason.where(season_id: @season.id).to_a
+      team_games_by_season_id = finalized_team_games_by_season_id(team_seasons.map(&:id))
+
+      team_seasons.each do |team_season|
+        team_games = team_games_by_season_id[team_season.id] || []
+
+        aggregates = calculate_average_stats(team_games)
+        aggregates.merge!(calculate_efficiency_stddevs(team_games))
         aggregates.merge!(calculate_volatility(team_season))
         aggregates.merge!(calculate_home_advantages(team_season))
-        aggregates.merge!(calculate_wins_and_losses(team_season))
+        aggregates.merge!(calculate_wins_and_losses(team_games))
 
+        # rubocop:disable Rails/SkipsModelValidations
         team_season.update_columns(aggregates) if aggregates.any?
+        # rubocop:enable Rails/SkipsModelValidations
       end
     end
 
@@ -55,7 +57,7 @@ module ProphetRatings
     def preload_predictions
       predictions = Prediction
                     .joins(:game)
-                    .where(game: { start_time: ..as_of })
+                    .where(game: { status: Game.statuses[:final], start_time: ..as_of })
                     .includes(:home_team_snapshot, :away_team_snapshot)
                     .to_a
 
@@ -68,22 +70,33 @@ module ProphetRatings
                               .group_by { |p| p.away_team_snapshot.team_season_id }
     end
 
-    def calculate_average_stats(team_season)
+    def finalized_team_games_by_season_id(team_season_ids)
+      return {} if team_season_ids.empty?
+
+      TeamGame
+        .joins(:game)
+        .where(team_season_id: team_season_ids)
+        .where(game: { status: Game.statuses[:final], start_time: ..as_of })
+        .includes(:game)
+        .group_by(&:team_season_id)
+    end
+
+    def calculate_average_stats(team_games)
       aggregates = {}
 
       AVERAGE_STATS.each do |stat|
-        values = team_season.team_games.filter_map { |g| g.send(stat) }
+        values = team_games.filter_map { |g| g.send(stat) }
         avg = values.sum / values.size.to_f if values.any?
         aggregates[stat] = avg
       end
 
-      possession_vals = team_season.team_games.filter_map { |g| g.game&.possessions }
+      possession_vals = team_games.filter_map { |g| g.game&.possessions }
       aggregates[:pace] = possession_vals.sum / possession_vals.size.to_f if possession_vals.any?
 
-      fgm = team_season.team_games.sum(&:field_goals_made)
-      fga = team_season.team_games.sum(&:field_goals_attempted)
-      three_pm = team_season.team_games.sum(&:three_pt_made)
-      three_pa = team_season.team_games.sum(&:three_pt_attempted)
+      fgm = team_games.sum { |tg| tg.field_goals_made.to_i }
+      fga = team_games.sum { |tg| tg.field_goals_attempted.to_i }
+      three_pm = team_games.sum { |tg| tg.three_pt_made.to_i }
+      three_pa = team_games.sum { |tg| tg.three_pt_attempted.to_i }
 
       aggregates[:effective_fg_percentage] = DERIVED_STATS[:effective_fg_percentage].call(fgm:, fga:, three_pm:)
       aggregates[:three_pt_proficiency] = DERIVED_STATS[:three_pt_proficiency].call(fga:, three_pm:, three_pa:)
@@ -91,9 +104,9 @@ module ProphetRatings
       aggregates
     end
 
-    def calculate_efficiency_stddevs(team_season)
-      off_vals = team_season.team_games.filter_map(&:offensive_efficiency)
-      def_vals = team_season.team_games.filter_map(&:defensive_efficiency)
+    def calculate_efficiency_stddevs(team_games)
+      off_vals = team_games.filter_map(&:offensive_efficiency)
+      def_vals = team_games.filter_map(&:defensive_efficiency)
 
       {
         offensive_efficiency_std_dev: StatisticsUtils.stddev(off_vals),
@@ -188,14 +201,10 @@ module ProphetRatings
       }
     end
 
-    def calculate_wins_and_losses(team_season)
-      games = team_season.team_games
-                         .includes(:game)
-                         .where(game: { status: Game.statuses[:final], start_time: ..as_of })
+    def calculate_wins_and_losses(team_games)
+      conference_games = team_games.select { |tg| tg.game.in_conference? }
 
-      conference_games = games.select { |tg| tg.game.in_conference? }
-
-      wins, losses = games.partition do |tg|
+      wins, losses = team_games.partition do |tg|
         game = tg.game
         if tg.home?
           game.home_team_score > game.away_team_score

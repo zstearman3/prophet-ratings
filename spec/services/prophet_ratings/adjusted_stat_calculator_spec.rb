@@ -67,4 +67,43 @@ RSpec.describe ProphetRatings::AdjustedStatCalculator, type: :service do
       expect(StatisticsUtils).not_to have_received(:solve_least_squares_with_python)
     end
   end
+
+  context 'when teams only have scheduled placeholder team games' do
+    let(:season) { create(:season, :current) }
+    let(:team_one) { create(:team, school: 'Team One') }
+    let(:team_two) { create(:team, school: 'Team Two') }
+    let(:team_season_one) { create(:team_season, season:, team: team_one) }
+    let(:team_season_two) { create(:team_season, season:, team: team_two) }
+
+    let(:calculator) do
+      described_class.new(
+        season:,
+        raw_stat: :effective_fg_percentage,
+        adj_stat: :adj_effective_fg_percentage,
+        adj_stat_allowed: :adj_effective_fg_percentage_allowed
+      )
+    end
+
+    before do
+      2.times do |index|
+        game = create(
+          :game,
+          season:,
+          status: :scheduled,
+          start_time: (Date.current + index.days).beginning_of_day + 1.hour,
+          home_team_name: team_one.school,
+          away_team_name: team_two.school
+        )
+        create(:team_game, game:, team: team_one, team_season: team_season_one, home: true)
+        create(:team_game, game:, team: team_two, team_season: team_season_two, home: false)
+      end
+    end
+
+    it 'does not count scheduled team games toward qualification' do
+      allow(StatisticsUtils).to receive(:solve_least_squares_with_python).and_call_original
+
+      expect { calculator.call }.not_to raise_error
+      expect(StatisticsUtils).not_to have_received(:solve_least_squares_with_python)
+    end
+  end
 end
