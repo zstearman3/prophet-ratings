@@ -116,11 +116,14 @@ module ProphetRatings
 
     def offensive_efficiency_volatility(home_predictions, away_predictions)
       baseline = Rails.application.config_for(:ratings).baseline_volatility[:efficiency_volatility].to_f
-      offensive_errors = home_predictions.map(&:home_offensive_efficiency_error) + away_predictions.map(&:away_offensive_efficiency_error)
+      offensive_errors = (
+        home_predictions.map(&:home_offensive_efficiency_error) +
+        away_predictions.map(&:away_offensive_efficiency_error)
+      ).compact
 
       return baseline if offensive_errors.size < 4
 
-      calculated_volatility = StatisticsUtils.stddev(offensive_errors.compact)
+      calculated_volatility = StatisticsUtils.stddev(offensive_errors)
 
       weight = [(offensive_errors.size / 16.0), 0.50].min.round(4)
 
@@ -129,11 +132,14 @@ module ProphetRatings
 
     def defensive_efficiency_volatility(home_predictions, away_predictions)
       baseline = Rails.application.config_for(:ratings).baseline_volatility[:efficiency_volatility].to_f
-      defensive_errors = home_predictions.map(&:home_defensive_efficiency_error) + away_predictions.map(&:away_defensive_efficiency_error)
+      defensive_errors = (
+        home_predictions.map(&:home_defensive_efficiency_error) +
+        away_predictions.map(&:away_defensive_efficiency_error)
+      ).compact
 
       return baseline if defensive_errors.size < 4
 
-      calculated_volatility = StatisticsUtils.stddev(defensive_errors.compact)
+      calculated_volatility = StatisticsUtils.stddev(defensive_errors)
 
       weight = [(defensive_errors.size / 16.0), 0.50].min.round(4)
 
@@ -142,11 +148,11 @@ module ProphetRatings
 
     def pace_volatility(home_predictions, away_predictions)
       baseline = Rails.application.config_for(:ratings).baseline_volatility[:pace_volatility].to_f
-      pace_errors = home_predictions.map(&:pace_error) + away_predictions.map(&:pace_error)
+      pace_errors = (home_predictions.map(&:pace_error) + away_predictions.map(&:pace_error)).compact
 
       return baseline if pace_errors.size < 4
 
-      calculated_volatility = StatisticsUtils.stddev(pace_errors.compact)
+      calculated_volatility = StatisticsUtils.stddev(pace_errors)
 
       weight = [(pace_errors.size / 16.0), 0.50].min.round(4)
 
@@ -179,21 +185,26 @@ module ProphetRatings
       return { home_offense_boost: baseline, home_defense_boost: -baseline } if home_preds.empty?
 
       off_deltas = home_preds.filter_map do |p|
-        used_boost = p.home_team_snapshot.home_offense_boost || baseline
+        next if p.home_offensive_efficiency_error.nil?
+
+        used_boost = p.home_team_snapshot&.home_offense_boost || baseline
         p.home_offensive_efficiency_error - (used_boost - baseline)
       end
 
       def_deltas = home_preds.filter_map do |p|
-        used_boost = p.home_team_snapshot.home_defense_boost || baseline
+        next if p.home_defensive_efficiency_error.nil?
+
+        used_boost = p.home_team_snapshot&.home_defense_boost || -baseline
         p.home_defensive_efficiency_error - (used_boost + baseline)
       end
 
       avg_off = StatisticsUtils.average(off_deltas)
       avg_def = StatisticsUtils.average(def_deltas)
-      weight = [(home_preds.size / 16.0), 0.50].min.round(4)
+      off_weight = [(off_deltas.size / 16.0), 0.50].min.round(4)
+      def_weight = [(def_deltas.size / 16.0), 0.50].min.round(4)
 
-      blended_off = baseline - (weight * avg_off)
-      blended_def = -baseline + (weight * avg_def)
+      blended_off = baseline - (off_weight * avg_off)
+      blended_def = -baseline + (def_weight * avg_def)
 
       {
         home_offense_boost: [blended_off, 0.0].max.round(3),
