@@ -10,9 +10,9 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2025_09_30_015506) do
+ActiveRecord::Schema[8.0].define(version: 2025_09_30_015506) do
   # These are extensions that must be enabled in order to support this database
-  enable_extension "plpgsql"
+  enable_extension "pg_catalog.plpgsql"
 
   create_table "bet_recommendations", force: :cascade do |t|
     t.bigint "game_id", null: false
