@@ -102,7 +102,7 @@ Rails.application.configure do
   config.good_job.cron = {
     # Every 15 minutes, enqueue `ExampleJob.set(priority: -10).perform_later(42, "life", name: "Alice")`
     daily_game_sync: { # each recurring job must have a unique key
-      cron: '0 12 * * *', # cron-style scheduling format by fugit gem
+      cron: '0 /8 * * *', # cron-style scheduling format by fugit gem
       class: 'SyncNightlyGamesJob', # name of the job class as a String; must reference an Active Job job class
       description: 'Nightly game sync from cbb reference' # optional description that appears in Dashboard
     }

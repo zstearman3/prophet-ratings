@@ -99,13 +99,13 @@
                   <%= @away_team_game&.turnovers || 'N/A' %>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
-                  <%= @away_team_game&.field_goals_percentage&.then { |p| number_with_precision(p * 100, precision: 1) } || 'N/A' %>%
+                  <%= @away_team_game&.field_goals_percentage&.then { |p| "#{number_with_precision(p * 100, precision: 1)}%" } || 'N/A' %>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
-                  <%= @away_team_game&.three_pt_percentage&.then { |p| number_with_precision(p * 100, precision: 1) } || 'N/A' %>%
+                  <%= @away_team_game&.three_pt_percentage&.then { |p| "#{number_with_precision(p * 100, precision: 1)}%" } || 'N/A' %>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
-                  <%= @away_team_game&.free_throws_percentage&.then { |p| number_with_precision(p * 100, precision: 1) } || 'N/A' %>%
+                  <%= @away_team_game&.free_throws_percentage&.then { |p| "#{number_with_precision(p * 100, precision: 1)}%" } || 'N/A' %>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
                   <%= @away_team_game&.offensive_rebounds || 'N/A' %>
@@ -154,13 +154,13 @@
                   <%= @home_team_game&.turnovers || 'N/A' %>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
-                  <%= @home_team_game&.field_goals_percentage&.then { |p| number_with_precision(p * 100, precision: 1) } || 'N/A' %>%
+                  <%= @home_team_game&.field_goals_percentage&.then { |p| "#{number_with_precision(p * 100, precision: 1)}%" } || 'N/A' %>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
-                  <%= @home_team_game&.three_pt_percentage&.then { |p| number_with_precision(p * 100, precision: 1) } || 'N/A' %>%
+                  <%= @home_team_game&.three_pt_percentage&.then { |p| "#{number_with_precision(p * 100, precision: 1)}%" } || 'N/A' %>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
-                  <%= @home_team_game&.free_throws_percentage&.then { |p| number_with_precision(p * 100, precision: 1) } || 'N/A' %>%
+                  <%= @home_team_game&.free_throws_percentage&.then { |p| "#{number_with_precision(p * 100, precision: 1)}%" } || 'N/A' %>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
                   <%= @home_team_game&.offensive_rebounds || 'N/A' %>
