@@ -23,7 +23,7 @@ module ProphetRatings
       qualified_team_seasons = TeamSeason
                                .includes(team_games: :game)
                                .where(season:)
-                               .select { |ts| ts.team_games.size >= 2 }
+                               .select { |ts| finalized_team_game_count(ts) >= 2 }
                                .sort_by(&:team_id)
 
       team_ids = qualified_team_seasons.map(&:team_id)
@@ -91,6 +91,13 @@ module ProphetRatings
     def average_stat_for_season
       stat_to_avg = raw_stat == :possessions ? :pace : raw_stat
       TeamSeason.where(season:).average(stat_to_avg).to_f
+    end
+
+    def finalized_team_game_count(team_season)
+      team_season.team_games.count do |team_game|
+        game = team_game.game
+        game&.final? && game.start_time.to_date <= as_of.to_date
+      end
     end
 
     def stat_value_for_game(team_game)
