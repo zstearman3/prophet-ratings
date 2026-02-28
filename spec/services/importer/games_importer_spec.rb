@@ -113,6 +113,16 @@ RSpec.describe Importer::GamesImporter do
     expect(Game.last).to be_scheduled
   end
 
+  it 'creates team game associations for incomplete scheduled games' do
+    described_class.import([row])
+
+    game = Game.last
+    expect(game.home_team_game).to be_present
+    expect(game.away_team_game).to be_present
+    expect(game.home_team_game.team_season).to eq(home_team_season)
+    expect(game.away_team_game.team_season).to eq(away_team_season)
+  end
+
   it 'finalizes complete games' do
     described_class.import([completed_row])
     game = Game.last
