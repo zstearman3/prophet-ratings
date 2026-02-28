@@ -9,6 +9,7 @@ RSpec.describe ProphetRatings::TeamSeasonStatsAggregator, type: :service do
     let(:team) { create(:team) }
     let(:season) { create(:season, :current) }
     let(:team_season) { create(:team_season, team:, season:) }
+    let(:baseline_volatility) { Rails.application.config_for(:ratings).baseline_volatility }
 
     before do
       opponents = create_list(:team, 3)
@@ -86,6 +87,100 @@ RSpec.describe ProphetRatings::TeamSeasonStatsAggregator, type: :service do
       expect(idle_team_season.defensive_efficiency_volatility).to eq(11.5)
       expect(idle_team_season.home_offense_boost).to eq(2.2)
       expect(idle_team_season.home_defense_boost).to eq(-2.2)
+    end
+
+    it 'ignores predictions with missing home efficiency errors when calculating home boosts' do
+      ratings_config_version = create(:ratings_config_version)
+      opponent_team_season = create(:team_season, season:)
+      create_prediction_with_snapshots(
+        opponent_team_season:,
+        ratings_config_version:,
+        game: team_season.team_games.first.game,
+        snapshot_date: season.end_date - 7.days,
+        attrs: {
+          home_snapshot: {
+            home_offense_boost: nil,
+            home_defense_boost: nil
+          },
+          prediction: {
+            home_offensive_efficiency_error: nil,
+            home_defensive_efficiency_error: nil
+          }
+        }
+      )
+
+      expect { described_class.new(season:).run }.not_to raise_error
+
+      team_season.reload
+      expect(team_season.home_offense_boost).to eq(2.2)
+      expect(team_season.home_defense_boost).to eq(-2.2)
+    end
+
+    it 'uses only non-nil errors when calculating volatility sample sizes' do
+      4.times do |i|
+        opponent_team_season = create(:team_season, season:)
+        create_prediction_with_snapshots(
+          opponent_team_season:,
+          ratings_config_version: create(:ratings_config_version),
+          game: create(
+            :game,
+            season:,
+            start_time: season.end_date - (5 - i).days,
+            home_team_name: team.school,
+            away_team_name: opponent_team_season.team.school
+          ),
+          snapshot_date: season.end_date - (10 + i).days,
+          attrs: {
+            prediction: {
+              home_offensive_efficiency_error: nil,
+              away_offensive_efficiency_error: nil,
+              home_defensive_efficiency_error: nil,
+              away_defensive_efficiency_error: nil,
+              pace_error: nil
+            }
+          }
+        )
+      end
+
+      described_class.new(season:).run
+      team_season.reload
+
+      expect(team_season.offensive_efficiency_volatility).to eq(baseline_volatility[:efficiency_volatility].to_f)
+      expect(team_season.defensive_efficiency_volatility).to eq(baseline_volatility[:efficiency_volatility].to_f)
+      expect(team_season.pace_volatility).to eq(baseline_volatility[:pace_volatility].to_f)
+    end
+
+    def create_prediction_with_snapshots(opponent_team_season:, ratings_config_version:, game:, snapshot_date:,
+                                         attrs: {})
+      home_snapshot_attrs = attrs.fetch(:home_snapshot, {})
+      prediction_attrs = attrs.fetch(:prediction, {})
+
+      home_snapshot = create(
+        :team_rating_snapshot,
+        team_season: team_season,
+        team: team,
+        season: season,
+        ratings_config_version:,
+        snapshot_date:,
+        **home_snapshot_attrs
+      )
+      away_snapshot = create(
+        :team_rating_snapshot,
+        team_season: opponent_team_season,
+        team: opponent_team_season.team,
+        season: season,
+        ratings_config_version:,
+        snapshot_date:
+      )
+
+      create(
+        :prediction,
+        game:,
+        home_team_snapshot: home_snapshot,
+        away_team_snapshot: away_snapshot,
+        ratings_config_version:,
+        **prediction_attrs
+      )
     end
   end
 end
