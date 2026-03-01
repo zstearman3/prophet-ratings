@@ -1,8 +1,31 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>ProphetRatings</title>
+    <title><%= page_title %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="description" content="<%= page_description %>">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-title" content="Prophet Ratings">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Prophet Ratings">
+    <meta property="og:title" content="<%= page_title %>">
+    <meta property="og:description" content="<%= page_description %>">
+    <meta property="og:url" content="<%= canonical_url %>">
+    <meta property="og:image" content="<%= page_image_url %>">
+    <meta property="og:image:secure_url" content="<%= page_image_url %>">
+    <meta property="og:image:type" content="image/png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Prophet Ratings logo">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="<%= page_title %>">
+    <meta name="twitter:description" content="<%= page_description %>">
+    <meta name="twitter:image" content="<%= page_image_url %>">
+    <meta name="twitter:image:alt" content="Prophet Ratings logo">
+    <link rel="canonical" href="<%= canonical_url %>">
+    <%= favicon_link_tag '/favicon.ico', type: 'image/x-icon' %>
+    <%= favicon_link_tag '/favicon-32.png', rel: 'icon', type: 'image/png', sizes: '32x32' %>
+    <%= favicon_link_tag '/apple-touch-icon.png', rel: 'apple-touch-icon', type: 'image/png', sizes: '180x180' %>
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
     <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload", skip_pipeline: Rails.env.test? %>
