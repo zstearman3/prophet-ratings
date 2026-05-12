@@ -4,7 +4,7 @@
 
 Prophet Ratings is a Ruby on Rails college basketball analytics platform. It generates adjusted team ratings, predictions, and matchup analysis using scraped game data, a Python-based least squares solver, and daily rating snapshots.
 
-The long-term goal is to launch a conversational, GPT-powered college basketball analytics experience before March Madness 2026. The app should help users understand matchups, identify prediction confidence, explore adjusted team strengths, and eventually evaluate betting value.
+The long-term goal is to launch a conversational, GPT-powered college basketball analytics experience ahead of the next March Madness. The app should help users understand matchups, identify prediction confidence, explore adjusted team strengths, and eventually evaluate betting value.
 
 This is a solo side project with limited weekly development time. Prefer pragmatic, incremental improvements over large rewrites.
 
@@ -234,7 +234,7 @@ TailwindCSS is available. Keep UI components simple and readable.
 
 ## Launch Priorities
 
-The project should stay focused on launching a usable product before March Madness 2026.
+The project should stay focused on launching a usable product ahead of the next March Madness.
 
 Near-term priorities likely include:
 

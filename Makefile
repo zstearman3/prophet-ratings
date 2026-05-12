@@ -72,4 +72,4 @@ yarn-install:
 reset-db:
 	$(DC) down -v
 	$(DC) up -d
-	$(DC) exec web bin/rails db:setup
+	$(DC) run --rm web bin/rails db:setup
