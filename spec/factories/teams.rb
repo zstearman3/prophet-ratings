@@ -25,10 +25,10 @@
 #
 FactoryBot.define do
   factory :team do
-    school { Faker::University.name }
+    sequence(:school) { |n| "Test University #{n}" }
     slug { school.parameterize }
     nickname { 'Testers' }
-    url { 'test-university' }
+    sequence(:url) { |n| "test-university-#{n}" }
     location { 'Testville, TS' }
   end
 end
