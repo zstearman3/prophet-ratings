@@ -166,6 +166,65 @@ From the container:
 docker compose exec web psql "$DATABASE_URL"
 ```
 
+## Pull production data locally
+
+Use `bin/pull-production-db` to replace the local development database with a dump of production:
+
+```bash
+make up
+bin/pull-production-db
+```
+
+The default source is the running ECS web task. This avoids requiring direct laptop access to private RDS. The ECS task runs `pg_dump` against its production `DATABASE_URL`, streams the dump down, and the script restores it into your local Docker Postgres database.
+
+Prerequisites:
+
+```bash
+aws sts get-caller-identity
+make up
+```
+
+Put the local admin credentials in the gitignored `.env` file:
+
+```dotenv
+LOCAL_ADMIN_EMAIL=you@example.com
+LOCAL_ADMIN_PASSWORD=change-me-locally
+```
+
+Keep local Docker runtime configuration in `.env.docker`:
+
+```dotenv
+RAILS_ENV=development
+DATABASE_URL=postgresql://postgres:password@db:5432/prophet_ratings_development
+```
+
+The script asks for confirmation before replacing the local database and then runs migrations. When the Docker `db` service is running, it restores into the database configured by `.env.docker`'s `DATABASE_URL`, uses the containerized PostgreSQL tools, and temporarily stops/restarts the local `web` and `worker` services around the restore. It does not store production credentials in the repo.
+
+Production user rows are excluded from the dump by default, so user data never lands locally. GoodJob runtime rows are also excluded so production jobs do not run in local development after restore. To include users anyway:
+
+```bash
+bin/pull-production-db --include-users
+```
+
+After restore, the script creates or updates a local admin user when `LOCAL_ADMIN_EMAIL` and `LOCAL_ADMIN_PASSWORD` are set. This keeps Rails Admin usable locally without importing production users.
+
+The ECS defaults match `bin/prod-console`:
+
+```bash
+ECS_CLUSTER=prophet-cluster
+ECS_SERVICE=prophet-ratings-web
+ECS_CONTAINER=web
+AWS_REGION=us-east-1
+```
+
+Override any of those only if the deployment changes.
+
+Direct RDS access is still available when needed:
+
+```bash
+PRODUCTION_DATABASE_URL="postgresql://..." bin/pull-production-db --source direct
+```
+
 ## Troubleshooting
 
 - Ensure `.env.docker` exists and has `RAILS_ENV=development` and a valid `DATABASE_URL` pointing at `db`.
@@ -193,4 +252,3 @@ docker compose exec web psql "$DATABASE_URL"
 
 - The `worker` service runs GoodJob for async jobs; it reads the same env as the web service.
 - API integrations (e.g., `ODDS_API_KEY`) must be provided in `.env.docker` if you need those features locally.
-
