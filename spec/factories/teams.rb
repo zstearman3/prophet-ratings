@@ -28,7 +28,7 @@ FactoryBot.define do
     sequence(:school) { |n| "Test University #{n}" }
     slug { school.parameterize }
     nickname { 'Testers' }
-    sequence(:url) { |n| "test-university-#{n}" }
+    sequence(:team_url) { |n| "test-university-#{n}" }
     location { 'Testville, TS' }
   end
 end

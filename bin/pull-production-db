@@ -254,7 +254,7 @@ done
 
 if [[ "$CONFIRM" != true ]]; then
   echo "This will replace your local development database:"
-  echo "  $LOCAL_DATABASE_URL"
+  echo "  $(masked_database_url "$LOCAL_DATABASE_URL")"
   if [[ "$INCLUDE_USERS" != true ]]; then
     echo "Production user rows will be excluded from the dump."
   fi
@@ -278,8 +278,8 @@ cleanup() {
     fi
   fi
 
-  if [[ "$KEEP_DUMP" != true && -f "$DUMP_FILE" ]]; then
-    rm -f "$DUMP_FILE"
+  if [[ "$KEEP_DUMP" != true ]]; then
+    rm -f "$DUMP_FILE" "$DUMP_FILE.ecs-output" "$DUMP_FILE.b64"
   fi
 }
 trap cleanup EXIT
@@ -370,6 +370,7 @@ create_local_admin() {
   echo "== Ensuring local admin exists =="
   if [[ "$USE_DOCKER" == true ]]; then
     docker compose run --rm \
+      -e DATABASE_URL="$LOCAL_DATABASE_URL" \
       -e LOCAL_ADMIN_EMAIL="$LOCAL_ADMIN_EMAIL" \
       -e LOCAL_ADMIN_PASSWORD="$LOCAL_ADMIN_PASSWORD" \
       web bin/rails runner "$runner"
@@ -407,6 +408,7 @@ if [[ "$USE_DOCKER" == true ]]; then
   LOCAL_SERVICES_STOPPED=true
 
   docker compose run --rm \
+    -e DATABASE_URL="$LOCAL_DATABASE_URL" \
     -e DISABLE_DATABASE_ENVIRONMENT_CHECK=1 \
     web bin/rails db:drop db:create
 else
@@ -422,14 +424,19 @@ fi
 
 echo "== Marking local database as development =="
 if [[ "$USE_DOCKER" == true ]]; then
-  docker compose run --rm -e RAILS_ENV=development web bin/rails db:environment:set
+  docker compose run --rm \
+    -e DATABASE_URL="$LOCAL_DATABASE_URL" \
+    -e RAILS_ENV=development \
+    web bin/rails db:environment:set
 else
   RAILS_ENV=development DATABASE_URL="$LOCAL_DATABASE_URL" bin/rails db:environment:set
 fi
 
 echo "== Running migrations =="
 if [[ "$USE_DOCKER" == true ]]; then
-  docker compose run --rm web bin/rails db:migrate
+  docker compose run --rm \
+    -e DATABASE_URL="$LOCAL_DATABASE_URL" \
+    web bin/rails db:migrate
 
   create_local_admin
 
