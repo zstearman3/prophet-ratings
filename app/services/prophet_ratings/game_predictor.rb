@@ -9,13 +9,14 @@ module ProphetRatings
     # @param home_rating_snapshot [Object] The rating snapshot for the home team.
     # @param away_rating_snapshot [Object] The rating snapshot for the away team.
     # @param upset_modifier [Float] Optional modifier to adjust upset likelihood (default: 1.0).
-    # @param neutral [Boolean] Whether the game is played at a neutral site (default: false).
+    # @param venue [Hash] Explicit venue classification with optional type and confidence keys.
     # @param season [Season] The season context for the prediction (default: current season).
-    def initialize(home_rating_snapshot:, away_rating_snapshot:, upset_modifier: 1.0, neutral: false, season: Season.current)
+    def initialize(home_rating_snapshot:, away_rating_snapshot:, upset_modifier: 1.0, venue: nil, season: Season.current)
       @home_rating_snapshot = home_rating_snapshot
       @away_rating_snapshot = away_rating_snapshot
       @upset_modifier = upset_modifier
-      @neutral = neutral
+      @venue_type = venue&.fetch(:type, nil).presence || 'home'
+      @venue_confidence = venue&.fetch(:confidence, nil).presence
       @season = season
     end
 
@@ -68,7 +69,11 @@ module ProphetRatings
         home_offensive_volatility: home_offensive_volatility.round(2),
         away_offensive_volatility: away_offensive_volatility.round(2),
         home_defensive_volatility: home_defensive_volatility.round(2),
-        away_defensive_volatility: away_defensive_volatility.round(2)
+        away_defensive_volatility: away_defensive_volatility.round(2),
+        venue_type: @venue_type,
+        venue_confidence: @venue_confidence,
+        home_court_adjustment_applied: home_court_adjustment_applied?,
+        venue_confidence_issue:
       }
     end
 
@@ -169,15 +174,23 @@ module ProphetRatings
     end
 
     def home_offense_boost
-      return 0 if @neutral
+      return 0 unless home_court_adjustment_applied?
 
       home_rating_snapshot&.home_offense_boost || default_home_boost
     end
 
     def home_defense_boost
-      return 0 if @neutral
+      return 0 unless home_court_adjustment_applied?
 
       home_rating_snapshot&.home_defense_boost || -default_home_boost
+    end
+
+    def home_court_adjustment_applied?
+      @venue_type == 'home'
+    end
+
+    def venue_confidence_issue
+      'venue_unknown_home_court_not_applied' if @venue_type == 'unknown'
     end
 
     ##
@@ -242,7 +255,7 @@ module ProphetRatings
         away_rating_snapshot: away_rating_snapshot,
         season: season,
         upset_modifier: @upset_modifier,
-        neutral: @neutral
+        neutral: !home_court_adjustment_applied?
       )
     end
   end

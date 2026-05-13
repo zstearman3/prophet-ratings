@@ -259,6 +259,36 @@ Required team stat keys are defined by `TEAM_STAT_KEYS` in `GamesImporter`.
 
 Incomplete rows still preserve the scheduled game and team-game associations where possible. This allows future schedule-aware prediction workflows without requiring box-score stats.
 
+## Venue classification
+
+Games store explicit venue metadata:
+
+- `venue_type`: `home`, `neutral`, or `unknown`
+- `venue_source`: currently `sports_reference_schedule` or `manual_override`
+- `venue_confidence`: `confirmed`, `manual`, `inferred`, or `unknown`
+- `venue_name`: optional venue text
+
+The default venue type is `unknown`. Missing Sports Reference location text is not treated as a normal home game.
+
+`Importer::GameVenueEnricher` is intentionally small, idempotent, and opt-in. It is not run by the standard Sports Reference game import pipeline. It first checks manual overrides in `db/data/game_venue_overrides.yml`. Overrides match by season year, game date, and unordered team pair, and can set `venue_type` plus an optional `venue_name`.
+
+If no manual override exists, the enricher can use the imported `Game#location` text:
+
+- exact match against the home team's `home_venue`, or inclusion of the home team's `location`, marks a confirmed home game
+- other present location text is treated as an inferred neutral venue
+- blank location leaves the game unknown
+
+Manual classifications are not overwritten by inferred Sports Reference data unless the service is called with `overwrite_manual: true`.
+
+Use this task to review coverage:
+
+```bash
+bundle exec rails venue:coverage
+bundle exec rails venue:coverage SEASON=2025
+```
+
+The task prints counts by venue type and lists unknown games for manual review. The next venue ingestion path should be a separate scraper/importer, not a side effect of the box-score import.
+
 ## Game finalization
 
 Complete imported games are finalized by:

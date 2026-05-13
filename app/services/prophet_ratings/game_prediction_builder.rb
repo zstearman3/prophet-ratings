@@ -21,7 +21,7 @@ module ProphetRatings
       result = ProphetRatings::GamePredictor.new(
         home_rating_snapshot: home_snapshot,
         away_rating_snapshot: away_snapshot,
-        neutral: game.neutral,
+        venue: { type: game.venue_type, confidence: game.venue_confidence },
         season: game.season
       ).call
 
@@ -31,14 +31,7 @@ module ProphetRatings
         ratings_config_version:,
         game:
       ).tap do |prediction|
-        prediction.home_offensive_efficiency = result[:meta][:home_expected_ortg]
-        prediction.away_offensive_efficiency = result[:meta][:away_expected_ortg]
-        prediction.home_defensive_efficiency = result[:meta][:away_expected_ortg]
-        prediction.away_defensive_efficiency = result[:meta][:home_expected_ortg]
-        prediction.home_score = result[:home_expected_score]
-        prediction.away_score = result[:away_expected_score]
-        prediction.home_win_probability = result[:win_probability_home]
-        prediction.pace = result[:meta][:expected_pace]
+        prediction.assign_attributes(prediction_attributes(result))
 
         prediction.save!
       end
@@ -47,6 +40,19 @@ module ProphetRatings
     private
 
     attr_reader :game, :ratings_config_version
+
+    def prediction_attributes(result)
+      {
+        home_offensive_efficiency: result[:meta][:home_expected_ortg],
+        away_offensive_efficiency: result[:meta][:away_expected_ortg],
+        home_defensive_efficiency: result[:meta][:away_expected_ortg],
+        away_defensive_efficiency: result[:meta][:home_expected_ortg],
+        home_score: result[:home_expected_score],
+        away_score: result[:away_expected_score],
+        home_win_probability: result[:win_probability_home],
+        pace: result[:meta][:expected_pace]
+      }
+    end
 
     ##
     # Returns the latest rating snapshot for the game's home team season, or nil if none exists.

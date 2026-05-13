@@ -44,7 +44,6 @@ module ProphetRatings
     def update_derived_fields
       game.update(
         possessions: calculated_possessions,
-        neutral: calculated_neutrality,
         minutes: calculated_minutes,
         in_conference: game.home_team_season&.conference == game.away_team_season&.conference
       )
@@ -100,9 +99,10 @@ module ProphetRatings
     # @return [Boolean] True if the game location excludes the home team's location and is not the home team's home venue,
     # false otherwise. For unknown locations, defaults to false unless an explicit neutral override already exists.
     def calculated_neutrality
-      if game.location.blank? || game.home_team&.location.blank?
-        return game.neutral.nil? ? false : game.neutral
-      end
+      return true if game.venue_neutral?
+      return false if game.confirmed_home_venue?
+
+      return game.neutral if game.location.blank? || game.home_team&.location.blank?
 
       game.location.exclude?(game.home_team.location) &&
         (game.location != game.home_team.home_venue)

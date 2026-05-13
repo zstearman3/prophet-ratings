@@ -96,4 +96,15 @@ RSpec.describe Game do
       expect(game.pace).to eq(70.0)
     end
   end
+
+  describe 'venue classification' do
+    it 'defaults new games to an unknown venue' do
+      game = described_class.new
+
+      expect(game.venue_type).to eq('unknown')
+      expect(game.venue_confidence).to eq('unknown')
+      expect(game).to be_venue_unknown
+      expect(game).not_to be_confirmed_home_venue
+    end
+  end
 end

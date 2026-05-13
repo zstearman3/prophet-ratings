@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_03_01_052600) do
+ActiveRecord::Schema[8.0].define(version: 2026_05_13_000100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -95,7 +95,13 @@ ActiveRecord::Schema[8.0].define(version: 2026_03_01_052600) do
     t.datetime "updated_at", null: false
     t.integer "minutes"
     t.boolean "in_conference", default: false
+    t.string "venue_type", default: "unknown", null: false
+    t.string "venue_source"
+    t.string "venue_confidence", default: "unknown", null: false
+    t.string "venue_name"
     t.index ["season_id"], name: "index_games_on_season_id"
+    t.index ["venue_confidence"], name: "index_games_on_venue_confidence"
+    t.index ["venue_type"], name: "index_games_on_venue_type"
   end
 
   create_table "good_job_batches", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|

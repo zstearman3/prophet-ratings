@@ -63,8 +63,8 @@ RSpec.describe ProphetRatings::GameFinalizer, type: :service do
     context 'when location is unknown and no override exists' do
       let(:location) { '' }
 
-      it 'defaults to non-neutral' do
-        expect(calculated_neutrality).to be(false)
+      it 'leaves neutrality unknown' do
+        expect(calculated_neutrality).to be_nil
       end
     end
 

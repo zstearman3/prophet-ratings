@@ -123,6 +123,14 @@ RSpec.describe Importer::GamesImporter do
     expect(game.away_team_game.team_season).to eq(away_team_season)
   end
 
+  it 'does not run venue enrichment during the standard import pipeline' do
+    allow(Importer::GameVenueEnricher).to receive(:new).and_call_original
+
+    described_class.import([row])
+
+    expect(Importer::GameVenueEnricher).not_to have_received(:new)
+  end
+
   it 'finalizes complete games' do
     described_class.import([completed_row])
     game = Game.last

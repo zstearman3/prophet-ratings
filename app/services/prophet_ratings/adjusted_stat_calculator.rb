@@ -188,7 +188,7 @@ module ProphetRatings
         next unless tg1 && tg2
         next unless team_index[tg1.team_id] && team_index[tg2.team_id]
 
-        apply_home_court = hca_stats.include?(raw_stat) && !game.neutral
+        apply_home_court = hca_stats.include?(raw_stat) && game.confirmed_home_venue?
 
         [[tg1, tg2], [tg2, tg1]].each do |off_tg, def_tg|
           observed = stat_value_for_game(off_tg)

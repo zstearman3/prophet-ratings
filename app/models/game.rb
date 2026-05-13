@@ -26,8 +26,17 @@
 #  index_games_on_season_id  (season_id)
 #
 class Game < ApplicationRecord
+  VENUE_TYPES = {
+    unknown: 'unknown',
+    home: 'home',
+    neutral: 'neutral'
+  }.freeze
+
+  VENUE_CONFIDENCES = %w[unknown confirmed manual inferred].freeze
+
   validates :url, presence: true
   validates :start_time, presence: true
+  validates :venue_confidence, inclusion: { in: VENUE_CONFIDENCES }
 
   validate :unique_game_per_teams_and_date
 
@@ -62,6 +71,15 @@ class Game < ApplicationRecord
   # rubocop:enable Rails/HasManyOrHasOneDependent, Rails/InverseOf
 
   enum :status, { scheduled: 0, final: 1, canceled: 2 }
+  enum :venue_type, VENUE_TYPES, prefix: :venue
+
+  def confirmed_home_venue?
+    venue_home? && %w[confirmed manual].include?(venue_confidence)
+  end
+
+  def venue_unknown?
+    venue_type == 'unknown'
+  end
 
   ##
   # Generates a prediction for the game using the external prediction builder service.

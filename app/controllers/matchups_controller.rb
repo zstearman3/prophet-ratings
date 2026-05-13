@@ -80,7 +80,7 @@ class MatchupsController < ApplicationController
     ProphetRatings::GamePredictor.new(
       home_rating_snapshot: @home_snapshot,
       away_rating_snapshot: @away_snapshot,
-      neutral: @neutral,
+      venue: { type: @neutral ? 'neutral' : 'home' },
       upset_modifier: @upset_modifier
     ).call
   end
