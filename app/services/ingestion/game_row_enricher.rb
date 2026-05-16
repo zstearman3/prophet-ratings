@@ -18,11 +18,16 @@ module Ingestion
       venue_row = venue_row_for(row)
       return row unless venue_row
 
-      row.merge(venue_attributes(venue_row))
+      attributes = venue_attributes(venue_row)
+      return row unless attributes
+
+      row.merge(attributes)
     end
 
     def venue_attributes(venue_row)
-      venue_type = venue_row[:game_location].to_s.strip == 'N' ? 'neutral' : 'home'
+      venue_type = venue_type_for(venue_row)
+      return unless venue_type
+
       {
         venue_type:,
         venue_source: SPORTS_REFERENCE_TEAM_SCHEDULE_SOURCE,
@@ -31,6 +36,15 @@ module Ingestion
         date: venue_row[:start_time],
         neutral: venue_type == 'neutral'
       }.compact
+    end
+
+    def venue_type_for(venue_row)
+      case venue_row[:game_location].to_s.strip
+      when 'N'
+        'neutral'
+      when ''
+        'home'
+      end
     end
 
     def venue_row_for(row)
@@ -67,7 +81,7 @@ module Ingestion
     end
 
     def schedule_rows_for(team, season)
-      schedule_cache[[team.id, season.id]] ||= Scraper::TeamScheduleEnrichmentScraper.new(team:, season:).to_json
+      schedule_cache[[team.id, season.id]] ||= Scraper::TeamScheduleEnrichmentScraper.new(team:, season:).schedule_data
     end
 
     def schedule_cache

@@ -12,7 +12,9 @@ RSpec.describe Ingestion::GameRowEnricher do
       schedule_row('Wake Forest', 'N', 'Little Caesars Arena', Time.zone.local(2025, 11, 11, 18, 30),
                    '/cbb/boxscores/2025-11-11-00-michigan.html'),
       schedule_row('Oakland', '', 'Crisler Arena', Time.zone.local(2025, 11, 11, 20, 30),
-                   '/cbb/boxscores/2025-11-11-01-michigan.html')
+                   '/cbb/boxscores/2025-11-11-01-michigan.html'),
+      schedule_row('Texas Christian', '@', 'Ed & Rae Schollmaier Arena', Time.zone.local(2025, 11, 14, 21, 0),
+                   '/cbb/boxscores/2025-11-14-21-texas-christian.html')
     ]
   end
   let(:same_date_rows) do
@@ -37,7 +39,7 @@ RSpec.describe Ingestion::GameRowEnricher do
              else
                []
              end
-      instance_double(Scraper::TeamScheduleEnrichmentScraper, to_json: rows)
+      instance_double(Scraper::TeamScheduleEnrichmentScraper, schedule_data: rows)
     end
   end
 
@@ -100,5 +102,22 @@ RSpec.describe Ingestion::GameRowEnricher do
       venue_name: 'Little Caesars Arena',
       date: Time.zone.local(2025, 11, 11, 18, 30)
     )
+  end
+
+  it "does not enrich rows marked '@' because away venue type is unsupported" do
+    original_date = Time.zone.local(2025, 11, 14, 21, 0)
+    row = game_row(
+      'Texas Christian',
+      'Michigan',
+      original_date,
+      '/cbb/boxscores/2025-11-14-21-texas-christian.html'
+    )
+
+    enriched_row = described_class.new([row]).call.first
+
+    expect(enriched_row).to eq(row)
+    expect(enriched_row[:venue_type]).not_to eq('neutral')
+    expect(enriched_row[:date]).to eq(original_date)
+    expect(enriched_row[:venue_name]).to be_nil
   end
 end

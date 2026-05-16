@@ -9,7 +9,7 @@ module Scraper
       @season = season
     end
 
-    def to_json(*_args)
+    def schedule_data
       schedule_rows.filter_map { |row| parse_row(row) }
     end
 
@@ -21,8 +21,20 @@ module Scraper
       sleep(SLEEP_COUNT)
 
       response = HTTParty.get(schedule_url)
-      document = Nokogiri::HTML(response.body)
+      return [] unless response&.code == 200
+
+      document = Nokogiri::HTML(response.body.to_s)
       document.css('table#schedule tbody tr').reject { |row| row['class'].to_s.split.include?('thead') }
+    rescue HTTParty::Error, Timeout::Error => e
+      log_schedule_failure('request', e)
+      []
+    rescue StandardError => e
+      log_schedule_failure('parse', e)
+      []
+    end
+
+    def log_schedule_failure(stage, error)
+      Rails.logger.warn("Sports Reference schedule #{stage} failed for #{schedule_url}: #{error.class} - #{error.message}")
     end
 
     def parse_row(row)

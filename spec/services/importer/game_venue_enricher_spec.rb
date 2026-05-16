@@ -27,7 +27,7 @@ RSpec.describe Importer::GameVenueEnricher do
     create(:team_game, game:, team: home_team, team_season: home_team_season, home: true)
     create(:team_game, game:, team: away_team, team_season: away_team_season, home: false)
     allow(Scraper::TeamScheduleEnrichmentScraper).to receive(:new)
-      .and_return(instance_double(Scraper::TeamScheduleEnrichmentScraper, to_json: []))
+      .and_return(instance_double(Scraper::TeamScheduleEnrichmentScraper, schedule_data: []))
   end
 
   it 'marks a game neutral from a manual override' do
@@ -76,7 +76,7 @@ RSpec.describe Importer::GameVenueEnricher do
   it 'marks a game neutral from a Sports Reference team schedule row' do
     schedule_scraper = instance_double(
       Scraper::TeamScheduleEnrichmentScraper,
-      to_json: [
+      schedule_data: [
         {
           date: game.start_time.to_date,
           opponent_name: away_team.school,
@@ -98,11 +98,88 @@ RSpec.describe Importer::GameVenueEnricher do
     )
   end
 
+  it 'marks a game home when the Sports Reference team schedule row location is blank' do
+    schedule_scraper = instance_double(
+      Scraper::TeamScheduleEnrichmentScraper,
+      schedule_data: [
+        {
+          date: game.start_time.to_date,
+          opponent_name: away_team.school,
+          game_location: '',
+          venue_name: 'Fertitta Center'
+        }
+      ]
+    )
+    allow(Scraper::TeamScheduleEnrichmentScraper).to receive(:new).with(team: home_team, season:).and_return(schedule_scraper)
+
+    described_class.new(game, overrides: []).call
+
+    expect(game.reload).to have_attributes(
+      venue_type: 'home',
+      venue_source: 'sports_reference_team_schedule',
+      venue_confidence: 'confirmed',
+      venue_name: 'Fertitta Center',
+      neutral: false
+    )
+  end
+
+  it "marks a game home when the away team's Sports Reference team schedule row location is '@'" do
+    home_schedule_scraper = instance_double(Scraper::TeamScheduleEnrichmentScraper, schedule_data: [])
+    away_schedule_scraper = instance_double(
+      Scraper::TeamScheduleEnrichmentScraper,
+      schedule_data: [
+        {
+          date: game.start_time.to_date,
+          opponent_name: home_team.school,
+          game_location: '@',
+          venue_name: 'Fertitta Center'
+        }
+      ]
+    )
+    allow(Scraper::TeamScheduleEnrichmentScraper).to receive(:new).with(team: home_team, season:).and_return(home_schedule_scraper)
+    allow(Scraper::TeamScheduleEnrichmentScraper).to receive(:new).with(team: away_team, season:).and_return(away_schedule_scraper)
+
+    described_class.new(game, overrides: []).call
+
+    expect(game.reload).to have_attributes(
+      venue_type: 'home',
+      venue_source: 'sports_reference_team_schedule',
+      venue_confidence: 'confirmed',
+      venue_name: 'Fertitta Center',
+      neutral: false
+    )
+  end
+
+  it "leaves venue unknown when the home team's Sports Reference team schedule row location is '@'" do
+    schedule_scraper = instance_double(
+      Scraper::TeamScheduleEnrichmentScraper,
+      schedule_data: [
+        {
+          date: game.start_time.to_date,
+          opponent_name: away_team.school,
+          game_location: '@',
+          venue_name: 'Coleman Coliseum'
+        }
+      ]
+    )
+    allow(Scraper::TeamScheduleEnrichmentScraper).to receive(:new).with(team: home_team, season:).and_return(schedule_scraper)
+
+    described_class.new(game, overrides: []).call
+
+    expect(game.reload).to have_attributes(
+      venue_type: 'unknown',
+      venue_source: nil,
+      venue_confidence: 'unknown',
+      venue_name: nil,
+      neutral: nil
+    )
+  end
+
   it 'prioritizes the Sports Reference team schedule row over legacy header location text' do
     game.update!(location: 'Fertitta Center')
     schedule_scraper = instance_double(
       Scraper::TeamScheduleEnrichmentScraper,
-      to_json: [
+      schedule_data: [
         {
           date: game.start_time.to_date,
           opponent_name: away_team.school,

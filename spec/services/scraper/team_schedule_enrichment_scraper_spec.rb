@@ -7,7 +7,7 @@ RSpec.describe Scraper::TeamScheduleEnrichmentScraper do
   let(:team) { create(:team, school: 'Michigan', slug: 'michigan', url: '/cbb/schools/michigan/men/') }
   let(:scraper) { described_class.new(team:, season:) }
   let(:schedule_url) { 'https://www.sports-reference.com/cbb/schools/michigan/men/2026-schedule.html' }
-  let(:response) { instance_double(HTTParty::Response, body: schedule_html) }
+  let(:response) { instance_double(HTTParty::Response, body: schedule_html, code: 200) }
   let(:expected_rows) do
     [
       expected_row(date: Date.new(2025, 11, 3), start_time: '2025-11-03 8:30pm', opponent_name: 'Oakland',
@@ -69,7 +69,19 @@ RSpec.describe Scraper::TeamScheduleEnrichmentScraper do
   end
 
   it 'parses venue rows from a Sports Reference team schedule table' do
-    expect(scraper.to_json).to eq(expected_rows)
+    expect(scraper.schedule_data).to eq(expected_rows)
+  end
+
+  it 'returns no rows when the schedule response is not successful' do
+    allow(HTTParty).to receive(:get).with(schedule_url).and_return(instance_double(HTTParty::Response, code: 503))
+
+    expect(scraper.schedule_data).to eq([])
+  end
+
+  it 'returns no rows when the schedule request fails' do
+    allow(HTTParty).to receive(:get).with(schedule_url).and_raise(Timeout::Error)
+
+    expect(scraper.schedule_data).to eq([])
   end
 
   def expected_row(attrs)

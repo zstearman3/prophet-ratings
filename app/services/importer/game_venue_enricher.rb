@@ -65,11 +65,25 @@ module Importer
     end
 
     def schedule_attributes(game)
-      row = schedule_row_for(game)
-      return unless row
+      match = schedule_row_for(game)
+      return unless match
 
-      venue_type = row[:game_location].to_s.strip == 'N' ? 'neutral' : 'home'
+      row, team = match
+      venue_type = schedule_venue_type(row, team, game)
+      return unknown_attributes(game) if venue_type == 'unknown'
+
       venue_attributes(venue_type, row[:venue_name])
+    end
+
+    def schedule_venue_type(row, team, game)
+      case row[:game_location].to_s.strip
+      when 'N'
+        'neutral'
+      when '@'
+        team == game.away_team ? 'home' : 'unknown'
+      else
+        team == game.home_team ? 'home' : 'unknown'
+      end
     end
 
     def venue_attributes(venue_type, venue_name)
@@ -85,7 +99,7 @@ module Importer
     def schedule_row_for(game)
       [game.home_team, game.away_team].compact.each do |team|
         row = schedule_rows_for(team, game.season).find { |candidate| schedule_row_matches_game?(candidate, game) }
-        return row if row
+        return [row, team] if row
       rescue StandardError => e
         Rails.logger.warn("Unable to scrape venue schedule for team_id=#{team.id}, season_id=#{game.season_id}: #{e.message}")
       end
@@ -94,7 +108,7 @@ module Importer
     end
 
     def schedule_rows_for(team, season)
-      schedule_cache[[team.id, season.id]] ||= Scraper::TeamScheduleEnrichmentScraper.new(team:, season:).to_json
+      schedule_cache[[team.id, season.id]] ||= Scraper::TeamScheduleEnrichmentScraper.new(team:, season:).schedule_data
     end
 
     def schedule_cache

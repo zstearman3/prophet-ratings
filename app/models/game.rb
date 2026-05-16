@@ -77,10 +77,6 @@ class Game < ApplicationRecord
     venue_home? && %w[confirmed manual].include?(venue_confidence)
   end
 
-  def venue_unknown?
-    venue_type == 'unknown'
-  end
-
   ##
   # Generates a prediction for the game using the external prediction builder service.
   def generate_prediction!
