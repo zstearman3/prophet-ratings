@@ -7,11 +7,12 @@ This document explains how Prophet Ratings ingests college basketball data into 
 The core game ingestion path is:
 
 1. A job or rake task chooses one or more dates to sync.
-2. `Scraper::GamesScraper` reads the Sports Reference schedule page for each date.
-3. The scraper returns either completed box-score rows or scheduled-game rows.
-4. `Importer::GamesImporter.import` upserts `Game` and `TeamGame` records.
-5. Complete games are finalized through `Game#finalize`, which delegates to `ProphetRatings::GameFinalizer`.
-6. Ratings jobs can then aggregate finalized `TeamGame` data.
+2. `Ingestion::GamesIngestionService` coordinates scraping, venue enrichment, and import for each date.
+3. `Scraper::GamesScraper` reads the Sports Reference schedule page for the date.
+4. `Ingestion::GameRowEnricher` decorates scraped rows with team schedule enrichment data.
+5. `Importer::GamesImporter.import` upserts `Game` and `TeamGame` records.
+6. Complete games are finalized through `Game#finalize`, which delegates to `ProphetRatings::GameFinalizer`.
+7. Ratings jobs can then aggregate finalized `TeamGame` data.
 
 The most direct entry point is `SyncDailyGamesJob`.
 
@@ -33,11 +34,11 @@ If no date is provided, the job defaults to `Date.yesterday`.
 
 Flow:
 
-1. Build `Scraper::GamesScraper.new(date)`.
-2. Ask the scraper for `game_count`.
-3. Scrape games in batches of 10 URLs.
-4. Pass each batch to `Importer::GamesImporter.import`.
-5. Log imported batch ranges.
+1. Build `Ingestion::GamesIngestionService.new(date:)`.
+2. The service scrapes games in batches of 10 URLs.
+3. Each batch is enriched with Sports Reference team schedule venue data.
+4. The enriched rows are passed to `Importer::GamesImporter.import`.
+5. Log the imported row count.
 
 This job does not enqueue ratings by itself.
 
@@ -264,30 +265,42 @@ Incomplete rows still preserve the scheduled game and team-game associations whe
 Games store explicit venue metadata:
 
 - `venue_type`: `home`, `neutral`, or `unknown`
-- `venue_source`: currently `sports_reference_schedule` or `manual_override`
+- `venue_source`: currently `sports_reference_team_schedule`, `sports_reference_schedule`, or `manual_override`
 - `venue_confidence`: `confirmed`, `manual`, `inferred`, or `unknown`
 - `venue_name`: optional venue text
 
 The default venue type is `unknown`. Missing Sports Reference location text is not treated as a normal home game.
 
-`Importer::GameVenueEnricher` is intentionally small, idempotent, and opt-in. It is not run by the standard Sports Reference game import pipeline. It first checks manual overrides in `db/data/game_venue_overrides.yml`. Overrides match by season year, game date, and unordered team pair, and can set `venue_type` plus an optional `venue_name`.
+Normal game ingestion enriches scraped rows before import through `Ingestion::GameRowEnricher`. It currently adds Sports Reference team schedule venue and start-time data, matching team schedule rows by box-score URL when present, then falls back to game date plus actual opponent/team pair. It does not match venue data by team and date alone.
 
-If no manual override exists, the enricher can use the imported `Game#location` text:
+`Importer::GameVenueEnricher` remains a small, idempotent, opt-in backfill/manual repair service. It is not run by the standard Sports Reference game import pipeline. It first checks manual overrides in `db/data/game_venue_overrides.yml`. Overrides match by season year, game date, and unordered team pair, and can set `venue_type` plus an optional `venue_name`.
+
+If no manual override exists, the enricher scrapes the Sports Reference team schedule table via `Scraper::TeamScheduleEnrichmentScraper`. The scraper reads:
+
+- `date_game` from the table row `csk` date
+- `time_game`, displayed by Sports Reference in Eastern Time and used to enrich import rows with a more precise `Game#start_time`
+- `game_location`, where blank means the team page's home game, `@` means away, and `N` means neutral
+- `opp_name`
+- `arena`
+
+The team schedule row is treated as the highest-priority Sports Reference venue source because it has an explicit location marker. If that scraper cannot match the game, the enricher can use the imported `Game#location` text only when it confirms a home game:
 
 - exact match against the home team's `home_venue`, or inclusion of the home team's `location`, marks a confirmed home game
-- other present location text is treated as an inferred neutral venue
+- other present location text leaves the game unknown
 - blank location leaves the game unknown
 
 Manual classifications are not overwritten by inferred Sports Reference data unless the service is called with `overwrite_manual: true`.
 
-Use this task to review coverage:
+Use these tasks to enrich and review coverage:
 
 ```bash
+bundle exec rails venue:enrich
+bundle exec rails venue:enrich SEASON=2026
 bundle exec rails venue:coverage
 bundle exec rails venue:coverage SEASON=2025
 ```
 
-The task prints counts by venue type and lists unknown games for manual review. The next venue ingestion path should be a separate scraper/importer, not a side effect of the box-score import.
+The coverage task prints counts by venue type and lists unknown games for manual review. Venue enrichment is a separate workflow, not a side effect of the box-score import.
 
 ## Game finalization
 

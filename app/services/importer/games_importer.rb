@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 module Importer
+  # rubocop:disable Metrics/ModuleLength
   module GamesImporter
     TEAM_STAT_KEYS = %i[minutes field_goals_made field_goals_attempted two_pt_made two_pt_attempted three_pt_made
                         three_pt_attempted free_throws_made free_throws_attempted offensive_rebounds
@@ -56,31 +57,40 @@ module Importer
         game = find_game_by_teams_and_date(row[:home_team], row[:away_team], date) ||
                Game.new(home_team_name: row[:home_team], away_team_name: row[:away_team], start_time: row[:date])
 
-        if game_complete?(row)
-          game.update!(
-            season:,
-            home_team_score: row[:home_team_score],
-            away_team_score: row[:away_team_score],
-            location: row[:location],
-            url: row[:url]
-          )
+        return process_complete_game(game, row, season, home_team_season, away_team_season) if game_complete?(row)
 
-          home_game = find_or_create_team_game(game, home_team_season, home: true)
-          away_game = find_or_create_team_game(game, away_team_season, home: false)
-          process_team_game(home_game, row[:home_team_stats], home_team_season, away_team_season) if home_game
-          process_team_game(away_game, row[:away_team_stats], away_team_season, home_team_season) if away_game
+        process_incomplete_game(game, row, season, home_team_season, away_team_season)
+      end
 
-          finalize_game_if_possible(game)
-          return
-        end
+      def process_complete_game(game, row, season, home_team_season, away_team_season)
+        game.update!(
+          season:,
+          start_time: row[:date],
+          home_team_score: row[:home_team_score],
+          away_team_score: row[:away_team_score],
+          location: row[:location],
+          url: row[:url],
+          **venue_attributes(row)
+        )
 
+        home_game = find_or_create_team_game(game, home_team_season, home: true)
+        away_game = find_or_create_team_game(game, away_team_season, home: false)
+        process_team_game(home_game, row[:home_team_stats], home_team_season, away_team_season) if home_game
+        process_team_game(away_game, row[:away_team_stats], away_team_season, home_team_season) if away_game
+
+        finalize_game_if_possible(game)
+      end
+
+      def process_incomplete_game(game, row, season, home_team_season, away_team_season)
         # Keep unplayed/incomplete games scheduled and avoid clobbering existing finals with partial rows.
         game.update!(
           season:,
+          start_time: row[:date],
           location: row[:location],
           url: row[:url],
           home_team_score: game.final? ? game.home_team_score : row[:home_team_score],
-          away_team_score: game.final? ? game.away_team_score : row[:away_team_score]
+          away_team_score: game.final? ? game.away_team_score : row[:away_team_score],
+          **venue_attributes(row)
         )
         home_game = find_or_create_team_game(game, home_team_season, home: true)
         away_game = find_or_create_team_game(game, away_team_season, home: false)
@@ -121,6 +131,11 @@ module Importer
           game.minutes.to_i.positive? &&
           game.possessions.present?
       end
+
+      def venue_attributes(row)
+        row.slice(:venue_type, :venue_source, :venue_confidence, :venue_name, :neutral)
+      end
     end
+    # rubocop:enable Metrics/ModuleLength
   end
 end

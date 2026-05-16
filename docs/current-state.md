@@ -13,13 +13,12 @@ The app now stores explicit venue classification on `games`:
 
 The default is `unknown`. Missing location data is no longer treated as a confirmed home game.
 
-`Importer::GameVenueEnricher` applies manual overrides from `db/data/game_venue_overrides.yml` before inferred location logic, but it is opt-in and not part of the standard game import pipeline. Manual overrides are the v1 correction path for neutral-site tournaments or unreliable imported locations.
+Normal game ingestion is coordinated by `Ingestion::GamesIngestionService`, which scrapes daily game rows, enriches them with `Ingestion::GameRowEnricher`, and imports the enriched rows. `Importer::GameVenueEnricher` applies manual overrides from `db/data/game_venue_overrides.yml`, then scrapes Sports Reference team schedule rows via `Scraper::TeamScheduleEnrichmentScraper`; it is still available as an opt-in backfill/manual repair path.
 
 Ratings and predictions apply home-court advantage only for confirmed or manual home games. Neutral and unknown venues receive zero home-court adjustment. Unknown venues are also surfaced in prediction metadata as a confidence issue.
 
 Remaining work:
 
-- add manual overrides for known neutral-site events
-- add a separate Sports Reference venue scraper/importer
+- add manual overrides for known neutral-site events that Sports Reference cannot classify
 - monitor `bundle exec rails venue:coverage` after imports
-- consider a small isolated schedule venue source only if manual review leaves too many unknown games
+- revisit whether `location` should be renamed once the venue scraper has run against real data

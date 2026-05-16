@@ -7,6 +7,7 @@ module Importer
     DEFAULT_OVERRIDE_PATH = Rails.root.join('db/data/game_venue_overrides.yml')
     MANUAL_SOURCE = 'manual_override'
     SPORTS_REFERENCE_SOURCE = 'sports_reference_schedule'
+    SPORTS_REFERENCE_TEAM_SCHEDULE_SOURCE = 'sports_reference_team_schedule'
 
     def initialize(games = Game.all, overrides: nil, override_path: DEFAULT_OVERRIDE_PATH, overwrite_manual: false)
       @games = games
@@ -30,7 +31,7 @@ module Importer
     def enrich_game(game)
       return if manual_classification?(game) && !overwrite_manual
 
-      attrs = manual_override_attributes(game) || inferred_attributes(game)
+      attrs = manual_override_attributes(game) || schedule_attributes(game) || inferred_attributes(game)
       game.update!(attrs) if attrs.present?
     end
 
@@ -52,23 +53,57 @@ module Importer
       location = game.location.to_s.strip
       return unknown_attributes(game) if location.blank?
 
-      if home_location?(game, location)
-        {
-          venue_type: 'home',
-          venue_source: SPORTS_REFERENCE_SOURCE,
-          venue_confidence: 'confirmed',
-          venue_name: location,
-          neutral: false
-        }
-      else
-        {
-          venue_type: 'neutral',
-          venue_source: SPORTS_REFERENCE_SOURCE,
-          venue_confidence: 'inferred',
-          venue_name: location,
-          neutral: true
-        }
+      return unknown_attributes(game) unless home_location?(game, location)
+
+      {
+        venue_type: 'home',
+        venue_source: SPORTS_REFERENCE_SOURCE,
+        venue_confidence: 'confirmed',
+        venue_name: location,
+        neutral: false
+      }
+    end
+
+    def schedule_attributes(game)
+      row = schedule_row_for(game)
+      return unless row
+
+      venue_type = row[:game_location].to_s.strip == 'N' ? 'neutral' : 'home'
+      venue_attributes(venue_type, row[:venue_name])
+    end
+
+    def venue_attributes(venue_type, venue_name)
+      {
+        venue_type:,
+        venue_source: SPORTS_REFERENCE_TEAM_SCHEDULE_SOURCE,
+        venue_confidence: 'confirmed',
+        venue_name:,
+        neutral: venue_type == 'neutral'
+      }
+    end
+
+    def schedule_row_for(game)
+      [game.home_team, game.away_team].compact.each do |team|
+        row = schedule_rows_for(team, game.season).find { |candidate| schedule_row_matches_game?(candidate, game) }
+        return row if row
+      rescue StandardError => e
+        Rails.logger.warn("Unable to scrape venue schedule for team_id=#{team.id}, season_id=#{game.season_id}: #{e.message}")
       end
+
+      nil
+    end
+
+    def schedule_rows_for(team, season)
+      schedule_cache[[team.id, season.id]] ||= Scraper::TeamScheduleEnrichmentScraper.new(team:, season:).to_json
+    end
+
+    def schedule_cache
+      @schedule_cache ||= {}
+    end
+
+    def schedule_row_matches_game?(row, game)
+      row[:date] == game.start_time.to_date &&
+        [game.home_team_name, game.away_team_name].map(&:downcase).include?(row[:opponent_name].to_s.downcase)
     end
 
     def unknown_attributes(game)

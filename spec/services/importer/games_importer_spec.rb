@@ -101,6 +101,28 @@ RSpec.describe Importer::GamesImporter do
     expect(game.start_time.to_date).to eq date
   end
 
+  it 'persists explicit venue fields from enriched game rows' do
+    enriched_row = row.merge(
+      date: Time.zone.local(2025, 1, 1, 18, 30),
+      venue_type: 'neutral',
+      venue_source: 'sports_reference_team_schedule',
+      venue_confidence: 'confirmed',
+      venue_name: 'Little Caesars Arena',
+      neutral: true
+    )
+
+    described_class.import([enriched_row])
+
+    expect(Game.last).to have_attributes(
+      venue_type: 'neutral',
+      venue_source: 'sports_reference_team_schedule',
+      venue_confidence: 'confirmed',
+      venue_name: 'Little Caesars Arena',
+      start_time: Time.zone.local(2025, 1, 1, 18, 30),
+      neutral: true
+    )
+  end
+
   it 'does not create a duplicate game for the same teams and date' do
     described_class.import([row])
     expect do
