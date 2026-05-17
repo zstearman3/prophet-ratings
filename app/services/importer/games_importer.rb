@@ -139,7 +139,7 @@ module Importer
       end
 
       def manual_venue?(game)
-        game.venue_confidence == 'manual'
+        game.venue_confidence == 'manual' || game.venue_source == 'manual_override'
       end
     end
     # rubocop:enable Metrics/ModuleLength

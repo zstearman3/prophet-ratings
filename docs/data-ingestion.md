@@ -265,17 +265,17 @@ Incomplete rows still preserve the scheduled game and team-game associations whe
 Games store explicit venue metadata:
 
 - `venue_type`: `home`, `neutral`, or `unknown`
-- `venue_source`: currently `sports_reference_team_schedule`, `sports_reference_schedule`, or `manual_override`
-- `venue_confidence`: `confirmed`, `manual`, `inferred`, or `unknown`
+- `venue_source`: currently `sports_reference_team_schedule`, `sports_reference_box_score_header`, or `manual_override`
+- `venue_confidence`: `confirmed`, `manual`, or `unknown`
 - `venue_name`: optional venue text
 
 The default venue type is `unknown`. Missing Sports Reference location text is not treated as a normal home game.
 
 Normal game ingestion enriches scraped rows before import through `Ingestion::GameRowEnricher`. It currently adds Sports Reference team schedule venue and start-time data, matching team schedule rows by box-score URL when present, then falls back to game date plus actual opponent/team pair. It does not match venue data by team and date alone.
 
-`Importer::GameVenueEnricher` remains a small, idempotent, opt-in backfill/manual repair service. It is not run by the standard Sports Reference game import pipeline. It first checks manual overrides in `db/data/game_venue_overrides.yml`. Overrides match by season year, game date, and unordered team pair, and can set `venue_type` plus an optional `venue_name`.
+`Importer::GameVenueEnricher` remains a small, idempotent, opt-in backfill/repair service. It is not run by the standard Sports Reference game import pipeline. Manual venue corrections are stored directly on `games`, typically via Rails admin or console changes, using `venue_confidence: manual`.
 
-If no manual override exists, the enricher scrapes the Sports Reference team schedule table via `Scraper::TeamScheduleEnrichmentScraper`. The scraper reads:
+The enricher scrapes the Sports Reference team schedule table via `Scraper::TeamScheduleEnrichmentScraper`. The scraper reads:
 
 - `date_game` from the table row `csk` date
 - `time_game`, displayed by Sports Reference in Eastern Time and used to enrich import rows with a more precise `Game#start_time`
@@ -289,7 +289,7 @@ The team schedule row is treated as the highest-priority Sports Reference venue 
 - other present location text leaves the game unknown
 - blank location leaves the game unknown
 
-Manual classifications are not overwritten by inferred Sports Reference data unless the service is called with `overwrite_manual: true`.
+Manual classifications stored on `games` are not overwritten by scraped Sports Reference data unless the service is called with `overwrite_manual: true`.
 
 Use these tasks to enrich and review coverage:
 
@@ -316,7 +316,6 @@ Finalization runs in a transaction and performs:
 
 1. Derived game field updates:
    - Possessions
-   - Neutral-site flag
    - Minutes
    - In-conference flag
 2. Finalization prerequisite validation.

@@ -15,31 +15,31 @@ module Ingestion
     private
 
     def enrich_row(row)
-      venue_row = venue_row_for(row)
-      return row unless venue_row
+      schedule_row = schedule_enrichment_row_for(row)
+      return row unless schedule_row
 
-      attributes = venue_attributes(venue_row)
+      attributes = enrichment_attributes(schedule_row)
       return row unless attributes
 
       row.merge(attributes)
     end
 
-    def venue_attributes(venue_row)
-      venue_type = venue_type_for(venue_row)
+    def enrichment_attributes(schedule_row)
+      venue_type = venue_type_for(schedule_row)
       return unless venue_type
 
       {
         venue_type:,
         venue_source: SPORTS_REFERENCE_TEAM_SCHEDULE_SOURCE,
         venue_confidence: 'confirmed',
-        venue_name: venue_row[:venue_name],
-        date: venue_row[:start_time],
+        venue_name: schedule_row[:venue_name],
+        date: schedule_row[:start_time],
         neutral: venue_type == 'neutral'
       }.compact
     end
 
-    def venue_type_for(venue_row)
-      case venue_row[:game_location].to_s.strip
+    def venue_type_for(schedule_row)
+      case schedule_row[:game_location].to_s.strip
       when 'N'
         'neutral'
       when ''
@@ -47,7 +47,7 @@ module Ingestion
       end
     end
 
-    def venue_row_for(row)
+    def schedule_enrichment_row_for(row)
       season = season_for(row)
       return unless season
 
@@ -55,7 +55,7 @@ module Ingestion
         matched_row = schedule_rows_for(team, season).find { |schedule_row| schedule_row_matches_game?(schedule_row, row) }
         return matched_row if matched_row
       rescue StandardError => e
-        Rails.logger.warn("Unable to enrich venue row for team_id=#{team.id}: #{e.message}")
+        Rails.logger.warn("Unable to enrich game row from team schedule for team_id=#{team.id}: #{e.message}")
       end
 
       nil

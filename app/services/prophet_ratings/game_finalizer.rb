@@ -40,7 +40,7 @@ module ProphetRatings
     end
 
     ##
-    # Updates the game record with derived fields including possessions, neutrality, average minutes played, and in-conference status.
+    # Updates the game record with derived fields including possessions, average minutes played, and in-conference status.
     def update_derived_fields
       game.update(
         possessions: calculated_possessions,
@@ -92,20 +92,6 @@ module ProphetRatings
       return unless arr.any?
 
       arr.sum / arr.size
-    end
-
-    ##
-    # Determines if the game was played at a neutral location.
-    # @return [Boolean] True if the game location excludes the home team's location and is not the home team's home venue,
-    # false otherwise. For unknown locations, defaults to false unless an explicit neutral override already exists.
-    def calculated_neutrality
-      return true if game.venue_neutral?
-      return false if game.confirmed_home_venue?
-
-      return game.neutral if game.location.blank? || game.home_team&.location.blank?
-
-      game.location.exclude?(game.home_team.location) &&
-        (game.location != game.home_team.home_venue)
     end
 
     ##

@@ -30,29 +30,7 @@ RSpec.describe Importer::GameVenueEnricher do
       .and_return(instance_double(Scraper::TeamScheduleEnrichmentScraper, schedule_data: []))
   end
 
-  it 'marks a game neutral from a manual override' do
-    overrides = [
-      {
-        'season' => 2025,
-        'date' => '2024-11-18',
-        'teams' => %w[Houston Alabama],
-        'venue_type' => 'neutral',
-        'venue_name' => 'T-Mobile Arena'
-      }
-    ]
-
-    described_class.new(game, overrides:).call
-
-    expect(game.reload).to have_attributes(
-      venue_type: 'neutral',
-      venue_source: 'manual_override',
-      venue_confidence: 'manual',
-      venue_name: 'T-Mobile Arena',
-      neutral: true
-    )
-  end
-
-  it 'does not overwrite manually classified games with inferred data' do
+  it 'does not overwrite manually classified games with scraped data' do
     game.update!(
       location: 'Fertitta Center',
       venue_type: 'neutral',
@@ -62,7 +40,7 @@ RSpec.describe Importer::GameVenueEnricher do
       neutral: true
     )
 
-    described_class.new(game, overrides: []).call
+    described_class.new(game).call
 
     expect(game.reload).to have_attributes(
       venue_type: 'neutral',
@@ -83,11 +61,11 @@ RSpec.describe Importer::GameVenueEnricher do
       neutral: true
     )
 
-    described_class.new(game, overrides: [], overwrite_manual: true).call
+    described_class.new(game, overwrite_manual: true).call
 
     expect(game.reload).to have_attributes(
       venue_type: 'home',
-      venue_source: 'sports_reference_schedule',
+      venue_source: 'sports_reference_box_score_header',
       venue_confidence: 'confirmed',
       venue_name: 'Fertitta Center',
       neutral: false
@@ -108,7 +86,7 @@ RSpec.describe Importer::GameVenueEnricher do
     )
     allow(Scraper::TeamScheduleEnrichmentScraper).to receive(:new).with(team: home_team, season:).and_return(schedule_scraper)
 
-    described_class.new(game, overrides: []).call
+    described_class.new(game).call
 
     expect(game.reload).to have_attributes(
       venue_type: 'neutral',
@@ -133,7 +111,7 @@ RSpec.describe Importer::GameVenueEnricher do
     )
     allow(Scraper::TeamScheduleEnrichmentScraper).to receive(:new).with(team: home_team, season:).and_return(schedule_scraper)
 
-    described_class.new(game, overrides: []).call
+    described_class.new(game).call
 
     expect(game.reload).to have_attributes(
       venue_type: 'home',
@@ -160,7 +138,7 @@ RSpec.describe Importer::GameVenueEnricher do
     allow(Scraper::TeamScheduleEnrichmentScraper).to receive(:new).with(team: home_team, season:).and_return(home_schedule_scraper)
     allow(Scraper::TeamScheduleEnrichmentScraper).to receive(:new).with(team: away_team, season:).and_return(away_schedule_scraper)
 
-    described_class.new(game, overrides: []).call
+    described_class.new(game).call
 
     expect(game.reload).to have_attributes(
       venue_type: 'home',
@@ -185,7 +163,7 @@ RSpec.describe Importer::GameVenueEnricher do
     )
     allow(Scraper::TeamScheduleEnrichmentScraper).to receive(:new).with(team: home_team, season:).and_return(schedule_scraper)
 
-    described_class.new(game, overrides: []).call
+    described_class.new(game).call
 
     expect(game.reload).to have_attributes(
       venue_type: 'unknown',
@@ -211,7 +189,7 @@ RSpec.describe Importer::GameVenueEnricher do
     )
     allow(Scraper::TeamScheduleEnrichmentScraper).to receive(:new).with(team: home_team, season:).and_return(schedule_scraper)
 
-    described_class.new(game, overrides: []).call
+    described_class.new(game).call
 
     expect(game.reload).to have_attributes(
       venue_type: 'neutral',
@@ -223,19 +201,12 @@ RSpec.describe Importer::GameVenueEnricher do
   end
 
   it 'is idempotent' do
-    overrides = [
-      {
-        'season' => 2025,
-        'date' => '2024-11-18',
-        'teams' => %w[Houston Alabama],
-        'venue_type' => 'neutral'
-      }
-    ]
+    game.update!(location: 'Fertitta Center')
 
-    described_class.new(game, overrides:).call
+    described_class.new(game).call
     first_attributes = game.reload.attributes.slice('venue_type', 'venue_source', 'venue_confidence', 'venue_name', 'neutral')
 
-    described_class.new(game, overrides:).call
+    described_class.new(game).call
 
     expect(game.reload.attributes.slice('venue_type', 'venue_source', 'venue_confidence', 'venue_name', 'neutral')).to eq(first_attributes)
   end
@@ -244,11 +215,11 @@ RSpec.describe Importer::GameVenueEnricher do
     let(:location) { 'Fertitta Center' }
 
     it 'marks the game as confirmed home' do
-      described_class.new(game, overrides: []).call
+      described_class.new(game).call
 
       expect(game.reload).to have_attributes(
         venue_type: 'home',
-        venue_source: 'sports_reference_schedule',
+        venue_source: 'sports_reference_box_score_header',
         venue_confidence: 'confirmed',
         venue_name: 'Fertitta Center',
         neutral: false
@@ -262,7 +233,7 @@ RSpec.describe Importer::GameVenueEnricher do
     it 'leaves the venue unknown' do
       allow(Scraper::TeamScheduleEnrichmentScraper).to receive(:new).and_raise(StandardError)
 
-      described_class.new(game, overrides: []).call
+      described_class.new(game).call
 
       expect(game.reload).to have_attributes(
         venue_type: 'unknown',
@@ -278,7 +249,7 @@ RSpec.describe Importer::GameVenueEnricher do
     let(:location) { nil }
 
     it 'leaves the game unknown instead of assuming home' do
-      described_class.new(game, overrides: []).call
+      described_class.new(game).call
 
       expect(game.reload).to have_attributes(
         venue_type: 'unknown',

@@ -32,7 +32,7 @@ class Game < ApplicationRecord
     neutral: 'neutral'
   }.freeze
 
-  VENUE_CONFIDENCES = %w[unknown confirmed manual inferred].freeze
+  VENUE_CONFIDENCES = %w[unknown confirmed manual].freeze
 
   validates :url, presence: true
   validates :start_time, presence: true

@@ -68,7 +68,7 @@ RSpec.describe Scraper::TeamScheduleEnrichmentScraper do
     allow(HTTParty).to receive(:get).with(schedule_url).and_return(response)
   end
 
-  it 'parses venue rows from a Sports Reference team schedule table' do
+  it 'parses enrichment rows from a Sports Reference team schedule table' do
     expect(scraper.schedule_data).to eq(expected_rows)
   end
 

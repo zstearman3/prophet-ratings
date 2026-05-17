@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 namespace :venue do
-  desc 'Enrich game venue classifications from manual overrides and Sports Reference team schedules'
+  desc 'Enrich game venue classifications from Sports Reference team schedules'
   task enrich: :environment do
     scope = ENV['SEASON'].present? ? Game.joins(:season).where(seasons: { year: ENV.fetch('SEASON').to_i }) : Game.all
 

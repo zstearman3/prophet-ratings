@@ -15,7 +15,7 @@ module ProphetRatings
       @home_rating_snapshot = home_rating_snapshot
       @away_rating_snapshot = away_rating_snapshot
       @upset_modifier = upset_modifier
-      @venue_type = venue&.fetch(:type, nil).presence || 'home'
+      @venue_type = venue&.fetch(:type, nil).presence || 'unknown'
       @venue_confidence = venue&.fetch(:confidence, nil).presence
       @season = season
     end
