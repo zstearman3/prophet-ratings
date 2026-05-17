@@ -106,4 +106,73 @@ RSpec.describe ProphetRatings::AdjustedStatCalculator, type: :service do
       expect(StatisticsUtils).not_to have_received(:solve_least_squares_with_python)
     end
   end
+
+  describe 'home-court adjustment in matrix inputs' do
+    let(:season) { create(:season, :current) }
+    let(:home_team) { create(:team) }
+    let(:away_team) { create(:team) }
+    let(:home_team_season) { create(:team_season, season:, team: home_team) }
+    let(:away_team_season) { create(:team_season, season:, team: away_team) }
+    let(:calculator) do
+      described_class.new(
+        season:,
+        raw_stat: :offensive_efficiency,
+        adj_stat: :adj_offensive_efficiency,
+        adj_stat_allowed: :adj_defensive_efficiency
+      )
+    end
+
+    def build_rows_for(game)
+      create(
+        :team_game,
+        game:,
+        team: home_team,
+        team_season: home_team_season,
+        opponent_team_season: away_team_season,
+        home: true,
+        offensive_efficiency: 110.0
+      )
+      create(
+        :team_game,
+        game:,
+        team: away_team,
+        team_season: away_team_season,
+        opponent_team_season: home_team_season,
+        home: false,
+        offensive_efficiency: 90.0
+      )
+
+      calculator.send(:build_matrix_components, { home_team.id => 0, away_team.id => 1 }, 2, 100.0).second
+    end
+
+    it 'applies configured home-court adjustment for confirmed home games' do
+      game = create(
+        :game,
+        season:,
+        status: :final,
+        start_time: Time.zone.now,
+        home_team_name: home_team.school,
+        away_team_name: away_team.school,
+        venue_type: 'home',
+        venue_confidence: 'confirmed'
+      )
+
+      expect(build_rows_for(game).first(2)).to eq([7.8, -7.8])
+    end
+
+    it 'does not apply home-court adjustment when venue is unknown' do
+      game = create(
+        :game,
+        season:,
+        status: :final,
+        start_time: Time.zone.now,
+        home_team_name: home_team.school,
+        away_team_name: away_team.school,
+        venue_type: 'unknown',
+        venue_confidence: 'unknown'
+      )
+
+      expect(build_rows_for(game).first(2)).to eq([10.0, -10.0])
+    end
+  end
 end

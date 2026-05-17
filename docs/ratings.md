@@ -177,9 +177,12 @@ The baseline home-court advantage is configured in `ratings.yml` as `home_court_
 
 During matrix construction:
 
-- Home teams receive `+home_court_advantage` for configured home-court-adjusted stats.
-- Away teams receive `-home_court_advantage` for configured home-court-adjusted stats.
+- Confirmed home games receive `+home_court_advantage` for configured home-court-adjusted stats.
+- The away observation in confirmed home games receives `-home_court_advantage`.
 - Neutral-site games receive no home-court adjustment.
+- Unknown-venue games also receive no home-court adjustment.
+
+The adjustment now uses `Game#venue_type` and `Game#venue_confidence` instead of treating a blank `neutral` flag as a normal home game. Only `venue_type = home` with confirmed or manual confidence is considered a confirmed home venue. This keeps missing Sports Reference venue data from silently entering the solver as home-court data.
 
 `TeamSeasonStatsAggregator` also estimates team-specific home boosts from historical prediction errors:
 

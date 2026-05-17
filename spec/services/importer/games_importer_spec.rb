@@ -65,7 +65,6 @@ RSpec.describe Importer::GamesImporter do
       date:,
       home_team_score: 100,
       away_team_score: 90,
-      location: 'Home Arena',
       url: 'http://example.com/game',
       home_team_stats: {},
       away_team_stats: {},
@@ -101,11 +100,181 @@ RSpec.describe Importer::GamesImporter do
     expect(game.start_time.to_date).to eq date
   end
 
+  it 'persists explicit venue fields from enriched game rows' do
+    enriched_row = row.merge(
+      date: Time.zone.local(2025, 1, 1, 18, 30),
+      venue_type: 'neutral',
+      venue_source: 'sports_reference_team_schedule',
+      venue_confidence: 'confirmed',
+      venue_name: 'Little Caesars Arena',
+      neutral: true
+    )
+
+    described_class.import([enriched_row])
+
+    expect(Game.last).to have_attributes(
+      venue_type: 'neutral',
+      venue_source: 'sports_reference_team_schedule',
+      venue_confidence: 'confirmed',
+      venue_name: 'Little Caesars Arena',
+      start_time: Time.zone.local(2025, 1, 1, 18, 30),
+      neutral: true
+    )
+  end
+
+  it 'uses box score location as a lower-priority confirmed home venue fallback' do
+    home_team.update!(home_venue: 'Home Arena')
+    fallback_row = row.merge(box_score_location: 'Home Arena')
+
+    described_class.import([fallback_row])
+
+    expect(Game.last).to have_attributes(
+      venue_type: 'home',
+      venue_source: 'sports_reference_box_score_header',
+      venue_confidence: 'confirmed',
+      venue_name: 'Home Arena',
+      neutral: false
+    )
+  end
+
+  it 'does not use box score location fallback when enriched venue fields are present' do
+    home_team.update!(home_venue: 'Home Arena')
+    enriched_row = row.merge(
+      box_score_location: 'Home Arena',
+      venue_type: 'neutral',
+      venue_source: 'sports_reference_team_schedule',
+      venue_confidence: 'confirmed',
+      venue_name: 'Neutral Arena',
+      neutral: true
+    )
+
+    described_class.import([enriched_row])
+
+    expect(Game.last).to have_attributes(
+      venue_type: 'neutral',
+      venue_source: 'sports_reference_team_schedule',
+      venue_confidence: 'confirmed',
+      venue_name: 'Neutral Arena',
+      neutral: true
+    )
+  end
+
+  it 'preserves manual venue fields when a complete game is re-imported' do
+    described_class.import([row])
+    game = Game.last
+    game.update!(
+      venue_type: 'neutral',
+      venue_source: 'manual_override',
+      venue_confidence: 'manual',
+      venue_name: 'T-Mobile Arena',
+      neutral: true
+    )
+
+    described_class.import([
+                             completed_row.merge(
+                               venue_type: 'home',
+                               venue_source: 'sports_reference_team_schedule',
+                               venue_confidence: 'confirmed',
+                               venue_name: 'Home Arena',
+                               neutral: false
+                             )
+                           ])
+
+    expect(game.reload).to have_attributes(
+      venue_type: 'neutral',
+      venue_source: 'manual_override',
+      venue_confidence: 'manual',
+      venue_name: 'T-Mobile Arena',
+      neutral: true
+    )
+  end
+
+  it 'preserves venue fields marked with the manual source during re-import' do
+    described_class.import([row])
+    game = Game.last
+    game.update!(
+      venue_type: 'neutral',
+      venue_source: 'manual_override',
+      venue_confidence: 'confirmed',
+      venue_name: 'T-Mobile Arena',
+      neutral: true
+    )
+
+    described_class.import([
+                             completed_row.merge(
+                               venue_type: 'home',
+                               venue_source: 'sports_reference_team_schedule',
+                               venue_confidence: 'confirmed',
+                               venue_name: 'Home Arena',
+                               neutral: false
+                             )
+                           ])
+
+    expect(game.reload).to have_attributes(
+      venue_type: 'neutral',
+      venue_source: 'manual_override',
+      venue_confidence: 'confirmed',
+      venue_name: 'T-Mobile Arena',
+      neutral: true
+    )
+  end
+
+  it 'preserves manual venue fields when an incomplete game is re-imported' do
+    described_class.import([row])
+    game = Game.last
+    game.update!(
+      venue_type: 'neutral',
+      venue_source: 'manual_override',
+      venue_confidence: 'manual',
+      venue_name: 'T-Mobile Arena',
+      neutral: true
+    )
+
+    described_class.import([
+                             row.merge(
+                               venue_type: 'home',
+                               venue_source: 'sports_reference_team_schedule',
+                               venue_confidence: 'confirmed',
+                               venue_name: 'Home Arena',
+                               neutral: false
+                             )
+                           ])
+
+    expect(game.reload).to have_attributes(
+      venue_type: 'neutral',
+      venue_source: 'manual_override',
+      venue_confidence: 'manual',
+      venue_name: 'T-Mobile Arena',
+      neutral: true
+    )
+  end
+
   it 'does not create a duplicate game for the same teams and date' do
     described_class.import([row])
     expect do
       described_class.import([row])
     end.not_to change(Game, :count)
+  end
+
+  it 'matches existing games by Eastern schedule date when enriched start time crosses UTC midnight' do
+    existing_game = create(
+      :game,
+      season:,
+      start_time: Time.zone.local(2025, 1, 1, 23, 0),
+      home_team_name: home_team.school,
+      away_team_name: away_team.school,
+      url: 'http://example.com/old-game'
+    )
+
+    late_row = row.merge(
+      date: ActiveSupport::TimeZone['Eastern Time (US & Canada)'].parse('2025-01-01 9:00pm'),
+      url: 'http://example.com/enriched-game'
+    )
+
+    expect do
+      described_class.import([late_row])
+    end.not_to change(Game, :count)
+    expect(existing_game.reload.url).to eq('http://example.com/enriched-game')
   end
 
   it 'keeps incomplete games scheduled' do
@@ -121,6 +290,14 @@ RSpec.describe Importer::GamesImporter do
     expect(game.away_team_game).to be_present
     expect(game.home_team_game.team_season).to eq(home_team_season)
     expect(game.away_team_game.team_season).to eq(away_team_season)
+  end
+
+  it 'does not run venue enrichment during the standard import pipeline' do
+    allow(Importer::GameVenueEnricher).to receive(:new).and_call_original
+
+    described_class.import([row])
+
+    expect(Importer::GameVenueEnricher).not_to have_received(:new)
   end
 
   it 'finalizes complete games' do

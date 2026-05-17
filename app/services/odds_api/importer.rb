@@ -33,7 +33,7 @@ module OddsApi
       raise ActiveRecord::RecordNotFound, 'Could not match game teams from odds payload' unless home_team && away_team
 
       Game
-        .where(start_time: start_time.all_day)
+        .on_schedule_date(Game.schedule_date_for(start_time))
         .includes(:home_team_game, :away_team_game)
         .detect do |game|
           game.home_team_game&.team_id == home_team.id &&

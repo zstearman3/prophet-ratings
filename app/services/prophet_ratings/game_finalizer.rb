@@ -40,11 +40,10 @@ module ProphetRatings
     end
 
     ##
-    # Updates the game record with derived fields including possessions, neutrality, average minutes played, and in-conference status.
+    # Updates the game record with derived fields including possessions, average minutes played, and in-conference status.
     def update_derived_fields
       game.update(
         possessions: calculated_possessions,
-        neutral: calculated_neutrality,
         minutes: calculated_minutes,
         in_conference: game.home_team_season&.conference == game.away_team_season&.conference
       )
@@ -96,19 +95,6 @@ module ProphetRatings
     end
 
     ##
-    # Determines if the game was played at a neutral location.
-    # @return [Boolean] True if the game location excludes the home team's location and is not the home team's home venue,
-    # false otherwise. For unknown locations, defaults to false unless an explicit neutral override already exists.
-    def calculated_neutrality
-      if game.location.blank? || game.home_team&.location.blank?
-        return game.neutral.nil? ? false : game.neutral
-      end
-
-      game.location.exclude?(game.home_team.location) &&
-        (game.location != game.home_team.home_venue)
-    end
-
-    ##
     # Calculates the average minutes played per player across both home and away team games, normalized by dividing the total minutes by 5.
     # @return [Integer, nil] The normalized average minutes per player, or nil if no data is available.
     def calculated_minutes
@@ -119,7 +105,7 @@ module ProphetRatings
     end
 
     ##
-    # Returns the latest team rating snapshot for the home team's season as of the game start date,
+    # Returns the latest team rating snapshot for the home team's season as of the game schedule date,
     # using the current ratings configuration version.
     # @return [TeamRatingSnapshot, nil] The latest snapshot for the home team season, or nil if none exists.
     def home_snapshot
@@ -127,7 +113,7 @@ module ProphetRatings
     end
 
     ##
-    # Returns the latest team rating snapshot for the away team's season as of the game start date,
+    # Returns the latest team rating snapshot for the away team's season as of the game schedule date,
     # using the current ratings configuration version.
     # @return [TeamRatingSnapshot, nil] The latest snapshot for the away team season, or nil if none exists.
     def away_snapshot
@@ -136,13 +122,13 @@ module ProphetRatings
 
     ##
     # Returns the most recent team rating snapshot for the given team season and current ratings configuration version,
-    # as of the game's start date.
+    # as of the game's Eastern schedule date.
     # @param [TeamSeason] team_season - The team season for which to retrieve the snapshot.
     # @return [TeamRatingSnapshot, nil] The latest applicable snapshot, or nil if none exists.
     def latest_snapshot(team_season)
       TeamRatingSnapshot
         .where(team_season:, ratings_config_version: RatingsConfigVersion.current)
-        .where(snapshot_date: ..game.start_time.to_date)
+        .where(snapshot_date: ..game.schedule_date)
         .order(snapshot_date: :desc)
         .first
     end

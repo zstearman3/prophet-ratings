@@ -38,11 +38,12 @@ class SyncFromLastGamesJob < ApplicationJob
 
   def start_date(season)
     latest_start_time = season.games.order(start_time: :desc).pick(:start_time)
-    [latest_start_time || season.start_date, season.start_date].max.to_date
+    latest_imported_date = latest_start_time && Game.schedule_date_for(latest_start_time)
+    [latest_imported_date || season.start_date, season.start_date].max
   end
 
   def end_date(season)
-    [season.end_date, Date.yesterday].min
+    [season.end_date, Game.current_schedule_date - 1.day].min
   end
 
   def max_url_position

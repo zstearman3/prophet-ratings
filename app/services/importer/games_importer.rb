@@ -1,10 +1,12 @@
 # frozen_string_literal: true
 
 module Importer
+  # rubocop:disable Metrics/ModuleLength
   module GamesImporter
     TEAM_STAT_KEYS = %i[minutes field_goals_made field_goals_attempted two_pt_made two_pt_attempted three_pt_made
                         three_pt_attempted free_throws_made free_throws_attempted offensive_rebounds
                         defensive_rebounds rebounds assists steals blocks turnovers fouls points].freeze
+    BOX_SCORE_HEADER_SOURCE = 'sports_reference_box_score_header'
 
     class << self
       def import(data) = data.each { |row| process_game(row) }
@@ -12,8 +14,8 @@ module Importer
       private
 
       def find_game_by_teams_and_date(home_team_name, away_team_name, date)
-        Game.where(home_team_name:, away_team_name:)
-            .where('DATE(start_time) = ?', date)
+        Game.on_schedule_date(date)
+            .where(home_team_name:, away_team_name:)
             .first
       end
 
@@ -39,7 +41,10 @@ module Importer
       end
 
       def process_game(row)
-        season = Season.find_by('start_date <= ? AND end_date >= ?', row[:date], row[:date])
+        start_time = Game.schedule_time_for(row[:date])
+        row = row.merge(date: start_time)
+        date = Game.schedule_date_for(start_time)
+        season = Season.find_by('start_date <= ? AND end_date >= ?', date, date)
 
         home_team_name = row[:home_team]
         away_team_name = row[:away_team]
@@ -52,36 +57,44 @@ module Importer
         home_team_season = home_team ? TeamSeason.find_by(season:, team: home_team) : nil
         away_team_season = away_team ? TeamSeason.find_by(season:, team: away_team) : nil
 
-        date = row[:date].to_date
         game = find_game_by_teams_and_date(row[:home_team], row[:away_team], date) ||
-               Game.new(home_team_name: row[:home_team], away_team_name: row[:away_team], start_time: row[:date])
+               Game.new(home_team_name: row[:home_team], away_team_name: row[:away_team], start_time:)
 
-        if game_complete?(row)
-          game.update!(
-            season:,
-            home_team_score: row[:home_team_score],
-            away_team_score: row[:away_team_score],
-            location: row[:location],
-            url: row[:url]
-          )
+        return process_complete_game(game, row, season, home_team_season, away_team_season) if game_complete?(row)
 
-          home_game = find_or_create_team_game(game, home_team_season, home: true)
-          away_game = find_or_create_team_game(game, away_team_season, home: false)
-          process_team_game(home_game, row[:home_team_stats], home_team_season, away_team_season) if home_game
-          process_team_game(away_game, row[:away_team_stats], away_team_season, home_team_season) if away_game
+        process_incomplete_game(game, row, season, home_team_season, away_team_season)
+      end
 
-          finalize_game_if_possible(game)
-          return
-        end
-
-        # Keep unplayed/incomplete games scheduled and avoid clobbering existing finals with partial rows.
-        game.update!(
+      def process_complete_game(game, row, season, home_team_season, away_team_season)
+        attrs = {
           season:,
-          location: row[:location],
+          start_time: row[:date],
+          home_team_score: row[:home_team_score],
+          away_team_score: row[:away_team_score],
+          url: row[:url]
+        }
+        attrs.merge!(venue_attributes(row, home_team_season&.team, game)) unless manual_venue?(game)
+        game.update!(attrs)
+
+        home_game = find_or_create_team_game(game, home_team_season, home: true)
+        away_game = find_or_create_team_game(game, away_team_season, home: false)
+        process_team_game(home_game, row[:home_team_stats], home_team_season, away_team_season) if home_game
+        process_team_game(away_game, row[:away_team_stats], away_team_season, home_team_season) if away_game
+
+        finalize_game_if_possible(game)
+      end
+
+      def process_incomplete_game(game, row, season, home_team_season, away_team_season)
+        # Keep unplayed/incomplete games scheduled and avoid clobbering existing finals with partial rows.
+        attrs = {
+          season:,
+          start_time: row[:date],
           url: row[:url],
           home_team_score: game.final? ? game.home_team_score : row[:home_team_score],
           away_team_score: game.final? ? game.away_team_score : row[:away_team_score]
-        )
+        }
+        attrs.merge!(venue_attributes(row, home_team_season&.team, game)) unless manual_venue?(game)
+        game.update!(attrs)
         home_game = find_or_create_team_game(game, home_team_season, home: true)
         away_game = find_or_create_team_game(game, away_team_season, home: false)
         process_team_game(home_game, {}, home_team_season, away_team_season)
@@ -121,6 +134,54 @@ module Importer
           game.minutes.to_i.positive? &&
           game.possessions.present?
       end
+
+      def venue_attributes(row, home_team, game)
+        explicit_attrs = row.slice(:venue_type, :venue_source, :venue_confidence, :venue_name, :neutral)
+        return explicit_attrs if explicit_attrs.values.any?(&:present?) || explicit_attrs.key?(:neutral)
+        return {} if venue_data_present?(game)
+
+        box_score_location_attributes(row[:box_score_location], home_team)
+      end
+
+      def box_score_location_attributes(box_score_location, home_team)
+        venue_name = box_score_location.to_s.strip
+        return {} if venue_name.blank?
+
+        attrs = {
+          venue_source: BOX_SCORE_HEADER_SOURCE,
+          venue_name:
+        }
+        return attrs unless home_location?(home_team, venue_name)
+
+        attrs.merge(
+          venue_type: 'home',
+          venue_confidence: 'confirmed',
+          neutral: false
+        )
+      end
+
+      def home_location?(home_team, location)
+        return false unless home_team
+
+        exact_match?(location, home_team.home_venue) || location_includes?(location, home_team.location)
+      end
+
+      def exact_match?(location, expected)
+        expected.present? && location.casecmp(expected.strip).zero?
+      end
+
+      def location_includes?(location, expected)
+        expected.present? && location.downcase.include?(expected.strip.downcase)
+      end
+
+      def venue_data_present?(game)
+        !game.venue_unknown? || game.venue_source.present? || game.venue_name.present? || !game.neutral.nil?
+      end
+
+      def manual_venue?(game)
+        game.venue_confidence == 'manual' || game.venue_source == 'manual_override'
+      end
     end
+    # rubocop:enable Metrics/ModuleLength
   end
 end

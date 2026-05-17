@@ -33,8 +33,8 @@
 
     <div class="mt-4">
       <p class="text-gray-600 text-center">Date: <%= @game.start_time.strftime("%B %d, %Y") %></p>
-      <% if @game.location.present? %>
-        <p class="text-gray-600 text-center">Location: <%= @game.location %></p>
+      <% if @game.venue_name.present? %>
+        <p class="text-gray-600 text-center">Venue: <%= @game.venue_name %></p>
       <% end %>
     </div>
 

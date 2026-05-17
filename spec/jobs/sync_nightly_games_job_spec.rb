@@ -18,7 +18,7 @@ RSpec.describe SyncNightlyGamesJob do
   before do
     allow(SyncDailyGamesJob).to receive(:perform_now) { |date| synced_dates << date }
     allow(UpdateRankingsJob).to receive(:perform_later)
-    allow(Time.zone).to receive(:today).and_return(today)
+    allow(Game).to receive(:current_schedule_date).and_return(today)
   end
 
   it 'syncs the recent past lookback window and all upcoming scheduled dates' do

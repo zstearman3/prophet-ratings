@@ -112,5 +112,115 @@ RSpec.describe ProphetRatings::GamePredictor do
       expect(result[:explanation]).to be_a(String)
       expect(result[:meta]).to be_a(Hash)
     end
+
+    it 'uses home-court adjustment for confirmed home games' do
+      config = create(:ratings_config_version)
+      home_snapshot = create(
+        :team_rating_snapshot,
+        team_season: home_team_season,
+        ratings_config_version: config,
+        adj_offensive_efficiency: 110.0,
+        stats: { home_offense_boost: 3.0, home_defense_boost: -2.0 }
+      )
+      away_snapshot = create(
+        :team_rating_snapshot,
+        team_season: away_team_season,
+        ratings_config_version: config,
+        adj_defensive_efficiency: 100.0
+      )
+
+      result = described_class.new(
+        home_rating_snapshot: home_snapshot,
+        away_rating_snapshot: away_snapshot,
+        season:,
+        venue: { type: 'home' }
+      ).call
+
+      expect(result[:meta][:home_court_adjustment_applied]).to be(true)
+      expect(result[:meta][:home_expected_ortg]).to eq(108.0)
+    end
+
+    it 'uses zero home-court adjustment for neutral games' do
+      config = create(:ratings_config_version)
+      home_snapshot = create(
+        :team_rating_snapshot,
+        team_season: home_team_season,
+        ratings_config_version: config,
+        adj_offensive_efficiency: 110.0,
+        stats: { home_offense_boost: 3.0, home_defense_boost: -2.0 }
+      )
+      away_snapshot = create(
+        :team_rating_snapshot,
+        team_season: away_team_season,
+        ratings_config_version: config,
+        adj_defensive_efficiency: 100.0
+      )
+
+      result = described_class.new(
+        home_rating_snapshot: home_snapshot,
+        away_rating_snapshot: away_snapshot,
+        season:,
+        venue: { type: 'neutral' }
+      ).call
+
+      expect(result[:meta][:home_court_adjustment_applied]).to be(false)
+      expect(result[:meta][:home_expected_ortg]).to eq(105.0)
+    end
+
+    it 'treats unknown venue as an explicit confidence issue without home-court adjustment' do
+      config = create(:ratings_config_version)
+      home_snapshot = create(
+        :team_rating_snapshot,
+        team_season: home_team_season,
+        ratings_config_version: config,
+        adj_offensive_efficiency: 110.0,
+        stats: { home_offense_boost: 3.0, home_defense_boost: -2.0 }
+      )
+      away_snapshot = create(
+        :team_rating_snapshot,
+        team_season: away_team_season,
+        ratings_config_version: config,
+        adj_defensive_efficiency: 100.0
+      )
+
+      result = described_class.new(
+        home_rating_snapshot: home_snapshot,
+        away_rating_snapshot: away_snapshot,
+        season:,
+        venue: { type: 'unknown' }
+      ).call
+
+      expect(result[:meta][:home_court_adjustment_applied]).to be(false)
+      expect(result[:meta][:venue_confidence_issue]).to eq('venue_unknown_home_court_not_applied')
+      expect(result[:meta][:home_expected_ortg]).to eq(105.0)
+    end
+
+    it 'treats a missing venue as unknown instead of assuming home court' do
+      config = create(:ratings_config_version)
+      home_snapshot = create(
+        :team_rating_snapshot,
+        team_season: home_team_season,
+        ratings_config_version: config,
+        adj_offensive_efficiency: 110.0,
+        stats: { home_offense_boost: 3.0, home_defense_boost: -2.0 }
+      )
+      away_snapshot = create(
+        :team_rating_snapshot,
+        team_season: away_team_season,
+        ratings_config_version: config,
+        adj_defensive_efficiency: 100.0
+      )
+
+      result = described_class.new(
+        home_rating_snapshot: home_snapshot,
+        away_rating_snapshot: away_snapshot,
+        season:
+      ).call
+
+      expect(result[:meta][:venue_type]).to eq('unknown')
+      expect(result[:meta][:home_court_adjustment_applied]).to be(false)
+      expect(result[:meta][:venue_confidence_issue]).to eq('venue_unknown_home_court_not_applied')
+      expect(result[:meta][:home_expected_ortg]).to eq(105.0)
+    end
   end
 end

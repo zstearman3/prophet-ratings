@@ -53,7 +53,7 @@ RSpec.describe Scraper::GamesScraper do
       home_team_score: 71,
       away_team_score: 62,
       date: Time.zone.parse('February 18, 2026'),
-      location: 'Chapel Hill, NC',
+      box_score_location: 'Chapel Hill, NC',
       away_team_stats: { minutes: '200' },
       home_team_stats: { minutes: '200' },
       url: completed_url
@@ -78,8 +78,7 @@ RSpec.describe Scraper::GamesScraper do
       away_team: 'Alabama State',
       home_team_score: nil,
       away_team_score: nil,
-      date: Time.zone.parse("#{date} 7:00pm"),
-      location: nil,
+      date: Game::SCHEDULE_TIME_ZONE.parse("#{date} 7:00pm").in_time_zone,
       away_team_stats: {},
       home_team_stats: {},
       url: schedule_url
@@ -140,7 +139,8 @@ RSpec.describe Scraper::GamesScraper do
     start_time = scraper.send(:scheduled_start_time, '7:00p ET')
 
     expect(start_time).to be_a(ActiveSupport::TimeWithZone)
-    expect(start_time.hour).to eq(19)
+    expect(start_time).to eq(Game::SCHEDULE_TIME_ZONE.parse("#{date} 7:00pm").in_time_zone)
+    expect(Game.schedule_date_for(start_time)).to eq(date)
   end
 
   it 'returns a time value for completed games from scorebox metadata' do
@@ -157,7 +157,7 @@ RSpec.describe Scraper::GamesScraper do
       </div>
       <div class="scorebox_meta">
         <div>February 18, 2026</div>
-        <div>Chapel Hill, NC</div>
+        <div> Chapel Hill, NC </div>
       </div>
       <table class="stats_table">
         <tfoot>
@@ -174,5 +174,6 @@ RSpec.describe Scraper::GamesScraper do
 
     expect(game[:date]).to be_a(ActiveSupport::TimeWithZone)
     expect(game[:date].to_date).to eq(date)
+    expect(game[:box_score_location]).to eq('Chapel Hill, NC')
   end
 end

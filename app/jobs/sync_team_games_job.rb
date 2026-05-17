@@ -6,29 +6,36 @@ class SyncTeamGamesJob < ApplicationJob
   def perform(team_id, season_id = Season.last.id)
     team = Team.find(team_id)
     season = Season.find(season_id)
-    end_date = [season.end_date, Date.yesterday].min
 
-    (season.start_date..end_date).each do |date|
-      Rails.logger.debug { "Looking for matches on #{date}" }
+    (season.start_date..sync_end_date(season)).each do |date|
+      import_team_games_for_date(team, date)
+    end
+  end
 
-      scraper = Scraper::GamesScraper.new(date)
-      game_count = scraper.game_count
+  private
 
-      next if game_count.zero?
+  def sync_end_date(season)
+    [season.end_date, Game.current_schedule_date - 1.day].min
+  end
 
-      data = scraper.to_json_for_team(team)
+  def import_team_games_for_date(team, date)
+    Rails.logger.debug { "Looking for matches on #{date}" }
 
-      # Keep only games where this team is involved
-      aliases = team.team_aliases.pluck(:value)
-      team_data = data.select do |row|
-        row[:home_team] == team.school || row[:away_team] == team.school ||
-          aliases.include?(row[:home_team]) ||
-          aliases.include?(row[:away_team])
-      end
+    scraper = Scraper::GamesScraper.new(date)
+    return if scraper.game_count.zero?
 
-      Importer::GamesImporter.import(team_data)
+    team_data = team_rows(team, scraper.to_json_for_team(team))
+    Importer::GamesImporter.import(team_data)
 
-      Rails.logger.debug { "Imported #{team_data.size} games for #{team.school} on #{date}" }
+    Rails.logger.debug { "Imported #{team_data.size} games for #{team.school} on #{date}" }
+  end
+
+  def team_rows(team, data)
+    aliases = team.team_aliases.pluck(:value)
+    data.select do |row|
+      row[:home_team] == team.school || row[:away_team] == team.school ||
+        aliases.include?(row[:home_team]) ||
+        aliases.include?(row[:away_team])
     end
   end
 end

@@ -2,7 +2,7 @@
 
 module Scraper
   class GamesScraper < Scraper
-    def initialize(date = Time.zone.today)
+    def initialize(date = Game.current_schedule_date)
       @date = date
     end
 
@@ -97,7 +97,6 @@ module Scraper
         home_team_score: score_from_row(home_row),
         away_team_score: score_from_row(away_row),
         date: scheduled_start_time(time_from_rows(rows)),
-        location: nil,
         away_team_stats: {},
         home_team_stats: {},
         url: schedule_url(@date)
@@ -141,8 +140,8 @@ module Scraper
       cleaned_time = time_token.delete(' ')
       cleaned_time = "#{cleaned_time}m" if cleaned_time.match?(/\A\d{1,2}:\d{2}[ap]\z/)
 
-      parsed_time = Time.zone.parse("#{@date} #{cleaned_time}")
-      parsed_time || fallback_start_time
+      parsed_time = Game::SCHEDULE_TIME_ZONE.parse("#{@date} #{cleaned_time}")
+      parsed_time&.in_time_zone || fallback_start_time
     rescue StandardError
       fallback_start_time
     end
@@ -150,14 +149,14 @@ module Scraper
     def completed_start_time(date_text)
       return fallback_start_time if date_text.blank?
 
-      parsed_time = Time.zone.parse(date_text)
-      parsed_time || fallback_start_time
+      parsed_time = Game::SCHEDULE_TIME_ZONE.parse(date_text)
+      parsed_time&.in_time_zone || fallback_start_time
     rescue StandardError
       fallback_start_time
     end
 
     def fallback_start_time
-      @date.in_time_zone
+      Game.schedule_time_for(@date)
     end
 
     def parse_team_stats(row)
@@ -198,7 +197,7 @@ module Scraper
       home_team_score = parsed_score(team_boxes[1]&.css('div.score')&.text)
       away_team_score = parsed_score(team_boxes[0]&.css('div.score')&.text)
       date = completed_start_time(document.css('div.scorebox_meta div')[0]&.text)
-      location = document.css('div.scorebox_meta div')[1]&.text
+      box_score_location = document.css('div.scorebox_meta div')[1]&.text.to_s.strip
       away_team_line = document.css('table.stats_table tfoot tr')[0]
       home_team_line = document.css('table.stats_table tfoot tr')[2]
 
@@ -208,7 +207,7 @@ module Scraper
         home_team_score:,
         away_team_score:,
         date:,
-        location:,
+        box_score_location:,
         away_team_stats: parse_team_stats(away_team_line),
         home_team_stats: parse_team_stats(home_team_line),
         url:

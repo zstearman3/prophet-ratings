@@ -38,7 +38,7 @@ class SyncFullSeasonGamesJob < ApplicationJob
   end
 
   def sync_date_range(season, start_date:, end_date:, resume:)
-    sync_end_date = [coerce_date(end_date) || season.end_date, Date.yesterday].min
+    sync_end_date = [coerce_date(end_date) || season.end_date, Game.current_schedule_date - 1.day].min
     sync_start_date = coerce_date(start_date) || (resume ? resume_start_date(season) : season.start_date)
     sync_start_date = [sync_start_date, season.start_date].max
 
@@ -54,7 +54,7 @@ class SyncFullSeasonGamesJob < ApplicationJob
   end
 
   def resume_start_date(season)
-    latest_imported = season.games.maximum(:start_time)&.to_date
+    latest_imported = season.games.maximum(:start_time)&.then { |start_time| Game.schedule_date_for(start_time) }
     latest_imported || season.start_date
   end
 
