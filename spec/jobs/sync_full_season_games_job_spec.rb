@@ -3,7 +3,7 @@
 require 'rails_helper'
 
 RSpec.describe SyncFullSeasonGamesJob do
-  let(:scraper) { instance_double(Scraper::GamesScraper, game_count: 0) }
+  let(:service) { instance_double(Ingestion::GamesIngestionService, call: { imported_rows: 0 }) }
   let(:today) { Date.current }
   let(:season) do
     create(
@@ -15,7 +15,7 @@ RSpec.describe SyncFullSeasonGamesJob do
   end
 
   before do
-    allow(Scraper::GamesScraper).to receive(:new).and_return(scraper)
+    allow(Ingestion::GamesIngestionService).to receive(:new).and_return(service)
   end
 
   it 'resumes from the latest imported game date when resume is enabled' do
@@ -23,9 +23,9 @@ RSpec.describe SyncFullSeasonGamesJob do
     create(:game, season:, start_time: latest_imported_date + 12.hours, home_team_name: 'H1', away_team_name: 'A1')
 
     called_dates = []
-    allow(Scraper::GamesScraper).to receive(:new) do |date|
+    allow(Ingestion::GamesIngestionService).to receive(:new) do |date:|
       called_dates << date
-      scraper
+      service
     end
 
     described_class.perform_now(season, resume: true)
@@ -35,9 +35,9 @@ RSpec.describe SyncFullSeasonGamesJob do
 
   it 'honors explicit date window overrides' do
     called_dates = []
-    allow(Scraper::GamesScraper).to receive(:new) do |date|
+    allow(Ingestion::GamesIngestionService).to receive(:new) do |date:|
       called_dates << date
-      scraper
+      service
     end
 
     described_class.perform_now(
@@ -57,6 +57,6 @@ RSpec.describe SyncFullSeasonGamesJob do
       end_date: season.end_date
     )
 
-    expect(Scraper::GamesScraper).not_to have_received(:new)
+    expect(Ingestion::GamesIngestionService).not_to have_received(:new)
   end
 end

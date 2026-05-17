@@ -70,23 +70,7 @@ class SyncFullSeasonGamesJob < ApplicationJob
 
   def import_day(date)
     Rails.logger.info { "Starting game scrape for #{date}" }
-
-    scraper = Scraper::GamesScraper.new(date)
-    @url_position = 0
-    @game_count = scraper.game_count
-
-    while @url_position < @game_count
-      batch_size = max_url_position - @url_position
-
-      data = scraper.to_json_in_batches(@url_position, batch_size)
-      Importer::GamesImporter.import(data)
-
-      Rails.logger.info { "Imported games #{@url_position} to #{max_url_position} of #{@game_count} for #{date}" }
-      @url_position = max_url_position
-    end
-  end
-
-  def max_url_position
-    @url_position + 10 < @game_count ? (@url_position + 10) : @game_count
+    result = Ingestion::GamesIngestionService.new(date:).call
+    Rails.logger.info { "Imported #{result[:imported_rows]} games for #{date}" }
   end
 end

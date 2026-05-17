@@ -12,12 +12,19 @@ RSpec.describe SyncFromLastGamesJob do
       end_date: Date.yesterday
     )
   end
-  let(:scraper) { instance_double(Scraper::GamesScraper, game_count: 0) }
+  let(:service) { instance_double(Ingestion::GamesIngestionService, call: { imported_rows: 0 }) }
 
   before do
     season
-    allow(Scraper::GamesScraper).to receive(:new).and_return(scraper)
+    allow(Ingestion::GamesIngestionService).to receive(:new).and_return(service)
     allow(UpdateRankingsJob).to receive(:perform_later)
+  end
+
+  it 'delegates each sync date to the ingestion service' do
+    described_class.perform_now(season.id)
+
+    expect(Ingestion::GamesIngestionService).to have_received(:new).with(date: season.start_date)
+    expect(service).to have_received(:call)
   end
 
   it 'enqueues rankings generation after syncing' do
