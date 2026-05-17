@@ -197,7 +197,7 @@ module Scraper
       home_team_score = parsed_score(team_boxes[1]&.css('div.score')&.text)
       away_team_score = parsed_score(team_boxes[0]&.css('div.score')&.text)
       date = completed_start_time(document.css('div.scorebox_meta div')[0]&.text)
-      box_score_location = document.css('div.scorebox_meta div')[1]&.text
+      box_score_location = document.css('div.scorebox_meta div')[1]&.text.to_s.strip
       away_team_line = document.css('table.stats_table tfoot tr')[0]
       home_team_line = document.css('table.stats_table tfoot tr')[2]
 

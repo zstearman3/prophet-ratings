@@ -156,7 +156,7 @@ RSpec.describe Scraper::GamesScraper do
       </div>
       <div class="scorebox_meta">
         <div>February 18, 2026</div>
-        <div>Chapel Hill, NC</div>
+        <div> Chapel Hill, NC </div>
       </div>
       <table class="stats_table">
         <tfoot>
@@ -173,5 +173,6 @@ RSpec.describe Scraper::GamesScraper do
 
     expect(game[:date]).to be_a(ActiveSupport::TimeWithZone)
     expect(game[:date].to_date).to eq(date)
+    expect(game[:box_score_location]).to eq('Chapel Hill, NC')
   end
 end

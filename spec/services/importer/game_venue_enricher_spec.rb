@@ -28,6 +28,21 @@ RSpec.describe Importer::GameVenueEnricher do
       .and_return(instance_double(Scraper::TeamScheduleEnrichmentScraper, schedule_data: []))
   end
 
+  it 'logs schedule scraper failures and leaves the game unchanged' do
+    allow(Scraper::TeamScheduleEnrichmentScraper).to receive(:new).and_raise(StandardError, 'network failure')
+    allow(Rails.logger).to receive(:warn)
+
+    expect { described_class.new(game).call }.not_to raise_error
+    expect(Rails.logger).to have_received(:warn).with(/Unable to scrape venue schedule.*network failure/).twice
+    expect(game.reload).to have_attributes(
+      venue_type: 'unknown',
+      venue_source: nil,
+      venue_confidence: 'unknown',
+      venue_name: nil,
+      neutral: nil
+    )
+  end
+
   it 'does not overwrite manually classified games with scraped data' do
     game.update!(
       venue_type: 'neutral',
