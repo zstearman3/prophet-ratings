@@ -85,7 +85,7 @@ RSpec.describe Ingestion::GameRowEnricher do
     )
   end
 
-  it 'does not enrich a same-date game unless the opponent also matches' do
+  it 'enriches a same-date game when the opponent also matches' do
     rows = [
       {
         home_team: 'Michigan',
@@ -102,6 +102,24 @@ RSpec.describe Ingestion::GameRowEnricher do
       venue_name: 'Little Caesars Arena',
       date: Time.zone.local(2025, 11, 11, 18, 30)
     )
+  end
+
+  it 'does not enrich a same-date game when the opponent does not match' do
+    original_date = Time.zone.local(2025, 11, 11, 18, 30)
+    rows = [
+      {
+        home_team: 'Michigan',
+        away_team: 'Detroit Mercy',
+        date: original_date,
+        url: '/cbb/boxscores/missing-url.html'
+      }
+    ]
+
+    enriched_row = described_class.new(rows).call.first
+
+    expect(enriched_row[:venue_type]).to be_nil
+    expect(enriched_row[:venue_name]).to be_nil
+    expect(enriched_row[:date]).to eq(original_date)
   end
 
   it "does not enrich rows marked '@' because away venue type is unsupported" do

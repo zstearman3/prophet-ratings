@@ -11,7 +11,7 @@ The app now stores explicit venue classification on `games`:
 - `venue_confidence`: `confirmed`, `manual`, or `unknown`
 - `venue_name`: optional display/source venue name
 
-The default is `unknown`. Missing location data is no longer treated as a confirmed home game.
+The default is `unknown`. Missing venue data is no longer treated as a confirmed home game.
 
 Normal game ingestion is coordinated by `Ingestion::GamesIngestionService`, which scrapes daily game rows, enriches them with `Ingestion::GameRowEnricher`, and imports the enriched rows. `Importer::GameVenueEnricher` scrapes Sports Reference team schedule rows via `Scraper::TeamScheduleEnrichmentScraper`; it is still available as an opt-in backfill/repair path and preserves manual classifications stored directly on `games`.
 
@@ -21,4 +21,3 @@ Remaining work:
 
 - add Rails admin support for manually correcting known neutral-site events that Sports Reference cannot classify
 - monitor `bundle exec rails venue:coverage` after imports
-- revisit whether `location` should be renamed once the venue scraper has run against real data

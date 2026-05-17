@@ -10,7 +10,6 @@
 #  home_team_name  :string           not null
 #  home_team_score :integer
 #  in_conference   :boolean          default(FALSE)
-#  location        :string
 #  minutes         :integer
 #  neutral         :boolean
 #  possessions     :decimal(4, 1)

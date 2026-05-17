@@ -15,13 +15,11 @@ RSpec.describe Importer::GameVenueEnricher do
       start_time: Time.zone.local(2024, 11, 18, 19, 0),
       home_team_name: home_team.school,
       away_team_name: away_team.school,
-      location:,
       venue_type: 'unknown',
       venue_source: nil,
       venue_confidence: 'unknown'
     )
   end
-  let(:location) { nil }
 
   before do
     create(:team_game, game:, team: home_team, team_season: home_team_season, home: true)
@@ -32,7 +30,6 @@ RSpec.describe Importer::GameVenueEnricher do
 
   it 'does not overwrite manually classified games with scraped data' do
     game.update!(
-      location: 'Fertitta Center',
       venue_type: 'neutral',
       venue_source: 'manual_override',
       venue_confidence: 'manual',
@@ -52,20 +49,31 @@ RSpec.describe Importer::GameVenueEnricher do
   end
 
   it 'overwrites manually classified games when requested' do
+    schedule_scraper = instance_double(
+      Scraper::TeamScheduleEnrichmentScraper,
+      schedule_data: [
+        {
+          date: game.start_time.to_date,
+          opponent_name: away_team.school,
+          game_location: '',
+          venue_name: 'Fertitta Center'
+        }
+      ]
+    )
     game.update!(
-      location: 'Fertitta Center',
       venue_type: 'neutral',
       venue_source: 'manual_override',
       venue_confidence: 'manual',
       venue_name: 'T-Mobile Arena',
       neutral: true
     )
+    allow(Scraper::TeamScheduleEnrichmentScraper).to receive(:new).with(team: home_team, season:).and_return(schedule_scraper)
 
     described_class.new(game, overwrite_manual: true).call
 
     expect(game.reload).to have_attributes(
       venue_type: 'home',
-      venue_source: 'sports_reference_box_score_header',
+      venue_source: 'sports_reference_team_schedule',
       venue_confidence: 'confirmed',
       venue_name: 'Fertitta Center',
       neutral: false
@@ -174,16 +182,22 @@ RSpec.describe Importer::GameVenueEnricher do
     )
   end
 
-  it 'prioritizes the Sports Reference team schedule row over legacy header location text' do
-    game.update!(location: 'Fertitta Center')
+  it 'preserves an existing known venue when scraped data cannot confirm a venue' do
+    game.update!(
+      venue_type: 'neutral',
+      venue_source: 'sports_reference_team_schedule',
+      venue_confidence: 'confirmed',
+      venue_name: 'T-Mobile Arena',
+      neutral: true
+    )
     schedule_scraper = instance_double(
       Scraper::TeamScheduleEnrichmentScraper,
       schedule_data: [
         {
           date: game.start_time.to_date,
           opponent_name: away_team.school,
-          game_location: 'N',
-          venue_name: 'Little Caesars Arena'
+          game_location: '@',
+          venue_name: 'Coleman Coliseum'
         }
       ]
     )
@@ -195,13 +209,24 @@ RSpec.describe Importer::GameVenueEnricher do
       venue_type: 'neutral',
       venue_source: 'sports_reference_team_schedule',
       venue_confidence: 'confirmed',
-      venue_name: 'Little Caesars Arena',
+      venue_name: 'T-Mobile Arena',
       neutral: true
     )
   end
 
   it 'is idempotent' do
-    game.update!(location: 'Fertitta Center')
+    schedule_scraper = instance_double(
+      Scraper::TeamScheduleEnrichmentScraper,
+      schedule_data: [
+        {
+          date: game.start_time.to_date,
+          opponent_name: away_team.school,
+          game_location: '',
+          venue_name: 'Fertitta Center'
+        }
+      ]
+    )
+    allow(Scraper::TeamScheduleEnrichmentScraper).to receive(:new).with(team: home_team, season:).and_return(schedule_scraper)
 
     described_class.new(game).call
     first_attributes = game.reload.attributes.slice('venue_type', 'venue_source', 'venue_confidence', 'venue_name', 'neutral')
@@ -211,52 +236,14 @@ RSpec.describe Importer::GameVenueEnricher do
     expect(game.reload.attributes.slice('venue_type', 'venue_source', 'venue_confidence', 'venue_name', 'neutral')).to eq(first_attributes)
   end
 
-  context 'when Sports Reference provides a home venue location' do
-    let(:location) { 'Fertitta Center' }
+  it 'leaves the game unknown when no schedule row matches' do
+    described_class.new(game).call
 
-    it 'marks the game as confirmed home' do
-      described_class.new(game).call
-
-      expect(game.reload).to have_attributes(
-        venue_type: 'home',
-        venue_source: 'sports_reference_box_score_header',
-        venue_confidence: 'confirmed',
-        venue_name: 'Fertitta Center',
-        neutral: false
-      )
-    end
-  end
-
-  context 'when only the box-score location is present and does not confirm a home game' do
-    let(:location) { 'Neutral Court' }
-
-    it 'leaves the venue unknown' do
-      allow(Scraper::TeamScheduleEnrichmentScraper).to receive(:new).and_raise(StandardError)
-
-      described_class.new(game).call
-
-      expect(game.reload).to have_attributes(
-        venue_type: 'unknown',
-        venue_source: nil,
-        venue_confidence: 'unknown',
-        venue_name: nil,
-        neutral: nil
-      )
-    end
-  end
-
-  context 'when location is missing' do
-    let(:location) { nil }
-
-    it 'leaves the game unknown instead of assuming home' do
-      described_class.new(game).call
-
-      expect(game.reload).to have_attributes(
-        venue_type: 'unknown',
-        venue_source: nil,
-        venue_confidence: 'unknown',
-        neutral: nil
-      )
-    end
+    expect(game.reload).to have_attributes(
+      venue_type: 'unknown',
+      venue_source: nil,
+      venue_confidence: 'unknown',
+      neutral: nil
+    )
   end
 end

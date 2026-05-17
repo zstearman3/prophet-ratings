@@ -3,7 +3,6 @@
 module Importer
   class GameVenueEnricher
     MANUAL_SOURCE = 'manual_override'
-    SPORTS_REFERENCE_SOURCE = 'sports_reference_box_score_header'
     SPORTS_REFERENCE_TEAM_SCHEDULE_SOURCE = 'sports_reference_team_schedule'
 
     def initialize(games = Game.all, overwrite_manual: false)
@@ -26,23 +25,8 @@ module Importer
     def enrich_game(game)
       return if manual_classification?(game) && !overwrite_manual
 
-      attrs = schedule_attributes(game) || header_location_attributes(game)
+      attrs = schedule_attributes(game)
       game.update!(attrs) if attrs.present?
-    end
-
-    def header_location_attributes(game)
-      location = game.location.to_s.strip
-      return unknown_attributes(game) if location.blank?
-
-      return unknown_attributes(game) unless home_location?(game, location)
-
-      {
-        venue_type: 'home',
-        venue_source: SPORTS_REFERENCE_SOURCE,
-        venue_confidence: 'confirmed',
-        venue_name: location,
-        neutral: false
-      }
     end
 
     def schedule_attributes(game)
@@ -51,7 +35,7 @@ module Importer
 
       row, team = match
       venue_type = schedule_venue_type(row, team, game)
-      return unknown_attributes(game) if venue_type == 'unknown'
+      return if venue_type == 'unknown'
 
       venue_attributes(venue_type, row[:venue_name])
     end
@@ -104,33 +88,6 @@ module Importer
     def schedule_row_matches_game?(row, game)
       row[:date] == game.start_time.to_date &&
         [game.home_team_name, game.away_team_name].map(&:downcase).include?(row[:opponent_name].to_s.downcase)
-    end
-
-    def unknown_attributes(game)
-      return if game.venue_unknown? && game.venue_confidence == 'unknown' && game.neutral.nil?
-
-      {
-        venue_type: 'unknown',
-        venue_source: nil,
-        venue_confidence: 'unknown',
-        venue_name: nil,
-        neutral: nil
-      }
-    end
-
-    def home_location?(game, location)
-      home_team = game.home_team
-      return false unless home_team
-
-      exact_match?(location, home_team.home_venue) || location_includes?(location, home_team.location)
-    end
-
-    def exact_match?(location, expected)
-      expected.present? && location.casecmp(expected.strip).zero?
-    end
-
-    def location_includes?(location, expected)
-      expected.present? && location.downcase.include?(expected.strip.downcase)
     end
 
     def manual_classification?(game)

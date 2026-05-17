@@ -9,7 +9,7 @@ RSpec.describe 'Games' do
       team = create(:team)
       team_season = create(:team_season, team:, season:)
       game = create(:game, start_time: Date.current.beginning_of_day + 12.hours, status: :final, minutes: 40, home_team_score: 70,
-                           away_team_score: 65, location: 'Arena', season:)
+                           away_team_score: 65, venue_name: 'Arena', season:)
       create(:team_game, game:, team:, team_season:)
       get '/games/schedule', params: { date: Date.current.to_s }
       expect(response).to have_http_status(:success)
@@ -79,7 +79,7 @@ RSpec.describe 'Games' do
     let(:away_team) { create(:team, school: 'Away Team', slug: 'away-team') }
     let(:home_team_season) { create(:team_season, team: home_team, season:) }
     let(:away_team_season) { create(:team_season, team: away_team, season:) }
-    let(:location) { nil }
+    let(:venue_name) { nil }
     let(:game) do
       create(
         :game,
@@ -91,7 +91,7 @@ RSpec.describe 'Games' do
         away_team_score: 65,
         home_team_name: home_team.school,
         away_team_name: away_team.school,
-        location:
+        venue_name:
       )
     end
 
@@ -100,25 +100,25 @@ RSpec.describe 'Games' do
       create(:team_game, game:, team: away_team, team_season: away_team_season, home: false, points: 65)
     end
 
-    context 'when location is blank' do
-      let(:location) { '' }
+    context 'when venue name is blank' do
+      let(:venue_name) { '' }
 
-      it 'does not render the location header' do
+      it 'does not render the venue header' do
         get "/games/#{game.id}"
 
         expect(response).to have_http_status(:success)
-        expect(response.body).not_to include('Location:')
+        expect(response.body).not_to include('Venue:')
       end
     end
 
-    context 'when location is present' do
-      let(:location) { 'Test Arena' }
+    context 'when venue name is present' do
+      let(:venue_name) { 'Test Arena' }
 
-      it 'renders the location header and value' do
+      it 'renders the venue header and value' do
         get "/games/#{game.id}"
 
         expect(response).to have_http_status(:success)
-        expect(response.body).to include('Location: Test Arena')
+        expect(response.body).to include('Venue: Test Arena')
       end
     end
 
@@ -131,7 +131,7 @@ RSpec.describe 'Games' do
           status: :scheduled,
           home_team_name: home_team.school,
           away_team_name: away_team.school,
-          location:
+          venue_name:
         )
       end
 

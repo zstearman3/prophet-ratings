@@ -65,7 +65,6 @@ RSpec.describe Importer::GamesImporter do
       date:,
       home_team_score: 100,
       away_team_score: 90,
-      location: 'Home Arena',
       url: 'http://example.com/game',
       home_team_stats: {},
       away_team_stats: {},
@@ -119,6 +118,43 @@ RSpec.describe Importer::GamesImporter do
       venue_confidence: 'confirmed',
       venue_name: 'Little Caesars Arena',
       start_time: Time.zone.local(2025, 1, 1, 18, 30),
+      neutral: true
+    )
+  end
+
+  it 'uses box score location as a lower-priority confirmed home venue fallback' do
+    home_team.update!(home_venue: 'Home Arena')
+    fallback_row = row.merge(box_score_location: 'Home Arena')
+
+    described_class.import([fallback_row])
+
+    expect(Game.last).to have_attributes(
+      venue_type: 'home',
+      venue_source: 'sports_reference_box_score_header',
+      venue_confidence: 'confirmed',
+      venue_name: 'Home Arena',
+      neutral: false
+    )
+  end
+
+  it 'does not use box score location fallback when enriched venue fields are present' do
+    home_team.update!(home_venue: 'Home Arena')
+    enriched_row = row.merge(
+      box_score_location: 'Home Arena',
+      venue_type: 'neutral',
+      venue_source: 'sports_reference_team_schedule',
+      venue_confidence: 'confirmed',
+      venue_name: 'Neutral Arena',
+      neutral: true
+    )
+
+    described_class.import([enriched_row])
+
+    expect(Game.last).to have_attributes(
+      venue_type: 'neutral',
+      venue_source: 'sports_reference_team_schedule',
+      venue_confidence: 'confirmed',
+      venue_name: 'Neutral Arena',
       neutral: true
     )
   end

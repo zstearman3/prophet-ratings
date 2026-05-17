@@ -68,9 +68,8 @@ class Team < ApplicationRecord
     self.slug = school.parameterize
   end
 
-  # Not ideal but until enough data will help determine if a game is neutral
   def probable_home_venue
-    arr = home_games.order(start_time: :desc).pluck(:location).first(5)
+    arr = home_games.venue_home.order(start_time: :desc).pluck(:venue_name).compact_blank.first(5)
     arr.max_by { |i| arr.count(i) }
   end
 end

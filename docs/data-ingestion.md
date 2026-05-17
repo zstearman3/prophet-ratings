@@ -269,7 +269,7 @@ Games store explicit venue metadata:
 - `venue_confidence`: `confirmed`, `manual`, or `unknown`
 - `venue_name`: optional venue text
 
-The default venue type is `unknown`. Missing Sports Reference location text is not treated as a normal home game.
+The default venue type is `unknown`. Missing Sports Reference venue text is not treated as a normal home game.
 
 Normal game ingestion enriches scraped rows before import through `Ingestion::GameRowEnricher`. It currently adds Sports Reference team schedule venue and start-time data, matching team schedule rows by box-score URL when present, then falls back to game date plus actual opponent/team pair. It does not match venue data by team and date alone.
 
@@ -283,11 +283,11 @@ The enricher scrapes the Sports Reference team schedule table via `Scraper::Team
 - `opp_name`
 - `arena`
 
-The team schedule row is treated as the highest-priority Sports Reference venue source because it has an explicit location marker. If that scraper cannot match the game, the enricher can use the imported `Game#location` text only when it confirms a home game:
+The team schedule row is treated as the highest-priority Sports Reference venue source because it has an explicit location marker. The box-score scraper still captures header location text as transient `box_score_location` data, but games no longer persist a separate `location` column. During import, `Importer::GamesImporter` only uses `box_score_location` as a lower-priority fallback when no schedule-enriched venue fields are present and the existing game does not already have venue data:
 
 - exact match against the home team's `home_venue`, or inclusion of the home team's `location`, marks a confirmed home game
-- other present location text leaves the game unknown
-- blank location leaves the game unknown
+- other present header text is stored as `venue_name` with source `sports_reference_box_score_header`, but leaves `venue_type` unknown
+- blank header text leaves the game unknown
 
 Manual classifications stored on `games` are not overwritten by scraped Sports Reference data unless the service is called with `overwrite_manual: true`.
 

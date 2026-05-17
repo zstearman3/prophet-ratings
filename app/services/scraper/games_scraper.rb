@@ -97,7 +97,6 @@ module Scraper
         home_team_score: score_from_row(home_row),
         away_team_score: score_from_row(away_row),
         date: scheduled_start_time(time_from_rows(rows)),
-        location: nil,
         away_team_stats: {},
         home_team_stats: {},
         url: schedule_url(@date)
@@ -198,7 +197,7 @@ module Scraper
       home_team_score = parsed_score(team_boxes[1]&.css('div.score')&.text)
       away_team_score = parsed_score(team_boxes[0]&.css('div.score')&.text)
       date = completed_start_time(document.css('div.scorebox_meta div')[0]&.text)
-      location = document.css('div.scorebox_meta div')[1]&.text
+      box_score_location = document.css('div.scorebox_meta div')[1]&.text
       away_team_line = document.css('table.stats_table tfoot tr')[0]
       home_team_line = document.css('table.stats_table tfoot tr')[2]
 
@@ -208,7 +207,7 @@ module Scraper
         home_team_score:,
         away_team_score:,
         date:,
-        location:,
+        box_score_location:,
         away_team_stats: parse_team_stats(away_team_line),
         home_team_stats: parse_team_stats(home_team_line),
         url:
