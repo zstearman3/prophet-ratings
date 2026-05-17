@@ -17,7 +17,7 @@ class GenerateSeasonRatingsJob < ApplicationJob
 
     (season.start_date..season.end_date).each do |date|
       Rails.logger.debug { "Backfilling for #{date}" }
-      games = Game.where(start_time: date.all_day)
+      games = Game.on_schedule_date(date)
       ProphetRatings::OverallRatingsCalculator.new(season).call(as_of: date)
       games.each(&:generate_prediction!)
       games.each { |game| game.finalize if game.final? }

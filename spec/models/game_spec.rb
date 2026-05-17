@@ -10,7 +10,6 @@
 #  home_team_name  :string           not null
 #  home_team_score :integer
 #  in_conference   :boolean          default(FALSE)
-#  location        :string
 #  minutes         :integer
 #  neutral         :boolean
 #  possessions     :decimal(4, 1)
@@ -36,7 +35,7 @@ RSpec.describe Game do
   let!(:home_snapshot) do
     create(:team_rating_snapshot,
            team_season: home_team_season,
-           snapshot_date: game.start_time.to_date,
+           snapshot_date: game.schedule_date,
            ratings_config_version:,
            adj_offensive_efficiency: 110.0,
            adj_defensive_efficiency: 105.0,
@@ -45,7 +44,7 @@ RSpec.describe Game do
   let!(:away_snapshot) do
     create(:team_rating_snapshot,
            team_season: away_team_season,
-           snapshot_date: game.start_time.to_date,
+           snapshot_date: game.schedule_date,
            ratings_config_version:,
            adj_offensive_efficiency: 108.0,
            adj_defensive_efficiency: 107.0,
@@ -94,6 +93,63 @@ RSpec.describe Game do
     it 'calculates pace when minutes and possessions are present' do
       game.update!(minutes: 40, possessions: 70.0)
       expect(game.pace).to eq(70.0)
+    end
+  end
+
+  describe 'venue classification' do
+    it 'defaults new games to an unknown venue' do
+      game = described_class.new
+
+      expect(game.venue_type).to eq('unknown')
+      expect(game.venue_confidence).to eq('unknown')
+      expect(game).to be_venue_unknown
+      expect(game).not_to be_confirmed_home_venue
+    end
+
+    it 'identifies confirmed home venues' do
+      game = described_class.new(venue_type: 'home', venue_confidence: 'confirmed')
+
+      expect(game).to be_confirmed_home_venue
+    end
+  end
+
+  describe 'schedule date' do
+    let(:eastern_time) { ActiveSupport::TimeZone['Eastern Time (US & Canada)'] }
+
+    it 'treats late Eastern games as belonging to the Eastern schedule date' do
+      late_game = create(
+        :game,
+        season:,
+        start_time: eastern_time.parse('2026-03-11 11:30pm'),
+        home_team_name: 'Late Home',
+        away_team_name: 'Late Away'
+      )
+
+      expect(late_game.schedule_date).to eq(Date.new(2026, 3, 11))
+      expect(described_class.on_schedule_date(Date.new(2026, 3, 11))).to include(late_game)
+      expect(described_class.on_schedule_date(Date.new(2026, 3, 12))).not_to include(late_game)
+    end
+
+    it 'validates uniqueness by Eastern schedule date' do
+      create(
+        :game,
+        season:,
+        start_time: Time.zone.local(2026, 3, 11, 23),
+        home_team_name: 'Duplicate Home',
+        away_team_name: 'Duplicate Away'
+      )
+      duplicate = build(
+        :game,
+        season:,
+        start_time: Time.zone.local(2026, 3, 12, 1),
+        home_team_name: 'Duplicate Home',
+        away_team_name: 'Duplicate Away'
+      )
+
+      expect(duplicate).not_to be_valid
+      expect(duplicate.errors[:base]).to include(
+        'Game with these teams already exists on 2026-03-11. If this is a double header, please ensure start_time is unique.'
+      )
     end
   end
 end

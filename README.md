@@ -50,7 +50,7 @@ Use team-season-level performance data to:
 
 ---
 
-## 🚧 Roadmap Highlights (2025)
+## 🚧 Roadmap Highlights (2026)
 
 > Full roadmap in `project.md`
 

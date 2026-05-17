@@ -23,7 +23,7 @@ module ProphetRatings
       qualified_team_seasons = TeamSeason
                                .includes(team_games: :game)
                                .where(season:)
-                               .select { |ts| ts.team_games.size >= 2 }
+                               .select { |ts| finalized_team_game_count(ts) >= 2 }
                                .sort_by(&:team_id)
 
       team_ids = qualified_team_seasons.map(&:team_id)
@@ -91,6 +91,13 @@ module ProphetRatings
     def average_stat_for_season
       stat_to_avg = raw_stat == :possessions ? :pace : raw_stat
       TeamSeason.where(season:).average(stat_to_avg).to_f
+    end
+
+    def finalized_team_game_count(team_season)
+      team_season.team_games.count do |team_game|
+        game = team_game.game
+        game&.final? && game.schedule_date <= as_of.to_date
+      end
     end
 
     def stat_value_for_game(team_game)
@@ -175,13 +182,13 @@ module ProphetRatings
       hca_stats = Array(RATINGS_CONFIG[:home_court_adjusted_stats]).map(&:to_sym)
       home_adv = RATINGS_CONFIG[:home_court_advantage].to_f
 
-      Game.where(season:, status: :final, start_time: ..as_of).includes(:home_team_game, :away_team_game).find_each do |game|
+      Game.where(season:).final.through_schedule_date(as_of).includes(:home_team_game, :away_team_game).find_each do |game|
         tg1 = game.home_team_game
         tg2 = game.away_team_game
         next unless tg1 && tg2
         next unless team_index[tg1.team_id] && team_index[tg2.team_id]
 
-        apply_home_court = hca_stats.include?(raw_stat) && !game.neutral
+        apply_home_court = hca_stats.include?(raw_stat) && game.confirmed_home_venue?
 
         [[tg1, tg2], [tg2, tg1]].each do |off_tg, def_tg|
           observed = stat_value_for_game(off_tg)

@@ -1,16 +1,29 @@
 # frozen_string_literal: true
 
 module ApplicationHelper
+  DEFAULT_PAGE_TITLE = 'Prophet Ratings | College Basketball Predictions & Betting Insights'
+  DEFAULT_PAGE_DESCRIPTION = [
+    'College basketball ratings, matchup projections, and betting value indicators',
+    'powered by Prophet Ratings.'
+  ].join(' ')
+
   def icon_button(form, text:, icon_svg:, title:, **options)
     name  = options.delete(:name)
     value = options.delete(:value)
     css   = options.delete(:class)
     data  = options.delete(:data)
 
-    icon = icon_svg.respond_to?(:html_safe) ? icon_svg.html_safe : icon_svg
+    icon = sanitize(
+      icon_svg,
+      tags: %w[svg path rect circle],
+      attributes: %w[
+        class fill stroke stroke-width viewBox d x y width height rx ry
+        stroke-linecap stroke-linejoin cx cy r
+      ]
+    )
 
     form.button name:, value:, title:, class: css, data:, type: :submit do
-      "#{icon}<span>#{text}</span>".html_safe
+      safe_join([icon, content_tag(:span, text)])
     end
   end
 
@@ -36,5 +49,25 @@ module ApplicationHelper
         <circle cx="15.5" cy="15.5" r="1.25" fill="currentColor"/>
       </svg>
     SVG
+  end
+
+  def page_title
+    content_for?(:page_title) ? content_for(:page_title) : DEFAULT_PAGE_TITLE
+  end
+
+  def page_description
+    content_for?(:page_description) ? content_for(:page_description) : DEFAULT_PAGE_DESCRIPTION
+  end
+
+  def canonical_url
+    "#{request.base_url}#{request.path}"
+  end
+
+  def page_url
+    request.original_url
+  end
+
+  def page_image_url
+    "#{request.base_url}/social-preview.png"
   end
 end

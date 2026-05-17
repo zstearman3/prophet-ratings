@@ -1,0 +1,457 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+APP_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$APP_ROOT"
+
+DUMP_FILE="${DUMP_FILE:-tmp/production-db.dump}"
+DOTENV_FILE="${DOTENV_FILE:-.env}"
+DOCKER_DOTENV_FILE="${DOCKER_DOTENV_FILE:-.env.docker}"
+SOURCE_MODE="${SOURCE_MODE:-ecs}"
+ECS_CLUSTER="${ECS_CLUSTER:-prophet-cluster}"
+ECS_SERVICE="${ECS_SERVICE:-prophet-ratings-web}"
+ECS_CONTAINER="${ECS_CONTAINER:-web}"
+AWS_REGION="${AWS_REGION:-us-east-1}"
+
+docker_service_running() {
+  local service="$1"
+
+  command -v docker >/dev/null 2>&1 &&
+    docker compose ps --services --status running 2>/dev/null | grep -qx "$service"
+}
+
+USE_DOCKER=false
+WEB_WAS_RUNNING=false
+WORKER_WAS_RUNNING=false
+LOCAL_SERVICES_STOPPED=false
+
+dotenv_value() {
+  local key="$1"
+  local file="$2"
+  local line value
+
+  [[ -f "$file" ]] || return 0
+
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line%$'\r'}"
+
+    case "$line" in
+      "$key="*|"export $key="*)
+        value="${line#*=}"
+        if [[ "$value" == \"*\" && "$value" == *\" ]]; then
+          value="${value:1:${#value}-2}"
+        elif [[ "$value" == \'*\' && "$value" == *\' ]]; then
+          value="${value:1:${#value}-2}"
+        fi
+
+        printf '%s' "$value"
+        return 0
+        ;;
+    esac
+  done < "$file"
+}
+
+docker_database_url_for_db_container() {
+  local url="$1"
+
+  url="${url//@db:/@localhost:}"
+  url="${url//@db\//@localhost\/}"
+  printf '%s' "$url"
+}
+
+database_url_present() {
+  local url="$1"
+
+  [[ "$url" == postgres://* || "$url" == postgresql://* ]]
+}
+
+masked_database_url() {
+  local url="$1"
+
+  if [[ "$url" =~ ^(postgresql?://)([^:@/]+)(:([^@/]+))?@(.+)$ ]]; then
+    printf '%s%s:****@%s' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[5]}"
+  else
+    printf '%s' "$url"
+  fi
+}
+
+if docker_service_running db; then
+  USE_DOCKER=true
+fi
+
+if [[ -z "${LOCAL_DATABASE_URL:-}" && "$USE_DOCKER" == true ]]; then
+  LOCAL_DATABASE_URL="$(dotenv_value DATABASE_URL "$DOCKER_DOTENV_FILE")"
+  LOCAL_DATABASE_URL="$(docker_database_url_for_db_container "$LOCAL_DATABASE_URL")"
+fi
+
+LOCAL_DATABASE_URL="${LOCAL_DATABASE_URL:-postgresql://postgres:password@localhost:5432/prophet_ratings_development}"
+
+SOURCE_DATABASE_URL="${PRODUCTION_DATABASE_URL:-}"
+
+if [[ -z "$SOURCE_DATABASE_URL" ]]; then
+  SOURCE_DATABASE_URL="$(dotenv_value PRODUCTION_DATABASE_URL "$DOTENV_FILE")"
+fi
+
+if [[ -z "$SOURCE_DATABASE_URL" ]]; then
+  SOURCE_DATABASE_URL="$(dotenv_value DATABASE_URL "$DOTENV_FILE")"
+fi
+
+LOCAL_ADMIN_EMAIL="${LOCAL_ADMIN_EMAIL:-}"
+LOCAL_ADMIN_PASSWORD="${LOCAL_ADMIN_PASSWORD:-}"
+
+if [[ -z "$LOCAL_ADMIN_EMAIL" ]]; then
+  LOCAL_ADMIN_EMAIL="$(dotenv_value LOCAL_ADMIN_EMAIL "$DOTENV_FILE")"
+fi
+
+if [[ -z "$LOCAL_ADMIN_PASSWORD" ]]; then
+  LOCAL_ADMIN_PASSWORD="$(dotenv_value LOCAL_ADMIN_PASSWORD "$DOTENV_FILE")"
+fi
+
+usage() {
+  cat <<USAGE
+Usage: bin/pull-production-db [options]
+
+Pull the production PostgreSQL database into the local development database.
+When the Docker db service is running, the script uses the containerized
+PostgreSQL tools and Rails runner.
+
+By default, the production dump runs inside the ECS web task so it can reach
+private RDS using the task's production DATABASE_URL.
+
+Options:
+  --source ecs      Dump from the running ECS web task. Default.
+  --source direct   Dump from PRODUCTION_DATABASE_URL locally.
+  -y, --yes         Skip the destructive confirmation prompt
+  --keep-dump      Keep the dump file after restore
+  --include-users   Include production user rows. By default, user rows are
+                    excluded from the dump so user data never lands locally.
+  -h, --help       Show this help
+
+Environment:
+  SOURCE_MODE              Optional. ecs or direct.
+                           Default: $SOURCE_MODE
+  PRODUCTION_DATABASE_URL  Optional. Direct-mode source PostgreSQL URL.
+                           Takes precedence over $DOTENV_FILE.
+  DOTENV_FILE              Optional. Env file to read for fallback source URL.
+                           Default: $DOTENV_FILE
+  ECS_CLUSTER              Optional. ECS cluster for ecs source mode.
+                           Default: $ECS_CLUSTER
+  ECS_SERVICE              Optional. ECS service for ecs source mode.
+                           Default: $ECS_SERVICE
+  ECS_CONTAINER            Optional. ECS container for ecs source mode.
+                           Default: $ECS_CONTAINER
+  AWS_REGION               Optional. AWS region for ecs source mode.
+                           Default: $AWS_REGION
+  LOCAL_DATABASE_URL       Optional. Target local URL. In Docker mode, this is
+                           used from inside the db container. Defaults to
+                           DATABASE_URL from $DOCKER_DOTENV_FILE when Docker is
+                           running, with the db host rewritten to localhost.
+                           Default: $LOCAL_DATABASE_URL
+  DOCKER_DOTENV_FILE       Optional. Docker env file for local DATABASE_URL.
+                           Default: $DOCKER_DOTENV_FILE
+  LOCAL_ADMIN_EMAIL        Optional. Local admin email to create after restore.
+                           Can also be set in $DOTENV_FILE.
+  LOCAL_ADMIN_PASSWORD     Optional. Local admin password to create after restore.
+                           Can also be set in $DOTENV_FILE.
+  DUMP_FILE                Optional. Dump path.
+                           Default: $DUMP_FILE
+USAGE
+}
+
+CONFIRM=false
+KEEP_DUMP=false
+INCLUDE_USERS=false
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --source)
+      SOURCE_MODE="${2:-}"
+      if [[ -z "$SOURCE_MODE" ]]; then
+        echo "--source requires 'ecs' or 'direct'"
+        exit 1
+      fi
+      shift 2
+      ;;
+    -y|--yes)
+      CONFIRM=true
+      shift
+      ;;
+    --keep-dump)
+      KEEP_DUMP=true
+      shift
+      ;;
+    --include-users)
+      INCLUDE_USERS=true
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1"
+      usage
+      exit 1
+      ;;
+  esac
+done
+
+if [[ "$SOURCE_MODE" != "ecs" && "$SOURCE_MODE" != "direct" ]]; then
+  echo "SOURCE_MODE must be 'ecs' or 'direct'."
+  exit 1
+fi
+
+if [[ "$SOURCE_MODE" == "direct" ]]; then
+  if ! database_url_present "$SOURCE_DATABASE_URL"; then
+    echo "A source database URL is required."
+    echo "Set PRODUCTION_DATABASE_URL, or add PRODUCTION_DATABASE_URL/DATABASE_URL to $DOTENV_FILE."
+    echo
+    usage
+    exit 1
+  fi
+fi
+
+if [[ "$USE_DOCKER" != true ]]; then
+  for command in pg_dump pg_restore bin/rails; do
+    if ! command -v "$command" >/dev/null 2>&1; then
+      echo "Missing required command: $command"
+      echo "Start the Docker stack with 'make up' to use the containerized tools."
+      exit 1
+    fi
+  done
+else
+  if docker_service_running web; then
+    WEB_WAS_RUNNING=true
+  fi
+
+  if docker_service_running worker; then
+    WORKER_WAS_RUNNING=true
+  fi
+fi
+
+if [[ "$SOURCE_MODE" == "ecs" ]]; then
+  for command in aws base64 awk; do
+    if ! command -v "$command" >/dev/null 2>&1; then
+      echo "Missing required command for ECS source mode: $command"
+      exit 1
+    fi
+  done
+fi
+
+mkdir -p "$(dirname "$DUMP_FILE")"
+
+PG_DUMP_OPTIONS=(--format=custom --no-owner --no-acl)
+EXCLUDED_TABLE_DATA=(ar_internal_metadata good_job_batches good_job_executions good_job_processes good_job_settings good_jobs)
+
+if [[ "$INCLUDE_USERS" != true ]]; then
+  EXCLUDED_TABLE_DATA+=(users)
+fi
+
+for table in "${EXCLUDED_TABLE_DATA[@]}"; do
+  PG_DUMP_OPTIONS+=(--exclude-table-data="$table")
+done
+
+if [[ "$CONFIRM" != true ]]; then
+  echo "This will replace your local development database:"
+  echo "  $(masked_database_url "$LOCAL_DATABASE_URL")"
+  if [[ "$INCLUDE_USERS" != true ]]; then
+    echo "Production user rows will be excluded from the dump."
+  fi
+  echo
+  read -r -p "Type 'pull production' to continue: " answer
+
+  if [[ "$answer" != "pull production" ]]; then
+    echo "Aborted."
+    exit 1
+  fi
+fi
+
+cleanup() {
+  if [[ "$USE_DOCKER" == true && "$LOCAL_SERVICES_STOPPED" == true ]]; then
+    if [[ "$WEB_WAS_RUNNING" == true ]]; then
+      docker compose up -d web >/dev/null 2>&1 || true
+    fi
+
+    if [[ "$WORKER_WAS_RUNNING" == true ]]; then
+      docker compose up -d worker >/dev/null 2>&1 || true
+    fi
+  fi
+
+  if [[ "$KEEP_DUMP" != true ]]; then
+    rm -f "$DUMP_FILE" "$DUMP_FILE.ecs-output" "$DUMP_FILE.b64"
+  fi
+}
+trap cleanup EXIT
+
+base64_decode() {
+  if base64 --decode </dev/null >/dev/null 2>&1; then
+    base64 --decode
+  else
+    base64 -D
+  fi
+}
+
+find_ecs_task_arn() {
+  local task_arn
+
+  task_arn="$(aws ecs list-tasks \
+    --cluster "$ECS_CLUSTER" \
+    --service-name "$ECS_SERVICE" \
+    --desired-status RUNNING \
+    --region "$AWS_REGION" \
+    --query 'taskArns[0]' \
+    --output text)"
+
+  if [[ "$task_arn" == "None" || -z "$task_arn" ]]; then
+    echo "No running task found for $ECS_SERVICE in $ECS_CLUSTER." >&2
+    return 1
+  fi
+
+  printf '%s' "$task_arn"
+}
+
+dump_from_ecs() {
+  local task_arn output_file base64_file remote_command remote_options
+
+  task_arn="$(find_ecs_task_arn)"
+  output_file="${DUMP_FILE}.ecs-output"
+  base64_file="${DUMP_FILE}.b64"
+  remote_options="--format=custom --no-owner --no-acl"
+
+  if [[ "$INCLUDE_USERS" != true ]]; then
+    remote_options="$remote_options --exclude-table-data=users"
+  fi
+
+  remote_options="$remote_options --exclude-table-data=ar_internal_metadata"
+  remote_options="$remote_options --exclude-table-data=good_job_batches"
+  remote_options="$remote_options --exclude-table-data=good_job_executions"
+  remote_options="$remote_options --exclude-table-data=good_job_processes"
+  remote_options="$remote_options --exclude-table-data=good_job_settings"
+  remote_options="$remote_options --exclude-table-data=good_jobs"
+
+  remote_command="bash -lc 'set -euo pipefail; dump=/tmp/prophet-ratings-production.dump; rm -f \"\$dump\"; pg_dump $remote_options --file \"\$dump\" \"\$DATABASE_URL\"; echo __BEGIN_PROPHET_DB_DUMP_BASE64__; base64 \"\$dump\"; echo __END_PROPHET_DB_DUMP_BASE64__; rm -f \"\$dump\"'"
+
+  echo "ECS task: $(basename "$task_arn")"
+  aws ecs execute-command \
+    --cluster "$ECS_CLUSTER" \
+    --task "$task_arn" \
+    --container "$ECS_CONTAINER" \
+    --command "$remote_command" \
+    --interactive \
+    --region "$AWS_REGION" > "$output_file"
+
+  awk '
+    /__BEGIN_PROPHET_DB_DUMP_BASE64__/ { in_dump = 1; next }
+    /__END_PROPHET_DB_DUMP_BASE64__/ { in_dump = 0 }
+    in_dump { gsub(/\r/, ""); print }
+  ' "$output_file" > "$base64_file"
+
+  if [[ ! -s "$base64_file" ]]; then
+    echo "Failed to capture database dump from ECS output."
+    echo "Raw ECS output is available at $output_file"
+    exit 1
+  fi
+
+  base64_decode < "$base64_file" > "$DUMP_FILE"
+  rm -f "$base64_file" "$output_file"
+}
+
+create_local_admin() {
+  if [[ -z "$LOCAL_ADMIN_EMAIL" || -z "$LOCAL_ADMIN_PASSWORD" ]]; then
+    echo "Skipping local admin creation."
+    echo "Set LOCAL_ADMIN_EMAIL and LOCAL_ADMIN_PASSWORD in $DOTENV_FILE to create one after restore."
+    return
+  fi
+
+  local runner
+  runner='email = ENV.fetch("LOCAL_ADMIN_EMAIL").strip; password = ENV.fetch("LOCAL_ADMIN_PASSWORD"); user = User.find_or_initialize_by(email: email); user.password = password; user.password_confirmation = password; user.admin = true; user.save!; puts "Local admin ready: #{email}"'
+
+  echo "== Ensuring local admin exists =="
+  if [[ "$USE_DOCKER" == true ]]; then
+    docker compose run --rm \
+      -e DATABASE_URL="$LOCAL_DATABASE_URL" \
+      -e LOCAL_ADMIN_EMAIL="$LOCAL_ADMIN_EMAIL" \
+      -e LOCAL_ADMIN_PASSWORD="$LOCAL_ADMIN_PASSWORD" \
+      web bin/rails runner "$runner"
+  else
+    LOCAL_ADMIN_EMAIL="$LOCAL_ADMIN_EMAIL" \
+      LOCAL_ADMIN_PASSWORD="$LOCAL_ADMIN_PASSWORD" \
+      DATABASE_URL="$LOCAL_DATABASE_URL" \
+      bin/rails runner "$runner"
+  fi
+}
+
+echo "== Dumping production database =="
+if [[ "$SOURCE_MODE" == "ecs" ]]; then
+  echo "Source: ECS service $ECS_SERVICE in $ECS_CLUSTER ($AWS_REGION)"
+  dump_from_ecs
+else
+  echo "Source: $(masked_database_url "$SOURCE_DATABASE_URL")"
+  if [[ "$USE_DOCKER" == true ]]; then
+    docker compose exec -T db pg_dump "${PG_DUMP_OPTIONS[@]}" --dbname="$SOURCE_DATABASE_URL" > "$DUMP_FILE"
+  else
+    pg_dump "${PG_DUMP_OPTIONS[@]}" --file "$DUMP_FILE" --dbname="$SOURCE_DATABASE_URL"
+  fi
+fi
+
+echo "== Recreating local development database =="
+if [[ "$USE_DOCKER" == true ]]; then
+  if [[ "$WEB_WAS_RUNNING" == true ]]; then
+    docker compose stop web
+  fi
+
+  if [[ "$WORKER_WAS_RUNNING" == true ]]; then
+    docker compose stop worker
+  fi
+
+  LOCAL_SERVICES_STOPPED=true
+
+  docker compose run --rm \
+    -e DATABASE_URL="$LOCAL_DATABASE_URL" \
+    -e DISABLE_DATABASE_ENVIRONMENT_CHECK=1 \
+    web bin/rails db:drop db:create
+else
+  DISABLE_DATABASE_ENVIRONMENT_CHECK=1 DATABASE_URL="$LOCAL_DATABASE_URL" bin/rails db:drop db:create
+fi
+
+echo "== Restoring production dump locally =="
+if [[ "$USE_DOCKER" == true ]]; then
+  docker compose exec -T db pg_restore --verbose --clean --if-exists --no-owner --no-acl --dbname "$LOCAL_DATABASE_URL" < "$DUMP_FILE"
+else
+  pg_restore --verbose --clean --if-exists --no-owner --no-acl --dbname "$LOCAL_DATABASE_URL" "$DUMP_FILE"
+fi
+
+echo "== Marking local database as development =="
+if [[ "$USE_DOCKER" == true ]]; then
+  docker compose run --rm \
+    -e DATABASE_URL="$LOCAL_DATABASE_URL" \
+    -e RAILS_ENV=development \
+    web bin/rails db:environment:set
+else
+  RAILS_ENV=development DATABASE_URL="$LOCAL_DATABASE_URL" bin/rails db:environment:set
+fi
+
+echo "== Running migrations =="
+if [[ "$USE_DOCKER" == true ]]; then
+  docker compose run --rm \
+    -e DATABASE_URL="$LOCAL_DATABASE_URL" \
+    web bin/rails db:migrate
+
+  create_local_admin
+
+  if [[ "$WEB_WAS_RUNNING" == true ]]; then
+    docker compose up -d web
+  fi
+
+  if [[ "$WORKER_WAS_RUNNING" == true ]]; then
+    docker compose up -d worker
+  fi
+
+  LOCAL_SERVICES_STOPPED=false
+else
+  DATABASE_URL="$LOCAL_DATABASE_URL" bin/rails db:migrate
+  create_local_admin
+fi
+
+echo "Done."

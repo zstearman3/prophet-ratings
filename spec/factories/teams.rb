@@ -24,11 +24,13 @@
 #  index_teams_on_the_odds_api_team_id  (the_odds_api_team_id) UNIQUE
 #
 FactoryBot.define do
+  sequence(:team_url) { |n| "test-university-#{n}" }
+
   factory :team do
-    school { Faker::University.name }
+    sequence(:school) { |n| "Test University #{n}" }
     slug { school.parameterize }
     nickname { 'Testers' }
-    url { 'test-university' }
+    url { generate(:team_url) }
     location { 'Testville, TS' }
   end
 end
