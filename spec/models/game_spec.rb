@@ -106,5 +106,11 @@ RSpec.describe Game do
       expect(game).to be_venue_unknown
       expect(game).not_to be_confirmed_home_venue
     end
+
+    it 'identifies confirmed home venues' do
+      game = described_class.new(venue_type: 'home', venue_confidence: 'confirmed')
+
+      expect(game).to be_confirmed_home_venue
+    end
   end
 end

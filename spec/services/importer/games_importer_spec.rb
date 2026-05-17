@@ -123,6 +123,66 @@ RSpec.describe Importer::GamesImporter do
     )
   end
 
+  it 'preserves manual venue fields when a complete game is re-imported' do
+    described_class.import([row])
+    game = Game.last
+    game.update!(
+      venue_type: 'neutral',
+      venue_source: 'manual_override',
+      venue_confidence: 'manual',
+      venue_name: 'T-Mobile Arena',
+      neutral: true
+    )
+
+    described_class.import([
+                             completed_row.merge(
+                               venue_type: 'home',
+                               venue_source: 'sports_reference_team_schedule',
+                               venue_confidence: 'confirmed',
+                               venue_name: 'Home Arena',
+                               neutral: false
+                             )
+                           ])
+
+    expect(game.reload).to have_attributes(
+      venue_type: 'neutral',
+      venue_source: 'manual_override',
+      venue_confidence: 'manual',
+      venue_name: 'T-Mobile Arena',
+      neutral: true
+    )
+  end
+
+  it 'preserves manual venue fields when an incomplete game is re-imported' do
+    described_class.import([row])
+    game = Game.last
+    game.update!(
+      venue_type: 'neutral',
+      venue_source: 'manual_override',
+      venue_confidence: 'manual',
+      venue_name: 'T-Mobile Arena',
+      neutral: true
+    )
+
+    described_class.import([
+                             row.merge(
+                               venue_type: 'home',
+                               venue_source: 'sports_reference_team_schedule',
+                               venue_confidence: 'confirmed',
+                               venue_name: 'Home Arena',
+                               neutral: false
+                             )
+                           ])
+
+    expect(game.reload).to have_attributes(
+      venue_type: 'neutral',
+      venue_source: 'manual_override',
+      venue_confidence: 'manual',
+      venue_name: 'T-Mobile Arena',
+      neutral: true
+    )
+  end
+
   it 'does not create a duplicate game for the same teams and date' do
     described_class.import([row])
     expect do

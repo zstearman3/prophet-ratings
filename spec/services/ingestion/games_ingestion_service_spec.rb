@@ -17,9 +17,17 @@ RSpec.describe Ingestion::GamesIngestionService do
   end
 
   it 'scrapes, enriches, and imports game rows for the date' do
-    described_class.new(date:).call
+    result = described_class.new(date:).call
 
     expect(scraper).to have_received(:to_json_in_batches).with(0, 1)
     expect(Importer::GamesImporter).to have_received(:import).with(enriched_rows)
+    expect(result[:imported_rows]).to eq(1)
+  end
+
+  it 'falls back to the default batch size when initialized with an invalid batch size' do
+    result = described_class.new(date:, batch_size: 0).call
+
+    expect(scraper).to have_received(:to_json_in_batches).with(0, 1)
+    expect(result[:imported_rows]).to eq(1)
   end
 end

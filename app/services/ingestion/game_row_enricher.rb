@@ -48,8 +48,11 @@ module Ingestion
     end
 
     def venue_row_for(row)
+      season = season_for(row)
+      return unless season
+
       teams_for(row).each do |team|
-        matched_row = schedule_rows_for(team, season_for(row)).find { |schedule_row| schedule_row_matches_game?(schedule_row, row) }
+        matched_row = schedule_rows_for(team, season).find { |schedule_row| schedule_row_matches_game?(schedule_row, row) }
         return matched_row if matched_row
       rescue StandardError => e
         Rails.logger.warn("Unable to enrich venue row for team_id=#{team.id}: #{e.message}")

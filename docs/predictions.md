@@ -19,4 +19,4 @@ Predictions use explicit game venue classification from `Game#venue_type`:
 
 For unknown venues, `venue_confidence_issue` is `venue_unknown_home_court_not_applied`.
 
-This is a conservative v1 choice. It prevents the model from confidently applying home-court advantage to games where Sports Reference did not provide trustworthy location data. Venue coverage can be corrected through the current layer 4 and layer 9 mechanisms: `Importer::GameVenueEnricher` and manual entries in `db/data/game_venue_overrides.yml`. Further coverage improvements should be handled by editing that override file or extending `GameVenueEnricher`.
+This is a conservative v1 choice. It prevents the model from confidently applying home-court advantage to games where Sports Reference did not provide trustworthy location data. Venue coverage can be corrected via `Importer::GameVenueEnricher` and manual entries in `db/data/game_venue_overrides.yml`. Further coverage improvements should be handled by editing that override file or extending `GameVenueEnricher`.

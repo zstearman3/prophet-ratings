@@ -73,6 +73,27 @@ RSpec.describe Importer::GameVenueEnricher do
     )
   end
 
+  it 'overwrites manually classified games when requested' do
+    game.update!(
+      location: 'Fertitta Center',
+      venue_type: 'neutral',
+      venue_source: 'manual_override',
+      venue_confidence: 'manual',
+      venue_name: 'T-Mobile Arena',
+      neutral: true
+    )
+
+    described_class.new(game, overrides: [], overwrite_manual: true).call
+
+    expect(game.reload).to have_attributes(
+      venue_type: 'home',
+      venue_source: 'sports_reference_schedule',
+      venue_confidence: 'confirmed',
+      venue_name: 'Fertitta Center',
+      neutral: false
+    )
+  end
+
   it 'marks a game neutral from a Sports Reference team schedule row' do
     schedule_scraper = instance_double(
       Scraper::TeamScheduleEnrichmentScraper,

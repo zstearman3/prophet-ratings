@@ -120,4 +120,14 @@ RSpec.describe Ingestion::GameRowEnricher do
     expect(enriched_row[:date]).to eq(original_date)
     expect(enriched_row[:venue_name]).to be_nil
   end
+
+  it 'does not attempt schedule enrichment when no season matches the row date' do
+    allow(Rails.logger).to receive(:warn)
+    row = game_row('Michigan', 'Wake Forest', Time.zone.local(2026, 7, 1, 18, 30), '/cbb/boxscores/offseason.html')
+
+    enriched_row = described_class.new([row]).call.first
+
+    expect(enriched_row).to eq(row)
+    expect(Rails.logger).not_to have_received(:warn)
+  end
 end

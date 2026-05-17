@@ -63,15 +63,16 @@ module Importer
       end
 
       def process_complete_game(game, row, season, home_team_season, away_team_season)
-        game.update!(
+        attrs = {
           season:,
           start_time: row[:date],
           home_team_score: row[:home_team_score],
           away_team_score: row[:away_team_score],
           location: row[:location],
-          url: row[:url],
-          **venue_attributes(row)
-        )
+          url: row[:url]
+        }
+        attrs.merge!(venue_attributes(row)) unless manual_venue?(game)
+        game.update!(attrs)
 
         home_game = find_or_create_team_game(game, home_team_season, home: true)
         away_game = find_or_create_team_game(game, away_team_season, home: false)
@@ -83,15 +84,16 @@ module Importer
 
       def process_incomplete_game(game, row, season, home_team_season, away_team_season)
         # Keep unplayed/incomplete games scheduled and avoid clobbering existing finals with partial rows.
-        game.update!(
+        attrs = {
           season:,
           start_time: row[:date],
           location: row[:location],
           url: row[:url],
           home_team_score: game.final? ? game.home_team_score : row[:home_team_score],
-          away_team_score: game.final? ? game.away_team_score : row[:away_team_score],
-          **venue_attributes(row)
-        )
+          away_team_score: game.final? ? game.away_team_score : row[:away_team_score]
+        }
+        attrs.merge!(venue_attributes(row)) unless manual_venue?(game)
+        game.update!(attrs)
         home_game = find_or_create_team_game(game, home_team_season, home: true)
         away_game = find_or_create_team_game(game, away_team_season, home: false)
         process_team_game(home_game, {}, home_team_season, away_team_season)
@@ -134,6 +136,10 @@ module Importer
 
       def venue_attributes(row)
         row.slice(:venue_type, :venue_source, :venue_confidence, :venue_name, :neutral)
+      end
+
+      def manual_venue?(game)
+        game.venue_confidence == 'manual'
       end
     end
     # rubocop:enable Metrics/ModuleLength

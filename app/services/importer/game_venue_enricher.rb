@@ -98,10 +98,15 @@ module Importer
 
     def schedule_row_for(game)
       [game.home_team, game.away_team].compact.each do |team|
-        row = schedule_rows_for(team, game.season).find { |candidate| schedule_row_matches_game?(candidate, game) }
+        rows = begin
+          schedule_rows_for(team, game.season)
+        rescue StandardError => e
+          Rails.logger.warn("Unable to scrape venue schedule for team_id=#{team.id}, season_id=#{game.season_id}: #{e.message}")
+          next
+        end
+
+        row = rows.find { |candidate| schedule_row_matches_game?(candidate, game) }
         return [row, team] if row
-      rescue StandardError => e
-        Rails.logger.warn("Unable to scrape venue schedule for team_id=#{team.id}, season_id=#{game.season_id}: #{e.message}")
       end
 
       nil

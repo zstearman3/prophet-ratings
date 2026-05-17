@@ -6,7 +6,7 @@ module Ingestion
 
     def initialize(date:, batch_size: DEFAULT_BATCH_SIZE)
       @date = date
-      @batch_size = batch_size
+      @batch_size = normalized_batch_size(batch_size)
     end
 
     def call
@@ -28,6 +28,10 @@ module Ingestion
     private
 
     attr_reader :date, :batch_size
+
+    def normalized_batch_size(value)
+      value.to_i.positive? ? value.to_i : DEFAULT_BATCH_SIZE
+    end
 
     def scraper
       @scraper ||= Scraper::GamesScraper.new(date)
