@@ -27,10 +27,10 @@ Purpose: sync one calendar date.
 Default behavior:
 
 ```ruby
-SyncDailyGamesJob.perform_later(Date.yesterday)
+SyncDailyGamesJob.perform_later(Game.current_schedule_date - 1.day)
 ```
 
-If no date is provided, the job defaults to `Date.yesterday`.
+If no date is provided, the job defaults to yesterday in the Eastern schedule-date calendar.
 
 Flow:
 
@@ -58,8 +58,8 @@ It resolves the season from the provided `season_id`, or falls back to `Season.c
 
 The default sync window includes:
 
-- Recently completed or stale dates from `today - 2.days` through yesterday.
-- Upcoming scheduled dates from today through the season end, unless `future_end_date` is provided.
+- Recently completed or stale dates from the current Eastern schedule date minus two days through yesterday.
+- Upcoming scheduled dates from the current Eastern schedule date through the season end, unless `future_end_date` is provided.
 
 For each date, it runs:
 
@@ -85,8 +85,8 @@ It resolves the season from `season_id`, or falls back to `Season.current || Sea
 
 Date range:
 
-- Start: latest existing `season.games.start_time`, or `season.start_date` if no games exist.
-- End: earlier of `season.end_date` and `Date.yesterday`.
+- Start: latest existing `season.games.start_time` converted to `Game#schedule_date`, or `season.start_date` if no games exist.
+- End: earlier of `season.end_date` and yesterday in the Eastern schedule-date calendar.
 
 Like `SyncDailyGamesJob`, it imports each date in batches of 10.
 
@@ -118,7 +118,7 @@ Optional parameters:
 
 Date range:
 
-- End is capped at the earlier of the requested end date, season end date, and `Date.yesterday`.
+- End is capped at the earlier of the requested end date, season end date, and yesterday in the Eastern schedule-date calendar.
 - Start is capped at no earlier than the season start date.
 - If `resume: true`, start defaults to the latest imported game date or season start.
 
@@ -135,7 +135,7 @@ File: `app/jobs/sync_team_games_job.rb`
 
 Purpose: sync games for a single team across a season.
 
-It loops from `season.start_date` through the earlier of `season.end_date` and `Date.yesterday`.
+It loops from `season.start_date` through the earlier of `season.end_date` and yesterday in the Eastern schedule-date calendar.
 
 For each date, it:
 
@@ -272,6 +272,8 @@ Games store explicit venue metadata:
 The default venue type is `unknown`. Missing Sports Reference venue text is not treated as a normal home game.
 
 Normal game ingestion enriches scraped rows before import through `Ingestion::GameRowEnricher`. It currently adds Sports Reference team schedule venue and start-time data, matching team schedule rows by box-score URL when present, then falls back to game date plus actual opponent/team pair. It does not match venue data by team and date alone.
+
+`Game#start_time` stores the actual timestamp, but ingestion treats calendar dates as Eastern schedule dates because Sports Reference publishes college basketball schedules in Eastern Time. Use `Game#schedule_date` and `Game.on_schedule_date(date)` for import matching, selected-date pages, backfill windows, and other basketball-date queries rather than `start_time.to_date` or `date.all_day`.
 
 `Importer::GameVenueEnricher` remains a small, idempotent, opt-in backfill/repair service. It is not run by the standard Sports Reference game import pipeline. Manual venue corrections are stored directly on `games`, typically via Rails admin or console changes, using `venue_confidence: manual`.
 
@@ -442,7 +444,7 @@ Purpose: remove duplicate games grouped by:
 
 - `home_team_name`
 - `away_team_name`
-- `start_time.to_date`
+- `schedule_date`
 
 It keeps the lowest-id game and deletes duplicate associated `TeamGame` rows. It also deletes odds associations if those classes are defined.
 
@@ -490,7 +492,7 @@ docker compose exec web bin/setup_data
 ## Data integrity notes
 
 - Team identity is resolved by `Team.search` and team aliases. If team names change upstream, update aliases rather than hardcoding importer exceptions when possible.
-- Games are matched by home team name, away team name, and calendar date. Be careful changing matching logic because duplicate games can affect ratings and snapshots.
+- Games are matched by home team name, away team name, and Eastern schedule date. Be careful changing matching logic because duplicate games can affect ratings and snapshots.
 - Scheduled rows intentionally preserve games without complete stats.
 - Complete rows must include all required stats before finalization is attempted.
 - Finalized games should not be overwritten by later partial/scheduled rows.

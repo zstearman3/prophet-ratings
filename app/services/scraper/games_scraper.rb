@@ -2,7 +2,7 @@
 
 module Scraper
   class GamesScraper < Scraper
-    def initialize(date = Time.zone.today)
+    def initialize(date = Game.current_schedule_date)
       @date = date
     end
 
@@ -140,8 +140,8 @@ module Scraper
       cleaned_time = time_token.delete(' ')
       cleaned_time = "#{cleaned_time}m" if cleaned_time.match?(/\A\d{1,2}:\d{2}[ap]\z/)
 
-      parsed_time = Time.zone.parse("#{@date} #{cleaned_time}")
-      parsed_time || fallback_start_time
+      parsed_time = Game::SCHEDULE_TIME_ZONE.parse("#{@date} #{cleaned_time}")
+      parsed_time&.in_time_zone || fallback_start_time
     rescue StandardError
       fallback_start_time
     end
@@ -149,14 +149,14 @@ module Scraper
     def completed_start_time(date_text)
       return fallback_start_time if date_text.blank?
 
-      parsed_time = Time.zone.parse(date_text)
-      parsed_time || fallback_start_time
+      parsed_time = Game::SCHEDULE_TIME_ZONE.parse(date_text)
+      parsed_time&.in_time_zone || fallback_start_time
     rescue StandardError
       fallback_start_time
     end
 
     def fallback_start_time
-      @date.in_time_zone
+      Game.schedule_time_for(@date)
     end
 
     def parse_team_stats(row)

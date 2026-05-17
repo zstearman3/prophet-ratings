@@ -68,14 +68,14 @@ module ProphetRatings
 
     ##
     # Returns the most recent team rating snapshot for the given team season and ratings configuration version.
-    # Only includes snapshots on or before the game's start date.
+    # Only includes snapshots on or before the game's Eastern schedule date.
     #
     # @param [TeamSeason] team_season - The team season for which to retrieve the snapshot.
     # @return [TeamRatingSnapshot, nil] The latest applicable rating snapshot, or nil if none exist.
     def latest_snapshot(team_season)
       TeamRatingSnapshot
         .where(team_season:, ratings_config_version:)
-        .where(snapshot_date: ..game.start_time.to_date)
+        .where(snapshot_date: ..game.schedule_date)
         .order(snapshot_date: :desc)
         .first
     end

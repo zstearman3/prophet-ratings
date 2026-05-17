@@ -256,6 +256,27 @@ RSpec.describe Importer::GamesImporter do
     end.not_to change(Game, :count)
   end
 
+  it 'matches existing games by Eastern schedule date when enriched start time crosses UTC midnight' do
+    existing_game = create(
+      :game,
+      season:,
+      start_time: Time.zone.local(2025, 1, 1, 23, 0),
+      home_team_name: home_team.school,
+      away_team_name: away_team.school,
+      url: 'http://example.com/old-game'
+    )
+
+    late_row = row.merge(
+      date: ActiveSupport::TimeZone['Eastern Time (US & Canada)'].parse('2025-01-01 9:00pm'),
+      url: 'http://example.com/enriched-game'
+    )
+
+    expect do
+      described_class.import([late_row])
+    end.not_to change(Game, :count)
+    expect(existing_game.reload.url).to eq('http://example.com/enriched-game')
+  end
+
   it 'keeps incomplete games scheduled' do
     described_class.import([row])
     expect(Game.last).to be_scheduled

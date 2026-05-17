@@ -15,6 +15,8 @@ The default is `unknown`. Missing venue data is no longer treated as a confirmed
 
 Normal game ingestion is coordinated by `Ingestion::GamesIngestionService`, which scrapes daily game rows, enriches them with `Ingestion::GameRowEnricher`, and imports the enriched rows. `Importer::GameVenueEnricher` scrapes Sports Reference team schedule rows via `Scraper::TeamScheduleEnrichmentScraper`; it is still available as an opt-in backfill/repair path and preserves manual classifications stored directly on `games`.
 
+Game date queries use an Eastern Time schedule date by default. `Game#start_time` remains an actual timestamp, but selected-date pages, import matching, resume windows, and rating snapshot lookups use `Game#schedule_date`/`Game.on_schedule_date` so late Eastern games are not moved to the next basketball date by UTC storage.
+
 Ratings and predictions apply home-court advantage only for confirmed or manual home games. Neutral and unknown venues receive zero home-court adjustment. Unknown venues are also surfaced in prediction metadata as a confidence issue.
 
 Remaining work:

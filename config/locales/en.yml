@@ -29,6 +29,9 @@
 
 en:
   hello: "Hello world"
+  games:
+    date_required: "Date is required."
+    invalid_date: "Invalid date."
   matchups:
     submit:
       turbo_not_supported: "Turbo not supported. Please use a compatible browser."

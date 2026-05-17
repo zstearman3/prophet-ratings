@@ -63,7 +63,7 @@ module Ingestion
 
     def schedule_row_matches_game?(schedule_row, game_row)
       box_score_url_matches?(schedule_row, game_row) ||
-        (schedule_row[:date] == game_row[:date].to_date && opponent_matches?(schedule_row, game_row))
+        (schedule_row[:date] == schedule_date_for(game_row) && opponent_matches?(schedule_row, game_row))
     end
 
     def box_score_url_matches?(schedule_row, game_row)
@@ -80,7 +80,12 @@ module Ingestion
     end
 
     def season_for(row)
-      Season.find_by('start_date <= ? AND end_date >= ?', row[:date], row[:date])
+      date = schedule_date_for(row)
+      Season.find_by('start_date <= ? AND end_date >= ?', date, date)
+    end
+
+    def schedule_date_for(row)
+      Game.schedule_date_for(Game.schedule_time_for(row[:date]))
     end
 
     def schedule_rows_for(team, season)

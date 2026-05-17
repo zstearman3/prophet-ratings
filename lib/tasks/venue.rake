@@ -19,7 +19,7 @@ namespace :venue do
 
     puts "\nUnknown games:"
     scope.where(venue_type: 'unknown').includes(:season).order(:start_time).find_each do |game|
-      puts "#{game.start_time.to_date} | #{game.away_team_name} vs #{game.home_team_name} | venue_type: #{game.venue_type}"
+      puts "#{game.schedule_date} | #{game.away_team_name} vs #{game.home_team_name} | venue_type: #{game.venue_type}"
     end
   end
 end

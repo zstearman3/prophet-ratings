@@ -104,6 +104,40 @@ RSpec.describe Ingestion::GameRowEnricher do
     )
   end
 
+  it 'matches by Eastern schedule date when the scraped start time crosses UTC midnight' do
+    eastern_start_time = Game::SCHEDULE_TIME_ZONE.parse('2025-11-11 11:30pm').in_time_zone
+    schedule_rows = [
+      {
+        date: Date.new(2025, 11, 11),
+        opponent_name: 'Wake Forest',
+        game_location: 'N',
+        venue_name: 'Little Caesars Arena',
+        start_time: eastern_start_time,
+        box_score_url: nil
+      }
+    ]
+    allow(Scraper::TeamScheduleEnrichmentScraper).to receive(:new) do |team:, **_kwargs|
+      rows = team.school == 'Michigan' ? schedule_rows : []
+      instance_double(Scraper::TeamScheduleEnrichmentScraper, schedule_data: rows)
+    end
+    rows = [
+      {
+        home_team: 'Michigan',
+        away_team: 'Wake Forest',
+        date: eastern_start_time,
+        url: '/cbb/boxscores/missing-url.html'
+      }
+    ]
+
+    enriched_row = described_class.new(rows).call.first
+
+    expect(enriched_row).to include(
+      venue_type: 'neutral',
+      venue_name: 'Little Caesars Arena',
+      date: eastern_start_time
+    )
+  end
+
   it 'does not enrich a same-date game when the opponent does not match' do
     original_date = Time.zone.local(2025, 11, 11, 18, 30)
     rows = [

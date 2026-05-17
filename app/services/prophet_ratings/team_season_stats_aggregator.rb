@@ -57,7 +57,7 @@ module ProphetRatings
     def preload_predictions
       predictions = Prediction
                     .joins(:game)
-                    .where(game: { status: Game.statuses[:final], start_time: ..as_of })
+                    .merge(Game.final.through_schedule_date(as_of))
                     .includes(:home_team_snapshot, :away_team_snapshot)
                     .to_a
 
@@ -76,7 +76,7 @@ module ProphetRatings
       TeamGame
         .joins(:game)
         .where(team_season_id: team_season_ids)
-        .where(game: { status: Game.statuses[:final], start_time: ..as_of })
+        .merge(Game.final.through_schedule_date(as_of))
         .includes(:game)
         .group_by(&:team_season_id)
     end

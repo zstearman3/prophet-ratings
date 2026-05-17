@@ -71,6 +71,25 @@ RSpec.describe 'Games' do
       expect(score_cell.text.strip).to eq('-')
       expect(prediction_link).to be_present
     end
+
+    it 'uses Eastern schedule dates when selecting games' do
+      season = create(:season, :current)
+      eastern_time = ActiveSupport::TimeZone['Eastern Time (US & Canada)']
+      game = create(
+        :game,
+        season:,
+        start_time: eastern_time.parse('2026-03-11 11:30pm'),
+        status: :scheduled,
+        home_team_name: 'Late Home',
+        away_team_name: 'Late Away'
+      )
+
+      get '/games/schedule', params: { date: '2026-03-11' }
+
+      expect(response).to have_http_status(:success)
+      expect(response.body).to include(game.home_team_name)
+      expect(response.body).to include(game.away_team_name)
+    end
   end
 
   describe 'GET /games/:id' do

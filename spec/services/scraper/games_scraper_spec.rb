@@ -78,7 +78,7 @@ RSpec.describe Scraper::GamesScraper do
       away_team: 'Alabama State',
       home_team_score: nil,
       away_team_score: nil,
-      date: Time.zone.parse("#{date} 7:00pm"),
+      date: Game::SCHEDULE_TIME_ZONE.parse("#{date} 7:00pm").in_time_zone,
       away_team_stats: {},
       home_team_stats: {},
       url: schedule_url
@@ -139,7 +139,8 @@ RSpec.describe Scraper::GamesScraper do
     start_time = scraper.send(:scheduled_start_time, '7:00p ET')
 
     expect(start_time).to be_a(ActiveSupport::TimeWithZone)
-    expect(start_time.hour).to eq(19)
+    expect(start_time).to eq(Game::SCHEDULE_TIME_ZONE.parse("#{date} 7:00pm").in_time_zone)
+    expect(Game.schedule_date_for(start_time)).to eq(date)
   end
 
   it 'returns a time value for completed games from scorebox metadata' do

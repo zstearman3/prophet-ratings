@@ -86,7 +86,7 @@ module Importer
     end
 
     def schedule_row_matches_game?(row, game)
-      row[:date] == game.start_time.to_date &&
+      row[:date] == game.schedule_date &&
         [game.home_team_name, game.away_team_name].map(&:downcase).include?(row[:opponent_name].to_s.downcase)
     end
 

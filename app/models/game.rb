@@ -32,6 +32,33 @@ class Game < ApplicationRecord
   }.freeze
 
   VENUE_CONFIDENCES = %w[unknown confirmed manual].freeze
+  SCHEDULE_TIME_ZONE = ActiveSupport::TimeZone['Eastern Time (US & Canada)']
+
+  scope :on_schedule_date, ->(date) { where(start_time: schedule_day_range(date)) }
+  scope :through_schedule_date, ->(date) { where(start_time: ..schedule_day_range(date).end) }
+
+  def self.schedule_day_range(date)
+    schedule_date = if date.is_a?(Date) && !date.respond_to?(:hour)
+                      date
+                    else
+                      schedule_date_for(date)
+                    end
+    SCHEDULE_TIME_ZONE.local(schedule_date.year, schedule_date.month, schedule_date.day).all_day
+  end
+
+  def self.schedule_date_for(time)
+    time.in_time_zone(SCHEDULE_TIME_ZONE).to_date
+  end
+
+  def self.current_schedule_date
+    schedule_date_for(Time.current)
+  end
+
+  def self.schedule_time_for(value)
+    return SCHEDULE_TIME_ZONE.local(value.year, value.month, value.day) if value.is_a?(Date) && !value.respond_to?(:hour)
+
+    value.in_time_zone
+  end
 
   validates :url, presence: true
   validates :start_time, presence: true
@@ -43,10 +70,10 @@ class Game < ApplicationRecord
   def unique_game_per_teams_and_date
     return unless home_team_name.present? && away_team_name.present? && start_time.present?
 
-    # Find other games with same teams and same date
-    date = start_time.to_date
-    existing = Game.where(home_team_name:, away_team_name:)
-                   .where('DATE(start_time) = ?', date)
+    date = schedule_date
+    existing = self.class
+                   .on_schedule_date(date)
+                   .where(home_team_name:, away_team_name:)
                    .where.not(id:)
 
     return unless existing.exists?
@@ -74,6 +101,10 @@ class Game < ApplicationRecord
 
   def confirmed_home_venue?
     venue_home? && %w[confirmed manual].include?(venue_confidence)
+  end
+
+  def schedule_date
+    self.class.schedule_date_for(start_time)
   end
 
   ##

@@ -138,7 +138,7 @@ module ProphetRatings
       TeamGame
         .joins(:game, :team_season)
         .where(team_seasons: { season_id: @season.id })
-        .where(games: { status: Game.statuses[:final], start_time: ..as_of })
+        .merge(Game.final.through_schedule_date(as_of))
         .group(:team_season_id)
         .having('COUNT(*) >= 2')
         .limit(2)

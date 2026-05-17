@@ -96,7 +96,7 @@ module ProphetRatings
     def finalized_team_game_count(team_season)
       team_season.team_games.count do |team_game|
         game = team_game.game
-        game&.final? && game.start_time.to_date <= as_of.to_date
+        game&.final? && game.schedule_date <= as_of.to_date
       end
     end
 
@@ -182,7 +182,7 @@ module ProphetRatings
       hca_stats = Array(RATINGS_CONFIG[:home_court_adjusted_stats]).map(&:to_sym)
       home_adv = RATINGS_CONFIG[:home_court_advantage].to_f
 
-      Game.where(season:, status: :final, start_time: ..as_of).includes(:home_team_game, :away_team_game).find_each do |game|
+      Game.where(season:).final.through_schedule_date(as_of).includes(:home_team_game, :away_team_game).find_each do |game|
         tg1 = game.home_team_game
         tg2 = game.away_team_game
         next unless tg1 && tg2

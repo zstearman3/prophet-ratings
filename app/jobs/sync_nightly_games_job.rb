@@ -33,8 +33,8 @@ class SyncNightlyGamesJob < ApplicationJob
 
   def recently_completed_or_stale_dates(season, past_lookback_days:)
     range_to_a(
-      [Time.zone.today - past_lookback_days.days, season.start_date].max,
-      [Time.zone.today - 1.day, season.end_date].min
+      [Game.current_schedule_date - past_lookback_days.days, season.start_date].max,
+      [Game.current_schedule_date - 1.day, season.end_date].min
     )
   end
 
@@ -42,7 +42,7 @@ class SyncNightlyGamesJob < ApplicationJob
     sync_end_date = [coerce_date(future_end_date) || season.end_date, season.end_date].min
 
     range_to_a(
-      [Time.zone.today, season.start_date].max,
+      [Game.current_schedule_date, season.start_date].max,
       sync_end_date
     )
   end

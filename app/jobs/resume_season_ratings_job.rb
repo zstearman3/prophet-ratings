@@ -64,7 +64,7 @@ class ResumeSeasonRatingsJob < ApplicationJob
   def backfill_date_range!(season, date_range)
     date_range.each do |date|
       Rails.logger.debug { "Backfilling for #{date}" }
-      games = season.games.where(start_time: date.all_day)
+      games = season.games.on_schedule_date(date)
       ProphetRatings::OverallRatingsCalculator.new(season).call(as_of: date)
       games.each(&:generate_prediction!)
       games.each { |game| game.finalize if game.final? }

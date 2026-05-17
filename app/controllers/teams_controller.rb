@@ -3,6 +3,21 @@
 # app/controllers/teams_controller.rb
 class TeamsController < ApplicationController
   def show
+    load_team_context
+    load_chart_data
+    load_team_games
+    load_snapshot_lookup
+    load_predictions
+
+    respond_to do |format|
+      format.html
+      format.turbo_stream if turbo_frame_request?
+    end
+  end
+
+  private
+
+  def load_team_context
     @team = Team.find_by!(slug: params[:slug])
     @season = Season.find_by(year: params[:year]) || Season.current
     @team_season = TeamSeason.find_by!(team: @team, season: @season)
@@ -11,7 +26,9 @@ class TeamsController < ApplicationController
     @snapshots = @team_season.team_rating_snapshots
                              .where(ratings_config_version: @config)
                              .order(:snapshot_date)
+  end
 
+  def load_chart_data
     chart_builder = ChartDataBuilder.new(
       snapshots: @snapshots,
       season: @season,
@@ -26,7 +43,9 @@ class TeamsController < ApplicationController
     @lower_line = chart_builder.reference_lines[:lower]
     @upper2_line = chart_builder.reference_lines[:upper2]
     @lower2_line = chart_builder.reference_lines[:lower2]
+  end
 
+  def load_team_games
     @team_games = @team_season.team_games
                               .includes(
                                 game: [
@@ -38,15 +57,17 @@ class TeamsController < ApplicationController
                                 ]
                               )
                               .order('games.start_time')
+  end
 
+  def load_snapshot_lookup
     @snapshot_lookup = TeamRatingSnapshot
                        .where(ratings_config_version: @config)
-                       .where(team_season_id: @team_games.map(&:game).flat_map do |g|
-                                                [g.home_team_season&.id, g.away_team_season&.id]
-                                              end.uniq)
-                       .where(snapshot_date: ..@team_games.map { |tg| tg.game.start_time }.max.to_date)
+                       .where(team_season_id: matchup_team_season_ids)
+                       .where(snapshot_date: ..@team_games.map { |tg| tg.game.schedule_date }.max)
                        .group_by(&:team_season_id)
+  end
 
+  def load_predictions
     @predictions_by_game = {}
 
     @team_games.each do |tg|
@@ -59,10 +80,11 @@ class TeamsController < ApplicationController
       end
       @predictions_by_game[game.id] = prediction
     end
+  end
 
-    respond_to do |format|
-      format.html
-      format.turbo_stream if turbo_frame_request?
-    end
+  def matchup_team_season_ids
+    @team_games.map(&:game).flat_map do |game|
+      [game.home_team_season&.id, game.away_team_season&.id]
+    end.uniq
   end
 end

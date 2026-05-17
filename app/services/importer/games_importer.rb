@@ -14,8 +14,8 @@ module Importer
       private
 
       def find_game_by_teams_and_date(home_team_name, away_team_name, date)
-        Game.where(home_team_name:, away_team_name:)
-            .where('DATE(start_time) = ?', date)
+        Game.on_schedule_date(date)
+            .where(home_team_name:, away_team_name:)
             .first
       end
 
@@ -41,7 +41,10 @@ module Importer
       end
 
       def process_game(row)
-        season = Season.find_by('start_date <= ? AND end_date >= ?', row[:date], row[:date])
+        start_time = Game.schedule_time_for(row[:date])
+        row = row.merge(date: start_time)
+        date = Game.schedule_date_for(start_time)
+        season = Season.find_by('start_date <= ? AND end_date >= ?', date, date)
 
         home_team_name = row[:home_team]
         away_team_name = row[:away_team]
@@ -54,9 +57,8 @@ module Importer
         home_team_season = home_team ? TeamSeason.find_by(season:, team: home_team) : nil
         away_team_season = away_team ? TeamSeason.find_by(season:, team: away_team) : nil
 
-        date = row[:date].to_date
         game = find_game_by_teams_and_date(row[:home_team], row[:away_team], date) ||
-               Game.new(home_team_name: row[:home_team], away_team_name: row[:away_team], start_time: row[:date])
+               Game.new(home_team_name: row[:home_team], away_team_name: row[:away_team], start_time:)
 
         return process_complete_game(game, row, season, home_team_season, away_team_season) if game_complete?(row)
 
