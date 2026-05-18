@@ -9,7 +9,7 @@ class SyncFromLastGamesJob < ApplicationJob
 
     (start_date(season)..end_date(season)).each do |date|
       result = Ingestion::GamesIngestionService.new(date:).call
-      Rails.logger.debug { "Imported #{result[:imported_rows]} games for #{date}" }
+      Rails.logger.info { "Imported #{result[:imported_rows]} games for #{date}" }
     end
 
     return unless enqueue_rankings

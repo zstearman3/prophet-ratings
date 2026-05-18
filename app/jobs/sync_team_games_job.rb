@@ -23,6 +23,6 @@ class SyncTeamGamesJob < ApplicationJob
 
     result = Ingestion::GamesIngestionService.new(date:, team:).call
 
-    Rails.logger.debug { "Imported #{result[:imported_rows]} games for #{team.school} on #{date}" }
+    Rails.logger.info { "Imported #{result[:imported_rows]} games for #{team.school} on #{date}" }
   end
 end
