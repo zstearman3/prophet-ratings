@@ -88,7 +88,7 @@ Date range:
 - Start: latest existing `season.games.start_time` converted to `Game#schedule_date`, or `season.start_date` if no games exist.
 - End: earlier of `season.end_date` and yesterday in the Eastern schedule-date calendar.
 
-Like `SyncDailyGamesJob`, it imports each date in batches of 10.
+Like `SyncDailyGamesJob`, it delegates each date to `Ingestion::GamesIngestionService`, so rows are scraped, enriched, and imported through the standard ingestion flow.
 
 After syncing, it can enqueue:
 
@@ -139,11 +139,10 @@ It loops from `season.start_date` through the earlier of `season.end_date` and y
 
 For each date, it:
 
-1. Builds a `Scraper::GamesScraper`.
-2. Skips dates with zero games.
-3. Scrapes rows for the target team with `to_json_for_team(team)`.
-4. Filters rows against the team's school name and aliases.
-5. Imports matching rows with `Importer::GamesImporter.import`.
+1. Builds `Ingestion::GamesIngestionService.new(date:, team:)`.
+2. Scrapes rows for the target team.
+3. Enriches those rows with Sports Reference team schedule venue/start-time data.
+4. Imports the enriched rows with `Importer::GamesImporter.import`.
 
 This is useful for targeted repair or team-specific backfills.
 
@@ -503,7 +502,7 @@ docker compose exec web bin/setup_data
 
 When changing ingestion code:
 
-- Inspect `SyncDailyGamesJob`, `SyncNightlyGamesJob`, `SyncFullSeasonGamesJob`, `Scraper::GamesScraper`, `Importer::GamesImporter`, and `ProphetRatings::GameFinalizer` first.
+- Inspect `SyncDailyGamesJob`, `SyncNightlyGamesJob`, `SyncFullSeasonGamesJob`, `Ingestion::GamesIngestionService`, `Scraper::GamesScraper`, `Importer::GamesImporter`, and `ProphetRatings::GameFinalizer` first.
 - Preserve idempotency where possible. Re-running a sync for the same date should update or preserve existing records, not create unnecessary duplicates.
 - Keep scheduled-game support intact; future prediction workflows may rely on scheduled games before box scores are final.
 - Do not silently alter team matching behavior without tests and alias migration/seed updates.
@@ -516,9 +515,9 @@ When changing ingestion code:
 
 - `SyncDailyGamesJob` imports one date and does not enqueue ratings.
 - `SyncNightlyGamesJob` imports a rolling window and then can enqueue `UpdateRankingsJob`.
-- `SyncFromLastGamesJob` resumes from the latest imported game date and then can enqueue `UpdateRankingsJob`.
-- `SyncFullSeasonGamesJob` handles retry/backoff per date but does not enqueue ratings by itself.
-- `SyncTeamGamesJob` is useful for targeted repair but defaults `season_id` to `Season.last.id`.
+- `SyncFromLastGamesJob` resumes from the latest imported game date, delegates each date to `Ingestion::GamesIngestionService`, and then can enqueue `UpdateRankingsJob`.
+- `SyncFullSeasonGamesJob` handles retry/backoff per date, delegates each date to `Ingestion::GamesIngestionService`, and does not enqueue ratings by itself.
+- `SyncTeamGamesJob` is useful for targeted repair, delegates team-date rows to `Ingestion::GamesIngestionService`, and defaults `season_id` to `Season.last.id`.
 - `Scraper::GamesScraper#scrape_day_batch` slices with `batch_urls[start_at..end_at]`, which is an inclusive range. Be careful if changing batch semantics.
 - `Importer::GamesImporter` logs partial team matches but can still preserve games with missing team-season associations.
 - `GameFinalizer` updates prediction errors if a matching prediction and snapshots already exist.

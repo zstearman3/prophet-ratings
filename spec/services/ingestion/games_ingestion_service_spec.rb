@@ -30,4 +30,17 @@ RSpec.describe Ingestion::GamesIngestionService do
     expect(scraper).to have_received(:to_json_in_batches).with(0, 1)
     expect(result[:imported_rows]).to eq(1)
   end
+
+  it 'supports team-specific scraping through the same enrichment and import path' do
+    team = build_stubbed(:team)
+    team_rows = [rows.first.merge(home_team: team.school)]
+    allow(scraper).to receive(:to_json_for_team).with(team).and_return(team_rows)
+    allow(row_enricher).to receive(:call).with(team_rows).and_return(enriched_rows)
+
+    result = described_class.new(date:, team:).call
+
+    expect(row_enricher).to have_received(:call).with(team_rows).once
+    expect(Importer::GamesImporter).to have_received(:import).with(enriched_rows).once
+    expect(result[:imported_rows]).to eq(1)
+  end
 end
