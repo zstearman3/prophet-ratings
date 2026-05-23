@@ -105,6 +105,11 @@ Rails.application.configure do
       cron: '0 /8 * * *', # cron-style scheduling format by fugit gem
       class: 'SyncNightlyGamesJob', # name of the job class as a String; must reference an Active Job job class
       description: 'Nightly game sync from cbb reference' # optional description that appears in Dashboard
+    },
+    odds_sync: {
+      cron: '0 /6 * * *', # cron-style scheduling format by fugit gem
+      class: 'SyncOddsJob', # name of the job class as a String; must reference an Active Job job class
+      description: 'Odds sync from The Odds API' # optional description that appears in Dashboard
     }
   }
 end
