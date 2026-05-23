@@ -54,6 +54,7 @@ RSpec.describe OddsApi::SyncService, type: :service do
           expect(result.failed_count).to eq(0)
           expect(result.failures).to be_empty
           expect(game.reload.game_odd).to be_present
+          # 12 bookmakers x 2 markets x 2 outcomes = 48
           expect(game.bookmaker_odds.count).to eq(48)
         end
       end
@@ -105,6 +106,27 @@ RSpec.describe OddsApi::SyncService, type: :service do
           expect(result.imported_count).to eq(0)
           expect(result.failed_count).to eq(0)
           expect(result.failures).to be_empty
+        end
+      end
+    end
+
+    context 'when the API returns malformed game payloads' do
+      let(:payload) { [nil] }
+
+      it 'records a failure instead of crashing while serializing failure details' do
+        result = service.call
+
+        aggregate_failures do
+          expect(result.fetched_count).to eq(1)
+          expect(result.imported_count).to eq(0)
+          expect(result.failed_count).to eq(1)
+          expect(result.failures.first).to include(
+            odds_api_game_id: nil,
+            home_team: nil,
+            away_team: nil,
+            commence_time: nil,
+            error_class: 'NoMethodError'
+          )
         end
       end
     end

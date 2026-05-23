@@ -21,7 +21,6 @@ Implemented:
 
 Not yet wired end to end:
 
-- no recurring schedule currently enqueues the live odds sync job
 - no existing workflow appears to run `BetRecommendationGenerator` after odds or predictions change
 - no production-facing observability, retry, or partial-failure handling exists around odds import
 - odds are not yet linked into a daily ingestion/prediction pipeline
@@ -143,6 +142,8 @@ SyncOddsJob.perform_later
 ```
 
 `SyncOddsJob` is intentionally thin. It calls `OddsApi::SyncService`, logs `fetched`, `imported`, and `failed` counts, and logs each failure mapping. It does not own retry policy or scheduling.
+
+Production schedules `SyncOddsJob` through the `odds_sync` GoodJob cron entry in `config/environments/production.rb`. The current cadence is every six hours.
 
 ## Consensus Calculation
 
@@ -284,9 +285,8 @@ Coverage gaps to address when finishing the integration:
 
 A pragmatic next increment would be:
 
-1. Add a recurring schedule for `SyncOddsJob` on a conservative cadence, such as every six hours during the season.
-2. After odds import, generate recommendations for games that have both current predictions and `GameOdd` rows.
-3. Add lightweight operational logging or admin visibility for imported, skipped, unmatched, and failed games.
-4. Decide whether bookmaker odds need a database-level uniqueness constraint on `game_id`, `bookmaker`, `market`, and `team_name`.
+1. After odds import, generate recommendations for games that have both current predictions and `GameOdd` rows.
+2. Add lightweight operational logging or admin visibility for imported, skipped, unmatched, and failed games.
+3. Decide whether bookmaker odds need a database-level uniqueness constraint on `game_id`, `bookmaker`, `market`, and `team_name`.
 
 Keep the first production version conservative: import available odds, preserve bookmaker rows, generate recommendations only when required model data exists, and clearly skip games that cannot be matched.

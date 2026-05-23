@@ -183,6 +183,7 @@ RSpec.describe OddsApi::Importer, type: :service do
         expect(game_odd.spread_point.to_f).to eq(6.5)
         expect(game_odd.spread_home_odds).to eq(-111)
         expect(game_odd.spread_away_odds).to eq(-109)
+        # 12 bookmakers x 2 markets x 2 outcomes = 48
         expect(game.bookmaker_odds.count).to eq(48)
       end
     end

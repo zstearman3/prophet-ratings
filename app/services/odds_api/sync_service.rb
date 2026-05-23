@@ -35,7 +35,7 @@ module OddsApi
     def import_game(game_data, result)
       OddsApi::Importer.new([game_data]).call
       result.imported_count += 1
-    rescue ActiveRecord::RecordNotFound, ArgumentError => e
+    rescue ActiveRecord::RecordNotFound, ArgumentError, NoMethodError => e
       failure = failure_for(game_data, e)
       result.failures << failure
       logger.warn("Odds API sync skipped game: #{failure.inspect}")
@@ -53,6 +53,8 @@ module OddsApi
     end
 
     def value_for(hash, key)
+      return nil unless hash.respond_to?(:[])
+
       hash[key] || hash[key.to_s]
     end
   end
