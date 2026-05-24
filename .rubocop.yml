@@ -24,9 +24,8 @@ AllCops:
     - "vendor/**/*"
     - "Rakefile"
 
-  # RuboCop 1.81 supports parser targets through Ruby 3.5. Keep this at the
-  # newest supported target until RuboCop adds Ruby 4.0 support.
-  TargetRubyVersion: 3.5
+  # RuboCop targets Ruby 4.0 syntax for this app's configured Ruby version.
+  TargetRubyVersion: 4.0
 
 Naming/RescuedExceptionsVariableName:
   Enabled: false

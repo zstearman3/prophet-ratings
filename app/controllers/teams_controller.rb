@@ -18,7 +18,7 @@ class TeamsController < ApplicationController
   private
 
   def load_team_context
-    @team = Team.find_by!(slug: params[:slug])
+    @team = Team.find_by!(slug: params.expect(:slug))
     @season = Season.find_by(year: params[:year]) || Season.current
     @team_season = TeamSeason.find_by!(team: @team, season: @season)
     @config = RatingsConfigVersion.current

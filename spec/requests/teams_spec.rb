@@ -94,7 +94,7 @@ RSpec.describe 'Teams' do
       )
 
       get "/teams/#{team.slug}", params: { year: season.year }
-      document = Nokogiri::HTML(response.body)
+      document = response.parsed_body
       score_cells = document.css('table tbody tr td').map { |cell| cell.text.strip }
       prediction_link = document.css("a[href='/games/#{game.id}']").find do |link|
         link.text.include?(prediction.predicted_score_string)
