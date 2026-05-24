@@ -39,9 +39,13 @@ This project is set up to run entirely via Docker for local development.
 
    The first build may take several minutes (Ruby, Node, and asset build steps).
 
+   Local source files are mounted into the `web` and `worker` containers by `compose.dev.yml`, which the Makefile loads explicitly. Ordinary code, spec, and RuboCop changes do not require a rebuild. Rebuild after changing dependencies, native packages, or the Dockerfile.
+
 ## Using the Makefile
 
-The root `Makefile` provides short commands for common Docker Compose workflows. These commands are just convenience wrappers around `docker compose`.
+The root `Makefile` provides short commands for common Docker Compose workflows. These commands load both `docker-compose.yml` and `compose.dev.yml`, so local containers see your working tree immediately.
+
+Use plain `docker compose -f docker-compose.yml ...` when you want the production-like image behavior without local development overrides.
 
 List available commands:
 
@@ -106,7 +110,8 @@ make migrate
 To run a one-off Rails task that does not have a Makefile shortcut:
 
 ```bash
-docker compose exec web bin/rails <task:name>
+make shell
+bin/rails <task:name>
 ```
 
 ## Common development workflows

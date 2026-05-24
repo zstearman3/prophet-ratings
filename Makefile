@@ -1,4 +1,4 @@
-DC := docker compose
+DC := docker compose -f docker-compose.yml -f compose.dev.yml
 
 .PHONY: help build up down restart logs logs-web logs-worker ps shell console migrate prepare setup-data test bundle-install yarn-install reset-db
 

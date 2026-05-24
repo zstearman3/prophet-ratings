@@ -42,6 +42,9 @@
 # Ignore project.md
 /project.md
 
+# Keep auto-loaded Docker Compose overrides local-only. Shared local dev config
+# belongs in compose.dev.yml and is loaded explicitly by the Makefile.
+/compose.override.yml
+
 # Ignore macOS system files
 .DS_Store
-
