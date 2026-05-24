@@ -14,20 +14,25 @@ module Importer
       private
 
       def find_existing_game(row, date)
-        find_game_by_box_score_url(row[:url]) ||
+        find_game_by_unique_url(row[:url]) ||
           find_game_by_teams_and_date(row[:home_team], row[:away_team], date) ||
           find_game_by_teams_and_legacy_date(row[:home_team], row[:away_team], date) ||
           find_neutral_game_by_reversed_teams(row, date)
       end
 
-      def find_game_by_box_score_url(url)
-        return unless box_score_url?(url)
+      def find_game_by_unique_url(url)
+        return unless unique_game_url?(url)
 
         Game.find_by(url:)
       end
 
-      def box_score_url?(url)
-        url.to_s.include?('/cbb/boxscores/')
+      def unique_game_url?(url)
+        normalized_url = url.to_s.strip
+        normalized_url.present? && !daily_schedule_url?(normalized_url)
+      end
+
+      def daily_schedule_url?(url)
+        url.include?('/cbb/boxscores/index.cgi')
       end
 
       def find_game_by_teams_and_date(home_team_name, away_team_name, date)

@@ -256,6 +256,24 @@ RSpec.describe Importer::GamesImporter do
     end.not_to change(Game, :count)
   end
 
+  it 'does not match different scheduled games by shared daily schedule URL' do
+    other_home_team = create(:team, school: 'Other Home', slug: 'other-home')
+    other_away_team = create(:team, school: 'Other Away', slug: 'other-away')
+    other_home_season = create(:team_season, team: other_home_team, season:)
+    other_away_season = create(:team_season, team: other_away_team, season:)
+    create(:team_alias, team: other_home_team, value: other_home_team.school, source: 'sports_reference')
+    create(:team_alias, team: other_away_team, value: other_away_team.school, source: 'sports_reference')
+    daily_schedule_url = 'https://www.sports-reference.com/cbb/boxscores/index.cgi?month=1&day=1&year=2025'
+    other_row = row.merge(
+      home_team: other_home_season.team.school,
+      away_team: other_away_season.team.school
+    )
+
+    expect do
+      described_class.import([row.merge(url: daily_schedule_url), other_row.merge(url: daily_schedule_url)])
+    end.to change(Game, :count).by(2)
+  end
+
   it 'matches existing games by Eastern schedule date when enriched start time crosses UTC midnight' do
     existing_game = create(
       :game,
