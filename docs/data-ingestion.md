@@ -241,7 +241,7 @@ For each row, the importer:
 1. Finds the season covering `row[:date]`.
 2. Resolves home and away teams with `Team.search`.
 3. Logs if either team cannot be matched.
-4. Finds existing games by home team name, away team name, and date.
+4. Finds existing games by unique non-placeholder URL, then home team name, away team name, and Eastern schedule date. It also has a legacy raw-date fallback for old date-only imports and a neutral-site reversed-team fallback.
 5. Builds a new `Game` if no matching game exists.
 6. Creates or finds home/away `TeamGame` records when team seasons can be resolved.
 7. Writes team-game stat attributes.
@@ -439,13 +439,30 @@ It supports:
 
 File: `lib/tasks/game_dedupe.rake`
 
-Purpose: remove duplicate games grouped by:
+Purpose: report or repair duplicate games created by historical import matching issues.
 
-- `home_team_name`
-- `away_team_name`
-- `schedule_date`
+By default this task is a dry run:
 
-It keeps the lowest-id game and deletes duplicate associated `TeamGame` rows. It also deletes odds associations if those classes are defined.
+```bash
+bin/rails games:dedupe
+```
+
+The task looks for duplicate groups using the same conservative identifiers used by the importer:
+
+- unique non-placeholder game URLs
+- ordered teams plus Eastern schedule date
+- ordered teams plus legacy raw stored date for old date-only rows
+- neutral-site unordered team pairs plus schedule date
+
+It chooses a survivor by preferring finalized games, complete `TeamGame` data, predictions/odds, manual or known venue data, unique URLs, and then lower ids as a tie breaker. In dry-run mode it only prints the groups and planned survivor.
+
+To repair records, set `APPLY=true`:
+
+```bash
+APPLY=true bin/rails games:dedupe
+```
+
+The apply mode reassigns safe dependent records such as `TeamGame`, `Prediction`, `GameOdd`, `BookmakerOdd`, and `BetRecommendation` where unique constraints allow it, deletes conflicting duplicate dependents, and then deletes duplicate `Game` records. You can restrict the scope with `YEAR=<year>` or `SEASON_ID=<id>`.
 
 Use this carefully because it deletes records.
 
@@ -491,7 +508,7 @@ docker compose exec web bin/setup_data
 ## Data integrity notes
 
 - Team identity is resolved by `Team.search` and team aliases. If team names change upstream, update aliases rather than hardcoding importer exceptions when possible.
-- Games are matched by home team name, away team name, and Eastern schedule date. Be careful changing matching logic because duplicate games can affect ratings and snapshots.
+- Games are matched first by unique non-placeholder URL, then by home team name, away team name, and Eastern schedule date, with legacy and neutral-site fallbacks. Be careful changing matching logic because duplicate games can affect ratings and snapshots.
 - Scheduled rows intentionally preserve games without complete stats.
 - Complete rows must include all required stats before finalization is attempted.
 - Finalized games should not be overwritten by later partial/scheduled rows.

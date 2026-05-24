@@ -1,27 +1,20 @@
 # frozen_string_literal: true
 
 namespace :games do
-  desc 'Deduplicate games by home_team_name, away_team_name, and Eastern schedule date, deleting duplicates and their associations.'
+  desc 'Report duplicate games by default; set APPLY=true to repair/delete duplicates.'
   task dedupe: :environment do
-    require 'active_record'
+    scope = if ENV['SEASON_ID'].present?
+              Season.find(ENV.fetch('SEASON_ID')).games
+            elsif ENV['YEAR'].present?
+              Season.find_by!(year: ENV.fetch('YEAR')).games
+            else
+              Game.all
+            end
 
-    grouped = Game.all.group_by { |g| [g.home_team_name, g.away_team_name, g.schedule_date] }
-    dup_groups = grouped.select { |_k, games| games.size > 1 }
-    puts "Found \\#{dup_groups.size} duplicate groups."
-    dup_groups.each do |key, games|
-      keep = games.min_by(&:id)
-      dups = games - [keep]
-      next if dups.empty?
+    apply = ActiveModel::Type::Boolean.new.cast(ENV.fetch('APPLY', false))
+    result = Maintenance::DuplicateGamesRepair.new(scope:, apply:).call
 
-      puts "Keeping game id=\\#{keep.id} (\\#{key.inspect}), deleting duplicates: \\#{dups.map(&:id).join(', ')}"
-      dups.each do |dup|
-        TeamGame.where(game_id: dup.id).delete_all
-        GameOdd.where(game_id: dup.id).delete_all if defined?(GameOdd)
-        BookmakerOdd.where(game_id: dup.id).delete_all if defined?(BookmakerOdd)
-        # Add any other associations here as needed
-        dup.destroy
-      end
-    end
-    puts 'Deduplication complete.'
+    puts "Deleted games: #{result.deleted_game_ids.join(', ')}" if result.deleted_game_ids.any?
+    puts "Reassigned/deleted associations: #{result.reassigned_counts.inspect}" if result.reassigned_counts.any?
   end
 end
