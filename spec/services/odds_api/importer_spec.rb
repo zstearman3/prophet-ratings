@@ -20,10 +20,10 @@ RSpec.describe OddsApi::Importer, type: :service do
         away_team_name: away_team.school
       )
     end
-    let!(:home_team_game) { create(:team_game, game:, team: home_team, team_season: home_team_season, home: true) }
-    let!(:away_team_game) { create(:team_game, game:, team: away_team, team_season: away_team_season, home: false) }
-    let!(:home_alias) { create(:team_alias, team: home_team, value: 'UAB Blazers', source: 'backfill') }
-    let!(:away_alias) { create(:team_alias, team: away_team, value: 'North Texas Mean Green', source: 'backfill') }
+    let(:home_team_game) { create(:team_game, game:, team: home_team, team_season: home_team_season, home: true) }
+    let(:away_team_game) { create(:team_game, game:, team: away_team, team_season: away_team_season, home: false) }
+    let(:home_alias) { create(:team_alias, team: home_team, value: 'UAB Blazers', source: 'backfill') }
+    let(:away_alias) { create(:team_alias, team: away_team, value: 'North Texas Mean Green', source: 'backfill') }
 
     let(:payload) do
       [
@@ -69,41 +69,8 @@ RSpec.describe OddsApi::Importer, type: :service do
       ]
     end
 
-    it 'imports game odds and bookmaker odds from the symbolized payload shape' do
-      described_class.new(payload).call
-
-      game_odd = game.reload.game_odd
-
-      aggregate_failures do
-        expect(game_odd).to be_present
-        expect(game_odd.moneyline_home).to eq(-135)
-        expect(game_odd.moneyline_away).to eq(120)
-        expect(game_odd.spread_point.to_f).to eq(-2.5)
-        expect(game_odd.spread_home_odds).to eq(-110)
-        expect(game_odd.spread_away_odds).to eq(-110)
-        expect(game_odd.total_points.to_f).to eq(121.5)
-        expect(game_odd.total_over_odds).to eq(-130)
-        expect(game_odd.total_under_odds).to eq(100)
-        expect(game.bookmaker_odds.count).to eq(6)
-      end
-
-      over = game.bookmaker_odds.find_by(bookmaker: 'BetMGM', market: 'totals', team_name: 'Over')
-      home_moneyline = game.bookmaker_odds.find_by(bookmaker: 'BetMGM', market: 'h2h', team_name: 'UAB Blazers')
-
-      aggregate_failures do
-        expect(over.team_side).to eq('over')
-        expect(over.value.to_f).to eq(121.5)
-        expect(over.odds).to eq(-130)
-        expect(home_moneyline.team_side).to eq('home')
-        expect(home_moneyline.value).to be_nil
-        expect(home_moneyline.odds).to eq(-135)
-      end
-    end
-
-    it 'updates existing rows instead of duplicating them on repeat imports' do
-      described_class.new(payload).call
-
-      updated_payload = [
+    let(:updated_payload) do
+      [
         payload.first.merge(
           bookmakers: [
             payload.first[:bookmakers].first.merge(
@@ -138,6 +105,48 @@ RSpec.describe OddsApi::Importer, type: :service do
           ]
         )
       ]
+    end
+
+    before do
+      home_team_game
+      away_team_game
+      home_alias
+      away_alias
+    end
+
+    it 'imports game odds and bookmaker odds from the symbolized payload shape' do
+      described_class.new(payload).call
+
+      game_odd = game.reload.game_odd
+
+      aggregate_failures do
+        expect(game_odd).to be_present
+        expect(game_odd.moneyline_home).to eq(-135)
+        expect(game_odd.moneyline_away).to eq(120)
+        expect(game_odd.spread_point.to_f).to eq(-2.5)
+        expect(game_odd.spread_home_odds).to eq(-110)
+        expect(game_odd.spread_away_odds).to eq(-110)
+        expect(game_odd.total_points.to_f).to eq(121.5)
+        expect(game_odd.total_over_odds).to eq(-130)
+        expect(game_odd.total_under_odds).to eq(100)
+        expect(game.bookmaker_odds.count).to eq(6)
+      end
+
+      over = game.bookmaker_odds.find_by(bookmaker: 'BetMGM', market: 'totals', team_name: 'Over')
+      home_moneyline = game.bookmaker_odds.find_by(bookmaker: 'BetMGM', market: 'h2h', team_name: 'UAB Blazers')
+
+      aggregate_failures do
+        expect(over.team_side).to eq('over')
+        expect(over.value.to_f).to eq(121.5)
+        expect(over.odds).to eq(-130)
+        expect(home_moneyline.team_side).to eq('home')
+        expect(home_moneyline.value).to be_nil
+        expect(home_moneyline.odds).to eq(-135)
+      end
+    end
+
+    it 'updates existing rows instead of duplicating them on repeat imports' do
+      described_class.new(payload).call
 
       expect do
         described_class.new(updated_payload).call
@@ -156,6 +165,38 @@ RSpec.describe OddsApi::Importer, type: :service do
         expect(over.odds).to eq(-120)
         expect(over.value.to_f).to eq(122.5)
       end
+    end
+
+    it 'imports the NCAAB fixture adapted from The Odds API published example' do
+      fixture_payload = JSON.parse(
+        Rails.root.join('spec/fixtures/odds_api/ncaab_odds_example.json').read,
+        symbolize_names: true
+      )
+
+      described_class.new(fixture_payload).call
+
+      game_odd = game.reload.game_odd
+
+      aggregate_failures do
+        expect(game_odd.moneyline_home).to eq(-291)
+        expect(game_odd.moneyline_away).to eq(236)
+        expect(game_odd.spread_point.to_f).to eq(6.5)
+        expect(game_odd.spread_home_odds).to eq(-111)
+        expect(game_odd.spread_away_odds).to eq(-109)
+        # 12 bookmakers x 2 markets x 2 outcomes = 48
+        expect(game.bookmaker_odds.count).to eq(48)
+      end
+    end
+
+    it 'accepts the empty odds fixture without importing rows' do
+      fixture_payload = JSON.parse(
+        Rails.root.join('spec/fixtures/odds_api/empty_odds.json').read,
+        symbolize_names: true
+      )
+
+      expect do
+        described_class.new(fixture_payload).call
+      end.not_to change(GameOdd, :count)
     end
   end
 end
