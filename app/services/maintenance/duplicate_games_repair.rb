@@ -47,7 +47,14 @@ module Maintenance
     end
 
     def games
-      @games ||= scope.includes(:predictions, :game_odd, :bookmaker_odds, :bet_recommendations).to_a
+      @games ||= scope.includes(
+        :home_team_game,
+        :away_team_game,
+        :predictions,
+        :game_odd,
+        :bookmaker_odds,
+        :bet_recommendations
+      ).to_a
     end
 
     def duplicate_key_map(game_rows)
@@ -155,7 +162,7 @@ module Maintenance
     end
 
     def complete_team_games?(game)
-      TeamGame.where(game:).size >= 2
+      game.home_team_game.present? && game.away_team_game.present?
     end
 
     def manual_venue?(game)
@@ -203,7 +210,7 @@ module Maintenance
     end
 
     def reset_duplicate_associations(duplicate)
-      %i[predictions game_odd bookmaker_odds bet_recommendations].each do |association_name|
+      %i[home_team_game away_team_game predictions game_odd bookmaker_odds bet_recommendations].each do |association_name|
         duplicate.association(association_name).reset
       end
     end
@@ -257,9 +264,15 @@ module Maintenance
           reassigned_counts[:team_games_deleted] += 1
         else
           team_game.update!(game: survivor)
+          reset_team_game_associations(survivor)
           reassigned_counts[:team_games_reassigned] += 1
         end
       end
+    end
+
+    def reset_team_game_associations(game)
+      game.association(:home_team_game).reset
+      game.association(:away_team_game).reset
     end
 
     def reassign_predictions!(survivor, duplicate)
@@ -298,9 +311,23 @@ module Maintenance
 
     def reassign_bookmaker_odds!(survivor, duplicate)
       duplicate.bookmaker_odds.find_each do |bookmaker_odd|
-        bookmaker_odd.update!(game: survivor)
-        reassigned_counts[:bookmaker_odds_reassigned] += 1
+        if matching_bookmaker_odd?(survivor, bookmaker_odd)
+          bookmaker_odd.destroy!
+          reassigned_counts[:bookmaker_odds_deleted] += 1
+        else
+          bookmaker_odd.update!(game: survivor)
+          survivor.association(:bookmaker_odds).reset
+          reassigned_counts[:bookmaker_odds_reassigned] += 1
+        end
       end
+    end
+
+    def matching_bookmaker_odd?(survivor, bookmaker_odd)
+      survivor.bookmaker_odds.find_by(
+        bookmaker: bookmaker_odd.bookmaker,
+        market: bookmaker_odd.market,
+        team_name: bookmaker_odd.team_name
+      )
     end
 
     def reassign_bet_recommendations!(survivor, duplicate)

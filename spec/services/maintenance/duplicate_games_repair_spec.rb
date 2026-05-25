@@ -14,6 +14,17 @@ RSpec.describe Maintenance::DuplicateGamesRepair do
     build(:game, attrs).tap { |game| game.save!(validate: false) }
   end
 
+  def create_bookmaker_odd_for(game)
+    create(
+      :bookmaker_odd,
+      game:,
+      bookmaker: 'DraftKings',
+      fetched_at: Time.current,
+      market: 'h2h',
+      team_name: home_team.school
+    )
+  end
+
   it 'reports duplicate groups without mutating records by default' do
     create_game(
       season:,
@@ -99,6 +110,33 @@ RSpec.describe Maintenance::DuplicateGamesRepair do
     expect(survivor.reload.home_team_game.team).to eq(home_team)
     expect(survivor.away_team_game.team).to eq(away_team)
     expect(Game.exists?(duplicate.id)).to be(false)
+  end
+
+  it 'deletes duplicate bookmaker odds when the survivor already has the same sportsbook market' do
+    survivor = create_game(
+      season:,
+      status: :final,
+      start_time: Game::SCHEDULE_TIME_ZONE.parse('2025-01-01 9:00pm'),
+      home_team_name: home_team.school,
+      away_team_name: away_team.school,
+      url: '/cbb/boxscores/2025-01-01-00-home.html'
+    )
+    duplicate = create_game(
+      season:,
+      status: :scheduled,
+      start_time: Time.zone.local(2025, 1, 1),
+      home_team_name: home_team.school,
+      away_team_name: away_team.school,
+      url: '/cbb/boxscores/2025-01-01-00-home.html'
+    )
+    survivor_odd = create_bookmaker_odd_for(survivor)
+    duplicate_odd = create_bookmaker_odd_for(duplicate)
+
+    result = described_class.new(apply: true, output:).call
+
+    expect(BookmakerOdd.exists?(duplicate_odd.id)).to be(false)
+    expect(survivor_odd.reload.game).to eq(survivor)
+    expect(result.reassigned_counts[:bookmaker_odds_deleted]).to eq(1)
   end
 
   it 'detects reversed neutral duplicates by unordered team pair and schedule date' do
