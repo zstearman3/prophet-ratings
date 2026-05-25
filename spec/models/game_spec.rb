@@ -96,6 +96,18 @@ RSpec.describe Game do
     end
   end
 
+  describe '#winning_team' do
+    it 'uses the loaded home and away team-game associations' do
+      game = create(:game, season:, home_team_score: 70, away_team_score: 65)
+      home_team = create(:team)
+      away_team = create(:team)
+      create(:team_game, game:, team: home_team, team_season: create(:team_season, team: home_team, season:), home: true)
+      create(:team_game, game:, team: away_team, team_season: create(:team_season, team: away_team, season:), home: false)
+
+      expect(game.winning_team).to eq(home_team)
+    end
+  end
+
   describe 'venue classification' do
     it 'defaults new games to an unknown venue' do
       game = described_class.new

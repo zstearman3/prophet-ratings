@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_05_17_000100) do
+ActiveRecord::Schema[8.0].define(version: 2026_05_25_173000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -98,7 +98,9 @@ ActiveRecord::Schema[8.0].define(version: 2026_05_17_000100) do
     t.string "venue_source"
     t.string "venue_confidence", default: "unknown", null: false
     t.string "venue_name"
+    t.index ["home_team_name", "away_team_name", "start_time"], name: "index_games_on_teams_and_start_time"
     t.index ["season_id"], name: "index_games_on_season_id"
+    t.index ["url"], name: "index_games_on_url"
     t.index ["venue_confidence"], name: "index_games_on_venue_confidence"
     t.index ["venue_type"], name: "index_games_on_venue_type"
   end
@@ -217,6 +219,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_05_17_000100) do
     t.decimal "vegas_total", precision: 6, scale: 3
     t.bigint "ratings_config_version_id"
     t.index ["away_team_snapshot_id"], name: "index_predictions_on_away_team_snapshot_id"
+    t.index ["game_id", "created_at"], name: "index_predictions_on_game_id_and_created_at"
     t.index ["game_id", "home_team_snapshot_id", "away_team_snapshot_id"], name: "index_predictions_on_game_and_snapshots", unique: true
     t.index ["game_id"], name: "index_predictions_on_game_id"
     t.index ["home_team_snapshot_id"], name: "index_predictions_on_home_team_snapshot_id"

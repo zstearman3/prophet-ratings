@@ -55,7 +55,7 @@ class Prediction < ApplicationRecord
   validate :snapshots_must_have_same_ratings_version
 
   def favorite
-    home_score > away_score ? game.home_team : game.away_team
+    home_score > away_score ? game.home_team_game&.team : game.away_team_game&.team
   end
 
   def win_probability_for_team(team_id)

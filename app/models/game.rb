@@ -134,7 +134,7 @@ class Game < ApplicationRecord
   # Returns the team with the higher score.
   # @return [Team, nil] The home or away team with the higher score, or nil if scores are equal or teams are missing.
   def winning_team
-    home_team_score > away_team_score ? home_team : away_team
+    home_team_score > away_team_score ? home_team_game&.team : away_team_game&.team
   end
 
   def pace
