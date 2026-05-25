@@ -1,7 +1,7 @@
 # syntax = docker/dockerfile:1
 
 # Make sure RUBY_VERSION matches the Ruby version in .ruby-version and Gemfile
-ARG RUBY_VERSION=3.2.2
+ARG RUBY_VERSION=4.0.5
 FROM registry.docker.com/library/ruby:$RUBY_VERSION-slim AS base
 
 # Rails app lives here
@@ -21,7 +21,7 @@ FROM base AS build
 RUN apt-get update -qq && \
     apt-get install --no-install-recommends -y \
     build-essential curl git libpq-dev libvips node-gyp pkg-config python-is-python3 \
-    imagemagick libmagickwand-dev
+    imagemagick libmagickwand-dev libyaml-dev
 
 # Install JavaScript dependencies
 ARG NODE_VERSION=18.16.0
@@ -67,7 +67,7 @@ FROM base
 # Install packages needed for deployment
 RUN apt-get update -qq && \
     apt-get install --no-install-recommends -y \
-    curl libvips postgresql-client python3 python3-pip python3-numpy && \
+    curl libvips libyaml-0-2 postgresql-client python3 python3-pip python3-numpy && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives
 
 # Copy built artifacts: gems, application

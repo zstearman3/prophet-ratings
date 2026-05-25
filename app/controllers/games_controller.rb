@@ -6,7 +6,7 @@ class GamesController < ApplicationController
       home_team_game: %i[team team_season],
       away_team_game: %i[team team_season],
       predictions: %i[home_team_snapshot away_team_snapshot]
-    ).find(params[:id])
+    ).find(params.expect(:id))
 
     @home_team_game = @game.home_team_game
     @away_team_game = @game.away_team_game

@@ -96,9 +96,7 @@ module OddsApi
       candidates << team.school if team.respond_to?(:school)
       candidates << team.the_odds_api_team_id if team.respond_to?(:the_odds_api_team_id)
 
-      if team.respond_to?(:team_aliases)
-        candidates.concat(Array(team.team_aliases).map { |team_alias| team_alias.value })
-      end
+      candidates.concat(Array(team.team_aliases).map(&:value)) if team.respond_to?(:team_aliases)
 
       candidates.compact.map(&:to_s).uniq
     end

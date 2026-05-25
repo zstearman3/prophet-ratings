@@ -61,7 +61,7 @@ RSpec.describe 'Games' do
       )
 
       get '/games/schedule', params: { date: Date.current.to_s }
-      document = Nokogiri::HTML(response.body)
+      document = response.parsed_body
       score_cell = document.css('table tbody tr td')[2]
       prediction_link = document.css("a[href='/games/#{game.id}']").find do |link|
         link.text.include?(prediction.predicted_score_string)

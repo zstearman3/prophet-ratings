@@ -2,7 +2,7 @@
 
 source 'https://rubygems.org'
 
-ruby '3.2.2'
+ruby '4.0.5'
 gem 'activerecord-import'
 gem 'chartkick'
 gem 'cssbundling-rails'

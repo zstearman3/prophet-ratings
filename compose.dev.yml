@@ -1,0 +1,8 @@
+services:
+  web:
+    volumes:
+      - .:/rails
+
+  worker:
+    volumes:
+      - .:/rails

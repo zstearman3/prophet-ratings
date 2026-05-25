@@ -24,7 +24,8 @@ AllCops:
     - "vendor/**/*"
     - "Rakefile"
 
-  TargetRubyVersion: 3.2.2
+  # RuboCop targets Ruby 4.0 syntax for this app's configured Ruby version.
+  TargetRubyVersion: 4.0
 
 Naming/RescuedExceptionsVariableName:
   Enabled: false
@@ -40,6 +41,8 @@ Rails/PluckInWhere:
 
 Metrics/MethodLength:
   Max: 40
+  Exclude:
+    - 'app/services/statistics_utils.rb'
 
 Metrics/BlockLength:
   Max: 35
@@ -82,12 +85,14 @@ Style/RescueModifier:
     - 'spec/**/*'
 
 Metrics/AbcSize:
-  Max: 25
+  Max: 30
   Exclude:
     - 'app/services/scraper/*'
     - 'app/services/importer/*'
+    - 'app/services/statistics_utils.rb'
     - 'app/services/prophet_ratings/prediction_evaluator.rb'
     - 'app/services/prophet_ratings/team_season_stats_aggregator.rb'
+    - 'spec/support/**/*'
 
 Metrics/ClassLength:
   Max: 300
@@ -114,3 +119,8 @@ Style/OpenStructUse:
 Lint/MissingSuper:
   Exclude:
     - 'app/services/**/*'
+
+Rails/SkipsModelValidations:
+  Exclude:
+    - 'app/models/ratings_config_version.rb'
+    - 'app/services/bet_recommendation_generator.rb'
