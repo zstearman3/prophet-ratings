@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_05_25_173000) do
+ActiveRecord::Schema[8.0].define(version: 2026_05_25_193000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -383,6 +383,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_05_25_173000) do
     t.index ["season_id"], name: "index_team_rating_snapshots_on_season_id"
     t.index ["team_id", "season_id", "snapshot_date", "ratings_config_version_id"], name: "idx_trs_on_team_season_date_rcv_unique", unique: true
     t.index ["team_id"], name: "index_team_rating_snapshots_on_team_id"
+    t.index ["team_season_id", "ratings_config_version_id", "snapshot_date"], name: "index_team_rating_snapshots_on_team_season_config_date"
     t.index ["team_season_id"], name: "index_team_rating_snapshots_on_team_season_id"
   end
 

@@ -84,29 +84,18 @@ class TeamSeason < ApplicationRecord
   scope :current, -> { where(season: Season.current) }
 
   def rank(as_of: nil)
-    bundle_name = Rails.application.config_for(:ratings).bundle_name
-    config = RatingsConfigVersion.find_by(name: bundle_name)
-    season = if as_of.present?
-               Season.find_by('start_date <= ? AND end_date >= ?', as_of, as_of)
-             else
-               Season.current
-             end
+    return overall_rank if as_of.blank?
 
-    snapshot_scope = TeamRatingSnapshot
-                     .where(ratings_config_version: config)
-                     .where(season:)
-                     .order(:team_season_id, snapshot_date: :desc)
+    config = RatingsConfigVersion.current ||
+             RatingsConfigVersion.find_by(name: Rails.application.config_for(:ratings).bundle_name)
+    return if config.blank?
 
-    snapshot_scope = snapshot_scope.where(snapshot_date: ..as_of) if as_of.present?
-
-    # DISTINCT ON requires ordering by the same column(s)
-    snapshots = snapshot_scope.select('DISTINCT ON (team_season_id) *').to_a
-
-    sorted = snapshots.sort_by { |s| [-s.rating, s.team_season_id] }
-
-    index = sorted.find_index { |s| s.team_season_id == id }
-
-    index ? index + 1 : nil
+    team_rating_snapshots
+      .where(ratings_config_version: config)
+      .where(snapshot_date: ..as_of)
+      .order(snapshot_date: :desc)
+      .first
+      &.overall_rank
   end
 
   def conference
