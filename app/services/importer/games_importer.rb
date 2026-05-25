@@ -13,21 +13,65 @@ module Importer
 
       private
 
+      def find_existing_game(row, date)
+        find_game_by_unique_url(row[:url]) ||
+          find_game_by_teams_and_date(row[:home_team], row[:away_team], date) ||
+          find_game_by_teams_and_legacy_date(row[:home_team], row[:away_team], date) ||
+          find_neutral_game_by_reversed_teams(row, date)
+      end
+
+      def find_game_by_unique_url(url)
+        return unless unique_game_url?(url)
+
+        Game.find_by(url:)
+      end
+
+      def unique_game_url?(url)
+        normalized_url = url.to_s.strip
+        normalized_url.present? && !daily_schedule_url?(normalized_url)
+      end
+
+      def daily_schedule_url?(url)
+        url.include?('/cbb/boxscores/index.cgi')
+      end
+
       def find_game_by_teams_and_date(home_team_name, away_team_name, date)
         Game.on_schedule_date(date)
             .where(home_team_name:, away_team_name:)
             .first
       end
 
+      def find_game_by_teams_and_legacy_date(home_team_name, away_team_name, date)
+        Game.where(home_team_name:, away_team_name:)
+            .where(start_time: Time.zone.local(date.year, date.month, date.day).all_day)
+            .first
+      end
+
+      def find_neutral_game_by_reversed_teams(row, date)
+        return unless neutral_row?(row)
+
+        find_game_by_teams_and_date(row[:away_team], row[:home_team], date) ||
+          find_game_by_teams_and_legacy_date(row[:away_team], row[:home_team], date)
+      end
+
+      def neutral_row?(row)
+        row[:neutral] == true || row[:venue_type] == 'neutral'
+      end
+
       def find_or_create_team_game(game, team_season, home:)
         return nil unless team_season&.team
 
-        TeamGame.find_or_create_by!(
-          game:,
-          team: team_season.team,
-          team_season:,
-          home:
-        )
+        remove_conflicting_team_game(game, team_season.team, home)
+        TeamGame.find_or_initialize_by(game:, home:).tap do |team_game|
+          team_game.update!(team: team_season.team, team_season:)
+        end
+      end
+
+      def remove_conflicting_team_game(game, team, home)
+        conflict = TeamGame.find_by(game:, team:)
+        return unless conflict && conflict.home != home
+
+        conflict.destroy!
       end
 
       def process_team_game(team_game, data, team_season, opponent_team_season)
@@ -57,7 +101,7 @@ module Importer
         home_team_season = home_team ? TeamSeason.find_by(season:, team: home_team) : nil
         away_team_season = away_team ? TeamSeason.find_by(season:, team: away_team) : nil
 
-        game = find_game_by_teams_and_date(row[:home_team], row[:away_team], date) ||
+        game = find_existing_game(row, date) ||
                Game.new(home_team_name: row[:home_team], away_team_name: row[:away_team], start_time:)
 
         return process_complete_game(game, row, season, home_team_season, away_team_season) if game_complete?(row)
@@ -69,6 +113,8 @@ module Importer
         attrs = {
           season:,
           start_time: row[:date],
+          home_team_name: row[:home_team],
+          away_team_name: row[:away_team],
           home_team_score: row[:home_team_score],
           away_team_score: row[:away_team_score],
           url: row[:url]
@@ -89,6 +135,8 @@ module Importer
         attrs = {
           season:,
           start_time: row[:date],
+          home_team_name: row[:home_team],
+          away_team_name: row[:away_team],
           url: row[:url],
           home_team_score: game.final? ? game.home_team_score : row[:home_team_score],
           away_team_score: game.final? ? game.away_team_score : row[:away_team_score]

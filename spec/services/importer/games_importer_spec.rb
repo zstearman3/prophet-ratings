@@ -256,6 +256,24 @@ RSpec.describe Importer::GamesImporter do
     end.not_to change(Game, :count)
   end
 
+  it 'does not match different scheduled games by shared daily schedule URL' do
+    other_home_team = create(:team, school: 'Other Home', slug: 'other-home')
+    other_away_team = create(:team, school: 'Other Away', slug: 'other-away')
+    other_home_season = create(:team_season, team: other_home_team, season:)
+    other_away_season = create(:team_season, team: other_away_team, season:)
+    create(:team_alias, team: other_home_team, value: other_home_team.school, source: 'sports_reference')
+    create(:team_alias, team: other_away_team, value: other_away_team.school, source: 'sports_reference')
+    daily_schedule_url = 'https://www.sports-reference.com/cbb/boxscores/index.cgi?month=1&day=1&year=2025'
+    other_row = row.merge(
+      home_team: other_home_season.team.school,
+      away_team: other_away_season.team.school
+    )
+
+    expect do
+      described_class.import([row.merge(url: daily_schedule_url), other_row.merge(url: daily_schedule_url)])
+    end.to change(Game, :count).by(2)
+  end
+
   it 'matches existing games by Eastern schedule date when enriched start time crosses UTC midnight' do
     existing_game = create(
       :game,
@@ -275,6 +293,83 @@ RSpec.describe Importer::GamesImporter do
       described_class.import([late_row])
     end.not_to change(Game, :count)
     expect(existing_game.reload.url).to eq('http://example.com/enriched-game')
+  end
+
+  it 'matches existing games by box score URL when the stored date is a legacy UTC date' do
+    box_score_url = '/cbb/boxscores/2025-01-01-00-home.html'
+    existing_game = create(
+      :game,
+      season:,
+      start_time: Time.zone.local(2025, 1, 1),
+      home_team_name: home_team.school,
+      away_team_name: away_team.school,
+      url: box_score_url
+    )
+
+    late_row = row.merge(
+      date: ActiveSupport::TimeZone['Eastern Time (US & Canada)'].parse('2025-01-01 9:00pm'),
+      url: box_score_url
+    )
+
+    expect do
+      described_class.import([late_row])
+    end.not_to change(Game, :count)
+    expect(existing_game.reload.start_time).to eq(late_row[:date])
+  end
+
+  it 'matches existing neutral games by box score URL when stored teams are reversed' do
+    box_score_url = '/cbb/boxscores/2025-01-01-00-neutral.html'
+    existing_game = create(
+      :game,
+      season:,
+      start_time: Time.zone.local(2025, 1, 1),
+      home_team_name: away_team.school,
+      away_team_name: home_team.school,
+      url: box_score_url,
+      venue_type: 'neutral',
+      neutral: true
+    )
+    create(:team_game, game: existing_game, team: away_team, team_season: away_team_season, home: true)
+    create(:team_game, game: existing_game, team: home_team, team_season: home_team_season, home: false)
+
+    neutral_row = row.merge(
+      url: box_score_url,
+      venue_type: 'neutral',
+      venue_name: 'Neutral Arena',
+      neutral: true
+    )
+
+    expect do
+      described_class.import([neutral_row])
+    end.not_to change(Game, :count)
+    expect(existing_game.reload).to have_attributes(
+      home_team_name: home_team.school,
+      away_team_name: away_team.school,
+      venue_name: 'Neutral Arena'
+    )
+    expect(existing_game.home_team_game.team).to eq(home_team)
+    expect(existing_game.away_team_game.team).to eq(away_team)
+  end
+
+  it 'matches legacy UTC-date games by teams and raw stored date' do
+    existing_game = create(
+      :game,
+      season:,
+      start_time: Time.zone.local(2025, 1, 1),
+      home_team_name: home_team.school,
+      away_team_name: away_team.school,
+      url: 'http://example.com/old-game'
+    )
+
+    late_row = row.merge(
+      date: ActiveSupport::TimeZone['Eastern Time (US & Canada)'].parse('2025-01-01 9:00pm'),
+      url: '/cbb/boxscores/2025-01-01-00-home.html'
+    )
+
+    expect do
+      described_class.import([late_row])
+    end.not_to change(Game, :count)
+    expect(existing_game.reload.url).to eq('/cbb/boxscores/2025-01-01-00-home.html')
   end
 
   it 'keeps incomplete games scheduled' do
