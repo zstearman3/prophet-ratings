@@ -44,5 +44,30 @@
 require 'rails_helper'
 
 RSpec.describe Prediction do
-  pending "add some examples to (or delete) #{__FILE__}"
+  describe '#favorite' do
+    it 'uses the game team-game associations' do
+      season = create(:season)
+      game = create(:game, season:)
+      home_team = create(:team)
+      away_team = create(:team)
+      home_team_season = create(:team_season, team: home_team, season:)
+      away_team_season = create(:team_season, team: away_team, season:)
+      ratings_config_version = create(:ratings_config_version)
+      home_snapshot = create(:team_rating_snapshot, team_season: home_team_season, ratings_config_version:)
+      away_snapshot = create(:team_rating_snapshot, team_season: away_team_season, ratings_config_version:)
+      create(:team_game, game:, team: home_team, team_season: home_team_season, home: true)
+      create(:team_game, game:, team: away_team, team_season: away_team_season, home: false)
+      prediction = create(
+        :prediction,
+        game:,
+        home_team_snapshot: home_snapshot,
+        away_team_snapshot: away_snapshot,
+        ratings_config_version:,
+        home_score: 72,
+        away_score: 68
+      )
+
+      expect(prediction.favorite).to eq(home_team)
+    end
+  end
 end
