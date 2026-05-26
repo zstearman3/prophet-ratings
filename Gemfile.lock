@@ -131,9 +131,9 @@ GEM
     erubi (1.13.1)
     et-orbi (1.4.0)
       tzinfo
-    factory_bot (6.5.4)
+    factory_bot (6.6.0)
       activesupport (>= 6.1.0)
-    factory_bot_rails (6.5.0)
+    factory_bot_rails (6.5.1)
       factory_bot (~> 6.5)
       railties (>= 6.1.0)
     faker (3.8.0)
@@ -478,7 +478,7 @@ GEM
       yard (>= 0.8)
     yard-solargraph (0.1.0)
       yard (~> 0.9)
-    zeitwerk (2.8.0)
+    zeitwerk (2.8.2)
 
 PLATFORMS
   aarch64-linux
