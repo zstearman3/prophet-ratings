@@ -59,4 +59,12 @@ RSpec.describe SyncFullSeasonGamesJob do
 
     expect(Ingestion::GamesIngestionService).not_to have_received(:new)
   end
+
+  it 'enqueues duplicate repair after syncing when dedupe is enabled' do
+    allow(RepairDuplicateGamesJob).to receive(:perform_later)
+
+    described_class.perform_now(season, dedupe: true)
+
+    expect(RepairDuplicateGamesJob).to have_received(:perform_later).with(season_id: season.id, apply: true)
+  end
 end

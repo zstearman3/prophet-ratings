@@ -6,7 +6,7 @@ class SyncFullSeasonGamesJob < ApplicationJob
   MAX_RETRIES = 5
   BASE_DELAY_SECONDS = 5
 
-  def perform(season = Season.current, start_date: nil, end_date: nil, resume: false)
+  def perform(season = Season.current, start_date: nil, end_date: nil, resume: false, dedupe: false)
     season = resolve_season(season)
     date_range = sync_date_range(season, start_date:, end_date:, resume:)
     return if date_range.nil?
@@ -27,6 +27,8 @@ class SyncFullSeasonGamesJob < ApplicationJob
         end
       end
     end
+
+    enqueue_duplicate_repair(season) if dedupe
   end
 
   private
@@ -72,5 +74,10 @@ class SyncFullSeasonGamesJob < ApplicationJob
     Rails.logger.info { "Starting game scrape for #{date}" }
     result = Ingestion::GamesIngestionService.new(date:).call
     Rails.logger.info { "Imported #{result[:imported_rows]} games for #{date}" }
+  end
+
+  def enqueue_duplicate_repair(season)
+    RepairDuplicateGamesJob.perform_later(season_id: season.id, apply: true)
+    Rails.logger.info { "Enqueued duplicate game repair for #{season.name}" }
   end
 end

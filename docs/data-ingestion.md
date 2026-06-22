@@ -110,11 +110,18 @@ Typical call:
 SyncFullSeasonGamesJob.perform_later(season)
 ```
 
+To run duplicate-game repair after the sync finishes, opt in explicitly:
+
+```ruby
+SyncFullSeasonGamesJob.perform_later(season, dedupe: true)
+```
+
 Optional parameters:
 
 - `start_date:` override the sync start date.
 - `end_date:` override the sync end date.
 - `resume:` start from the latest imported game date instead of the season start.
+- `dedupe:` enqueue `RepairDuplicateGamesJob` for the synced season after the date loop completes. This defaults to `false`.
 
 Date range:
 
@@ -460,6 +467,18 @@ To repair records, set `APPLY=true`:
 
 ```bash
 APPLY=true bin/rails games:dedupe
+```
+
+For production-sized repairs, enqueue the same repair as a background job instead of keeping a console session open:
+
+```bash
+APPLY=true ENQUEUE=true bin/rails games:dedupe
+```
+
+You can also enqueue directly:
+
+```ruby
+RepairDuplicateGamesJob.perform_later(season_id: season.id, apply: true)
 ```
 
 The apply mode reassigns safe dependent records such as `TeamGame`, `Prediction`, `GameOdd`, `BookmakerOdd`, and `BetRecommendation` where unique constraints allow it, deletes conflicting duplicate dependents, and then deletes duplicate `Game` records. You can restrict the scope with `YEAR=<year>` or `SEASON_ID=<id>`.
