@@ -27,5 +27,9 @@
 #  fk_rails_...  (start_season_id => seasons.id)
 #  fk_rails_...  (team_id => teams.id)
 FactoryBot.define do
-  factory :team_conference
+  factory :team_conference do
+    team
+    association :conference, name: 'Test Conference', slug: "conference-#{SecureRandom.hex(4)}"
+    start_season { association(:season) }
+  end
 end
