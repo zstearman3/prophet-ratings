@@ -2,6 +2,8 @@
 
 This document explains how Prophet Ratings ingests college basketball data into the Rails app. It is intended for agents and contributors working on scraping, imports, game finalization, ratings backfills, or scheduled sync jobs.
 
+For the offseason sequence that creates future seasons, applies conference realignment, and then bootstraps game/rating workflows, see [Offseason Operations](offseason.md).
+
 ## High-level flow
 
 The core game ingestion path is:

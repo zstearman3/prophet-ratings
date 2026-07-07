@@ -107,6 +107,8 @@ If you only need migrations or a Rails task:
 make migrate
 ```
 
+For offseason season creation, conference realignment, and bootstrap order, see [Offseason Operations](offseason.md).
+
 To run a one-off Rails task that does not have a Makefile shortcut:
 
 ```bash
