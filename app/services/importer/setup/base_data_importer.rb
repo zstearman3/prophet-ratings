@@ -14,7 +14,6 @@ module Importer
         import_seasons
         import_team_seasons
         import_conferences
-        import_team_conferences
       end
 
       private
@@ -67,22 +66,6 @@ module Importer
         end
       end
 
-      def import_team_conferences
-        path = Rails.root.join('db/seeds/team_conferences.csv')
-        CSV.foreach(path, headers: true) do |row|
-          team = Team.find_by!(school: row['school'])
-          conf = Conference.find_by!(slug: row['conference_slug'])
-          start_season = Season.find_by!(year: row['start_year'].to_i)
-          end_season = row['end_year'].present? ? Season.find_by!(year: row['end_year'].to_i) : nil
-
-          TeamConference.find_or_create_by!(
-            team:,
-            conference: conf,
-            start_season:,
-            end_season:
-          )
-        end
-      end
       # rubocop:enable Rails/SkipsModelValidations
     end
   end
