@@ -17,6 +17,8 @@
 #  index_conferences_on_slug  (slug)
 #
 class Conference < ApplicationRecord
+  has_many :team_conferences, dependent: :destroy
+
   def team_seasons_for_season(season = Season.current)
     TeamSeason
       .joins(:team)

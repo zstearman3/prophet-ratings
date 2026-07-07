@@ -62,4 +62,35 @@ RSpec.describe 'RailsAdmin team conferences', type: :request do
     expect(previous.reload.end_season).to be_nil
     expect(TeamConference.where(team:, start_season: season2027)).to be_empty
   end
+
+  it 'renders useful team and conference labels on index and show pages' do
+    membership = create(
+      :team_conference,
+      team:,
+      conference: old_conference,
+      start_season: season2025,
+      end_season: season2026
+    )
+
+    get '/admin/team_conference'
+
+    expect(response.body).to include('Admin Realignment U')
+    expect(response.body).to include('Old Conference')
+    expect(response.body).not_to include("Team ##{team.id}")
+
+    get "/admin/team_conference/#{membership.id}"
+
+    expect(response.body).to include('Admin Realignment U')
+    expect(response.body).to include('Old Conference')
+    expect(response.body).to include('2025-2026')
+    expect(response.body).not_to include("Team ##{team.id}")
+  end
+
+  it 'does not expose bulk delete for team conferences' do
+    create(:team_conference, team:, conference: old_conference, start_season: season2025)
+
+    get '/admin/team_conference'
+
+    expect(response.body).not_to include('bulk_delete')
+  end
 end
