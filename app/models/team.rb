@@ -52,10 +52,16 @@ class Team < ApplicationRecord
   end
 
   def conference_for(season)
-    team_conferences.find do |tc|
-      season.year >= tc.start_season.year &&
-        (tc.end_season.nil? || season.year <= tc.end_season.year)
-    end&.conference
+    return if season.blank?
+
+    team_conferences
+      .joins('INNER JOIN seasons AS lookup_start_seasons ON lookup_start_seasons.id = team_conferences.start_season_id')
+      .joins('LEFT JOIN seasons AS lookup_end_seasons ON lookup_end_seasons.id = team_conferences.end_season_id')
+      .where(lookup_start_seasons: { year: ..season.year })
+      .where('lookup_end_seasons.id IS NULL OR lookup_end_seasons.year >= ?', season.year)
+      .includes(:conference)
+      .first
+      &.conference
   end
 
   def current_conference
