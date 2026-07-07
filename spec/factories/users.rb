@@ -19,5 +19,13 @@
 #  index_users_on_email                 (email) UNIQUE
 #  index_users_on_reset_password_token  (reset_password_token) UNIQUE
 FactoryBot.define do
-  factory :user
+  factory :user do
+    sequence(:email) { |n| "user-#{n}@example.com" }
+    password { 'password123' }
+    password_confirmation { password }
+
+    trait :admin do
+      admin { true }
+    end
+  end
 end

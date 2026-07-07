@@ -1,3 +1,7 @@
+# frozen_string_literal: true
+
+require Rails.root.join('lib/rails_admin/config/actions/new_team_conference')
+
 RailsAdmin.config do |config|
   config.asset_source = :sprockets
 
@@ -27,7 +31,10 @@ RailsAdmin.config do |config|
   config.actions do
     dashboard                     # mandatory
     index                         # mandatory
-    new
+    new do
+      except ['TeamConference']
+    end
+    new_team_conference
     export
     bulk_delete
     show
