@@ -1,4 +1,5 @@
 DC := docker compose -f docker-compose.yml -f compose.dev.yml
+TEST_DATABASE_URL ?= postgresql://postgres:password@db:5432/prophet_ratings_test
 
 .PHONY: help build up down restart logs logs-web logs-worker ps shell console migrate prepare setup-data test bundle-install yarn-install reset-db
 
@@ -61,7 +62,7 @@ setup-data:
 	$(DC) exec web bin/setup_data
 
 test:
-	$(DC) run --rm web bundle exec rspec
+	$(DC) run --rm -e RAILS_ENV=test -e DATABASE_URL=$(TEST_DATABASE_URL) web bundle exec rspec
 
 bundle-install:
 	$(DC) exec web bundle install
