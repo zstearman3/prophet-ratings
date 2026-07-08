@@ -45,8 +45,15 @@ module ProphetRatings
       game.update(
         possessions: calculated_possessions,
         minutes: calculated_minutes,
-        in_conference: game.home_team_season&.conference == game.away_team_season&.conference
+        in_conference: in_conference_game?
       )
+    end
+
+    def in_conference_game?
+      home_conference = game.home_team_season&.conference
+      away_conference = game.away_team_season&.conference
+
+      home_conference.present? && home_conference == away_conference
     end
 
     ##

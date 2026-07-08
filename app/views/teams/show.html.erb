@@ -8,7 +8,7 @@
     <div class="flex items-center">
       <span class="text-sm text-gray-600 mr-2">
         <%= "#{@team_season.wins}-#{@team_season.losses}
-            (#{@team_season.conference_wins}-#{@team_season.conference_losses} in #{@team_season.conference.abbreviation})" %>
+            (#{@team_season.conference_wins}-#{@team_season.conference_losses} in #{@team_season.conference&.abbreviation || 'Independent'})" %>
       </span>
     </div>
 

@@ -16,5 +16,8 @@
 #  index_conferences_on_name  (name)
 #  index_conferences_on_slug  (slug)
 FactoryBot.define do
-  factory :conference
+  factory :conference do
+    sequence(:name) { |n| "Test Conference #{n}" }
+    slug { name.parameterize }
+  end
 end

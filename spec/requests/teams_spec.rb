@@ -104,5 +104,27 @@ RSpec.describe 'Teams' do
       expect(score_cells).to include('Scheduled', '-')
       expect(prediction_link).to be_present
     end
+
+    it 'renders when the team season has no conference membership' do
+      season = create(:season, :current, year: 2026, start_date: Date.new(2025, 11, 1), end_date: Date.new(2026, 4, 1))
+      config = create(:ratings_config_version, name: 'v1.2-default', current: true)
+      team = create(:team, school: 'Independent Team', slug: 'independent-team')
+      team_season = create(:team_season, team:, season:, wins: 10, losses: 5, conference_wins: 0, conference_losses: 0)
+      create(
+        :team_rating_snapshot,
+        team_season:,
+        team:,
+        season:,
+        ratings_config_version: config,
+        snapshot_date: Date.current,
+        rating: 25.0,
+        stats: snapshot_stats
+      )
+
+      get "/teams/#{team.slug}", params: { year: season.year }
+
+      expect(response).to have_http_status(:success)
+      expect(response.body).to include('Independent')
+    end
   end
 end

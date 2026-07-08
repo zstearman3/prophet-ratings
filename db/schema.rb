@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_05_25_193000) do
+ActiveRecord::Schema[8.0].define(version: 2026_06_22_000100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -32,6 +32,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_05_25_193000) do
     t.datetime "updated_at", null: false
     t.bigint "ratings_config_version_id"
     t.boolean "current", default: false
+    t.index ["game_id", "bet_type"], name: "index_bet_recommendations_on_game_and_type_current_true", unique: true, where: "(current IS TRUE)"
     t.index ["game_id"], name: "index_bet_recommendations_on_game_id"
     t.index ["game_odd_id"], name: "index_bet_recommendations_on_game_odd_id"
     t.index ["prediction_id", "game_odd_id", "bet_type"], name: "index_bet_recommendations_on_prediction_game_odd_bet_type", unique: true
@@ -295,7 +296,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_05_25_193000) do
     t.index ["conference_id"], name: "index_team_conferences_on_conference_id"
     t.index ["end_season_id"], name: "index_team_conferences_on_end_season_id"
     t.index ["start_season_id"], name: "index_team_conferences_on_start_season_id"
-    t.index ["team_id", "start_season_id", "end_season_id"], name: "index_team_conferences_on_team_and_season_range", unique: true
+    t.index ["team_id", "start_season_id"], name: "index_team_conferences_on_team_and_start_season", unique: true
     t.index ["team_id"], name: "index_team_conferences_on_team_id"
   end
 
