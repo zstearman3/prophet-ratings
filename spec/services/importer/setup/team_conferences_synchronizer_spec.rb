@@ -121,6 +121,12 @@ RSpec.describe Importer::Setup::TeamConferencesSynchronizer do
     end.to raise_error(described_class::InvalidData, /CSV headers must be school, conference_slug, start_year, end_year/)
   end
 
+  it 'wraps malformed CSV parser errors as invalid data' do
+    expect do
+      synchronize("school,conference_slug,start_year,end_year\n\"Alpha,old,2025,\n")
+    end.to raise_error(described_class::InvalidData, /CSV is malformed:/)
+  end
+
   it 'rejects invalid rows before writing' do
     season2027
 

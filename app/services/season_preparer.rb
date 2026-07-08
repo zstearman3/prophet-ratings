@@ -37,7 +37,7 @@ class SeasonPreparer
   end
 
   def ensure_team_seasons(season)
-    existing_team_ids = TeamSeason.where(season_id: season.id).pluck(:team_id).index_with(true)
+    existing_team_ids = TeamSeason.where(season_id: season.id).pluck(:team_id).to_set
     created = 0
 
     Team.find_each do |team|

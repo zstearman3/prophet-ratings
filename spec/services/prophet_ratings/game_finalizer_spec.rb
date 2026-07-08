@@ -23,6 +23,25 @@ RSpec.describe ProphetRatings::GameFinalizer, type: :service do
       expect(game.reload.in_conference).to be(true)
     end
 
+    it 'sets in_conference false when teams have different conferences' do
+      game = build_game_for_finalization
+      create(:team_conference, team: game.home_team_season.team, start_season: game.season)
+      create(:team_conference, team: game.away_team_season.team, start_season: game.season)
+
+      described_class.new(game).send(:update_derived_fields)
+
+      expect(game.reload.in_conference).to be(false)
+    end
+
+    it 'sets in_conference false when only one team has a conference' do
+      game = build_game_for_finalization
+      create(:team_conference, team: game.home_team_season.team, start_season: game.season)
+
+      described_class.new(game).send(:update_derived_fields)
+
+      expect(game.reload.in_conference).to be(false)
+    end
+
     def build_game_for_finalization
       season = create(:season, year: 2026, start_date: Date.new(2025, 11, 1), end_date: Date.new(2026, 4, 10))
       home_team_season = create(:team_season, season:)

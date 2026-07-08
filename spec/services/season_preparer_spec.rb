@@ -60,6 +60,25 @@ RSpec.describe SeasonPreparer do
       )
     end
 
+    it 'updates stale attributes on an existing season' do
+      season = create(
+        :season,
+        year: 2027,
+        name: 'Stale Name',
+        start_date: Date.new(2026, 10, 1),
+        end_date: Date.new(2027, 5, 1)
+      )
+
+      result = described_class.new(year: 2027).call
+
+      expect(result.season).to eq(season)
+      expect(result.season).to have_attributes(
+        name: '2026-27',
+        start_date: Date.new(2026, 11, 1),
+        end_date: Date.new(2027, 4, 10)
+      )
+    end
+
     it 'raises before writing when the year is invalid' do
       expect do
         described_class.new(year: 0).call

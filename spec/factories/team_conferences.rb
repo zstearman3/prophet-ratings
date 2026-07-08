@@ -29,7 +29,7 @@
 FactoryBot.define do
   factory :team_conference do
     team
-    association :conference, name: 'Test Conference', slug: "conference-#{SecureRandom.hex(4)}"
+    association :conference
     start_season { association(:season) }
   end
 end

@@ -41,6 +41,7 @@
 
 # Ignore project.md
 /project.md
+/docs/superpowers
 
 # Keep auto-loaded Docker Compose overrides local-only. Shared local dev config
 # belongs in compose.dev.yml and is loaded explicitly by the Makefile.

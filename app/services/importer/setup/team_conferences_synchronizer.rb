@@ -62,12 +62,16 @@ module Importer
         contents = File.read(path)
         raise InvalidData, 'CSV must include headers and at least one data row' if contents.blank?
 
-        table = CSV.parse(contents, headers: true)
-        validate_headers!(table)
+        begin
+          table = CSV.parse(contents, headers: true)
+          validate_headers!(table)
 
-        errors = []
-        rows = table.each.with_index(2).map do |csv_row, number|
-          build_parsed_row(csv_row, number, errors)
+          errors = []
+          rows = table.each.with_index(2).map do |csv_row, number|
+            build_parsed_row(csv_row, number, errors)
+          end
+        rescue CSV::MalformedCSVError => e
+          raise InvalidData, "CSV is malformed: #{e.message}"
         end
 
         [rows, errors]
