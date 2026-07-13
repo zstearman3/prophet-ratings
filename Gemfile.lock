@@ -162,7 +162,7 @@ GEM
       thor (>= 1.0.0)
     groupdate (6.7.0)
       activesupport (>= 7.1)
-    gruff (0.29.0)
+    gruff (0.32.0)
       bigdecimal (>= 3.0)
       histogram
       rmagick (>= 5.5)
@@ -263,7 +263,7 @@ GEM
       ast (~> 2.4.1)
       racc
     pg (1.5.9)
-    pkg-config (1.6.2)
+    pkg-config (1.6.5)
     pp (0.6.4)
       prettyprint
     prettyprint (0.2.0)
@@ -349,7 +349,7 @@ GEM
     reverse_markdown (3.0.2)
       nokogiri
     rexml (3.4.4)
-    rmagick (6.1.2)
+    rmagick (7.0.5)
       observer (~> 0.1)
       pkg-config (~> 1.4)
     rspec-core (3.13.6)
