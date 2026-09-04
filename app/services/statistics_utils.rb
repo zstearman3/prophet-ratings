@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'benchmark'
+
 module StatisticsUtils
   module_function
 
@@ -44,7 +46,7 @@ module StatisticsUtils
   # @param [Array<Array<Numeric>>] a_rows - The coefficient matrix as an array of rows.
   # @param [Array<Numeric>] b_vector - The target vector.
   # @param [Array<Numeric>, nil] weights - Optional weights for each observation; defaults to all ones if not provided.
-  # @return [Hash] The result parsed from the Python solver's JSON output.
+  # @return [Array<Float>] The solution vector parsed from the Python solver's JSON output.
   def solve_least_squares_with_python(a_rows, b_vector, weights = nil)
     require 'open3'
     require 'json'
