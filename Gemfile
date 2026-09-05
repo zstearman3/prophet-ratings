@@ -19,7 +19,6 @@ gem 'puma', '>= 5.0'
 gem 'rails', '~> 8.1.3'
 gem 'rails_admin'
 gem 'redis', '>= 4.0.1'
-gem 'sassc'
 gem 'sprockets-rails'
 gem 'stimulus-rails'
 gem 'tailwindcss-rails'
@@ -42,7 +41,6 @@ group :development, :test do
   gem 'annotate'
   gem 'debug', platforms: %i[mri windows]
   gem 'factory_bot_rails'
-  gem 'gruff'
   gem 'pry'
   gem 'rspec-rails'
   gem 'rubocop'
@@ -64,6 +62,10 @@ group :development do
   gem 'overcommit'
   # Static analysis security scanner for Ruby on Rails
   gem 'brakeman', require: false
+end
+
+group :charts do
+  gem 'gruff'
 end
 
 group :test do
