@@ -1,16 +1,63 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
+set -euo pipefail
 
-if ! gem list foreman -i --silent; then
-  echo "Installing foreman..."
-  gem install foreman
+APP_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$APP_ROOT"
+
+detached=false
+case "${1:-}" in
+  --detach) detached=true; shift ;;
+  -h|--help)
+    echo "Usage: bin/dev [--detach]"
+    echo "Start Docker development; Ctrl-C removes containers but preserves data and images."
+    echo "Use bin/stop after a detached session."
+    exit 0 ;;
+esac
+if [[ $# -gt 0 ]]; then
+  echo "Unknown option: $1. See bin/dev --help." >&2
+  exit 1
 fi
 
-# Default to port 3000 if not specified
-export PORT="${PORT:-3000}"
+docker info >/dev/null 2>&1 || { echo "Start Docker Desktop, then retry bin/dev." >&2; exit 1; }
+# Cached builds are cheap and keep the image in sync with Gemfile.lock.
+bin/compose build web
 
-# Let the debug gem allow remote connections,
-# but avoid loading until `debugger` is called
-export RUBY_DEBUG_OPEN="true"
-export RUBY_DEBUG_LAZY="true"
+compose_pid=""
+run() {
+  "$@" &
+  compose_pid=$!
+  wait "$compose_pid"
+  compose_pid=""
+}
+cleanup() {
+  local result=$?
+  trap - EXIT INT TERM
+  if [[ -n "$compose_pid" ]]; then
+    kill -TERM "$compose_pid" 2>/dev/null || true
+  fi
+  bin/compose down --remove-orphans || result=1
+  exit "$result"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
-exec foreman start -f Procfile.dev "$@"
+run bin/compose up -d --wait --wait-timeout 60 db
+# Startup must not rewrite the checked-in schema just because Rails' dump format changed.
+# Run bin/compose exec web bin/rails db:migrate explicitly when authoring migrations.
+run bin/compose run --rm --no-deps -T -e SCHEMA=/tmp/development-schema.rb web bin/rails db:create db:migrate
+# Build once before serving requests, then let the long-lived watchers handle edits.
+run bin/compose run --rm --no-deps -T js sh -c 'yarn install --frozen-lockfile && yarn build'
+run bin/compose run --rm --no-deps -T css bin/rails tailwindcss:build
+
+echo "Development: http://localhost:${DEV_PORT:-3000}"
+if [[ "$detached" == true ]]; then
+  run bin/compose up -d --wait --wait-timeout 60
+  trap - EXIT INT TERM
+  echo "Running in the background. Stop with bin/stop."
+else
+  echo "Ctrl-C stops this project's services and preserves its database."
+  bin/compose up --abort-on-container-exit --remove-orphans &
+  compose_pid=$!
+  wait "$compose_pid"
+fi

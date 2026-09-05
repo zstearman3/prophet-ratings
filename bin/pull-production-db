@@ -18,7 +18,7 @@ docker_service_running() {
   local service="$1"
 
   command -v docker >/dev/null 2>&1 &&
-    docker compose ps --services --status running 2>/dev/null | grep -qx "$service"
+    bin/compose ps --services --status running 2>/dev/null | grep -qx "$service"
 }
 
 USE_DOCKER=false
@@ -270,11 +270,11 @@ fi
 cleanup() {
   if [[ "$USE_DOCKER" == true && "$LOCAL_SERVICES_STOPPED" == true ]]; then
     if [[ "$WEB_WAS_RUNNING" == true ]]; then
-      docker compose up -d web >/dev/null 2>&1 || true
+      bin/compose up -d web >/dev/null 2>&1 || true
     fi
 
     if [[ "$WORKER_WAS_RUNNING" == true ]]; then
-      docker compose up -d worker >/dev/null 2>&1 || true
+      bin/compose up -d worker >/dev/null 2>&1 || true
     fi
   fi
 
@@ -369,7 +369,7 @@ create_local_admin() {
 
   echo "== Ensuring local admin exists =="
   if [[ "$USE_DOCKER" == true ]]; then
-    docker compose run --rm \
+    bin/compose run --rm \
       -e DATABASE_URL="$LOCAL_DATABASE_URL" \
       -e LOCAL_ADMIN_EMAIL="$LOCAL_ADMIN_EMAIL" \
       -e LOCAL_ADMIN_PASSWORD="$LOCAL_ADMIN_PASSWORD" \
@@ -389,7 +389,7 @@ if [[ "$SOURCE_MODE" == "ecs" ]]; then
 else
   echo "Source: $(masked_database_url "$SOURCE_DATABASE_URL")"
   if [[ "$USE_DOCKER" == true ]]; then
-    docker compose exec -T db pg_dump "${PG_DUMP_OPTIONS[@]}" --dbname="$SOURCE_DATABASE_URL" > "$DUMP_FILE"
+    bin/compose exec -T db pg_dump "${PG_DUMP_OPTIONS[@]}" --dbname="$SOURCE_DATABASE_URL" > "$DUMP_FILE"
   else
     pg_dump "${PG_DUMP_OPTIONS[@]}" --file "$DUMP_FILE" --dbname="$SOURCE_DATABASE_URL"
   fi
@@ -398,16 +398,16 @@ fi
 echo "== Recreating local development database =="
 if [[ "$USE_DOCKER" == true ]]; then
   if [[ "$WEB_WAS_RUNNING" == true ]]; then
-    docker compose stop web
+    bin/compose stop web
   fi
 
   if [[ "$WORKER_WAS_RUNNING" == true ]]; then
-    docker compose stop worker
+    bin/compose stop worker
   fi
 
   LOCAL_SERVICES_STOPPED=true
 
-  docker compose run --rm \
+  bin/compose run --rm \
     -e DATABASE_URL="$LOCAL_DATABASE_URL" \
     -e DISABLE_DATABASE_ENVIRONMENT_CHECK=1 \
     web bin/rails db:drop db:create
@@ -417,14 +417,14 @@ fi
 
 echo "== Restoring production dump locally =="
 if [[ "$USE_DOCKER" == true ]]; then
-  docker compose exec -T db pg_restore --verbose --clean --if-exists --no-owner --no-acl --dbname "$LOCAL_DATABASE_URL" < "$DUMP_FILE"
+  bin/compose exec -T db pg_restore --verbose --clean --if-exists --no-owner --no-acl --dbname "$LOCAL_DATABASE_URL" < "$DUMP_FILE"
 else
   pg_restore --verbose --clean --if-exists --no-owner --no-acl --dbname "$LOCAL_DATABASE_URL" "$DUMP_FILE"
 fi
 
 echo "== Marking local database as development =="
 if [[ "$USE_DOCKER" == true ]]; then
-  docker compose run --rm \
+  bin/compose run --rm \
     -e DATABASE_URL="$LOCAL_DATABASE_URL" \
     -e RAILS_ENV=development \
     web bin/rails db:environment:set
@@ -434,18 +434,18 @@ fi
 
 echo "== Running migrations =="
 if [[ "$USE_DOCKER" == true ]]; then
-  docker compose run --rm \
+  bin/compose run --rm \
     -e DATABASE_URL="$LOCAL_DATABASE_URL" \
     web bin/rails db:migrate
 
   create_local_admin
 
   if [[ "$WEB_WAS_RUNNING" == true ]]; then
-    docker compose up -d web
+    bin/compose up -d web
   fi
 
   if [[ "$WORKER_WAS_RUNNING" == true ]]; then
-    docker compose up -d worker
+    bin/compose up -d worker
   fi
 
   LOCAL_SERVICES_STOPPED=false

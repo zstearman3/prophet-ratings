@@ -1,11 +1,14 @@
-DC := docker compose -f docker-compose.yml -f compose.dev.yml
-TEST_DATABASE_URL ?= postgresql://postgres:password@db:5432/prophet_ratings_test
+DC := bin/compose
 
-.PHONY: help build up down restart logs logs-web logs-worker ps shell console migrate prepare setup-data test bundle-install yarn-install reset-db
+.PHONY: help build up down restart logs logs-web logs-worker ps shell console migrate prepare setup-data test check bundle-install yarn-install reset-db
 
 help:
 	@echo "Available commands:"
-	@echo "  make build          Build Docker images"
+	@echo "  bin/dev             Start Docker development; Ctrl-C cleans up"
+	@echo "  bin/stop            Stop development, preserving data and images"
+	@echo "  bin/test [args]     Run isolated Docker specs with automatic cleanup"
+	@echo "  bin/check           Run native quality checks and isolated specs"
+	@echo "  make build          Build the shared development/test image"
 	@echo "  make up             Start the local Docker stack"
 	@echo "  make down           Stop the local Docker stack"
 	@echo "  make restart        Restart the local Docker stack"
@@ -16,21 +19,20 @@ help:
 	@echo "  make shell          Open a shell in the web container"
 	@echo "  make console        Open the Rails console"
 	@echo "  make migrate        Run database migrations"
-	@echo "  make prepare        Run Rails db:prepare"
+	@echo "  make prepare        Create/migrate the development database without seeds"
 	@echo "  make setup-data     Run the project data setup script"
-	@echo "  make test           Run the RSpec test suite"
-	@echo "  make bundle-install Run bundle install in the web container"
-	@echo "  make yarn-install   Run yarn install in the web container"
-	@echo "  make reset-db       Stop containers, remove DB volume, restart, and set up DB"
+	@echo "  make test           Run isolated Docker specs (ARGS='spec/path_spec.rb')"
+	@echo "  make bundle-install Update the native bundle and rebuild the image"
+	@echo "  make yarn-install   Run yarn install in the JavaScript container"
 
 build:
-	$(DC) build
+	$(DC) build web
 
 up:
-	$(DC) up -d
+	bin/dev --detach
 
 down:
-	$(DC) down
+	bin/stop
 
 restart: down up
 
@@ -56,21 +58,24 @@ migrate:
 	$(DC) exec web bin/rails db:migrate
 
 prepare:
-	$(DC) exec web bin/rails db:prepare
+	$(DC) exec web bin/rails db:create db:migrate
 
 setup-data:
 	$(DC) exec web bin/setup_data
 
 test:
-	$(DC) run --rm -e RAILS_ENV=test -e TEST_DATABASE_URL=$(TEST_DATABASE_URL) web bundle exec rspec
+	bin/test $(ARGS)
+
+check:
+	bin/check
 
 bundle-install:
-	$(DC) exec web bundle install
+	bundle install
+	$(DC) build web
 
 yarn-install:
-	$(DC) exec web yarn install
+	$(DC) run --rm --no-deps js yarn install
 
 reset-db:
-	$(DC) down -v
-	$(DC) up -d
-	$(DC) run --rm web bin/rails db:setup
+	@echo "Database deletion is not part of routine setup. See docs/development.md for explicit reset instructions."
+	@exit 1

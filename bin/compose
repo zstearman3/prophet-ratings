@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+APP_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$APP_ROOT"
+
+exec docker compose --project-name "${COMPOSE_PROJECT_NAME:-prophet-ratings}" \
+  -f docker-compose.yml -f compose.dev.yml "$@"

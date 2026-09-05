@@ -1,8 +1,84 @@
+x-app: &app
+  image: prophet-ratings-dev
+  init: true
+  restart: "no"
+  environment:
+    RAILS_ENV: development
+    DATABASE_URL: postgresql://postgres:password@db:5432/prophet_ratings_development
+    GOOD_JOB_EXECUTION_MODE: external
+    GOOD_JOB_ENABLE_CRON: "false"
+    GOOD_JOB_MAX_THREADS: "2"
+    RAILS_MAX_THREADS: "3"
+  env_file:
+    - path: .env.docker
+      required: false
+  volumes:
+    - .:/rails
+  logging: &logging
+    driver: local
+    options:
+      max-size: "10m"
+      max-file: "3"
+
 services:
+  db:
+    ports: !override
+      - "127.0.0.1:${DEV_DB_PORT:-54320}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    mem_limit: 512m
+    logging: *logging
+
   web:
-    volumes:
-      - .:/rails
+    <<: *app
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    env_file: !override
+      - path: .env.docker
+        required: false
+    ports: !override
+      - "127.0.0.1:${DEV_PORT:-3000}:3000"
+    command: ["bin/rails", "server", "-b", "0.0.0.0", "--pid", "/tmp/rails-server.pid"]
+    healthcheck:
+      test: ["CMD", "ruby", "-rnet/http", "-e", "exit(Net::HTTP.get_response(URI('http://127.0.0.1:3000/up')).is_a?(Net::HTTPSuccess) ? 0 : 1)"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    depends_on:
+      db:
+        condition: service_healthy
+    mem_limit: 768m
 
   worker:
+    <<: *app
+    build: !reset null
+    env_file: !override
+      - path: .env.docker
+        required: false
+    command: ["bundle", "exec", "good_job", "start"]
+    depends_on:
+      db:
+        condition: service_healthy
+    mem_limit: 768m
+
+  js:
+    <<: *app
+    command: ["yarn", "build", "--watch"]
+    stdin_open: true
     volumes:
       - .:/rails
+      - node_modules:/rails/node_modules
+    mem_limit: 384m
+
+  css:
+    <<: *app
+    command: ["bin/rails", "tailwindcss:watch"]
+    stdin_open: true
+    mem_limit: 512m
+
+volumes:
+  node_modules:

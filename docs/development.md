@@ -1,362 +1,277 @@
-# Local Development Guide
+# Local development
 
-The application can run via Docker, while Git hooks run with native Ruby so they
-do not depend on a running application container.
+The app runs in Docker. Git hooks and static analysis use native Ruby; native specs
+use a disposable Docker PostgreSQL database. You do not need host Node, PostgreSQL,
+Python or Foreman for the normal workflow.
 
-## Native Ruby and Git hooks (macOS / Apple Silicon)
+## The weekly workflow
 
-Use the Ruby version in `.ruby-version` (currently 4.0.5) and Bundler 4.0.10 from
-`Gemfile.lock`. With rbenv and the Xcode Command Line Tools installed:
+Start Docker Desktop, then:
+
+```bash
+bin/dev
+```
+
+Open http://localhost:3000. Rails reloads Ruby changes, and JavaScript and Tailwind
+watchers rebuild assets. GoodJob runs in a separate worker with two job threads.
+Press **Ctrl-C** when finished: the project's containers and network are removed,
+while the development database, Node dependency cache and images are kept.
+
+In another terminal, or from an agent:
+
+| Command | Purpose |
+| --- | --- |
+| `bin/test` | Full Docker specs, fresh database, automatic cleanup |
+| `bin/test spec/models/team_spec.rb` | A specific spec file; other RSpec arguments work too |
+| `bin/test --local` | Native Ruby specs with the same disposable database lifecycle |
+| `bin/check` | Native RuboCop, Reek, Brakeman, then native specs |
+| `bin/dev --detach` | Explicitly keep development running in the background |
+| `bin/stop` | Stop a detached session; preserve data and images |
+| `bin/compose logs -f web worker` | Follow application/job logs |
+| `bin/compose ps` | Check this project's containers |
+| `bin/compose exec web bin/rails console` | Rails console in the running app |
+| `bin/compose exec web bin/rails db:migrate` | Apply a migration and update the tracked schema |
+| `bin/compose exec web bash` | Shell in the app container |
+
+Tests do not require `bin/dev` to be running. On this 8 GB laptop, prefer one test
+run at a time and stop development while running a large batch of checks.
+
+The Makefile remains as a compatibility layer: `make up` means
+`bin/dev --detach`, `make down` means `bin/stop`, and `make test` means
+`bin/test`. Use `make help` for the remaining aliases.
+
+## First-time setup
+
+Install Docker Desktop with Compose **2.24.4 or newer**, Xcode Command Line Tools,
+Homebrew, and rbenv. The Compose minimum supports the explicit local port overrides.
+Start Docker Desktop and use the versions in `.ruby-version` and `Gemfile.lock`:
 
 ```bash
 rbenv install -s 4.0.5
 gem install bundler -v 4.0.10
 brew install libpq pkg-config
 bundle config set --local build.pg --with-pg-config="$(brew --prefix libpq)/bin/pg_config"
-bundle config set --local without charts
-bundle install
-bundle check
+bin/setup
+bin/dev
 ```
 
-The `charts` group is optional: it contains Gruff/RMagick and requires ImageMagick
-and a working C++ compiler. Numeric prediction evaluation and Rails eager loading
-work without it; only the diagnostic PNG generation methods load Gruff. To use
-those methods, install ImageMagick and include the `charts` group in your bundle.
+`bin/setup` installs the native bundle without the optional `charts` group,
+installs Git hooks, accepts this checkout's hook configuration, and builds the
+shared development/test image. Read unfamiliar checkout scripts before running
+setup. It does not clear logs, import data, or reset a database.
 
-Sass uses `sassc-embedded`, which preserves the SassC API used by Sprockets and
-Rails Admin and ships Dart Sass for Apple Silicon and Linux. The previous SassC
-2.4.0 installation failed because this local Ruby's `RbConfig::CONFIG['CXX']` was
-`false`; its generated LibSass Makefile therefore invoked `false` as the compiler.
-The old `build.sassc --with-cxx=c++` setting did not override that value. No SassC
-compiler override is needed with the replacement. Existing overrides can be removed:
+No `.env.docker` is required for basic startup. Compose supplies local-only
+development database defaults. If an integration needs a key, put it in the
+gitignored `.env.docker`; never commit it. Do not put production database
+credentials there. Rails runs in development, GoodJob cron is disabled, and the
+web process enqueues jobs for the separate worker instead of running another
+background scheduler itself.
+
+Startup creates and migrates the development database without running seeds.
+Importing games or backfilling ratings is a separate, explicit operation.
+A fresh database has no basketball data; startup success does not imply the
+analytics pages have enough data to show results.
+
+## How the Docker setup works
+
+`bin/compose` always selects `docker-compose.yml` plus `compose.dev.yml`, from
+the repository root. Use it for local commands instead of plain `docker compose`,
+which selects the production-style configuration and can recreate services with
+the wrong image or settings. The production Dockerfile and deployment workflow
+are separate and unchanged.
+
+All local application services share `Dockerfile.dev` and one
+`prophet-ratings-dev` image. It contains development/test gems, Node, PostgreSQL
+client tools, and Python with NumPy. It does not compile production assets during
+the image build.
+
+`bin/dev` and Docker `bin/test` do a cached build before starting, so a changed
+Gemfile.lock or Dockerfile.dev is picked up automatically. Ordinary Ruby changes
+are bind-mounted and need no rebuild. Development startup installs from
+`yarn.lock` into a named Docker volume, keeping Linux packages separate from host
+`node_modules`. Restart development after changing package dependencies.
+
+PostgreSQL must pass its health check before database setup or tests start.
+`bin/dev` prepares the schema and builds assets before starting the server and worker.
+Detached startup waits for the Rails health endpoint. Startup schema dumps go
+to a container temporary file to avoid incidental schema-format churn; when
+authoring migrations, run the explicit migration command in the table above and
+commit the resulting `db/schema.rb` change.
+
+Local ports bind only to loopback:
+
+- App: `localhost:3000`; override with `DEV_PORT`.
+- Development PostgreSQL: `localhost:54320`; override with `DEV_DB_PORT`.
+- Test PostgreSQL: a dynamically assigned localhost port for each run.
+
+Port 54320 avoids the Homebrew PostgreSQL instance that may already own 5432.
+For a host database client, use:
 
 ```bash
-bundle config unset --local build.sassc
+psql postgresql://postgres:password@localhost:54320/prophet_ratings_development
 ```
 
-### Test database
+Existing data stays in the existing `prophet-ratings_pgdata` named volume.
+Keep the same Compose project name to keep using that data. Set
+`COMPOSE_PROJECT_NAME`, `DEV_PORT` and `DEV_DB_PORT` consistently if you
+intentionally run a separate development checkout.
 
-RSpec needs PostgreSQL, but Rails and the checks execute on the host. By default,
-tests connect to `prophet_ratings_test` through the local PostgreSQL socket as your
-OS user. Start your local PostgreSQL service before preparing the test database.
-Alternatively, start the Compose database and point native Rails at its published
-port:
+## Reliable tests and hooks
+
+Every `bin/test` invocation creates a uniquely named Compose project with a fresh
+PostgreSQL database. It loads the checked-in schema, runs specs, and removes its
+containers, network and test volumes on success, failure, Ctrl-C or termination.
+It starts no app server, watchers or job worker. Concurrent invocations have
+separate databases and ports, although running many in parallel is a poor fit for
+this laptop's RAM.
+
+Both modes use the same PostgreSQL image and schema. `--local` runs Ruby on the
+host; the default runs Ruby in the development image. Both force test mode and
+supply their own `TEST_DATABASE_URL`, ignoring inherited database URLs. They set
+`CI=true` for eager loading and to prevent focused examples from silently
+narrowing a full run. Shared source files, Rails logs and RSpec status files are
+still shared between simultaneous runs.
+
+Tests load the schema instead of running `db:prepare`: on an empty database,
+`db:prepare` invokes application seeds, which import domain data and currently
+fail in `Importer::Setup::BaseDataImporter#import_teams`. That ingestion issue is
+separate from test/environment setup. Tests must use factories, not that seed path.
+
+The normal hooks are:
+
+- **Pre-commit:** RuboCop, JSON/YAML syntax, trailing whitespace and merge conflicts.
+- **Pre-push:** Reek, Brakeman and `bin/test --local`.
+
+Docker Desktop must be available for pre-push PostgreSQL, but no persistent
+database service or app container needs to be running. Static checks and Ruby
+specs still run natively. Verify hook execution without committing or pushing:
 
 ```bash
-docker compose up -d db
-export TEST_DATABASE_URL=postgresql://postgres:password@localhost:5432/prophet_ratings_test
-```
-
-Use only one PostgreSQL service on port 5432. If a Homebrew instance already owns
-that port, use its local socket/default URL instead of the Compose credentials.
-`TEST_DATABASE_URL` is separate from `DATABASE_URL` so exported development or
-production connection settings cannot redirect specs into those databases. Any
-custom test URL must point to a dedicated, disposable test database.
-
-```bash
-RAILS_ENV=test bundle exec rails db:prepare
-bundle exec rspec
-RAILS_ENV=test bundle exec rails zeitwerk:check
-```
-
-Running the actual ratings solver locally additionally requires `python3` with
-NumPy. For example, create and activate a virtual environment under `tmp/` and
-install NumPy there. The current specs stub the numerical solver and do not verify
-that Python dependency.
-
-### Install and verify hooks
-
-```bash
-bundle exec overcommit --install
-# After reviewing .overcommit.yml and .git-hooks/pre_push/reek.rb:
-bundle exec overcommit --sign
-bundle exec overcommit --sign pre_push
 bundle exec overcommit --run
 bundle exec overcommit --run pre_push
 ```
 
-`--run` checks all tracked files without committing. `--run pre_push` executes the
-push checks without contacting a remote or pushing. Normal commits check staged
-files. Re-sign after reviewing changes to the hook configuration or plugin.
+The all-files pre-commit run covers tracked files; lint newly added files directly
+or stage them before relying on that run. Signature verification is disabled in
+this project's configuration. `bin/setup` signs once to record that setting in
+local Git configuration; quality checks remain enabled.
 
-Pre-commit runs RuboCop, JSON/YAML syntax, whitespace, and merge-conflict checks.
-Pre-push runs the full RSpec suite, Reek, and Brakeman. All Ruby tools use the
-project's locked bundle. You can also run them directly:
+Reek has an explicit baseline of 709 existing findings in `.reek.yml`. Its
+exclusions match exact existing class/method contexts. New contexts and other
+smell types fail, but the same excluded smell can recur within an existing
+context. Remove exclusions as code is cleaned up; do not regenerate the baseline
+just to pass checks. Specs and generated/configuration files are outside Reek's
+application-code scan.
 
-```bash
-bundle exec rubocop
-bundle exec reek
-bundle exec brakeman -q -w2 -x EOLRails,EOLRuby
-```
+The suite reports 15 pre-existing pending examples (mostly generated placeholders
+plus unsupported double-header ingestion). Rails Admin's bundled SCSS emits Sass
+deprecation warnings, with a regression spec covering stylesheet compilation.
 
-Reek was introduced with a baseline of 709 existing findings in `.reek.yml`.
-Detectors remain enabled, with exclusions anchored to the exact existing class
-or method context; new contexts and other smell types still fail. An excluded
-smell type can still recur within the same context, so remove exclusions as the
-affected code is cleaned up. Do not regenerate the baseline merely to pass a
-hook. Specs and generated/configuration files are excluded from Reek's application
-code analysis.
+## Dependencies and optional tools
 
-The suite currently includes 15 pre-existing pending examples (mostly generated
-placeholders, plus unsupported double-header ingestion). They are reported by
-RSpec and are not treated as failures. Rails Admin's bundled Bootstrap SCSS also
-emits Dart Sass deprecation warnings; the stylesheet compilation regression spec
-verifies it still builds.
-
-## Prerequisites
-
-- **Docker Desktop** 4.x+ (includes docker compose)
-- **make** (included by default on macOS)
-- Optional: make sure ports 3000 (web) and 5432 (Postgres) are free
-
-## First-time setup
-
-1. Create a `.env.docker` file in the project root. This file is loaded by `docker-compose.yml` for the `web` and `worker` services.
-
-   Recommended contents:
-
-   ```dotenv
-   # Run the app in development mode inside the container
-   RAILS_ENV=development
-
-   # Database URL for Rails (Active Record will honor this if present)
-   DATABASE_URL=postgresql://postgres:password@db:5432/prophet_ratings_development
-
-   # Puma / Rails binding is already set in docker-compose (0.0.0.0:3000)
-
-   # Optional: API keys and other env
-   # ODDS_API_KEY=your_api_key_here
-   ```
-
-   Notes:
-   - The Postgres credentials/host must match the `db` service in `docker-compose.yml`.
-   - If you don’t have an odds API key yet, leave it unset; most of the app should still boot.
-
-2. Build the images:
-
-   ```bash
-   make build
-   ```
-
-   The first build may take several minutes (Ruby, Node, and asset build steps).
-
-   Local source files are mounted into the `web` and `worker` containers by `compose.dev.yml`, which the Makefile loads explicitly. Ordinary code, spec, and RuboCop changes do not require a rebuild. Rebuild after changing dependencies, native packages, or the Dockerfile.
-
-## Using the Makefile
-
-The root `Makefile` provides short commands for common Docker Compose workflows. These commands load both `docker-compose.yml` and `compose.dev.yml`, so local containers see your working tree immediately.
-
-Use plain `docker compose -f docker-compose.yml ...` when you want the production-like image behavior without local development overrides.
-
-List available commands:
+After editing `Gemfile`:
 
 ```bash
-make help
+bundle install
+bin/test
 ```
 
-Common commands:
+Commit Gemfile and Gemfile.lock together. The cached Docker build uses the lockfile
+in frozen mode and fails if they disagree. Do not install gems interactively into
+a running app container: those changes disappear at teardown.
 
-- **Build images**: `make build`
-- **Start the stack**: `make up`
-- **Stop the stack**: `make down`
-- **Restart the stack**: `make restart`
-- **View all logs**: `make logs`
-- **View web logs**: `make logs-web`
-- **Open Rails console**: `make console`
-- **Open a shell in the web container**: `make shell`
-- **Run migrations**: `make migrate`
-- **Bootstrap project data**: `make setup-data`
-- **Run tests**: `make test`
-- **Reset the database volume**: `make reset-db`
-
-## Start the stack
+After editing `package.json`:
 
 ```bash
-make up
+bin/compose run --rm --no-deps js yarn install
 ```
 
-This starts:
-- `db` (Postgres 15)
-- `web` (Rails server on http://localhost:3000)
-- `worker` (GoodJob background jobs)
+Commit package.json and yarn.lock together, then restart `bin/dev`. Dependency
+installation uses `--frozen-lockfile` during routine startup.
 
-The `web` container runs `./bin/rails server -b 0.0.0.0`. The entrypoint auto-runs `db:prepare` when starting the server.
+The optional `charts` group contains Gruff/RMagick for diagnostic PNG exports.
+It requires ImageMagick and a working C++ compiler and is excluded from native
+hook setup and the development image. Rails boot, numeric evaluation and current
+specs work without it. Chart export setup is an explicit dependency change, not
+a requirement for normal development.
 
-View logs:
+Sass uses `sassc-embedded`, preserving Sprockets' API without compiling retired
+LibSass. An old native `build.sassc` override can be removed with
+`bundle config unset --local build.sassc`.
+
+Python/NumPy are present in Docker. Current specs stub the numerical solver, so
+a passing suite alone does not verify a full ratings calculation.
+
+## Memory, disk space and cleanup
+
+**Running containers and Docker's VM use RAM. Images and build cache use disk.**
+Deleting images after each session makes the next build slower and is not the
+normal remedy for memory pressure.
+
+For this 8 GB laptop, start with Docker Desktop capped at about **4 GB RAM and
+2 CPUs**, and keep Resource Saver enabled. This is a starting point, not a
+performance guarantee; adjust after measuring your workload. Local containers
+also have explicit memory ceilings and rotated Docker logs. A ceiling can stop
+a particularly large ratings job, so check for OOM kills before increasing limits
+in `compose.dev.yml`.
+
+Useful read-only diagnostics:
 
 ```bash
-make logs-web
-make logs-worker
+docker stats --no-stream
+docker system df
+bin/compose ps -a
 ```
 
-## Seed and bootstrap data
-
-There is a helper script to set up baseline data and backfill ratings:
+Use `bin/stop` after detached development. Resource Saver can stop the idle Docker
+VM once **all** containers are stopped, including containers from other projects.
+A crashed terminal or laptop shutdown can prevent script traps from running.
+Use `bin/stop` for development; inspect `docker compose ls --all` for leftover
+`prophet-ratings-test-...` projects. Only after confirming a particular test run
+is no longer active, remove that exact test project with:
 
 ```bash
-make setup-data
+docker compose -p <exact-test-project-name> -f compose.test.yml down --volumes
 ```
 
-What it does:
-- Ensures DB is prepared (migrate/create)
-- Imports base models and games/stats
-- Runs a ratings backfill
+For occasional **disk** cleanup, inspect `docker system df` first. Docker Desktop
+can remove selected unused images. `docker builder prune` removes unused build
+cache and asks for confirmation; it affects the selected builder across projects,
+and subsequent builds will take longer. No routine script runs a global prune,
+removes application images, or deletes the development database.
 
-If you only need migrations or a Rails task:
+Avoid `docker system prune --volumes` as routine cleanup. If you intentionally
+want a completely empty development database, back up anything needed, stop the
+stack, and then explicitly run `bin/compose down --volumes`. That deletes this
+project's database and Node dependency volume. It is irreversible without a backup.
+`make reset-db` no longer performs this deletion automatically.
+
+Docker references: [startup readiness](https://docs.docker.com/compose/how-tos/startup-order/),
+[Compose teardown](https://docs.docker.com/reference/cli/docker/compose/down/),
+[Resource Saver](https://docs.docker.com/desktop/use-desktop/resource-saver/), and
+[rotating local logs](https://docs.docker.com/engine/logging/drivers/local/).
+
+## Data import and production copies
+
+Do not import data or backfill ratings as part of routine startup or testing.
+For season/bootstrap operations, see [Offseason Operations](offseason.md) and
+[Data Ingestion](data-ingestion.md). `make setup-data` explicitly invokes the
+existing imports/backfill; it can be slow and depends on the ingestion code being
+healthy. It is not a fix for a failing test environment.
+
+The existing `bin/pull-production-db` is an explicit, destructive development
+database replacement, separate from setup:
 
 ```bash
-make migrate
+bin/dev --detach
+bin/pull-production-db --help
 ```
 
-For offseason season creation, conference realignment, and bootstrap order, see [Offseason Operations](offseason.md).
-
-To run a one-off Rails task that does not have a Makefile shortcut:
-
-```bash
-make shell
-bin/rails <task:name>
-```
-
-## Common development workflows
-
-- **Rails console**
-
-  ```bash
-  make console
-  ```
-
-- **Run tests (RSpec)**
-
-  ```bash
-  make test
-  ```
-
-- **Open an interactive shell in the web container**
-
-  ```bash
-  make shell
-  ```
-
-- **Install a new Ruby gem**
-
-  1) Update `Gemfile` and run inside the container:
-  ```bash
-  make bundle-install
-  ```
-  2) Rebuild if native extensions or image layers require it:
-  ```bash
-  make build && make up
-  ```
-
-- **Install/update JavaScript packages**
-
-  ```bash
-  make yarn-install
-  ```
-
-## Database access
-
-Connect with a local Postgres client to `localhost:5432` using:
-
-- User: `postgres`
-- Password: `password`
-- Database (dev): `prophet_ratings_development`
-
-From the host:
-
-```bash
-psql postgresql://postgres:password@localhost:5432/prophet_ratings_development
-```
-
-From the container:
-
-```bash
-docker compose exec web psql "$DATABASE_URL"
-```
-
-## Pull production data locally
-
-Use `bin/pull-production-db` to replace the local development database with a dump of production:
-
-```bash
-make up
-bin/pull-production-db
-```
-
-The default source is the running ECS web task. This avoids requiring direct laptop access to private RDS. The ECS task runs `pg_dump` against its production `DATABASE_URL`, streams the dump down, and the script restores it into your local Docker Postgres database.
-
-Prerequisites:
-
-```bash
-aws sts get-caller-identity
-make up
-```
-
-Put the local admin credentials in the gitignored `.env` file:
-
-```dotenv
-LOCAL_ADMIN_EMAIL=you@example.com
-LOCAL_ADMIN_PASSWORD=change-me-locally
-```
-
-Keep local Docker runtime configuration in `.env.docker`:
-
-```dotenv
-RAILS_ENV=development
-DATABASE_URL=postgresql://postgres:password@db:5432/prophet_ratings_development
-```
-
-The script asks for confirmation before replacing the local database and then runs migrations. When the Docker `db` service is running, it restores into the database configured by `.env.docker`'s `DATABASE_URL`, uses the containerized PostgreSQL tools, and temporarily stops/restarts the local `web` and `worker` services around the restore. It does not store production credentials in the repo.
-
-Production user rows are excluded from the dump by default, so user data never lands locally. GoodJob runtime rows are also excluded so production jobs do not run in local development after restore. To include users anyway:
-
-```bash
-bin/pull-production-db --include-users
-```
-
-After restore, the script creates or updates a local admin user when `LOCAL_ADMIN_EMAIL` and `LOCAL_ADMIN_PASSWORD` are set. This keeps Rails Admin usable locally without importing production users.
-
-The ECS defaults match `bin/prod-console`:
-
-```bash
-ECS_CLUSTER=prophet-cluster
-ECS_SERVICE=prophet-ratings-web
-ECS_CONTAINER=web
-AWS_REGION=us-east-1
-```
-
-Override any of those only if the deployment changes.
-
-Direct RDS access is still available when needed:
-
-```bash
-PRODUCTION_DATABASE_URL="postgresql://..." bin/pull-production-db --source direct
-```
-
-## Troubleshooting
-
-- Ensure `.env.docker` exists and has `RAILS_ENV=development` and a valid `DATABASE_URL` pointing at `db`.
-- If migrations fail on boot, run `make prepare` and check logs.
-- If assets or Node modules change significantly, rebuild: `make build`.
-- To reset the database completely:
-  ```bash
-  make reset-db
-  ```
-  Warning: `-v` removes the Postgres volume and erases all data.
-
-## Stop and teardown
-
-- Stop containers (preserve data):
-  ```bash
-  make down
-  ```
-
-- Stop containers and remove DB volume (destroys data):
-  ```bash
-  docker compose down -v
-  ```
-
-## Notes
-
-- The `worker` service runs GoodJob for async jobs; it reads the same env as the web service.
-- API integrations (e.g., `ODDS_API_KEY`) must be provided in `.env.docker` if you need those features locally.
+It defaults to an ECS-based dump and requires AWS credentials/ECS Exec access.
+The script prompts before replacing local data. Production users and GoodJob
+runtime rows are excluded by default. Put optional `LOCAL_ADMIN_EMAIL` and
+`LOCAL_ADMIN_PASSWORD` in the gitignored `.env`; the script can create a local
+admin after restore. Read its help for source overrides and `--include-users`.
+It uses `bin/compose` for local operations so it selects the same development
+image/settings. Run `bin/stop` when finished. Production access is not part of
+environment verification or the test suite.

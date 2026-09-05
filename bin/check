@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+APP_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$APP_ROOT"
+
+bundle check
+bundle exec rubocop
+bundle exec reek
+bundle exec brakeman -q -w2 -x EOLRails,EOLRuby
+exec bin/test --local "$@"

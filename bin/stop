@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+APP_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if [[ $# -gt 0 ]]; then
+  echo "Usage: bin/stop (preserves database, dependency cache and images)" >&2
+  exit 1
+fi
+exec "$APP_ROOT/bin/compose" down --remove-orphans

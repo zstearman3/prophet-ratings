@@ -36,8 +36,8 @@ PrePush:
   RSpec:
     enabled: true
     description: "Run RSpec test suite"
-    command: ["bundle", "exec", "rspec"]
-    required_executable: "bundle"
+    command: ["bin/test", "--local"]
+    required_executable: "docker"
   Brakeman:
     enabled: true
     description: "Run Brakeman security scan"

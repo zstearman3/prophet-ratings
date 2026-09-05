@@ -313,6 +313,20 @@ python --version
 
 Use the commands that actually exist in the repo.
 
+For the normal local workflow, prefer:
+
+- `bin/test [RSpec arguments]`: Docker specs with a fresh disposable database and automatic cleanup.
+- `bin/check`: native RuboCop, Reek, Brakeman and specs; Docker provides the disposable test database.
+- `bin/dev`: foreground Docker development with automatic teardown on Ctrl-C.
+- `bin/dev --detach` and `bin/stop`: explicit background development and cleanup when a task needs the app running.
+- `bin/compose`: local Compose commands with the correct development overrides.
+
+Tests do not need the development stack running. On a memory-constrained laptop,
+avoid concurrent full suites or unnecessary development services. Do not run data
+imports, ratings backfills, production restores, database resets or global Docker
+prunes as routine setup or verification. Keep development data and cached images
+when stopping services. See `docs/development.md` for first-time setup and details.
+
 If a command fails because dependencies or environment variables are missing, report that clearly instead of guessing.
 
 ---

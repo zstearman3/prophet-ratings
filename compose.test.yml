@@ -1,0 +1,29 @@
+# Independent of development: no dev volume, jobs, secrets or fixed ports.
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: prophet_ratings_test
+    ports:
+      - "127.0.0.1::5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d prophet_ratings_test"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+    mem_limit: 384m
+
+  test:
+    image: prophet-ratings-dev
+    init: true
+    working_dir: /rails
+    environment:
+      RAILS_ENV: test
+      CI: "true"
+      DATABASE_URL: postgresql://postgres:password@db:5432/prophet_ratings_test
+      TEST_DATABASE_URL: postgresql://postgres:password@db:5432/prophet_ratings_test
+    volumes:
+      - .:/rails
+    mem_limit: 768m

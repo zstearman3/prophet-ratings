@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+APP_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$APP_ROOT"
+
+native=false
+case "${1:-}" in
+  --local) native=true; shift ;;
+  -h|--help)
+    echo "Usage: bin/test [--local] [RSpec arguments...]"
+    echo "Run Docker specs, or native Ruby specs with --local."
+    echo "Both modes create and clean up their own disposable Docker PostgreSQL database."
+    exit 0 ;;
+esac
+
+docker info >/dev/null 2>&1 || { echo "Start Docker Desktop, then retry bin/test." >&2; exit 1; }
+if [[ "$native" == true ]]; then
+  bundle check
+else
+  bin/compose build web
+fi
+
+# Each invocation owns a separate project, database and dynamically assigned port.
+test_project="prophet-ratings-test-$$-${RANDOM}"
+test_compose=(docker compose --project-name "$test_project" -f "$APP_ROOT/compose.test.yml")
+task_pid=""
+run() {
+  "$@" &
+  task_pid=$!
+  wait "$task_pid"
+  task_pid=""
+}
+cleanup() {
+  local result=$?
+  trap - EXIT INT TERM
+  if [[ -n "$task_pid" ]]; then
+    kill -TERM "$task_pid" 2>/dev/null || true
+  fi
+  # Volumes here belong only to this disposable test project, never to development.
+  "${test_compose[@]}" down --volumes --remove-orphans || result=1
+  exit "$result"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+run "${test_compose[@]}" up -d --wait --wait-timeout 60 db
+if [[ "$native" == true ]]; then
+  endpoint="$("${test_compose[@]}" port db 5432)"
+  export TEST_DATABASE_URL="postgresql://postgres:password@127.0.0.1:${endpoint##*:}/prophet_ratings_test"
+  export DATABASE_URL="$TEST_DATABASE_URL"
+  export RAILS_ENV=test CI=true
+  run bundle exec rails db:schema:load
+  run bundle exec rspec "$@"
+else
+  run "${test_compose[@]}" run --rm --no-deps -T test bash -c \
+    'bundle exec rails db:schema:load && bundle exec rspec "$@"' -- "$@"
+fi
