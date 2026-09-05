@@ -29,11 +29,12 @@ PrePush:
   RSpec:
     enabled: true
     description: "Run RSpec test suite"
-    command: ["bundle", "exec", "rspec"]
+    command: ["make", "test"]
+    required_executable: "docker"
   Brakeman:
     enabled: true
     description: "Run Brakeman security scan"
-    command: ["bundle", "exec", "brakeman", "-q", "-w2", "-x", "EOLRails,EOLRuby"]
-    required_executable: "brakeman"
+    command: ["docker", "compose", "-f", "docker-compose.yml", "-f", "compose.dev.yml", "run", "--rm", "--no-deps", "web", "bundle", "exec", "brakeman", "-q", "-w2", "-x", "EOLRails,EOLRuby"]
+    required_executable: "docker"
 
 # RSpec and Brakeman run on PrePush to keep commits fast.
