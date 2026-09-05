@@ -16,6 +16,7 @@ RSpec.describe SyncFromLastGamesJob do
 
   before do
     season
+    allow(Game).to receive(:current_schedule_date).and_return(Date.current)
     allow(Ingestion::GamesIngestionService).to receive(:new).and_return(service)
     allow(UpdateRankingsJob).to receive(:perform_later)
   end

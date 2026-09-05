@@ -98,7 +98,14 @@ RSpec.describe Game do
 
   describe '#winning_team' do
     it 'uses the loaded home and away team-game associations' do
-      game = create(:game, season:, home_team_score: 70, away_team_score: 65)
+      game = create(
+        :game,
+        season:,
+        home_team_name: 'Winning Home Team',
+        away_team_name: 'Losing Away Team',
+        home_team_score: 70,
+        away_team_score: 65
+      )
       home_team = create(:team)
       away_team = create(:team)
       create(:team_game, game:, team: home_team, team_season: create(:team_season, team: home_team, season:), home: true)

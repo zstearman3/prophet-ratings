@@ -15,6 +15,7 @@ RSpec.describe SyncFullSeasonGamesJob do
   end
 
   before do
+    allow(Game).to receive(:current_schedule_date).and_return(Date.current)
     allow(Ingestion::GamesIngestionService).to receive(:new).and_return(service)
   end
 

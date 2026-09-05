@@ -23,7 +23,7 @@ PreCommit:
   RuboCop:
     enabled: true
     description: "Run RuboCop"
-    command: ["bundle", "exec", "rubocop"]
+    command: ["rubocop"]
 
 PrePush:
   RSpec:
