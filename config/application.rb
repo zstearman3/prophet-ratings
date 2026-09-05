@@ -28,5 +28,6 @@ module ProphetRatings
     config.action_controller.action_on_unpermitted_parameters = false
 
     config.active_job.queue_adapter = :good_job
+    config.good_job.retry_on_unhandled_error = false
   end
 end
