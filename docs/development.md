@@ -1,6 +1,107 @@
-# Local Development Guide (Docker)
+# Local Development Guide
 
-This project is set up to run entirely via Docker for local development.
+The application can run via Docker, while Git hooks run with native Ruby so they
+do not depend on a running application container.
+
+## Native Ruby and Git hooks (macOS / Apple Silicon)
+
+Use the Ruby version in `.ruby-version` (currently 4.0.5) and Bundler 4.0.10 from
+`Gemfile.lock`. With rbenv and the Xcode Command Line Tools installed:
+
+```bash
+rbenv install -s 4.0.5
+gem install bundler -v 4.0.10
+brew install libpq pkg-config
+bundle config set --local build.pg --with-pg-config="$(brew --prefix libpq)/bin/pg_config"
+bundle config set --local without charts
+bundle install
+bundle check
+```
+
+The `charts` group is optional: it contains Gruff/RMagick and requires ImageMagick
+and a working C++ compiler. Numeric prediction evaluation and Rails eager loading
+work without it; only the diagnostic PNG generation methods load Gruff. To use
+those methods, install ImageMagick and include the `charts` group in your bundle.
+
+Sass uses `sassc-embedded`, which preserves the SassC API used by Sprockets and
+Rails Admin and ships Dart Sass for Apple Silicon and Linux. The previous SassC
+2.4.0 installation failed because this local Ruby's `RbConfig::CONFIG['CXX']` was
+`false`; its generated LibSass Makefile therefore invoked `false` as the compiler.
+The old `build.sassc --with-cxx=c++` setting did not override that value. No SassC
+compiler override is needed with the replacement. Existing overrides can be removed:
+
+```bash
+bundle config unset --local build.sassc
+```
+
+### Test database
+
+RSpec needs PostgreSQL, but Rails and the checks execute on the host. By default,
+tests connect to `prophet_ratings_test` through the local PostgreSQL socket as your
+OS user. Start your local PostgreSQL service before preparing the test database.
+Alternatively, start the Compose database and point native Rails at its published
+port:
+
+```bash
+docker compose up -d db
+export TEST_DATABASE_URL=postgresql://postgres:password@localhost:5432/prophet_ratings_test
+```
+
+Use only one PostgreSQL service on port 5432. If a Homebrew instance already owns
+that port, use its local socket/default URL instead of the Compose credentials.
+`TEST_DATABASE_URL` is separate from `DATABASE_URL` so exported development or
+production connection settings cannot redirect specs into those databases. Any
+custom test URL must point to a dedicated, disposable test database.
+
+```bash
+RAILS_ENV=test bundle exec rails db:prepare
+bundle exec rspec
+RAILS_ENV=test bundle exec rails zeitwerk:check
+```
+
+Running the actual ratings solver locally additionally requires `python3` with
+NumPy. For example, create and activate a virtual environment under `tmp/` and
+install NumPy there. The current specs stub the numerical solver and do not verify
+that Python dependency.
+
+### Install and verify hooks
+
+```bash
+bundle exec overcommit --install
+# After reviewing .overcommit.yml and .git-hooks/pre_push/reek.rb:
+bundle exec overcommit --sign
+bundle exec overcommit --sign pre_push
+bundle exec overcommit --run
+bundle exec overcommit --run pre_push
+```
+
+`--run` checks all tracked files without committing. `--run pre_push` executes the
+push checks without contacting a remote or pushing. Normal commits check staged
+files. Re-sign after reviewing changes to the hook configuration or plugin.
+
+Pre-commit runs RuboCop, JSON/YAML syntax, whitespace, and merge-conflict checks.
+Pre-push runs the full RSpec suite, Reek, and Brakeman. All Ruby tools use the
+project's locked bundle. You can also run them directly:
+
+```bash
+bundle exec rubocop
+bundle exec reek
+bundle exec brakeman -q -w2 -x EOLRails,EOLRuby
+```
+
+Reek was introduced with a baseline of 709 existing findings in `.reek.yml`.
+Detectors remain enabled, with exclusions anchored to the exact existing class
+or method context; new contexts and other smell types still fail. An excluded
+smell type can still recur within the same context, so remove exclusions as the
+affected code is cleaned up. Do not regenerate the baseline merely to pass a
+hook. Specs and generated/configuration files are excluded from Reek's application
+code analysis.
+
+The suite currently includes 15 pre-existing pending examples (mostly generated
+placeholders, plus unsupported double-header ingestion). They are reported by
+RSpec and are not treated as failures. Rails Admin's bundled Bootstrap SCSS also
+emits Dart Sass deprecation warnings; the stylesheet compilation regression spec
+verifies it still builds.
 
 ## Prerequisites
 

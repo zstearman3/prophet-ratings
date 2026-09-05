@@ -6,7 +6,7 @@ class CreateTeams < ActiveRecord::Migration[7.1]
       t.string "url"
       t.string "location"
       t.index ["school"], name: "index_teams_on_school", unique: true
-      
+
       t.timestamps
     end
   end

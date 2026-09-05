@@ -6,7 +6,7 @@ class CreateTeamSeasons < ActiveRecord::Migration[7.1]
       t.index ["season_id"], name: "index_team_seasons_on_season_id"
       t.index ["team_id", "season_id"], name: "index_team_seasons_on_team_id_and_season_id", unique: true
       t.index ["team_id"], name: "index_team_seasons_on_team_id"
-      
+
       t.timestamps
     end
   end

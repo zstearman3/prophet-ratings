@@ -10,6 +10,9 @@ development:
 test:
   <<: *default
   database: prophet_ratings_test
+  # An explicit test URL prevents an exported development/production DATABASE_URL
+  # from redirecting specs to the wrong database.
+  url: <%= ENV.fetch("TEST_DATABASE_URL", "postgresql:///prophet_ratings_test") %>
 
 production:
   url: <%= ENV["DATABASE_URL"] %>

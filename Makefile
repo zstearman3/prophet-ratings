@@ -62,7 +62,7 @@ setup-data:
 	$(DC) exec web bin/setup_data
 
 test:
-	$(DC) run --rm -e RAILS_ENV=test -e DATABASE_URL=$(TEST_DATABASE_URL) web bundle exec rspec
+	$(DC) run --rm -e RAILS_ENV=test -e TEST_DATABASE_URL=$(TEST_DATABASE_URL) web bundle exec rspec
 
 bundle-install:
 	$(DC) exec web bundle install

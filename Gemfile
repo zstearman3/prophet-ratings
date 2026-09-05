@@ -19,7 +19,8 @@ gem 'puma', '>= 5.0'
 gem 'rails', '~> 8.1.3'
 gem 'rails_admin'
 gem 'redis', '>= 4.0.1'
-gem 'sassc'
+# Preserve Sprockets' SassC API without compiling the retired LibSass C++ extension.
+gem 'sassc-embedded', '~> 1.6', require: 'sassc'
 gem 'sprockets-rails'
 gem 'stimulus-rails'
 gem 'tailwindcss-rails'
@@ -63,6 +64,7 @@ group :development do
   gem 'overcommit'
   # Static analysis security scanner for Ruby on Rails
   gem 'brakeman', require: false
+  gem 'reek', '~> 6.5', require: false
 end
 
 group :charts do

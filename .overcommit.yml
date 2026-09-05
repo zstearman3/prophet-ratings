@@ -1,6 +1,8 @@
 # Overcommit configuration for prophet-ratings
-# Runs fast linters plus full RSpec and Brakeman before allowing a commit.
-# You can bypass hooks with: git commit --no-verify
+# Runs native Ruby checks using the versions locked in Gemfile.lock.
+gemfile: Gemfile
+
+verify_signatures: false
 
 CommitMsg:
   TrailingPeriod:
@@ -23,18 +25,24 @@ PreCommit:
   RuboCop:
     enabled: true
     description: "Run RuboCop"
-    command: ["rubocop"]
+    command: ["bundle", "exec", "rubocop"]
 
 PrePush:
+  Reek:
+    enabled: true
+    description: "Check for new code smells"
+    command: ["bundle", "exec", "reek"]
+    required_executable: "bundle"
   RSpec:
     enabled: true
     description: "Run RSpec test suite"
-    command: ["make", "test"]
-    required_executable: "docker"
+    command: ["bundle", "exec", "rspec"]
+    required_executable: "bundle"
   Brakeman:
     enabled: true
     description: "Run Brakeman security scan"
-    command: ["docker", "compose", "-f", "docker-compose.yml", "-f", "compose.dev.yml", "run", "--rm", "--no-deps", "web", "bundle", "exec", "brakeman", "-q", "-w2", "-x", "EOLRails,EOLRuby"]
-    required_executable: "docker"
+    command: ["bundle", "exec", "brakeman"]
+    flags: ["-q", "-w2", "-x", "EOLRails,EOLRuby"]
+    required_executable: "bundle"
 
-# RSpec and Brakeman run on PrePush to keep commits fast.
+# Reek, RSpec and Brakeman run on PrePush to keep commits fast.

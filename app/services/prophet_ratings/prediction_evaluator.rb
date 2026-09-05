@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require 'gruff'
-
 module ProphetRatings
   class PredictionEvaluator
     ##
@@ -29,6 +27,8 @@ module ProphetRatings
     end
 
     def generate_pace_diagnostics
+      require 'gruff'
+
       plot_pace_scatterplot
       plot_pace_residuals_histogram
       plot_residuals_vs_predicted_pace
@@ -41,6 +41,8 @@ module ProphetRatings
     #
     # Also includes team residuals CSV and margin z-score histogram.
     def generate_efficiency_diagnostics
+      require 'gruff'
+
       plot_efficiency_error_histograms
       plot_win_prob_calibration
       export_team_residuals_to_csv

@@ -36,7 +36,7 @@
   <tbody>
     <% @games.each do |game| %>
       <% recommendations = game.current_bet_recommendations.index_by(&:bet_type) %>
-      
+
       <tr class="border-t tr-hoverable cursor-pointer" data-controller="betting-expand" data-action="click->betting-expand#toggle" data-betting-sort-target="row"
         data-ev-for-spread="<%= recommendations["spread"]&.ev || -999 %>"
         data-ev-for-moneyline="<%= recommendations["moneyline"]&.ev || -999 %>"
