@@ -39,6 +39,7 @@ namespace :season do
       end_date: parse_date_env('END_DATE')
     ).call
     season = preparation.season
+    align_season_conferences(season.year)
     season.set_current! unless season.current?
 
     created_team_seasons = preparation.team_seasons_created
