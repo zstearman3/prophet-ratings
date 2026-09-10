@@ -6,7 +6,59 @@ Prophet Ratings is a Ruby on Rails college basketball analytics platform. It gen
 
 The long-term goal is to launch a conversational, GPT-powered college basketball analytics experience ahead of the next March Madness. The app should help users understand matchups, identify prediction confidence, explore adjusted team strengths, and eventually evaluate betting value.
 
-This is a solo side project with limited weekly development time. Prefer pragmatic, incremental improvements over large rewrites.
+This is a solo side project with limited monthly development time. Prefer pragmatic, incremental improvements over large rewrites.
+
+---
+
+## Agent Workflow
+
+1. Inspect Git status and relevant files before editing. Preserve unrelated changes and staged work; a dirty checkout does not block independent work. Ask only if overlapping changes cannot be safely preserved.
+2. Briefly explain the intended change, then make the smallest useful, PR-sized implementation. Do not perform broad refactors without explicit direction.
+3. Carry implementation through verification. Make routine, reversible decisions using existing conventions; ask when an unresolved choice materially affects behavior, scope, cost, or data integrity. Honor authorization already given in the conversation.
+4. Keep work within the requested task. Launch priorities provide context, not authorization to add features. Reviews and diagnosis do not authorize implementation unless requested.
+5. Document changes to model assumptions explicitly. Never invent domain data or make prediction logic depend on unstored transient values.
+6. Update relevant documentation when behavior, commands, or operational requirements change.
+7. Review the final diff and Git status for unintended files, schema churn, debugging code, and unrelated changes. Leave the repo runnable.
+
+### Required Verification
+
+Before declaring a task that changes repository files complete, run both hook suites successfully against the final changes:
+
+```bash
+bundle exec overcommit --run
+bundle exec overcommit --run pre_push
+```
+
+- These commands verify hooks without committing or pushing. Verification alone does not authorize a commit or push.
+- Ensure newly added files are covered: the all-files pre-commit run covers tracked files. Check new files directly with the applicable checks or stage only the task's intended files, preserving unrelated staged work.
+- Run targeted tests during development, then the required hook suites at completion. Avoid redundant full-suite runs when the same final changes have already passed. `bin/check` does not replace both hook suites; it omits some pre-commit hygiene checks.
+- Fix failures caused by the task. Do not bypass hooks, disable checks, weaken assertions, or expand lint/security exclusions merely to pass.
+- If verification is blocked or fails for an unrelated reason, report the exact command, failure, and remaining work. Describe the changes as implemented but verification incomplete; do not claim completion or expand into unrelated repairs.
+- Read-only reviews and discussions do not require running hooks.
+
+See `docs/development.md` for hook prerequisites, setup, and known verification limitations.
+
+### Definition of Done and Handoff
+
+A task that changes repository files is complete when:
+
+- The intended behavior works locally and fits existing Rails conventions.
+- Tests are added or updated for changed behavior, and relevant tests and both hook suites pass.
+- Model/data assumptions and changes to behavior or commands are documented where needed.
+- The final diff contains only intended changes, with no secrets or accidental environment-specific values.
+- The implementation is small enough to understand after another side-project hiatus.
+
+The final response should briefly state what changed, which checks ran and their results, and any remaining limitations or manual steps. Distinguish successful verification from checks that were skipped, blocked, or failed.
+
+### Related Documentation
+
+Do not read every document in `docs/` for every task. Use them selectively based on the work area:
+
+- Read `docs/development.md` when working on local setup, Docker, Makefile commands, database setup, test commands, or developer workflow.
+- Read `docs/ratings.md` before changing ratings calculations, adjusted stats, rating snapshots, ratings configuration, ranking logic, preseason blending, volatility, or the Rails/Python solver boundary.
+- Read `docs/data-ingestion.md` before changing scraping, game imports, sync jobs, season bootstrap tasks, game finalization, team matching, deduplication, or any data pipeline behavior that affects `Game` or `TeamGame` records.
+
+If a task spans multiple areas, read only the relevant docs plus the directly affected source files.
 
 ---
 
@@ -99,9 +151,7 @@ The future GPT interface should answer questions like:
 - "Which team is vulnerable despite a strong record?"
 - "What does the model think Vegas is mispricing?"
 
-All GPT-facing insights must be grounded in stored ratings, predictions, adjusted stats, and model diagnostics.
-
-Avoid hallucinating matchup narratives. If the data does not support a claim, say so clearly.
+See GPT Integration Guidelines for grounding requirements.
 
 ---
 
@@ -194,6 +244,8 @@ When modifying it:
 
 Do not rewrite the solver unless there is a clear correctness or performance reason.
 
+Current specs stub the numerical solver. When changing the solver or the Rails/Python boundary, add or update and run a small deterministic check using the real solver with synthetic inputs and independently reasoned expected outputs. Exercise the boundary when it changes. Use Docker's Python/NumPy environment; do not import domain data or run a ratings backfill for verification. Passing hook suites alone does not establish numerical correctness.
+
 ---
 
 ## Background Jobs
@@ -269,51 +321,9 @@ Tiny gremlins in prediction code become giant gremlins in March.
 
 ---
 
-## Agent Behavior
-
-When acting as an AI coding agent in this repo:
-
-1. Read relevant files before making changes.
-2. Explain the intended change briefly before editing.
-3. Make the smallest useful change.
-4. Update or add tests when behavior changes.
-5. Do not perform broad refactors without explicit direction.
-6. Do not change model assumptions silently.
-7. Do not modify infrastructure unless the task is explicitly about deployment.
-8. Do not invent domain data.
-9. Prefer incremental PR-sized changes.
-10. Leave the repo in a runnable state.
-
-### Related Documentation
-
-Do not read every document in `docs/` for every task. Use them selectively based on the work area:
-
-- Read `docs/development.md` when working on local setup, Docker, Makefile commands, database setup, test commands, or developer workflow.
-- Read `docs/ratings.md` before changing ratings calculations, adjusted stats, rating snapshots, ratings configuration, ranking logic, preseason blending, volatility, or the Rails/Python solver boundary.
-- Read `docs/data-ingestion.md` before changing scraping, game imports, sync jobs, season bootstrap tasks, game finalization, team matching, deduplication, or any data pipeline behavior that affects `Game` or `TeamGame` records.
-
-If a task spans multiple areas, read only the relevant docs plus the directly affected source files.
-
----
-
 ## Commands
 
-Before assuming commands, inspect the repo. Common commands may include:
-
-```bash
-bundle install
-bundle exec rails db:migrate
-bundle exec rails test
-bundle exec rspec
-bundle exec rubocop
-yarn install
-yarn build
-python --version
-```
-
-Use the commands that actually exist in the repo.
-
-For the normal local workflow, prefer:
+Use the repository's local workflow commands:
 
 - `bin/test [RSpec arguments]`: Docker specs with a fresh disposable database and automatic cleanup.
 - `bin/check`: native RuboCop, Reek, Brakeman and specs; Docker provides the disposable test database.
@@ -381,30 +391,4 @@ GPT responses should explain the model, not replace it.
 
 When building GPT features, prefer endpoints/services that assemble grounded context first, then pass that context to the model.
 
----
-
-## What Not To Do
-
-Avoid:
-
-- Rewriting the ratings engine without a clear reason
-- Making prediction logic depend on unstored transient values
-- Adding complex abstractions for hypothetical future sports
-- Building a polished UI before model validation
-- Introducing background job workflows that are not observable
-- Adding GPT-generated claims that cannot be traced to app data
-- Silently changing rating assumptions
-- Treating betting recommendations as certainty
-
----
-
-## Definition of Done
-
-A task is generally done when:
-
-- The intended behavior works locally
-- Relevant tests pass or new tests are added
-- The change fits existing Rails conventions
-- Model/data assumptions are documented where needed
-- No secrets or environment-specific values are committed
-- The implementation is small enough to understand later after another side-project hiatus
+All GPT-facing insights must be traceable to stored data. If the data does not support a claim or matchup narrative, say so clearly. Never treat betting recommendations as certainty.

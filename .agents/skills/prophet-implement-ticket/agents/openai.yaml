@@ -1,0 +1,4 @@
+interface:
+  display_name: "Prophet: Implement a Ticket"
+  short_description: "Implement and verify a Prophet Ratings Notion ticket"
+  default_prompt: "Use $prophet-implement-ticket to implement this Prophet Ratings Notion ticket, run the required checks, and update its status and handoff notes."
