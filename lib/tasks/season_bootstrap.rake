@@ -29,6 +29,7 @@ namespace :season do
     dedupe_games = env_bool('DEDUPE_GAMES', default: true)
     run_preseason = env_bool('RUN_PRESEASON', default: true)
     run_ratings = env_bool('RUN_RATINGS', default: true)
+    align_conferences = env_bool('ALIGN_CONFERENCES', default: true)
     ratings_resume = env_bool('RATINGS_RESUME', default: false)
     ratings_start_date = parse_date_env('RATINGS_START_DATE')
     ratings_end_date = parse_date_env('RATINGS_END_DATE')
@@ -39,6 +40,16 @@ namespace :season do
       end_date: parse_date_env('END_DATE')
     ).call
     season = preparation.season
+    if align_conferences
+      begin
+        alignment = SeasonConferenceAlignment.new(year: season.year)
+        result = alignment.call
+        SeasonConferenceAlignmentReporter.new(result:, year: season.year).call
+        abort('Resolve suggestions from conference alignment before bootstrap can continue.') unless result.success?
+      rescue ArgumentError, SeasonConferenceAlignment::Error, Scraper::ConferenceStandingsScraper::Error => e
+        abort("Conference alignment failed for year=#{season.year}: #{e.message}")
+      end
+    end
     season.set_current! unless season.current?
 
     created_team_seasons = preparation.team_seasons_created

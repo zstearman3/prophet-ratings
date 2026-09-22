@@ -399,7 +399,13 @@ bin/rails import:games
 
 File: `lib/tasks/season_bootstrap.rake`
 
-Purpose: create/update a season, ensure team seasons exist, optionally sync games, optionally dedupe, and optionally run ratings.
+Purpose: create/update a season, ensure team seasons exist, align conference
+memberships, optionally sync games, optionally dedupe, and optionally run ratings.
+
+After `SeasonPreparer`, bootstrap runs `SeasonConferenceAlignment` before making
+the season current or starting ratings config/preseason/game/dedupe/rating work.
+Source failures or review-required suggestions stop those downstream operations.
+The season shell remains prepared; safe membership changes may already be saved.
 
 Default year is `2026`.
 
@@ -424,6 +430,32 @@ Useful environment variables:
 - `RATINGS_RESUME`: whether to resume ratings backfill.
 - `RATINGS_START_DATE`: override ratings backfill start date.
 - `RATINGS_END_DATE`: override ratings backfill end date.
+- `ALIGN_CONFERENCES`: whether bootstrap runs conference alignment. Defaults to
+  `true`; set `ALIGN_CONFERENCES=false` only when a source outage or unresolved
+  review suggestions should not block the rest of bootstrap. Standalone
+  `season:align_conferences` remains available for the deferred review.
+
+### `season:align_conferences`
+
+```bash
+bin/rails season:align_conferences YEAR=2027
+```
+
+Omit `YEAR` to use the greatest stored season year. A missing season fails clearly.
+`Scraper::ConferenceStandingsScraper` fetches the target Sports Reference men's
+standings page and parses ordinary or commented conference tables without writes.
+It rejects unsupported structure, wrong-year links, missing identity fields,
+duplicate team memberships, and inconsistent source conference identities.
+`ConferenceAlignmentMatch` resolves stored identities conservatively;
+`SeasonConferenceAlignment` applies safe assignments transactionally using
+`TeamConferenceAssignment`, preserving unchanged rows and historical ranges.
+
+Output includes year, source URL, created/changed/unchanged counts and details,
+and review suggestions. Suggestions are informational; no team/conference lifecycle
+changes are applied. Safe assignments can succeed while suggestions cause a nonzero
+exit. Resolve identities or membership ranges manually, then rerun the same command.
+See [Offseason Operations](offseason.md) for roster assumptions, conflict handling,
+review steps, and the distinction from destructive authoritative CSV reconciliation.
 
 ### `season:sync_games`
 
