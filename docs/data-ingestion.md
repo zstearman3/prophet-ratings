@@ -430,6 +430,10 @@ Useful environment variables:
 - `RATINGS_RESUME`: whether to resume ratings backfill.
 - `RATINGS_START_DATE`: override ratings backfill start date.
 - `RATINGS_END_DATE`: override ratings backfill end date.
+- `ALIGN_CONFERENCES`: whether bootstrap runs conference alignment. Defaults to
+  `true`; set `ALIGN_CONFERENCES=false` only when a source outage or unresolved
+  review suggestions should not block the rest of bootstrap. Standalone
+  `season:align_conferences` remains available for the deferred review.
 
 ### `season:align_conferences`
 

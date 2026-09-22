@@ -18,7 +18,7 @@ RSpec.describe SeasonConferenceAlignment do
     %w[conference_alignment season_bootstrap game_dedupe].each do |task_file|
       load Rails.root.join("lib/tasks/#{task_file}.rake")
     end
-    %w[YEAR START_DATE END_DATE SYNC_GAMES DEDUPE_GAMES RUN_PRESEASON RUN_RATINGS].each { |key| ENV.delete(key) }
+    %w[YEAR START_DATE END_DATE SYNC_GAMES DEDUPE_GAMES RUN_PRESEASON RUN_RATINGS ALIGN_CONFERENCES].each { |key| ENV.delete(key) }
     example.run
   ensure
     Rake.application = original_rake
@@ -89,6 +89,15 @@ RSpec.describe SeasonConferenceAlignment do
     end
     ENV['SYNC_GAMES'] = ENV['DEDUPE_GAMES'] = ENV['RUN_PRESEASON'] = ENV['RUN_RATINGS'] = 'false'
     expect { invoke('season:bootstrap') }.to output(/Season bootstrap complete/).to_stdout
+  end
+
+  it 'allows bootstrap to skip alignment explicitly while keeping it enabled by default' do
+    ENV['YEAR'] = '2026'
+    ENV['ALIGN_CONFERENCES'] = 'false'
+    ENV['SYNC_GAMES'] = ENV['DEDUPE_GAMES'] = ENV['RUN_PRESEASON'] = ENV['RUN_RATINGS'] = 'false'
+    expect { invoke('season:bootstrap') }.to output(/Season bootstrap complete/).to_stdout
+    expect(Scraper::ConferenceStandingsScraper).not_to have_received(:new)
+    expect(Season.current.year).to eq(2026)
   end
 
   context 'when bootstrap cannot finish alignment' do

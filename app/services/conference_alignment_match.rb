@@ -6,7 +6,8 @@ class ConferenceAlignmentMatch
 
   def self.resolve(rows)
     local_teams = Team.all.to_a
-    matches = rows.map { |row| new(row, local_teams:) }
+    local_conferences = Conference.all.to_a
+    matches = rows.map { |row| new(row, local_teams:, local_conferences:) }
     validate_matches(matches)
     matches
   end
@@ -18,9 +19,10 @@ class ConferenceAlignmentMatch
     raise SeasonConferenceAlignment::Error, 'Duplicate source rows resolve to the same stored team; no memberships changed'
   end
 
-  def initialize(row, local_teams:)
+  def initialize(row, local_teams:, local_conferences:)
     @row = row
     @local_teams = local_teams
+    @local_conferences = local_conferences
   end
 
   def teams
@@ -28,9 +30,11 @@ class ConferenceAlignmentMatch
   end
 
   def conferences
-    @conferences ||= Conference.where(slug: row.fetch(:conference_slug))
-                               .or(Conference.where(name: row.fetch(:conference_name)))
-                               .or(Conference.where(abbreviation: row.fetch(:conference_abbreviation))).to_a
+    @conferences ||= local_conferences.select do |conference|
+      conference.slug == row.fetch(:conference_slug) ||
+        conference.name == row.fetch(:conference_name) ||
+        conference.abbreviation == row.fetch(:conference_abbreviation)
+    end
   end
 
   def team
@@ -64,7 +68,7 @@ class ConferenceAlignmentMatch
 
   private
 
-  attr_reader :row, :local_teams
+  attr_reader :row, :local_teams, :local_conferences
 
   def stable_teams
     slug = row.fetch(:team_slug)

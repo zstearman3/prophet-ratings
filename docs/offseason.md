@@ -102,6 +102,10 @@ optionally initializes preseason ratings, syncs games, deduplicates, and runs ra
 An alignment error or review-required result stops all those downstream steps.
 The prepared shell and any safe alignment changes remain available for review and
 an idempotent rerun. Alignment still runs when game and ratings flags are disabled.
+Set `ALIGN_CONFERENCES=false` to explicitly defer alignment while allowing the
+season to become current and continue through game and ratings work. Alignment is
+enabled by default; run `season:align_conferences YEAR=<year>` afterward and
+review its output before treating the season as fully prepared.
 
 Useful flags:
 
