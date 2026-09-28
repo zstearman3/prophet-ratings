@@ -19,7 +19,17 @@ Fetch the database to refresh its schema, templates, data sources, and view filt
 
 Current Sprint filters on the Sprint property. Do not infer its selected month from the calendar or hardcode September 2026: inspect the live view. Unscheduled tickets are visible through All tasks; creating a ticket does not automatically schedule it.
 
-## Properties and defaults
+## Epics and stories
+
+Use **Initiatives as epics** and **Work Items as the stories/tasks that deliver them**. When the user asks for an epic, create it in Initiatives; do not substitute a parent Work Item or add an `Epic` type to Work Items.
+
+Keep the epic's outcome, scope, shared acceptance criteria, and related work on the Initiative. Put implementable stories, their acceptance criteria, and verification steps in Work Items, linked through each item's `Initiative` relation. Verify that the Initiative's reciprocal `Tasks` relation includes those items. Use `Parent-task` / `Sub-tasks` only for an agreed breakdown within Work Items, not as a replacement for the Initiative-to-story structure.
+
+Agree on the story split before creating multiple Work Items. An epic request authorizes creating the Initiative once its scope is settled; it does not require another permission gate. If the split is not settled, keep proposed stories in the Initiative body until agreed. Do not create an Initiative for every standalone ticket.
+
+For new Initiatives, use `Project name` for the title, `Summary` for the outcome, and `Planning` for the status unless the user specifies otherwise. Leave `Owner`, `Dates`, and `Priority` unset unless provided. Preserve existing initiative statuses when linking or implementing stories.
+
+## Work Item properties and defaults
 
 These are observed schema values; live schema takes precedence for valid names and types. Default choices below are initial workflow conventions, not claims about database-enforced defaults. Honor explicit user choices.
 
@@ -33,7 +43,7 @@ These are observed schema values; live schema takes precedence for valid names a
 | Priority | Existing choices: `Low`, `Medium`, `High`; omit unless chosen |
 | Sprint | Omit unless chosen; use a live option or the live Current Sprint filter when the user requests the current sprint |
 | Assignee / Due | Omit unless provided; do not infer identity or deadlines |
-| Initiative | Link an existing, confirmed relevant initiative; otherwise omit |
+| Initiative | Link the agreed epic in Initiatives, including one created for the request; omit for standalone work without a confirmed relevant initiative |
 | Parent-task / Sub-tasks | Preserve existing relations; create a hierarchy only for an agreed task split |
 | Tags | Optional; use existing relevant choices only |
 
@@ -49,9 +59,9 @@ The observed Task template contains Description. The Bug template adds Steps to 
 
 ## Notion operations
 
-Use currently available Notion MCP tool schemas, not copied payloads from an old session. Search within the Work Items data source when locating or deduplicating tickets; a filtered sprint view is not a complete duplicate search. Fetch full matching pages and resolve meaningful ambiguity before writing.
+Use currently available Notion MCP tool schemas, not copied payloads from an old session. Search within Initiatives when locating or deduplicating epics and within Work Items for their stories or standalone tickets; a filtered sprint view is not a complete duplicate search. Fetch full matching pages and resolve meaningful ambiguity before writing.
 
-Before creating or editing page content, read `notion://docs/enhanced-markdown-spec` through the Notion fetch tool or its resource interface. Create tickets with an explicit `parent.data_source_id` taken from the fetched Work Items collection (the UUID, not the database ID). Put the title in `Task name`, not a duplicate body heading.
+Before creating or editing page content, read `notion://docs/enhanced-markdown-spec` through the Notion fetch tool or its resource interface. Create pages with an explicit `parent.data_source_id` taken from the appropriate fetched collection (the UUID, not the database ID): Initiatives for epics, Work Items for stories/tasks. Use `Project name` for Initiative titles and `Task name` for Work Item titles, not a duplicate body heading.
 
 For this simple ticket format, supply the agreed body directly. If a task specifically calls for applying a Notion template, follow the live tool's template rules: do not send template and content together, and wait for asynchronous template application before editing the result.
 
