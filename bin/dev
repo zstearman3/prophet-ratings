@@ -43,9 +43,8 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 
 run bin/compose up -d --wait --wait-timeout 60 db
-# Startup must not rewrite the checked-in schema just because Rails' dump format changed.
-# Run bin/compose exec web bin/rails db:migrate explicitly when authoring migrations.
-run bin/compose run --rm --no-deps -T -e SCHEMA=/tmp/development-schema.rb web bin/rails db:create db:migrate
+# Keep the tracked schema in sync with migrations, including during normal startup.
+run bin/compose run --rm --no-deps -T web bin/rails db:create db:migrate
 # Build once before serving requests, then let the long-lived watchers handle edits.
 run bin/compose run --rm --no-deps -T js sh -c 'yarn install --frozen-lockfile && yarn build'
 run bin/compose run --rm --no-deps -T css bin/rails tailwindcss:build

@@ -22,6 +22,8 @@ x-app: &app
 
 services:
   db:
+    # Keep the Debian/glibc family stable for this persistent local volume.
+    image: postgres:15-trixie
     ports: !override
       - "127.0.0.1:${DEV_DB_PORT:-54320}:5432"
     healthcheck:
@@ -43,11 +45,6 @@ services:
     ports: !override
       - "127.0.0.1:${DEV_PORT:-3000}:3000"
     command: ["bin/rails", "server", "-b", "0.0.0.0", "--pid", "/tmp/rails-server.pid"]
-    healthcheck:
-      test: ["CMD", "ruby", "-rnet/http", "-e", "exit(Net::HTTP.get_response(URI('http://127.0.0.1:3000/up')).is_a?(Net::HTTPSuccess) ? 0 : 1)"]
-      interval: 5s
-      timeout: 3s
-      retries: 12
     depends_on:
       db:
         condition: service_healthy
