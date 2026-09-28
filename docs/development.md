@@ -30,7 +30,8 @@ In another terminal, or from an agent:
 | `bin/compose logs -f web worker` | Follow application/job logs |
 | `bin/compose ps` | Check this project's containers |
 | `bin/compose exec web bin/rails console` | Rails console in the running app |
-| `bin/compose exec web bin/rails db:migrate` | Apply a migration and update the tracked schema |
+| `bin/migrate` | Apply migrations and update the tracked schema; no running app required |
+| `bin/repair-collation` | Repair local PostgreSQL collation mismatches after an image/OS upgrade |
 | `bin/compose exec web bash` | Shell in the app container |
 
 Tests do not require `bin/dev` to be running. On this 8 GB laptop, prefer one test
@@ -92,11 +93,48 @@ are bind-mounted and need no rebuild. Development startup installs from
 `node_modules`. Restart development after changing package dependencies.
 
 PostgreSQL must pass its health check before database setup or tests start.
+The local PostgreSQL image uses `postgres:15-trixie`; keeping the Debian family
+explicit prevents a floating image tag from switching the volume between Debian
+releases. A new distro image can change collation rules even within PostgreSQL 15.
 `bin/dev` prepares the schema and builds assets before starting the server and worker.
-Detached startup waits for the Rails health endpoint. Startup schema dumps go
-to a container temporary file to avoid incidental schema-format churn; when
-authoring migrations, run the explicit migration command in the table above and
-commit the resulting `db/schema.rb` change.
+Detached startup waits for containers to be running; Rails may need another
+moment to boot. Local development does not probe `/up` repeatedly. Startup writes
+the normal tracked `db/schema.rb`, so automatic migrations no longer hide schema
+updates.
+Review the diff before committing; Rails upgrades can reorder the dump as well.
+
+## Working on migrations
+
+`development` is this project's integration branch; branch features from it.
+The local database and installed gems do not switch when Git branches do.
+After switching branches, check `bundle check` and review schema changes against
+the migrations on that branch, especially if the database has newer migrations.
+
+After adding a migration, run this **on the feature branch**, before committing:
+
+```bash
+bin/migrate
+git diff -- db/schema.rb db/migrate
+git add db/schema.rb db/migrate/<your-migration>.rb
+git commit
+```
+
+`bin/migrate` (also `make migrate` / `make prepare`) builds the cached development
+image, starts PostgreSQL if needed, and runs `db:create db:migrate` in a temporary
+app container. It needs Docker Desktop, not `bin/dev`. It does not seed or reset
+data. If it started PostgreSQL, it stops it afterward; an existing development
+session is left running. Database volumes and images are preserved.
+
+Pre-commit checks that migration changes include a staged schema and that its
+version matches the latest tracked migration. An updated but **unstaged** schema
+does not count. Schema-only format refreshes are allowed at the current version.
+Hooks never migrate your development database or stage files automatically.
+
+Pre-push independently loads the checked-in schema into a disposable database
+and rejects pending migrations before running specs. Neither guard requires
+starting the app. These are missing-update guards, not a proof that every column
+matches every migration: do not edit migrations already shared with others, and
+review schema diffs for drift (including changes from other branches).
 
 Local ports bind only to loopback:
 
@@ -119,7 +157,8 @@ intentionally run a separate development checkout.
 ## Reliable tests and hooks
 
 Every `bin/test` invocation creates a uniquely named Compose project with a fresh
-PostgreSQL database. It loads the checked-in schema, runs specs, and removes its
+PostgreSQL database. It loads the checked-in schema, rejects pending migrations,
+runs specs, and removes its
 containers, network and test volumes on success, failure, Ctrl-C or termination.
 It starts no app server, watchers or job worker. Concurrent invocations have
 separate databases and ports, although running many in parallel is a poor fit for
@@ -139,7 +178,8 @@ separate from test/environment setup. Tests must use factories, not that seed pa
 
 The normal hooks are:
 
-- **Pre-commit:** RuboCop, JSON/YAML syntax, trailing whitespace and merge conflicts.
+- **Pre-commit:** migration/schema consistency, RuboCop, JSON/YAML syntax,
+  trailing whitespace and merge conflicts.
 - **Pre-push:** Reek, Brakeman and `bin/test --local`.
 
 Docker Desktop must be available for pre-push PostgreSQL, but no persistent
@@ -245,6 +285,15 @@ want a completely empty development database, back up anything needed, stop the
 stack, and then explicitly run `bin/compose down --volumes`. That deletes this
 project's database and Node dependency volume. It is irreversible without a backup.
 `make reset-db` no longer performs this deletion automatically.
+
+If `bin/dev` reports a PostgreSQL collation version mismatch after a Docker image
+update, stop development and run `bin/repair-collation`, then retry `bin/dev`.
+The repair starts only this project's database service, reindexes each database
+whose stored collation version differs from the current image, and refreshes its
+recorded version only after reindexing succeeds. It preserves the volume and stops
+PostgreSQL afterward if it started it. It may take time on a large local database;
+do not interrupt it midway. Do not use a bare `ALTER DATABASE ... REFRESH COLLATION
+VERSION` without first rebuilding affected indexes.
 
 Docker references: [startup readiness](https://docs.docker.com/compose/how-tos/startup-order/),
 [Compose teardown](https://docs.docker.com/reference/cli/docker/compose/down/),

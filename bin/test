@@ -51,9 +51,9 @@ if [[ "$native" == true ]]; then
   export TEST_DATABASE_URL="postgresql://postgres:password@127.0.0.1:${endpoint##*:}/prophet_ratings_test"
   export DATABASE_URL="$TEST_DATABASE_URL"
   export RAILS_ENV=test CI=true
-  run bundle exec rails db:schema:load
+  run bundle exec rails db:schema:load db:abort_if_pending_migrations
   run bundle exec rspec "$@"
 else
   run "${test_compose[@]}" run --rm --no-deps -T test bash -c \
-    'bundle exec rails db:schema:load && bundle exec rspec "$@"' -- "$@"
+    'bundle exec rails db:schema:load db:abort_if_pending_migrations && bundle exec rspec "$@"' -- "$@"
 fi

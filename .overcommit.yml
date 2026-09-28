@@ -20,6 +20,12 @@ PreCommit:
     enabled: true
   MergeConflicts:
     enabled: true
+  MigrationSchema:
+    enabled: true
+    description: "Check migrations include an up-to-date schema"
+    include:
+      - "db/migrate/*.rb"
+      - "db/schema.rb"
 
   # Ruby/Rails checks
   RuboCop:

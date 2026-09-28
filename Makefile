@@ -55,10 +55,10 @@ console:
 	$(DC) exec web bin/rails console
 
 migrate:
-	$(DC) exec web bin/rails db:migrate
+	bin/migrate
 
 prepare:
-	$(DC) exec web bin/rails db:create db:migrate
+	bin/migrate
 
 setup-data:
 	$(DC) exec web bin/setup_data

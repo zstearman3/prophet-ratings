@@ -1,7 +1,7 @@
 # Independent of development: no dev volume, jobs, secrets or fixed ports.
 services:
   db:
-    image: postgres:15
+    image: postgres:15-trixie
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password

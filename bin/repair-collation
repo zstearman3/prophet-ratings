@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+APP_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$APP_ROOT"
+
+if [[ $# -gt 0 ]]; then
+  echo "Usage: bin/repair-collation (reindex and refresh mismatched local PostgreSQL databases)"
+  [[ $# -eq 1 && ( "$1" == --help || "$1" == -h ) ]] && exit 0
+  exit 1
+fi
+
+docker info >/dev/null 2>&1 || { echo "Start Docker Desktop, then retry bin/repair-collation." >&2; exit 1; }
+database_running="$(bin/compose ps --status running -q db)"
+cleanup() {
+  local result=$?
+  trap - EXIT INT TERM
+  if [[ -z "$database_running" ]]; then
+    bin/compose stop db || result=1
+  fi
+  exit "$result"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+bin/compose up -d --wait --wait-timeout 60 db
+mismatched_databases="$(bin/compose exec -T db psql -U postgres -d postgres -X -A -t -v ON_ERROR_STOP=1 \
+  -c 'SELECT datname FROM pg_database WHERE datallowconn AND datcollversion IS DISTINCT FROM pg_database_collation_actual_version(oid) ORDER BY datname')"
+if [[ -z "$mismatched_databases" ]]; then
+  echo "Local PostgreSQL collation versions already match."
+  exit 0
+fi
+
+while IFS= read -r database; do
+  quoted_database="${database//\"/\"\"}"
+  echo "Rebuilding indexes in $database..."
+  bin/compose exec -T db psql -U postgres -d "$database" -X -v ON_ERROR_STOP=1 \
+    -c "REINDEX DATABASE \"$quoted_database\""
+  bin/compose exec -T db psql -U postgres -d postgres -X -v ON_ERROR_STOP=1 \
+    -c "ALTER DATABASE \"$quoted_database\" REFRESH COLLATION VERSION"
+done <<< "$mismatched_databases"
+
+echo "Local PostgreSQL collation repair complete."
