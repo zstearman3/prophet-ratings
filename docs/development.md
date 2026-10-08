@@ -326,5 +326,21 @@ runtime rows are excluded by default. Put optional `LOCAL_ADMIN_EMAIL` and
 `LOCAL_ADMIN_PASSWORD` in the gitignored `.env`; the script can create a local
 admin after restore. Read its help for source overrides and `--include-users`.
 It uses `bin/compose` for local operations so it selects the same development
-image/settings. Run `bin/stop` when finished. Production access is not part of
-environment verification or the test suite.
+image/settings. In Docker mode, `LOCAL_DATABASE_URL` is interpreted inside the
+PostgreSQL container (normally `localhost:5432`); Rails commands in the web
+container use the `db` service for localhost/127.0.0.1 targets. The published host
+port (`54320` by default) is only for host clients.
+
+Docker pulls decode the archive with `postgres:17-trixie` client tools before
+stopping services or dropping the local database. Override `RESTORE_CLIENT_IMAGE`
+if the source uses a newer archive format. This client container does not start a
+database or mount the development volume. PostgreSQL 17's generated
+`SET transaction_timeout = 0;` is omitted for compatibility with the local
+PostgreSQL 15 server. Other SQL incompatibilities fail the restore; this is not
+a general major-version downgrade tool. SQL restores use one transaction and stop
+on the first error. Native pulls require compatible `pg_restore` and `psql` tools.
+Failed pulls retain the dump at `DUMP_FILE` (default `tmp/production-db.dump`);
+successful pulls delete it unless `--keep-dump` is supplied. After a failure during
+restore, the recreated database can be empty. Resolve the error before retrying.
+Run `bin/stop` when finished. Production access is not part of environment
+verification or the test suite.
