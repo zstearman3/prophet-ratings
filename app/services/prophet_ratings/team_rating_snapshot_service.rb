@@ -30,9 +30,22 @@ module ProphetRatings
             *TeamRatingSnapshot::STORED_RANKS
           )
 
+          self.class.capture_provenance(snapshot, team_season, ratings_config_version)
+
           snapshot.save!
         end
       end
+    end
+
+    def self.capture_provenance(snapshot, team_season, ratings_config_version)
+      prior = PreseasonPrior.find_by(team_season:, ratings_config_version:)
+      return unless prior
+
+      unless prior.outputs.all? { |stat, value| team_season.public_send(stat) == value }
+        raise ArgumentError, 'Preseason values differ from this captured model; rerun the preseason calculator for this bundle'
+      end
+
+      snapshot.stats['preseason_prior'] = prior.attributes.slice('id', 'inputs', 'outputs', 'created_at')
     end
   end
 end

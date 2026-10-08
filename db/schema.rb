@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_22_000100) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_08_180000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -225,6 +225,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_22_000100) do
     t.index ["game_id"], name: "index_predictions_on_game_id"
     t.index ["home_team_snapshot_id"], name: "index_predictions_on_home_team_snapshot_id"
     t.index ["ratings_config_version_id"], name: "index_predictions_on_ratings_config_version_id"
+  end
+
+  create_table "preseason_priors", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.jsonb "inputs", null: false
+    t.jsonb "outputs", null: false
+    t.bigint "ratings_config_version_id", null: false
+    t.bigint "team_season_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["ratings_config_version_id"], name: "index_preseason_priors_on_ratings_config_version_id"
+    t.index ["team_season_id", "ratings_config_version_id"], name: "index_preseason_priors_on_team_season_and_config", unique: true
+    t.index ["team_season_id"], name: "index_preseason_priors_on_team_season_id"
   end
 
   create_table "ratings_config_versions", force: :cascade do |t|
@@ -493,6 +505,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_22_000100) do
   add_foreign_key "predictions", "ratings_config_versions"
   add_foreign_key "predictions", "team_rating_snapshots", column: "away_team_snapshot_id"
   add_foreign_key "predictions", "team_rating_snapshots", column: "home_team_snapshot_id"
+  add_foreign_key "preseason_priors", "ratings_config_versions"
+  add_foreign_key "preseason_priors", "team_seasons"
   add_foreign_key "team_aliases", "teams"
   add_foreign_key "team_conferences", "conferences"
   add_foreign_key "team_conferences", "seasons", column: "end_season_id"
