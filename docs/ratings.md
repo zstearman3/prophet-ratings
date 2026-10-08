@@ -333,6 +333,22 @@ Snapshots are associated with a `RatingsConfigVersion` produced from the active 
 
 ## Operational safety
 
+Preseason initialization currently writes prior/live offense, defense, pace and
+rating only. It does not publish ranks, snapshots or prediction defaults. Review
+those outputs with the [offseason readiness checklist](offseason.md#readiness-checklist-and-decision-record)
+before declaring a season prediction-ready. Complete publication and preservation
+of zero/one-game team priors await the publishing story; an ordinary rankings run
+is not a safe substitute because the adjustment path initializes all teams to
+season averages. Inputs still depend on mutable prior-season values and profiles;
+frozen input capture and a leakage-safe historical comparison remain pending.
+
+This runbook change introduces no model or config changes. Operators should record
+the bundle name and compare the persisted `RatingsConfigVersion#config` with the
+deployed YAML. Lookup uses bundle name, not a content hash, and reusing a name does
+not update an existing stored configuration. Changed assumptions need a new bundle
+name to keep old outputs understandable. Missing history falls back to configured
+baselines; fallback confidence and unknown venues are not evidence of calibration.
+
 Season preparation/bootstrap never resets live ratings or deletes predictions or
 snapshots. Activation is a separate atomic operation. Non-deleting
 season:resume_ratings is capped at the Eastern schedule date and ignores future

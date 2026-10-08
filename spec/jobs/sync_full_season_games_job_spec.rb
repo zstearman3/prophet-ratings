@@ -68,4 +68,28 @@ RSpec.describe SyncFullSeasonGamesJob do
 
     expect(RepairDuplicateGamesJob).to have_received(:perform_later).with(season_id: season.id, apply: true)
   end
+
+  it 'logs an exhausted date, continues, and lets an explicit recovery revisit that date' do
+    first_date = season.start_date
+    failed_service = instance_double(Ingestion::GamesIngestionService)
+    allow(failed_service).to receive(:call).and_raise('source unavailable')
+    allow(Ingestion::GamesIngestionService).to receive(:new) do |date:|
+      date == first_date ? failed_service : service
+    end
+    errors = []
+    allow(Rails.logger).to receive(:error) { |&message| errors << message.call }
+    job = described_class.new
+    allow(job).to receive(:sleep)
+
+    job.perform(season, start_date: first_date, end_date: first_date + 1.day)
+
+    expect(failed_service).to have_received(:call).exactly(6).times
+    expect(service).to have_received(:call).once
+    expect(errors).to include(/#{first_date}.*source unavailable/)
+
+    allow(Ingestion::GamesIngestionService).to receive(:new).and_return(service)
+    job.perform(season, start_date: first_date, end_date: first_date, resume: false)
+    expect(Ingestion::GamesIngestionService).to have_received(:new).with(date: first_date).exactly(7).times
+    expect(service).to have_received(:call).twice
+  end
 end

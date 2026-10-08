@@ -2,7 +2,9 @@
 
 This document explains how Prophet Ratings ingests college basketball data into the Rails app. It is intended for agents and contributors working on scraping, imports, game finalization, ratings backfills, or scheduled sync jobs.
 
-For the offseason sequence that creates future seasons, applies conference realignment, and then bootstraps game/rating workflows, see [Offseason Operations](offseason.md).
+For separate preparation, conference review, initialization, schedule refresh,
+activation and recovery, see [Offseason Operations](offseason.md), including its
+[readiness checklist](offseason.md#readiness-checklist-and-decision-record).
 
 ## High-level flow
 
@@ -56,7 +58,9 @@ Default behavior:
 SyncNightlyGamesJob.perform_later
 ```
 
-It resolves the season from the provided `season_id`, or falls back to `Season.current || Season.last`.
+It resolves the season from the provided `season_id`, or uses `Season.current`.
+With no current season it returns without syncing. Pass an explicit season ID
+and `enqueue_rankings: false` when refreshing an inactive future season.
 
 The default sync window includes:
 
@@ -98,7 +102,9 @@ After syncing, it can enqueue:
 UpdateRankingsJob.perform_later(season.id)
 ```
 
-Use this when trying to catch up from whatever has already been imported.
+This is a legacy resume path. A future imported game can skip earlier historical
+gaps; use an explicit date window with `season:sync_games SYNC_RESUME=false` for
+recovery rather than treating the latest game as proof of completeness.
 
 ### `SyncFullSeasonGamesJob`
 
@@ -127,7 +133,7 @@ Optional parameters:
 
 Date range:
 
-- End is capped at the earlier of the requested end date, season end date, and yesterday in the Eastern schedule-date calendar.
+- End defaults to season end and is capped at yesterday in the Eastern schedule-date calendar. An explicit end override is not independently clipped to season end; keep it within the reviewed season boundaries.
 - Start is capped at no earlier than the season start date.
 - If `resume: true`, start defaults to the latest imported game date or season start.
 
@@ -136,7 +142,10 @@ Each date is retried up to five times with exponential backoff:
 - Base delay: 5 seconds
 - Max retries: 5
 
-This job is used by season bootstrap and import rake tasks.
+This job is used by `season:sync_games` and import rake tasks, not bootstrap.
+Exhausted per-date retries are logged and the loop continues; a completed job can
+still contain failed dates. Record those dates and rerun a bounded window with
+resume disabled. See the offseason checklist for job-outcome review.
 
 ### `SyncTeamGamesJob`
 
@@ -370,7 +379,7 @@ bin/rails import:base
 In Docker/local development:
 
 ```bash
-docker compose exec web bin/rails import:base
+bin/compose exec web bin/rails import:base
 ```
 
 ## Rake task workflows
@@ -507,34 +516,34 @@ Use this carefully because it deletes records.
 From the host, using the local Docker setup:
 
 ```bash
-docker compose exec web bin/rails import:base
+bin/compose exec web bin/rails import:base
 ```
 
 Sync all seasons:
 
 ```bash
-docker compose exec web bin/rails import:games
+bin/compose exec web bin/rails import:games
 ```
 
 Prepare and review an explicit target season without activating it:
 
 ```bash
-docker compose exec web bin/rails season:bootstrap YEAR=2026
+bin/compose exec web bin/rails season:bootstrap YEAR=2026
 ```
 
 Sync a bounded season window:
 
 ```bash
-docker compose exec web bin/rails season:sync_games YEAR=2026 SYNC_START_DATE=2025-11-01 SYNC_END_DATE=2025-11-15
+bin/compose exec web bin/rails season:sync_games YEAR=2026 SYNC_START_DATE=2025-11-01 SYNC_END_DATE=2025-11-15
 ```
 
-Run the project setup script:
+The broad legacy data setup script is a separate, explicit import/backfill:
 
 ```bash
-docker compose exec web bin/setup_data
+bin/compose exec web bin/setup_data
 ```
 
-`bin/setup_data` runs:
+`bin/setup_data` is not a routine rollover or verification command. It runs:
 
 1. `bin/rails db:prepare`
 2. `bin/rails import:base`
