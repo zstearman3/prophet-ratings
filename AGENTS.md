@@ -339,6 +339,19 @@ when stopping services. See `docs/development.md` for first-time setup and detai
 
 If a command fails because dependencies or environment variables are missing, report that clearly instead of guessing.
 
+### Agent worktrees and Docker preference
+
+The maintainer normally develops in the main checkout. Worktrees are primarily for agents; agent setup must preserve the main checkout's development services, database, ports, and local configuration.
+
+- Read `docs/development.md` before preparing a worktree. Prefer Docker for application development, targeted specs (`bin/test`), and real-solver checks. Do not assume ignored files such as `.bundle/config`, environment files, or credentials are present in a new worktree; do not copy secrets automatically.
+- Before starting development services in a worktree, choose a distinct `COMPOSE_PROJECT_NAME`, `DEV_PORT`, and `DEV_DB_PORT`, and use them consistently for startup, migration, Compose commands, and teardown. Never let worktree cleanup stop the maintainer's stack or delete its volumes. Tests already use disposable projects and do not need development services.
+- Account for the shared `prophet-ratings-dev` image when branches have different dependencies; avoid concurrent builds/runs that could use another branch's image. Keep full-suite runs sequential on this laptop.
+- The current hook suites and `bin/check` still use native Ruby. Until Docker verification tooling is implemented, use the documented `bin/setup` for missing native hook setup; it excludes the optional `charts` group. Diagnose missing Bundler configuration before treating optional chart gems as required. Report any remaining prerequisite or permission blocker without bypassing verification.
+
+Recommended developer-workflow follow-up, when explicitly tasked: implement Docker-based hook/static-check execution first, then a repeatable agent-worktree setup command with isolated development projects, ports, volumes, and dependency images. Containerized hooks must support worktree Git metadata outside the checkout; keep Docker/database orchestration on the host rather than mounting the Docker socket into the checker. Preserve all existing checks and update the required commands here, `.overcommit.yml`, and `docs/development.md` together. These tools are not implemented by this guidance, and unrelated tickets do not authorize building them.
+
+The skill-creator validator is separate from Rails development. Run it in an environment with PyYAML (a dedicated environment/container is preferred); do not add skill-only dependencies to the application image or claim validation passed when its prerequisites are missing.
+
 ---
 
 ## Environment / Secrets

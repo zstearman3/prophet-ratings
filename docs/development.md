@@ -220,6 +220,10 @@ Commit Gemfile and Gemfile.lock together. The cached Docker build uses the lockf
 in frozen mode and fails if they disagree. Do not install gems interactively into
 a running app container: those changes disappear at teardown.
 
+JSON is constrained to version 2 because the current Rails 8.1 JSON decoder
+passes a positional options hash that JSON 3 rejects. Keep this constraint until
+the Rails decoder supports JSON 3; otherwise JSONB persistence and specs fail.
+
 After editing `package.json`:
 
 ```bash
