@@ -30,7 +30,7 @@ module ProphetRatings
 
     private
 
-    # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    # rubocop:disable-next Metrics/AbcSize, Metrics/MethodLength
     def recalculate_all_aggregate_ratings
       team_seasons = TeamSeason.where(season: @season).to_a
       ratings_config = Rails.application.config_for(:ratings).deep_symbolize_keys
@@ -106,17 +106,15 @@ module ProphetRatings
         ]
       }
     end
-    # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
 
     def run_least_squares_adjustments(as_of: nil)
       # Set default values for adj efficiency/pace before solving
-      # rubocop:disable Rails/SkipsModelValidations
+      # rubocop:disable-next Rails/SkipsModelValidations
       TeamSeason.where(season: @season).update_all(
         adj_offensive_efficiency: @season.average_efficiency,
         adj_defensive_efficiency: @season.average_efficiency,
         adj_pace: @season.average_pace
       )
-      # rubocop:enable Rails/SkipsModelValidations
 
       ADJUSTED_STATS.each do |raw_stat, (adj_stat, adj_stat_allowed)|
         ProphetRatings::AdjustedStatCalculator.new(

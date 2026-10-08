@@ -72,13 +72,12 @@ class TeamGame < ApplicationRecord
 
   has_one :season, through: :game
 
-  # rubocop:disable Rails/HasManyOrHasOneDependent, Rails/InverseOf
+  # rubocop:disable-next Rails/HasManyOrHasOneDependent, Rails/InverseOf
   has_one :opponent_game, lambda { |g|
                             unscope(where: :team_game_id)
                               .where(game_id: g.game_id)
                               .where.not(id: g.id)
                           }, class_name: 'TeamGame'
-  # rubocop:enable Rails/HasManyOrHasOneDependent, Rails/InverseOf
   #
   ## Alias for naming consistency in analytics
   alias_attribute :offensive_efficiency, :offensive_rating

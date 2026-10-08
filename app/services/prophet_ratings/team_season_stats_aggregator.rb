@@ -44,9 +44,8 @@ module ProphetRatings
         aggregates.merge!(calculate_home_advantages(team_season))
         aggregates.merge!(calculate_wins_and_losses(team_games))
 
-        # rubocop:disable Rails/SkipsModelValidations
+        # rubocop:disable-next Rails/SkipsModelValidations
         team_season.update_columns(aggregates) if aggregates.any?
-        # rubocop:enable Rails/SkipsModelValidations
       end
     end
 
