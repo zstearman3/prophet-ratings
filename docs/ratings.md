@@ -207,8 +207,11 @@ New rating snapshots embed the matching capture's identity, inputs, outputs, and
 capture time in `stats.preseason_prior`. A snapshot without that metadata is a
 legacy/uncaptured output. Publication rejects a mismatch between a matching
 capture and live preseason fields, preventing model switches or manual edits
-from attaching incorrect provenance. Rerun the preseason calculator for the
-intended bundle to apply its capture before retrying. In-season adjusted values remain distinct from the
+from attaching incorrect provenance. Snapshot publication is atomic across the
+season: a failure rolls back earlier inserts and updates for that run, preserving
+existing snapshots even when an enclosing caller rescues the error. Rerun the
+preseason calculator for the intended bundle to apply its capture before retrying.
+In-season adjusted values remain distinct from the
 captured preseason outputs. Deployment requires the additive `preseason_priors`
 migration before invoking the calculator or snapshot writer; no existing
 historical capture is fabricated by the migration.

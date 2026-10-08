@@ -38,4 +38,34 @@ RSpec.describe ProphetRatings::TeamRatingSnapshotService do
     service.call
     expect(TeamRatingSnapshot.last.stats.dig('preseason_prior', 'outputs', 'preseason_adj_offensive_efficiency')).to eq(105.5)
   end
+
+  context 'when a later team has mismatched provenance' do
+    let(:season) { create(:season, :current) }
+    let!(:first_team_season) { create(:team_season, season:) }
+    let!(:later_team_season) { create(:team_season, season:) }
+    let(:service) { described_class.new(season:, as_of: season.start_date - 1) }
+
+    before { ProphetRatings::PreseasonRatingsCalculator.new(season).call }
+
+    it 'rolls back earlier inserts and permits a complete retry' do
+      later_team_season.update!(preseason_adj_offensive_efficiency: 999)
+      expect { service.call }.to raise_error(ArgumentError, /rerun the preseason calculator/)
+      expect(TeamRatingSnapshot.count).to eq(0)
+      ProphetRatings::PreseasonRatingsCalculator.new(season).call
+      service.call
+      expect(TeamRatingSnapshot.pluck(:team_season_id)).to contain_exactly(first_team_season.id, later_team_season.id)
+    end
+
+    it 'preserves existing snapshots and unrelated dates even if an outer transaction catches the failure' do
+      service.call
+      described_class.new(season:, as_of: season.start_date - 2).call
+      original = TeamRatingSnapshot.order(:id).map(&:attributes)
+      first_team_season.update!(adj_offensive_efficiency: 120)
+      later_team_season.update!(preseason_adj_offensive_efficiency: 999)
+      TeamRatingSnapshot.transaction(requires_new: true) do
+        expect { service.call }.to raise_error(ArgumentError, /rerun the preseason calculator/)
+        expect(TeamRatingSnapshot.order(:id).map(&:attributes)).to eq(original)
+      end
+    end
+  end
 end
