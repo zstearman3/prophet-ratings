@@ -3,6 +3,33 @@
 require 'rails_helper'
 
 RSpec.describe ProphetRatings::AdjustedStatCalculator, type: :service do
+  describe 'preseason blending limits' do
+    let(:season) { create(:season, :current) }
+
+    def blended_at(days, preseason_value = 120)
+      calculator = described_class.new(
+        season:, raw_stat: :offensive_efficiency, adj_stat: :adj_offensive_efficiency,
+        adj_stat_allowed: :adj_defensive_efficiency, as_of: season.start_date + days
+      )
+      calculator.send(:blend_with_preseason, preseason_value, 100)
+    end
+
+    it 'keeps the full prior before and at season start without extrapolation' do
+      expect(blended_at(-10)).to eq(120)
+      expect(blended_at(0)).to eq(120)
+    end
+
+    it 'retains the documented calendar decay and floor pending evaluation' do
+      expect(blended_at(20)).to eq(110)
+      expect(blended_at(40)).to eq(102)
+      expect(blended_at(100)).to eq(102)
+    end
+
+    it 'uses observed ratings when the prior is missing' do
+      expect(blended_at(20, nil)).to eq(100)
+    end
+  end
+
   describe '#call' do
     let(:season) { create(:season, :current) }
     let!(:team_seasons) { create_three_team_round_robin(season:, stat: :effective_fg_percentage) }

@@ -65,6 +65,22 @@ RSpec.describe ProphetRatings::PreseasonRatingsCalculator, type: :service do
     it 'blends pace from prior season without offseason pace adjustment' do
       expect(team_season.preseason_adj_pace).to eq(67.3)
     end
+
+    it 'produces the same values on repeated runs' do
+      keys = %w[preseason_adj_offensive_efficiency preseason_adj_defensive_efficiency preseason_adj_pace]
+      expected = team_season.attributes.slice(*keys)
+      described_class.new(season).call
+
+      expect(team_season.reload.attributes.slice(*expected.keys)).to eq(expected)
+    end
+
+    it 'uses the prior-season baseline for a team with missing history' do
+      previous_team_season.update!(adj_offensive_efficiency: nil)
+      offseason_profile.destroy!
+      described_class.new(season).call
+
+      expect(team_season.reload.preseason_adj_offensive_efficiency).to eq(107)
+    end
   end
 
   context 'when there is no previous season' do
