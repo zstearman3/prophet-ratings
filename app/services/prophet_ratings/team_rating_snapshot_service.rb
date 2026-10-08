@@ -8,31 +8,47 @@ module ProphetRatings
     end
 
     def call
-      current_config = Rails.application.config_for(:ratings).deep_symbolize_keys
-      ratings_config_version = RatingsConfigVersion.find_or_create_by_config(current_config)
+      # A savepoint also protects callers that rescue a mismatch inside their own transaction.
+      TeamRatingSnapshot.transaction(requires_new: true) do
+        current_config = Rails.application.config_for(:ratings).deep_symbolize_keys
+        ratings_config_version = RatingsConfigVersion.find_or_create_by_config(current_config)
 
-      TeamSeason.where(season: @season).find_each do |team_season|
-        TeamRatingSnapshot.find_or_initialize_by(
-          team_id: team_season.team_id,
-          season_id: @season.id,
-          team_season_id: team_season.id,
-          snapshot_date: @as_of,
-          ratings_config_version:
-        ).tap do |snapshot|
-          snapshot.rating = team_season.rating
-          snapshot.adj_offensive_efficiency = team_season.adj_offensive_efficiency
-          snapshot.adj_defensive_efficiency = team_season.adj_defensive_efficiency
-          snapshot.adj_pace = team_season.adj_pace
+        TeamSeason.where(season: @season).find_each do |team_season|
+          TeamRatingSnapshot.find_or_initialize_by(
+            team_id: team_season.team_id,
+            season_id: @season.id,
+            team_season_id: team_season.id,
+            snapshot_date: @as_of,
+            ratings_config_version:
+          ).tap do |snapshot|
+            snapshot.rating = team_season.rating
+            snapshot.adj_offensive_efficiency = team_season.adj_offensive_efficiency
+            snapshot.adj_defensive_efficiency = team_season.adj_defensive_efficiency
+            snapshot.adj_pace = team_season.adj_pace
 
-          # All other adjusted stats into stats column
-          snapshot.stats = team_season.attributes.slice(
-            *TeamRatingSnapshot::STORED_STATS,
-            *TeamRatingSnapshot::STORED_RANKS
-          )
+            # All other adjusted stats into stats column
+            snapshot.stats = team_season.attributes.slice(
+              *TeamRatingSnapshot::STORED_STATS,
+              *TeamRatingSnapshot::STORED_RANKS
+            )
 
-          snapshot.save!
+            self.class.capture_provenance(snapshot, team_season, ratings_config_version)
+
+            snapshot.save!
+          end
         end
       end
+    end
+
+    def self.capture_provenance(snapshot, team_season, ratings_config_version)
+      prior = PreseasonPrior.find_by(team_season:, ratings_config_version:)
+      return unless prior
+
+      unless prior.outputs.all? { |stat, value| team_season.public_send(stat) == value }
+        raise ArgumentError, 'Preseason values differ from this captured model; rerun the preseason calculator for this bundle'
+      end
+
+      snapshot.stats['preseason_prior'] = prior.attributes.slice('id', 'inputs', 'outputs', 'created_at')
     end
   end
 end

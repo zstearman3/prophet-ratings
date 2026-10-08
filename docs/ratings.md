@@ -186,10 +186,35 @@ compatible with existing finite inputs inside the bounds. Partial profiles now
 use only their supplied components, replacing the old assumed +3 recruitment
 and -3 attrition contributions.
 
-Repeated calculation is deterministic for unchanged stored history and profiles.
-Those source records remain mutable; immutable input capture belongs to the
-reproducibility story. The new bundle distinguishes changed assumptions in
-snapshots without rewriting old config versions or historical outputs.
+The `v1.4-captured-priors` bundle retains these coefficients and freezes inputs
+once per team-season/configuration in `PreseasonPrior`. Captures contain source
+identities and timestamps, stored source attributes, per-stat baseline/previous
+values, normalized profile components, the full ratings configuration, and
+calculated outputs rounded to the published three-decimal precision. Invalid legacy profile components retain their original
+representation in source attributes but contribute zero to calculations.
+`PreseasonPriorFormula` replays this contract without reading mutable sources.
+
+The calculator locks the target season and captures/updates all its priors in one
+transaction; partial failure rolls back the entire publication. Repeated runs
+reuse captured outputs even if source history, season averages, or profiles
+change. Corrected inputs require a new `bundle_name`; existing captures are
+read-only through Active Record, and existing configuration names/values cannot
+be edited or silently reused for changed assumptions. This is application-level
+immutability, not a database guarantee against direct SQL. Old configuration
+versions and snapshots are not rewritten or retroactively labeled reproducible.
+
+New rating snapshots embed the matching capture's identity, inputs, outputs, and
+capture time in `stats.preseason_prior`. A snapshot without that metadata is a
+legacy/uncaptured output. Publication rejects a mismatch between a matching
+capture and live preseason fields, preventing model switches or manual edits
+from attaching incorrect provenance. Snapshot publication is atomic across the
+season: a failure rolls back earlier inserts and updates for that run, preserving
+existing snapshots even when an enclosing caller rescues the error. Rerun the
+preseason calculator for the intended bundle to apply its capture before retrying.
+In-season adjusted values remain distinct from the
+captured preseason outputs. Deployment requires the additive `preseason_priors`
+migration before invoking the calculator or snapshot writer; no existing
+historical capture is fabricated by the migration.
 
 Some adjusted values can blend with preseason values on `TeamSeason`:
 
@@ -235,9 +260,10 @@ The existing evaluator's win accuracy and plot do not provide a leakage-safe
 opening-month Brier score, log loss, or reliability report. The prediction builder
 allows snapshots on the game's schedule date, and ratings backfills calculate
 that day's ratings before predictions, potentially including the result being
-predicted. The evaluation story must use strictly pregame inputs and separate
-tuning/evaluation seasons before selecting coefficients or uncertainty changes.
-No historical comparison, import, or backfill was run for this implementation.
+predicted. The separate read-only `ratings:compare_preseason` benchmark avoids these paths;
+see [the comparison report](preseason-comparison.md). It retains the current
+probability arithmetic and does not establish confidence calibration or justify
+changes to the in-season transition. No import or ratings backfill is required.
 
 ## Home court adjustment
 
@@ -329,7 +355,7 @@ The snapshot stores top-level columns for:
 
 Other adjusted stats, volatility fields, home-court fields, and ranks are copied into the snapshot `stats` JSONB column.
 
-Snapshots are associated with a `RatingsConfigVersion` produced from the active `config/ratings.yml` bundle. The lookup is based on `bundle_name`, so changing rating assumptions should generally include a new bundle name.
+Snapshots are associated with a `RatingsConfigVersion` produced from the active `config/ratings.yml` bundle. The lookup is based on `bundle_name`. Reusing an existing name with different configuration raises an error; changed assumptions or corrected captured prior inputs require a new bundle name.
 
 ## Operational safety
 
