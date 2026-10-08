@@ -110,7 +110,7 @@ For each finalized game, the calculator creates two observations:
 For each observation:
 
 - The observed value comes from the relevant `TeamGame` stat.
-- For `possessions`, pace is normalized as `(game.possessions * 40.0) / game.minutes`.
+- For `possessions`, pace is normalized through `Game#pace` to possessions per 40 minutes. Games with missing possessions or missing/nonpositive minutes are skipped by the existing blank-observation check.
 - Home-court adjustment is applied only for stats listed in `ratings.yml` under `home_court_adjusted_stats`, and only for non-neutral games.
 - The target value is `observed - home_court - season_average`.
 - The matrix row has one coefficient for the offensive team and one for the defensive/opponent team.

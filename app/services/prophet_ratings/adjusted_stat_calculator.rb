@@ -104,8 +104,7 @@ module ProphetRatings
         game = team_game.game
         return nil unless game
 
-        scaled_possessions = game.possessions&.*(40.0)
-        return scaled_possessions / game.minutes
+        return game.pace
       end
 
       team_game.send(raw_stat)

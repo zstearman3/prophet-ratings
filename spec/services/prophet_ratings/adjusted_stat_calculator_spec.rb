@@ -3,6 +3,35 @@
 require 'rails_helper'
 
 RSpec.describe ProphetRatings::AdjustedStatCalculator, type: :service do
+  describe 'pace observations' do
+    let(:season) { create(:season, :current) }
+    let(:calculator) do
+      described_class.new(season:, raw_stat: :possessions, adj_stat: :adj_pace, adj_stat_allowed: :adj_pace_allowed)
+    end
+
+    [[70, 40, 70.0], [90, 45, 80.0], [nil, 40, nil], [70, nil, nil], [70, 0, nil], [70, -40, nil]].each do |possessions, minutes, expected|
+      it "returns #{expected.inspect} for #{possessions.inspect} possessions over #{minutes.inspect} minutes" do
+        team_game = build(:team_game, game: build(:game, possessions:, minutes:))
+
+        expect(calculator.send(:stat_value_for_game, team_game)).to eq(expected)
+      end
+    end
+
+    it 'skips incomplete games and normalizes regulation and overtime pace in the matrix' do
+      team_seasons = create_three_team_round_robin(season:, stat: :effective_fg_percentage)
+      games = Game.where(season:).order(:start_time).to_a
+      games[0].update!(possessions: 80, minutes: 40)
+      games[1].update!(possessions: 90, minutes: 45)
+      games[2].update!(possessions: nil, minutes: 40)
+      team_index = team_seasons.map(&:team_id).each_with_index.to_h
+
+      _rows, observations, _weights, metadata = calculator.send(:build_matrix_components, team_index, 3, 80.0)
+
+      expect(metadata.pluck(:game_id)).to contain_exactly(games[0].id, games[0].id, games[1].id, games[1].id)
+      expect(observations).to contain_exactly(0.0, 0.0, 0.0, 0.0, 0.0)
+    end
+  end
+
   describe 'preseason blending limits' do
     let(:season) { create(:season, :current) }
 
