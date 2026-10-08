@@ -39,7 +39,7 @@ module ProphetRatings
     private
 
     def validate_publication
-      return unless @season.games.final.exists? ||
+      return unless @season.current? || @season.games.final.exists? ||
                     @season.team_rating_snapshots.where.not(snapshot_date: @season.start_date - 1.day).exists? ||
                     @season.team_seasons.any? { |team_season| self.class.changed_ratings?(team_season) }
 
@@ -47,11 +47,29 @@ module ProphetRatings
     end
 
     def publish
-      config = Rails.application.config_for(:ratings).deep_symbolize_keys.fetch(:baseline_volatility)
-      @season.update!(average_efficiency: @season.team_seasons.average(:adj_offensive_efficiency),
-                      efficiency_std_deviation: config.fetch(:efficiency_volatility),
-                      pace_std_deviation: config.fetch(:pace_volatility))
+      @season.assign_attributes(publication_baselines)
+      validate_prediction_baselines
+      @season.save!
       OverallRatingsCalculator.new(@season).publish(as_of: @season.start_date - 1.day)
+    end
+
+    def publication_baselines
+      config = Rails.application.config_for(:ratings).deep_symbolize_keys.fetch(:baseline_volatility)
+      { average_efficiency: @season.team_seasons.average(:adj_offensive_efficiency),
+        average_pace: preseason_average_pace,
+        efficiency_std_deviation: config.fetch(:efficiency_volatility), pace_std_deviation: config.fetch(:pace_volatility) }
+    end
+
+    def preseason_average_pace
+      @season.team_seasons.average(:adj_pace)
+    end
+
+    def validate_prediction_baselines
+      return unless @season.predictions.exists? &&
+                    @season.changed_attribute_names_to_save.intersect?(%w[average_efficiency average_pace])
+
+      raise ArgumentError, 'Saved predictions depend on existing season baselines; ' \
+                           'review them before changing preseason coverage or inputs.'
     end
 
     def initialize_ratings

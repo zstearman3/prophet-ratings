@@ -95,6 +95,37 @@ RSpec.describe ProphetRatings::PreseasonInitializer do
     expect(TeamRatingSnapshot.count).to eq(2)
   end
 
+  it 'rejects a direct publication call after activation without changing outputs' do
+    initializer.call
+    season.set_current!
+    original = TeamRatingSnapshot.order(:id).map(&:attributes)
+    expect { initializer.call }.to raise_error(ArgumentError, /in-season outputs/)
+    expect(TeamRatingSnapshot.order(:id).map(&:attributes)).to eq(original)
+    expect(season.reload).to be_current
+  end
+
+  %i[efficiency pace].each do |baseline|
+    it "rejects a repeat that would change the #{baseline} baseline with saved predictions and rolls back new captures" do
+      game = scheduled_game
+      initializer.call
+      prediction = ProphetRatings::GamePredictionBuilder.new(game).call
+      original = [season.reload.attributes, prediction.attributes, TeamRatingSnapshot.order(:id).map(&:attributes)]
+      new_team = create(:team_season, season:)
+      if baseline == :efficiency
+        create(:team_offseason_profile, team_season: new_team, manual_adjustment: 3, recruiting_score: nil, returning_minutes_pct: nil)
+      else
+        previous = create(:season, year: season.year - 1, average_pace: 69.5, average_efficiency: 105.5,
+                                   avg_adj_offensive_efficiency: 105.5, avg_adj_defensive_efficiency: 105.5)
+        create(:team_season, season: previous, team: new_team.team,
+                             adj_offensive_efficiency: 105.5, adj_defensive_efficiency: 105.5, adj_pace: 80.5)
+      end
+      expect { initializer.call }.to raise_error(ArgumentError, /Saved predictions/)
+      expect([season.reload.attributes, prediction.reload.attributes, TeamRatingSnapshot.order(:id).map(&:attributes)]).to eq(original)
+      expect(new_team.reload.adj_pace).to be_nil
+      expect(PreseasonPrior.count).to eq(2)
+    end
+  end
+
   it 'rejects publication after live values change without modifying existing outputs' do
     initializer.call
     home.update!(adj_offensive_efficiency: 120)

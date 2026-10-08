@@ -130,7 +130,9 @@ Five Factors remain unranked rather than receiving invented values.
 A safe repeat reuses captures and snapshot identities, and can initialize newly
 prepared teams. Current-season status, final games, snapshots on other dates or
 live core ratings differing from their preseason values cause a clear refusal.
-Scheduled predictions alone do not prevent a repeat. A failed publication rolls
+Scheduled predictions permit an unchanged repeat. A repeat that would change
+the efficiency or pace baseline while saved predictions exist is refused and
+rolled back; review dependent predictions before changing coverage or inputs. A failed publication rolls
 back all writes and can be retried. Review team coverage and season boundaries
 before activation; changing boundaries after publication requires explicit review.
 
