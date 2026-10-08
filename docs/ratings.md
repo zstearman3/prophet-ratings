@@ -29,7 +29,7 @@ The calculator accepts an `as_of:` cutoff. By default, it uses the earlier of `T
 
 The adjusted-ratings step only runs when both are true:
 
-- `as_of.to_date - season.start_date > 14`
+- `as_of.to_date - season.start_date > preseason.adjustment_start_after_days` (currently 14)
 - At least two teams have at least two finalized team games as of the cutoff
 
 Snapshots are still written even if adjusted ratings are skipped.
@@ -151,6 +151,46 @@ Newer games receive more weight, while older games decay toward the minimum.
 
 ## Preseason blending
 
+### Prior and optional profiles
+
+The `v1.3-preseason-safety` bundle makes prior assumptions explicit under
+`preseason` in `config/ratings.yml`. Each stat retains 85% of the previous
+season's team adjusted value and 15% of its previous-season baseline. Offense
+and defense use their respective stored adjusted season averages, falling back
+to the previous season's raw average efficiency, then 105.5. Pace uses the
+previous season's average pace, then 69.5. Missing team history for an individual
+stat uses that stat's baseline entirely. Only the immediately previous season
+is used; multiyear weighting and stronger regression await the linked evaluation
+story's comparison rather than assuming accuracy gains.
+
+Optional `TeamOffseasonProfile` effects retain the existing per-side units:
+`recruiting_score * 0.1 - 5 * (1 - returning_minutes_pct) + manual_adjustment`.
+Recruiting score is an optional non-negative finite score in the existing local
+scale, not a class rank or a standardized provider metric. Returning minutes
+must be a fraction from 0 to 1 (80% is stored as 0.8). Manual adjustment is a
+finite efficiency adjustment in points per 100 possessions **per side**.
+Each missing component contributes zero; an empty profile equals no profile.
+Unused class rank, coaching change, lost starters and returning BPM are not
+model evidence. Legacy non-finite/negative recruiting scores and invalid
+returning fractions are ignored during calculation; new invalid values fail
+model validation.
+
+The combined profile adjustment is clamped to +/-5 per side, added to offense
+and subtracted from defense. Its maximum net-rating effect is therefore +/-10
+points per 100 possessions. This cap is a safety bound using the existing full
+attrition magnitude, not a fitted coefficient or evidence of predictive skill.
+For example, score 40, returning fraction 0.8, and manual adjustment +1 give
+`4 - 1 + 1 = 4` per side and +8 net rating. A missing profile gives zero;
+a score of one million is bounded to +5 per side. Profile units and signs remain
+compatible with existing finite inputs inside the bounds. Partial profiles now
+use only their supplied components, replacing the old assumed +3 recruitment
+and -3 attrition contributions.
+
+Repeated calculation is deterministic for unchanged stored history and profiles.
+Those source records remain mutable; immutable input capture belongs to the
+reproducibility story. The new bundle distinguishes changed assumptions in
+snapshots without rewriting old config versions or historical outputs.
+
 Some adjusted values can blend with preseason values on `TeamSeason`:
 
 - `preseason_adj_offensive_efficiency`
@@ -165,11 +205,39 @@ The preseason weight decays linearly from season start using:
 Formula:
 
 ```text
+days_since_start = max(as_of_date - start_date, 0)
 weight = max(1.0 - days_since_start / preseason_decay_days, min_preseason_weight)
 blended = weight * preseason_value + (1 - weight) * observed_adjusted_value
 ```
 
 If the preseason value is blank, the observed adjusted value is used directly.
+Clamping elapsed days to zero prevents a weight above 1 before season start.
+With the retained 40-day decay and 10% floor, a prior of 120 and observed value
+100 produce 120 at/before opening day, 110 at day 20, and 102 from day 36 onward.
+The two-week gate, two-game qualification, calendar decay and permanent floor
+remain baseline choices pending comparison with game-count decay. Synthetic
+checks establish arithmetic and bounds, not calibration or improved accuracy.
+
+### Opening-period uncertainty assessment
+
+The configured efficiency volatility fallback remains 11.5 and pace fallback
+4.5. Aggregation uses the efficiency baseline with fewer than four residuals,
+then blends empirical volatility toward it. `VolatilityCalculator` falls back
+to mutable season deviations when snapshot volatility is absent. Equal
+volatilities yield a `High` confidence label under the existing gap rule even
+when both are defaults: this label is not evidence of opening-period
+calibration. `GamePredictor` also scales score volatility by pace squared before
+combining standard deviations; its dimensional interpretation needs validation
+in the comparison before changing probabilities. No calibration improvement or
+empirical confidence claim is established by this safety change.
+
+The existing evaluator's win accuracy and plot do not provide a leakage-safe
+opening-month Brier score, log loss, or reliability report. The prediction builder
+allows snapshots on the game's schedule date, and ratings backfills calculate
+that day's ratings before predictions, potentially including the result being
+predicted. The evaluation story must use strictly pregame inputs and separate
+tuning/evaluation seasons before selecting coefficients or uncertainty changes.
+No historical comparison, import, or backfill was run for this implementation.
 
 ## Home court adjustment
 

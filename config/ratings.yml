@@ -1,5 +1,14 @@
 default: &default
-  bundle_name: "v1.2-default"
+  bundle_name: "v1.3-preseason-safety"
+  preseason:
+    previous_season_weight: 0.85
+    fallback_efficiency: 105.5
+    fallback_pace: 69.5
+    adjustment_start_after_days: 14
+    profile:
+      recruiting_score_multiplier: 0.1
+      attrition_multiplier: 5.0
+      max_efficiency_adjustment: 5.0
   weighting:
     recency_decay_days: 60.0
     min_recency_weight: 0.75

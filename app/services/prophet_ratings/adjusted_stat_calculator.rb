@@ -138,7 +138,7 @@ module ProphetRatings
     # @return [Float] The preseason weight, between the configured minimum and 1.0.
     def preseason_weight
       start_date = season.start_date
-      days_since_start = (as_of.to_date - start_date).to_i
+      days_since_start = [(as_of.to_date - start_date).to_i, 0].max
       decay_days = RATINGS_CONFIG[:weighting][:preseason_decay_days] || 30
       min_weight = RATINGS_CONFIG[:weighting][:min_preseason_weight] || 0.0
       [1.0 - (days_since_start.to_f / decay_days), min_weight].max.round(4)

@@ -19,7 +19,8 @@ module ProphetRatings
     def call(as_of: [Time.current, Season.current.end_date].min)
       TeamSeasonStatsAggregator.new(season: @season, as_of:).run
       @season.update_average_ratings
-      if (as_of.to_date - @season.start_date) > 14 && enough_finalized_data_for_adjustments?(as_of:)
+      adjustment_start = Rails.application.config_for(:ratings).dig(:preseason, :adjustment_start_after_days)
+      if (as_of.to_date - @season.start_date) > adjustment_start && enough_finalized_data_for_adjustments?(as_of:)
         run_least_squares_adjustments(as_of:)
         recalculate_all_aggregate_ratings
       end
