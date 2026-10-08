@@ -399,41 +399,23 @@ bin/rails import:games
 
 File: `lib/tasks/season_bootstrap.rake`
 
-Purpose: create/update a season, ensure team seasons exist, align conference
-memberships, optionally sync games, optionally dedupe, and optionally run ratings.
-
-After `SeasonPreparer`, bootstrap runs `SeasonConferenceAlignment` before making
-the season current or starting ratings config/preseason/game/dedupe/rating work.
-Source failures or review-required suggestions stop those downstream operations.
-The season shell remains prepared; safe membership changes may already be saved.
-
-Default year is `2026`.
-
-Example:
+Purpose: repeat preparation and conference review without activating or changing
+rating/prediction outputs. YEAR is required; existing dates are preserved unless
+START_DATE or END_DATE is supplied. Missing TeamSeason rows are created.
 
 ```bash
-YEAR=2026 bin/rails season:bootstrap
+YEAR=2027 bin/rails season:bootstrap
 ```
 
-Useful environment variables:
+Conference alignment remains enabled by default. Source failures or unresolved
+suggestions stop the operation after preserving the prepared shell and safe
+membership changes. ALIGN_CONFERENCES=false explicitly defers source review.
+Former sync/dedupe/preseason/rating bootstrap flags fail when enabled; use separate
+tasks. Preparation never starts sync or ratings.
 
-- `YEAR`: target season year.
-- `START_DATE`: override season start date.
-- `END_DATE`: override season end date.
-- `SYNC_GAMES`: whether to sync games during bootstrap.
-- `SYNC_RESUME`: whether game sync should resume from latest imported game date.
-- `SYNC_START_DATE`: override game sync start date.
-- `SYNC_END_DATE`: override game sync end date.
-- `DEDUPE_GAMES`: whether to run `games:dedupe`.
-- `RUN_PRESEASON`: whether to initialize preseason ratings.
-- `RUN_RATINGS`: whether to run ratings after sync.
-- `RATINGS_RESUME`: whether to resume ratings backfill.
-- `RATINGS_START_DATE`: override ratings backfill start date.
-- `RATINGS_END_DATE`: override ratings backfill end date.
-- `ALIGN_CONFERENCES`: whether bootstrap runs conference alignment. Defaults to
-  `true`; set `ALIGN_CONFERENCES=false` only when a source outage or unresolved
-  review suggestions should not block the rest of bootstrap. Standalone
-  `season:align_conferences` remains available for the deferred review.
+See [Offseason Operations](offseason.md) for separate initialization, schedule
+refresh, explicit activation, non-deleting resume and confirmed, bounded rebuild
+commands, including partial-failure recovery and shared ratings locking.
 
 ### `season:align_conferences`
 
@@ -461,7 +443,8 @@ review steps, and the distinction from destructive authoritative CSV reconciliat
 
 File: `lib/tasks/season_bootstrap.rake`
 
-Purpose: sync games for an existing season.
+Purpose: sync historical games for an explicit existing YEAR, capped at yesterday.
+Inspect job logs for exhausted date retries; completion does not prove every date succeeded.
 
 Example:
 
@@ -533,7 +516,7 @@ Sync all seasons:
 docker compose exec web bin/rails import:games
 ```
 
-Bootstrap the current target season:
+Prepare and review an explicit target season without activating it:
 
 ```bash
 docker compose exec web bin/rails season:bootstrap YEAR=2026

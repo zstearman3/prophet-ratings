@@ -137,7 +137,7 @@ RSpec.describe SeasonConferenceAlignment do
   end
 
   it 'reports multiple active memberships for one team and does not create another range' do
-    # rubocop:disable Rails/SkipsModelValidations -- deliberately seed invalid overlap to test defensive reporting.
+    # rubocop:disable-next Rails/SkipsModelValidations -- deliberately seed invalid overlap to test defensive reporting.
     TeamConference.insert_all!(
       [
         { team_id: team.id, conference_id: old_conference.id, start_season_id: previous_season.id,
@@ -146,7 +146,6 @@ RSpec.describe SeasonConferenceAlignment do
           created_at: Time.current, updated_at: Time.current }
       ]
     )
-    # rubocop:enable Rails/SkipsModelValidations
 
     result = alignment
     expect(result.suggestions.join).to include('membership_conflict')

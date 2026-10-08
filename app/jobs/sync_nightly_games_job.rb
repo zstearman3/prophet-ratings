@@ -23,7 +23,7 @@ class SyncNightlyGamesJob < ApplicationJob
   def resolve_season(season_id)
     return Season.find_by(id: season_id) if season_id.present?
 
-    Season.current || Season.last
+    Season.current
   end
 
   def sync_dates(season, past_lookback_days:, future_end_date:)

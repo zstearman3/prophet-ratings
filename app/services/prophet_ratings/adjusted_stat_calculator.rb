@@ -14,7 +14,7 @@ module ProphetRatings
       @as_of = as_of
     end
 
-    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+    # rubocop:disable-next Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
     def call
       Rails.logger.info("Starting adjustment: #{raw_stat} → #{adj_stat} / #{adj_stat_allowed}")
       season_avg = average_stat_for_season
@@ -82,7 +82,6 @@ module ProphetRatings
 
       Rails.logger.info("Adjustment complete for #{raw_stat}")
     end
-    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 
     private
 
@@ -105,8 +104,7 @@ module ProphetRatings
         game = team_game.game
         return nil unless game
 
-        pace = (game&.possessions&.* 40.0) / game.minutes
-        return pace
+        return game.pace
       end
 
       team_game.send(raw_stat)
@@ -172,7 +170,7 @@ module ProphetRatings
       end
     end
 
-    # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    # rubocop:disable-next Metrics/AbcSize, Metrics/MethodLength
     def build_matrix_components(team_index, num_teams, season_avg)
       rows = []
       b = []
@@ -234,6 +232,5 @@ module ProphetRatings
 
       [rows, b, weights, row_metadata]
     end
-    # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
   end
 end

@@ -15,6 +15,13 @@ RSpec.describe GenerateNightlyPredictionsJob do
   let(:current_config) { create(:ratings_config_version, current: true) }
   let(:older_config) { create(:ratings_config_version, current: false) }
 
+  it 'does not select an unactivated season when no current season exists' do
+    create(:season, year: 2027)
+    allow(ProphetRatings::GamePredictionBuilder).to receive(:new)
+    described_class.perform_now
+    expect(ProphetRatings::GamePredictionBuilder).not_to have_received(:new)
+  end
+
   it 'generates predictions for final games missing current-config predictions and scheduled games in the next week' do
     final_missing = create(:game, season:, status: :final, start_time: as_of - 2.days)
     final_with_current = create(:game, season:, status: :final, start_time: as_of - 1.day)

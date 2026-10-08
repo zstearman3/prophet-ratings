@@ -92,9 +92,8 @@ class Game < ApplicationRecord
   has_one :game_odd, dependent: :destroy
   has_many :bookmaker_odds, dependent: :destroy
   has_many :bet_recommendations, dependent: :destroy
-  # rubocop:disable Rails/HasManyOrHasOneDependent, Rails/InverseOf
+  # rubocop:disable-next Rails/HasManyOrHasOneDependent, Rails/InverseOf
   has_many :current_bet_recommendations, -> { where(current: true) }, class_name: 'BetRecommendation'
-  # rubocop:enable Rails/HasManyOrHasOneDependent, Rails/InverseOf
 
   enum :status, { scheduled: 0, final: 1, canceled: 2 }
   enum :venue_type, VENUE_TYPES, prefix: :venue
