@@ -23,16 +23,16 @@ The calculator accepts an `as_of:` cutoff. By default, it uses the earlier of `T
 1. Aggregate raw team-season stats through `TeamSeasonStatsAggregator`.
 2. Update season-level raw averages through `Season#update_average_ratings`.
 3. If the season is far enough along and has enough finalized games, run least-squares adjustments.
-4. Recalculate aggregate ratings, home boost defaults, volatility defaults, and ranks.
-5. Create or update rating snapshots through `TeamRatingSnapshotService`.
-6. Update season-level adjusted averages through `Season#update_adjusted_averages`.
+4. Fill missing core values from stored preseason values or configured baselines, then recalculate aggregate ratings, home boost defaults, volatility defaults, and ranks.
+5. Update season-level adjusted averages through `Season#update_adjusted_averages`.
+6. Create or update rating snapshots through `TeamRatingSnapshotService`.
 
 The adjusted-ratings step only runs when both are true:
 
 - `as_of.to_date - season.start_date > preseason.adjustment_start_after_days` (currently 14)
 - At least two teams have at least two finalized team games as of the cutoff
 
-Snapshots are still written even if adjusted ratings are skipped.
+Ranks, prediction defaults and snapshots are published even if adjusted ratings are skipped.
 
 ## Raw stat aggregation
 
@@ -88,11 +88,11 @@ These averages become anchors/defaults for the adjustment step.
 | `free_throw_rate` | `adj_free_throw_rate` | `adj_free_throw_rate_allowed` |
 | `three_pt_proficiency` | `adj_three_pt_proficiency` | `adj_three_pt_proficiency_allowed` |
 
-Before solving, the calculator initializes all team seasons in the season with defaults:
-
-- `adj_offensive_efficiency = season.average_efficiency`
-- `adj_defensive_efficiency = season.average_efficiency`
-- `adj_pace = season.average_pace`
+The solver writes only qualified teams. It no longer resets all teams to season
+averages: zero/one-game teams retain their published preseason core values. Missing
+core values fall back individually to stored preseason values, then configured
+105.5 efficiency and 69.5 pace. No new game-count blending or coefficient change
+is introduced.
 
 Each raw stat is then processed by `ProphetRatings::AdjustedStatCalculator`.
 
@@ -313,7 +313,8 @@ rating = adj_offensive_efficiency - adj_defensive_efficiency
 total_home_boost = home_offense_boost - home_defense_boost
 ```
 
-Higher `rating` is better.
+Higher `rating` is better. Ties break by ascending `team_id`; missing adjusted
+stats have no rank. Core ranks/defaults are independent of the solver gate.
 
 Ranks are then assigned across all `TeamSeason` records for the season:
 
@@ -418,3 +419,25 @@ When changing ratings code:
 - `TeamRatingSnapshot::STORED_STATS` includes `home_total_boost`, while `OverallRatingsCalculator` writes `total_home_boost` on `TeamSeason`. Check naming carefully before relying on that snapshot JSON key.
 - `AdjustedStatCalculator#blowout_dampening` currently checks for `offensive_rating` and `defensive_rating`, while the configured adjusted efficiency raw stat is `offensive_efficiency`. Do not assume blowout dampening is active for efficiency without verifying this behavior.
 - `GameWeightingService` is initialized with a `TeamGame` object in the adjustment loop, despite the parameter name `game:`. Its recency calculation uses `@game.game.start_time`.
+
+## Preseason publication contract
+
+The `v1.5-preseason-publication` bundle distinguishes the changed publication,
+fallback and ranking behavior without changing solver coefficients. The preseason
+initializer publishes atomically at `season.start_date - 1`, reusing the captured
+prior inputs from v1.4's contract. It refuses implicit replacement of in-season
+outputs; see [Offseason Operations](offseason.md) for rerun/reset semantics.
+
+Before results exist, the prediction efficiency baseline is the published teams'
+mean preseason offense; pace is the mean published adjusted pace. Missing season
+efficiency/deviations during daily updates fall back to the mean stored preseason
+offense (then 105.5), 11.5 efficiency volatility and 4.5 pace volatility. Home
+boosts retain +/-2.2 and team volatility uses the existing configured defaults.
+Unavailable Five Factors are left null. Equal baseline teams yield neutral scores
+of `105.5 * 69.5 / 100 = 73.3225` and win probability 0.5. These defaults support
+prediction generation; they do not establish calibrated confidence or accuracy.
+
+The prediction builder defaults to the configured bundle rather than a potentially
+stale global current flag. It skips and logs missing/incomplete core snapshot or
+pace/volatility inputs. Existing same-day snapshot selection and mutable season
+prediction baselines remain limitations for leakage-safe historical evaluation.

@@ -5,18 +5,18 @@ module ProphetRatings
     ##
     # Initializes a new GamePredictionBuilder for the given game and ratings configuration version.
     # @param game The game for which predictions will be built.
-    # @param ratings_config_version The ratings configuration version to use (defaults to the current version).
-    def initialize(game, ratings_config_version: RatingsConfigVersion.current)
+    # @param ratings_config_version The ratings configuration version to use (defaults to the configured bundle).
+    def initialize(game, ratings_config_version: RatingsConfigVersion.find_or_create_by_current_config)
       @game = game
       @ratings_config_version = ratings_config_version
     end
 
     ##
     # Builds and saves a game prediction based on the latest team rating snapshots and ratings configuration version.
-    # Returns nil if either team's rating snapshot is unavailable.
+    # Returns nil and logs a warning if required prediction inputs are unavailable.
     # @return [Prediction, nil] The saved prediction record, or nil if prediction could not be generated.
     def call
-      return unless home_snapshot && away_snapshot
+      return unless prediction_inputs_available?
 
       result = ProphetRatings::GamePredictor.new(
         home_rating_snapshot: home_snapshot,
@@ -40,6 +40,25 @@ module ProphetRatings
     private
 
     attr_reader :game, :ratings_config_version
+
+    def prediction_inputs_available?
+      values = prediction_input_values.map(&:to_f)
+      return true if values.all? { |value| value.finite? && value.positive? }
+
+      Rails.logger.warn("Prediction skipped for game=#{game.id}: missing or invalid rating inputs")
+      false
+    end
+
+    def prediction_input_values
+      return [nil] unless home_snapshot && away_snapshot
+
+      season = game.season
+      deviation = season.efficiency_std_deviation
+      [season.average_pace] + [home_snapshot, away_snapshot].flat_map do |snapshot|
+        [snapshot.adj_offensive_efficiency, snapshot.adj_defensive_efficiency, snapshot.adj_pace,
+         snapshot.offensive_efficiency_volatility || deviation, snapshot.defensive_efficiency_volatility || deviation]
+      end
+    end
 
     def prediction_attributes(result)
       {

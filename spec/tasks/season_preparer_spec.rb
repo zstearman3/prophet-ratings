@@ -52,14 +52,14 @@ RSpec.describe SeasonPreparer do
     expect(Season.count).to eq(0)
   end
 
-  it 'initializes a fresh season transactionally without activating it and rejects an implicit reset' do
+  it 'initializes a fresh season transactionally without activating it and permits a safe repeat' do
     create(:team)
     expect { invoke('season:prepare') }.to output(/Season prepared/).to_stdout
     expect { invoke('season:initialize_preseason') }.to output(/Preseason values initialized/).to_stdout
     expect(Season.current).to be_nil
-    before_values = TeamSeason.first.attributes
-    expect { invoke('season:initialize_preseason') }.to raise_error(SystemExit)
-    expect(TeamSeason.first.attributes).to eq(before_values)
+    before_values = TeamSeason.first.attributes.except('updated_at')
+    expect { invoke('season:initialize_preseason') }.to output(/Preseason values initialized/).to_stdout
+    expect(TeamSeason.first.attributes.except('updated_at')).to eq(before_values)
   end
 
   it 'rolls back partial initialization and leaves the old current season unchanged' do
