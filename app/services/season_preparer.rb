@@ -6,34 +6,48 @@ class SeasonPreparer
   attr_reader :year, :start_date, :end_date
 
   def initialize(year:, start_date: nil, end_date: nil)
-    @year = Integer(year)
+    @year = self.class.parse_year(year)
     @start_date = start_date
     @end_date = end_date
   end
 
   def call
-    raise ArgumentError, 'year must be positive' unless year.positive?
-    raise ArgumentError, 'end_date must be after start_date' if resolved_end_date <= resolved_start_date
-
-    Season.transaction do
-      season = prepare_season
-      Result.new(season:, team_seasons_created: ensure_team_seasons(season))
+    Season.with_ratings_lock do
+      Season.transaction do
+        season = prepare_season
+        season.save! if season.changed?
+        Result.new(season:, team_seasons_created: ensure_team_seasons(season))
+      end
     end
+  end
+
+  def self.parse_year(value)
+    text = value.to_s
+    raise ArgumentError, 'YEAR must be an integer from 1 to 9999' unless /\A[0-9]{1,4}\z/.match?(text) && text.to_i.positive?
+
+    Integer(text, 10)
   end
 
   private
 
   def prepare_season
-    season = Season.find_or_initialize_by(year:)
-    season.assign_attributes(
-      name: season_name,
-      start_date: resolved_start_date,
-      end_date: resolved_end_date,
+    Season.find_or_initialize_by(year:).tap do |season|
+      season.assign_attributes(prepared_attributes(season))
+    end
+  end
+
+  def prepared_attributes(season)
+    first = start_date || season.start_date || resolved_start_date
+    last = end_date || season.end_date || resolved_end_date
+    raise ArgumentError, 'end_date must be after start_date' if last <= first
+
+    {
+      name: season.name || season_name,
+      start_date: first,
+      end_date: last,
       average_efficiency: season.average_efficiency || season_default(:average_efficiency),
       average_pace: season.average_pace || season_default(:average_pace)
-    )
-    season.save! if season.changed?
-    season
+    }
   end
 
   def ensure_team_seasons(season)

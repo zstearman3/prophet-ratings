@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class UpdateRankingsJob < ApplicationJob
-  ADVISORY_LOCK_KEY = 'prophet-ratings:update-rankings'
+  ADVISORY_LOCK_KEY = Season::RATINGS_LOCK_KEY
 
   queue_as :default
   around_perform :run_with_exclusive_lock

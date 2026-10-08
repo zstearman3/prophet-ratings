@@ -45,6 +45,11 @@
 #  index_seasons_on_year     (year) UNIQUE
 #
 class Season < ApplicationRecord
+  RATINGS_LOCK_KEY = 'prophet-ratings:update-rankings'
+  # Operator actions fail visibly when a scheduled rating writer holds the lock.
+  class OperationInProgress < StandardError
+  end
+
   validates :year, presence: true, uniqueness: true
   validate :only_one_current_season, if: :current?
 
@@ -54,7 +59,14 @@ class Season < ApplicationRecord
   has_many :team_rating_snapshots, dependent: :destroy
   has_many :bet_recommendations, through: :games
 
-  scope :current, -> { find_by(current: true) }
+  def self.current
+    find_by(current: true)
+  end
+
+  def rating_outputs?
+    initialized = team_seasons.where('adj_offensive_efficiency IS NOT NULL OR adj_defensive_efficiency IS NOT NULL OR adj_pace IS NOT NULL')
+    team_rating_snapshots.exists? || predictions.exists? || games.final.exists? || initialized.exists?
+  end
 
   def update_average_ratings
     update!(
@@ -65,7 +77,7 @@ class Season < ApplicationRecord
     )
   end
 
-  # rubocop:disable Metrics/AbcSize
+  # rubocop:disable-next Metrics/AbcSize
   def update_adjusted_averages
     update!(
       avg_adj_offensive_efficiency: team_seasons.average(:adj_offensive_efficiency),
@@ -92,14 +104,44 @@ class Season < ApplicationRecord
       stddev_adj_free_throw_rate_allowed: stddev(:adj_free_throw_rate_allowed)
     )
   end
-  # rubocop:enable Metrics/AbcSize
 
   def set_current!
-    Season.find_each { |s| s.update!(current: false) }
-    update!(current: true)
+    Season.with_ratings_lock do
+      Season.transaction { switch_current_season! }
+    end
+  end
+
+  # Share the scheduled rankings lock so setup/rebuilds cannot race live rating writes.
+  def self.with_ratings_lock
+    result = GoodJob::Job.advisory_lock_key(RATINGS_LOCK_KEY) { [yield] }
+    raise OperationInProgress, 'Another season/rating operation is running; retry after it finishes.' unless result
+
+    result.first
   end
 
   private
+
+  def switch_current_season!
+    reload
+    return if current?
+
+    validate_activation!
+    deactivate_current_season!
+    update!(current: true)
+  end
+
+  def deactivate_current_season!
+    Season.where(current: true).where.not(id:).find_each { |season| season.update!(current: false) }
+  end
+
+  def validate_activation!
+    missing_teams = Team.where.not(id: team_seasons.select(:team_id)).exists?
+    incomplete = team_seasons.where(adj_offensive_efficiency: nil)
+                             .or(team_seasons.where(adj_defensive_efficiency: nil)).or(team_seasons.where(adj_pace: nil))
+    return if start_date < end_date && team_seasons.exists? && !missing_teams && !incomplete.exists?
+
+    raise ArgumentError, 'Season is incomplete: prepare missing teams and initialize/review preseason ratings before activation.'
+  end
 
   def calculated_average_pace
     team_seasons.average(:pace)

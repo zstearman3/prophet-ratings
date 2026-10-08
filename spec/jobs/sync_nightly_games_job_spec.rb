@@ -21,6 +21,13 @@ RSpec.describe SyncNightlyGamesJob do
     allow(Game).to receive(:current_schedule_date).and_return(today)
   end
 
+  it 'does not select an unactivated season when no current season exists' do
+    create(:season, year: 2027)
+    allow(SyncDailyGamesJob).to receive(:perform_now)
+    described_class.perform_now
+    expect(SyncDailyGamesJob).not_to have_received(:perform_now)
+  end
+
   it 'syncs the recent past lookback window and all upcoming scheduled dates' do
     described_class.perform_now(season.id)
 

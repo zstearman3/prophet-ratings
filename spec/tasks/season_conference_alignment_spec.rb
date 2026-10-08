@@ -75,20 +75,17 @@ RSpec.describe SeasonConferenceAlignment do
     expect(TeamConference.count).to eq(1)
   end
 
-  it 'prepares and aligns before making the season current or performing downstream bootstrap work' do
+  it 'prepares and aligns without activating or performing ratings work' do
     ENV['YEAR'] = '2026'
     allow(scraper).to receive(:call) do
       expect(Season.find_by!(year: 2026)).not_to be_current
       expect(TeamSeason.count).to eq(1)
       rows
     end
-    allow(RatingsConfigVersion).to receive(:ensure_current!) do
-      expect(Season.current.year).to eq(2026)
-      expect(TeamConference.count).to eq(1)
-      instance_double(RatingsConfigVersion, name: 'test', id: 1)
-    end
+    allow(RatingsConfigVersion).to receive(:ensure_current!)
     ENV['SYNC_GAMES'] = ENV['DEDUPE_GAMES'] = ENV['RUN_PRESEASON'] = ENV['RUN_RATINGS'] = 'false'
     expect { invoke('season:bootstrap') }.to output(/Season bootstrap complete/).to_stdout
+    expect(RatingsConfigVersion).not_to have_received(:ensure_current!)
   end
 
   it 'allows bootstrap to skip alignment explicitly while keeping it enabled by default' do
@@ -97,7 +94,7 @@ RSpec.describe SeasonConferenceAlignment do
     ENV['SYNC_GAMES'] = ENV['DEDUPE_GAMES'] = ENV['RUN_PRESEASON'] = ENV['RUN_RATINGS'] = 'false'
     expect { invoke('season:bootstrap') }.to output(/Season bootstrap complete/).to_stdout
     expect(Scraper::ConferenceStandingsScraper).not_to have_received(:new)
-    expect(Season.current.year).to eq(2026)
+    expect(Season.current).to be_nil
   end
 
   context 'when bootstrap cannot finish alignment' do

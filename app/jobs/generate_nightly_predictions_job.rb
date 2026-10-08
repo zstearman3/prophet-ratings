@@ -2,6 +2,7 @@
 
 class GenerateNightlyPredictionsJob < ApplicationJob
   queue_as :default
+  around_perform { |_job, block| Season.with_ratings_lock(&block) }
 
   LOOKAHEAD_DAYS = 7
 
@@ -17,7 +18,7 @@ class GenerateNightlyPredictionsJob < ApplicationJob
   def resolve_season(season_id)
     return Season.find_by(id: season_id) if season_id.present?
 
-    Season.current || Season.last
+    Season.current
   end
 
   def games_for_prediction(season, as_of:)

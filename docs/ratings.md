@@ -331,6 +331,25 @@ Other adjusted stats, volatility fields, home-court fields, and ranks are copied
 
 Snapshots are associated with a `RatingsConfigVersion` produced from the active `config/ratings.yml` bundle. The lookup is based on `bundle_name`, so changing rating assumptions should generally include a new bundle name.
 
+## Operational safety
+
+Season preparation/bootstrap never resets live ratings or deletes predictions or
+snapshots. Activation is a separate atomic operation. Non-deleting
+season:resume_ratings is capped at the Eastern schedule date and ignores future
+snapshots as resume points. Destructive season:rebuild_ratings requires explicit
+YEAR, REBUILD=true and date boundaries; deletion is restricted to that window and
+the active config, with the entire rebuild rolled back on failure. Live team
+values reflect the final processed date, so follow historical repairs with a
+resume to the intended live cutoff. Backfill prediction ordering is unchanged
+and is not a leakage-safe evaluation path.
+
+The shared scheduled rankings advisory lock excludes concurrent setup,
+activation, resume, rebuild and nightly prediction writes. Scheduled rankings
+skip a busy lock; operator operations fail visibly, while async rating/prediction
+jobs use the existing bounded retry policy. See [Offseason Operations](offseason.md)
+for commands, dependency checks and recovery. Model coefficients, solver inputs,
+ranks and preseason snapshot publication are unchanged by these safety defaults.
+
 ## Configuration
 
 Ratings configuration lives in `config/ratings.yml`.
