@@ -17,6 +17,11 @@ watchers rebuild assets. GoodJob runs in a separate worker with two job threads.
 Press **Ctrl-C** when finished: the project's containers and network are removed,
 while the development database, Node dependency cache and images are kept.
 
+The GoodJob dashboard at `/good_job` requires signing in through `/users/sign_in`
+with an existing admin account (`User#admin?`). Guests are redirected to sign in;
+signed-in non-admins receive 404 responses. The restriction covers all dashboard
+pages and job actions in every environment.
+
 In another terminal, or from an agent:
 
 | Command | Purpose |
