@@ -3,6 +3,7 @@
 require 'rails_helper'
 
 RSpec.describe ResumeSeasonRatingsJob do
+  let(:model_version) { RatingsConfigVersion.default_version }
   let(:season) do
     create(
       :season,
@@ -14,6 +15,7 @@ RSpec.describe ResumeSeasonRatingsJob do
   let(:ratings_config_version) { create(:ratings_config_version, current: true) }
 
   before do
+    RatingsConfigVersion.publish!
     allow(Game).to receive(:current_schedule_date).and_return(season.end_date)
     allow(RatingsConfigVersion).to receive(:ensure_current!).and_return(ratings_config_version)
   end
@@ -31,7 +33,8 @@ RSpec.describe ResumeSeasonRatingsJob do
 
     called_dates = []
     calculator = instance_double(ProphetRatings::OverallRatingsCalculator)
-    allow(ProphetRatings::OverallRatingsCalculator).to receive(:new).with(season).and_return(calculator)
+    allow(ProphetRatings::OverallRatingsCalculator).to receive(:new).with(season,
+                                                                          ratings_config_version: model_version).and_return(calculator)
     allow(calculator).to receive(:call) { |as_of:| called_dates << as_of }
 
     described_class.perform_now(season.id)
@@ -42,7 +45,8 @@ RSpec.describe ResumeSeasonRatingsJob do
   it 'honors explicit start and end date overrides' do
     called_dates = []
     calculator = instance_double(ProphetRatings::OverallRatingsCalculator)
-    allow(ProphetRatings::OverallRatingsCalculator).to receive(:new).with(season).and_return(calculator)
+    allow(ProphetRatings::OverallRatingsCalculator).to receive(:new).with(season,
+                                                                          ratings_config_version: model_version).and_return(calculator)
     allow(calculator).to receive(:call) { |as_of:| called_dates << as_of }
 
     described_class.perform_now(
@@ -107,15 +111,17 @@ RSpec.describe ResumeSeasonRatingsJob do
 
   it 'initializes preseason ratings when requested and no snapshots exist for the current config' do
     calculator = instance_double(ProphetRatings::OverallRatingsCalculator)
-    allow(ProphetRatings::OverallRatingsCalculator).to receive(:new).with(season).and_return(calculator)
+    allow(ProphetRatings::OverallRatingsCalculator).to receive(:new).with(season,
+                                                                          ratings_config_version: model_version).and_return(calculator)
     allow(calculator).to receive(:call)
 
     initializer = instance_double(ProphetRatings::PreseasonInitializer, call: true)
-    allow(ProphetRatings::PreseasonInitializer).to receive(:new).with(season).and_return(initializer)
+    allow(ProphetRatings::PreseasonInitializer).to receive(:new)
+      .with(season, ratings_config_version: ratings_config_version).and_return(initializer)
 
     described_class.perform_now(season.id, run_preseason: true)
 
-    expect(ProphetRatings::PreseasonInitializer).to have_received(:new).with(season)
+    expect(ProphetRatings::PreseasonInitializer).to have_received(:new).with(season, ratings_config_version: ratings_config_version)
     expect(initializer).to have_received(:call)
   end
 

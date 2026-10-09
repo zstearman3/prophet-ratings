@@ -3,11 +3,7 @@
 require 'rails_helper'
 
 RSpec.describe UpdateRankingsJob do
-  include ActiveSupport::Testing::TimeHelpers
-
-  # Commit callbacks must be exercised with real commits, outside fixture transactions.
-  self.use_transactional_tests = false
-
+  let(:model_version) { RatingsConfigVersion.default_version }
   let(:season) do
     create(
       :season,
@@ -19,11 +15,18 @@ RSpec.describe UpdateRankingsJob do
   end
   let(:calculator) { instance_double(ProphetRatings::OverallRatingsCalculator, call: true) }
 
+  include ActiveSupport::Testing::TimeHelpers
+
+  # Commit callbacks must be exercised with real commits, outside fixture transactions.
+  self.use_transactional_tests = false
+
   before do
+    RatingsConfigVersion.publish!
     allow(GoodJob::Job).to receive(:advisory_lock_key).with(described_class::ADVISORY_LOCK_KEY).and_wrap_original do |_method, *, &block|
       block.call
     end
-    allow(ProphetRatings::OverallRatingsCalculator).to receive(:new).with(season).and_return(calculator)
+    allow(ProphetRatings::OverallRatingsCalculator).to receive(:new).with(season,
+                                                                          ratings_config_version: model_version).and_return(calculator)
     allow(GenerateNightlyPredictionsJob).to receive(:perform_later)
   end
 
@@ -36,9 +39,11 @@ RSpec.describe UpdateRankingsJob do
   it 'recalculates rankings and enqueues nightly predictions' do
     described_class.perform_now(season.id)
 
-    expect(ProphetRatings::OverallRatingsCalculator).to have_received(:new).with(season)
+    expect(ProphetRatings::OverallRatingsCalculator).to have_received(:new).with(season,
+                                                                                 ratings_config_version: model_version)
     expect(calculator).to have_received(:call)
-    expect(GenerateNightlyPredictionsJob).to have_received(:perform_later).with(season.id)
+    expect(GenerateNightlyPredictionsJob).to have_received(:perform_later).with(season.id,
+                                                                                ratings_config_version_id: model_version.id)
     expect(GoodJob::Job).to have_received(:advisory_lock_key).with(described_class::ADVISORY_LOCK_KEY)
   end
 
@@ -54,7 +59,8 @@ RSpec.describe UpdateRankingsJob do
       described_class.new.perform(season.id)
       expect(GenerateNightlyPredictionsJob).not_to have_received(:perform_later)
     end
-    expect(GenerateNightlyPredictionsJob).to have_received(:perform_later).with(season.id)
+    expect(GenerateNightlyPredictionsJob).to have_received(:perform_later).with(season.id,
+                                                                                ratings_config_version_id: model_version.id)
   end
 
   it 'does not enqueue predictions when the enclosing transaction rolls back' do
@@ -64,6 +70,18 @@ RSpec.describe UpdateRankingsJob do
       raise ActiveRecord::Rollback
     end
     expect(GenerateNightlyPredictionsJob).not_to have_received(:perform_later)
+  end
+
+  it 'retains the selected model when activation changes before the enclosing commit' do
+    selected = model_version
+    replacement = RatingsConfigVersion.publish!(RatingsConfigVersion.authored_config.merge(bundle_name: 'replacement'))
+    season
+    Season.transaction do
+      described_class.new.perform(season.id, ratings_config_version_id: selected.id)
+      replacement.activate
+      expect(GenerateNightlyPredictionsJob).not_to have_received(:perform_later)
+    end
+    expect(GenerateNightlyPredictionsJob).to have_received(:perform_later).with(season.id, ratings_config_version_id: selected.id)
   end
 
   it 'propagates publication failures without enqueueing predictions' do
@@ -85,7 +103,7 @@ RSpec.describe UpdateRankingsJob do
     create(:season, :current, year: 2100)
     travel_to(Time.utc(2100, 10, 1)) { described_class.deserialize(queued).perform_now }
     expect(team_season.team_rating_snapshots.sole.snapshot_date).to eq(season.end_date)
-    expect(ProphetRatings::OverallRatingsCalculator).to have_received(:new).with(season)
+    expect(ProphetRatings::OverallRatingsCalculator).to have_received(:new).with(season, ratings_config_version: model_version)
   end
 
   it 'exits without recalculating when another rankings update holds the lock' do

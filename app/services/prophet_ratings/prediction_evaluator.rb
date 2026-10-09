@@ -8,12 +8,15 @@ module ProphetRatings
     # @param ratings_config_version [RatingsConfigVersion] The ratings configuration version to filter predictions by.
     # @param date_range [Range<Date>] The date range of games to include.
     def initialize(
-      ratings_config_version: RatingsConfigVersion.ensure_current!,
+      ratings_config_version: RatingsConfigVersion.default_version,
       date_range: Season.current.start_date..Season.current.end_date
     )
+      version_id = ratings_config_version.id
       @predictions = Prediction
-                     .joins(:home_team_snapshot, :game)
-                     .where(home_team_snapshot: { ratings_config_version_id: ratings_config_version.id })
+                     .joins(:home_team_snapshot, :away_team_snapshot, :game)
+                     .where(ratings_config_version:,
+                            home_team_snapshot: { ratings_config_version_id: version_id },
+                            away_team_snapshot: { ratings_config_version_id: version_id })
                      .where(games: { start_time: date_range })
     end
 

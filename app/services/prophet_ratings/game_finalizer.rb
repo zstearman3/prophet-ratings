@@ -7,8 +7,9 @@ module ProphetRatings
     ##
     # Initializes a new GameFinalizer for the given game.
     # @param game The game record to be finalized.
-    def initialize(game)
+    def initialize(game, ratings_config_version: nil)
       @game = game
+      @ratings_config_version = ratings_config_version
     end
 
     ##
@@ -58,16 +59,39 @@ module ProphetRatings
 
     ##
     # Updates the prediction record for the game with calculated errors based on actual game results.
-    # If a matching prediction is found using the latest team rating snapshots, updates its offensive
-    # and defensive efficiency errors and pace error by comparing predicted values to actual game statistics.
+    # A pinned run updates its model's stored predictions; ingestion updates all stored models.
+    # Actual-result errors depend on each prediction's own snapshots, never the active model.
     def finalize_prediction!
-      prediction = game.predictions.find_by(
-        home_team_snapshot: home_snapshot,
-        away_team_snapshot: away_snapshot
-      )
-      return unless prediction
+      scope = game.predictions
+      scope = scope.where(ratings_config_version: @ratings_config_version) if @ratings_config_version
+      scope.includes(:home_team_snapshot, :away_team_snapshot).find_each do |prediction|
+        finalize_stored_prediction(prediction)
+      end
+    end
+
+    def finalize_stored_prediction(prediction)
+      return unless prediction_version_valid?(prediction)
 
       update_prediction_errors!(prediction)
+    end
+
+    def prediction_version_valid?(prediction)
+      self.class.validate_prediction_version(prediction)
+      true
+    rescue ArgumentError => error
+      raise if @ratings_config_version
+
+      skip_invalid_prediction(prediction, error)
+    end
+
+    def skip_invalid_prediction(prediction, error)
+      Rails.logger.warn("Skipping prediction=#{prediction.id} for game=#{game.id}: #{error.message}")
+      nil
+    end
+
+    public_class_method def self.validate_prediction_version(prediction)
+      version = prediction.ratings_config_version
+      ModelConfiguration.validate_snapshots([prediction.home_team_snapshot, prediction.away_team_snapshot], version)
     end
 
     def update_prediction_errors!(prediction)
@@ -109,35 +133,6 @@ module ProphetRatings
       return unless arr.any?
 
       arr.sum / (5 * arr.size)
-    end
-
-    ##
-    # Returns the latest team rating snapshot for the home team's season as of the game schedule date,
-    # using the current ratings configuration version.
-    # @return [TeamRatingSnapshot, nil] The latest snapshot for the home team season, or nil if none exists.
-    def home_snapshot
-      @home_snapshot ||= latest_snapshot(game.home_team_season)
-    end
-
-    ##
-    # Returns the latest team rating snapshot for the away team's season as of the game schedule date,
-    # using the current ratings configuration version.
-    # @return [TeamRatingSnapshot, nil] The latest snapshot for the away team season, or nil if none exists.
-    def away_snapshot
-      @away_snapshot ||= latest_snapshot(game.away_team_season)
-    end
-
-    ##
-    # Returns the most recent team rating snapshot for the given team season and current ratings configuration version,
-    # as of the game's Eastern schedule date.
-    # @param [TeamSeason] team_season - The team season for which to retrieve the snapshot.
-    # @return [TeamRatingSnapshot, nil] The latest applicable snapshot, or nil if none exists.
-    def latest_snapshot(team_season)
-      TeamRatingSnapshot
-        .where(team_season:, ratings_config_version: RatingsConfigVersion.current)
-        .where(snapshot_date: ..game.schedule_date)
-        .order(snapshot_date: :desc)
-        .first
     end
   end
 end

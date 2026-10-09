@@ -12,36 +12,42 @@ module ProphetRatings
       three_pt_proficiency: %i[adj_three_pt_proficiency adj_three_pt_proficiency_allowed]
     }.freeze
 
-    def initialize(season = Season.current)
+    def initialize(season = Season.current, ratings_config_version: nil)
+      @ratings_config_version = RatingsConfigVersion.resolve(ratings_config_version)
+      @config = @ratings_config_version.settings
       @season = season
       validate_target_season!
     end
 
     def call(as_of: nil)
-      as_of = cutoff_date(as_of)
-      # A savepoint protects callers that rescue a failed day inside an outer transaction.
-      Season.transaction(requires_new: true) do
-        TeamSeasonStatsAggregator.new(season: @season, as_of:).run
-        @season.update_average_ratings
-        adjustment_start = Rails.application.config_for(:ratings).dig(:preseason, :adjustment_start_after_days)
-        if (as_of - @season.start_date) > adjustment_start && enough_finalized_data_for_adjustments?(as_of:)
-          run_least_squares_adjustments(as_of:)
-        end
-        publish(as_of:)
-      end
+      as_of = self.class.cutoff_date(as_of, @season)
+      @season.with_lock(requires_new: true) { calculate(as_of:) }
+    end
+
+    def calculate(as_of:)
+      validate_live_versions!
+      TeamSeasonStatsAggregator.new(season: @season, as_of:, ratings_config_version: @ratings_config_version).run
+      @season.update_average_ratings
+      run_least_squares_adjustments(as_of:) if adjustment_period?(as_of) && enough_finalized_data_for_adjustments?(as_of:)
+      publish(as_of:)
     end
 
     def publish(as_of:)
-      fill_missing_ratings
-      fill_prediction_baselines
-      recalculate_all_aggregate_ratings
-      @season.update_adjusted_averages
-      TeamRatingSnapshotService.new(season: @season, as_of:).call
+      @season.with_lock(requires_new: true) { publish_ratings(as_of:) }
     end
 
-    def self.missing_ratings(team_season)
+    def publish_ratings(as_of:)
+      validate_live_versions!
+      update_live_ratings
+      @season.team_seasons.find_each { |team_season| team_season.update!(ratings_config_version: @ratings_config_version) }
+      TeamRatingSnapshotService.new(season: @season, as_of:, ratings_config_version: @ratings_config_version).call
+    end
+
+    private :calculate, :publish_ratings
+
+    def self.missing_ratings(team_season, config)
       attributes = team_season.attributes
-      config = Rails.application.config_for(:ratings).deep_symbolize_keys.fetch(:preseason)
+      config = config.fetch(:preseason)
       { 'adj_offensive_efficiency' => :fallback_efficiency, 'adj_defensive_efficiency' => :fallback_efficiency,
         'adj_pace' => :fallback_pace }.to_h do |stat, fallback|
         [stat, attributes[stat] || attributes["preseason_#{stat}"] || config.fetch(fallback)]
@@ -56,6 +62,21 @@ module ProphetRatings
 
     private
 
+    def adjustment_period?(as_of)
+      (as_of.to_date - @season.start_date) > @config.dig(:preseason, :adjustment_start_after_days)
+    end
+
+    def update_live_ratings
+      fill_missing_ratings
+      fill_prediction_baselines
+      recalculate_all_aggregate_ratings
+      @season.update_adjusted_averages
+    end
+
+    def validate_live_versions!
+      @season.team_seasons.find_each { |team_season| team_season.validate_model_inputs(@ratings_config_version) }
+    end
+
     def validate_target_season!
       raise ArgumentError, 'A persisted target season is required' unless @season.is_a?(Season) && @season.persisted?
 
@@ -66,17 +87,17 @@ module ProphetRatings
       raise ArgumentError, 'A persisted target season with valid start/end dates is required'
     end
 
-    def cutoff_date(value)
+    public_class_method def self.cutoff_date(value, season)
       date = case value
              when NilClass then Game.current_schedule_date
              when String then date_only_cutoff(value)
              when Date, Time, ActiveSupport::TimeWithZone then Game.schedule_day_range(value).begin.to_date
              else raise ArgumentError, 'Cutoff must be a date, time, or ISO date string'
              end
-      [date, @season.end_date].min
+      [date, season.end_date].min
     end
 
-    def date_only_cutoff(value)
+    public_class_method def self.date_only_cutoff(value)
       date = Date.iso8601(value)
       raise ArgumentError, 'String cutoffs must be YYYY-MM-DD; pass timestamps as time objects' unless date.iso8601 == value
 
@@ -84,7 +105,7 @@ module ProphetRatings
     end
 
     def fill_prediction_baselines
-      config = Rails.application.config_for(:ratings).deep_symbolize_keys
+      config = @config
       @season.update!(
         average_efficiency: @season.average_efficiency || @season.team_seasons.average(:preseason_adj_offensive_efficiency) ||
                             config.dig(:preseason, :fallback_efficiency),
@@ -94,13 +115,13 @@ module ProphetRatings
     end
 
     def fill_missing_ratings
-      @season.team_seasons.find_each { |team_season| team_season.update!(self.class.missing_ratings(team_season)) }
+      @season.team_seasons.find_each { |team_season| team_season.update!(self.class.missing_ratings(team_season, @config)) }
     end
 
     # rubocop:disable-next Metrics/AbcSize, Metrics/MethodLength
     def recalculate_all_aggregate_ratings
       team_seasons = TeamSeason.where(season: @season).to_a
-      ratings_config = Rails.application.config_for(:ratings).deep_symbolize_keys
+      ratings_config = @config
       default_home_boost = ratings_config[:home_court_advantage].to_f
       default_efficiency_volatility = ratings_config.dig(:baseline_volatility, :efficiency_volatility).to_f
 
@@ -183,7 +204,8 @@ module ProphetRatings
           raw_stat:,
           adj_stat:,
           adj_stat_allowed:,
-          as_of:
+          as_of:,
+          ratings_config_version: @ratings_config_version
         ).call
       end
     end

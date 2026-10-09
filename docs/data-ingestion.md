@@ -339,7 +339,13 @@ Finalization runs in a transaction and performs:
    - In-conference flag
 2. Finalization prerequisite validation.
 3. `calculate_game_stats` on each `TeamGame`.
-4. Prediction error updates for matching predictions.
+4. Prediction error updates for stored predictions, validating snapshot/version identity.
+   A rating run supplies its pinned model and updates that model's predictions;
+   ordinary ingestion finalization updates all stored model predictions without
+   looking up the global active version.
+   Invalid snapshot/model associations are logged and skipped during ordinary
+   ingestion, leaving their prediction errors unchanged. A pinned rating run
+   raises on the same mismatch and rolls back finalization for review.
 5. `game.final!` status transition.
 
 A game cannot finalize unless it has enough derived data to compute pace. If finalization fails due to missing derived stats, the importer logs a warning and leaves the game scheduled.

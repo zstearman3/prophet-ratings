@@ -4,14 +4,12 @@ require 'matrix'
 
 module ProphetRatings
   class AdjustedStatCalculator
-    RATINGS_CONFIG = Rails.application.config_for(:ratings).deep_symbolize_keys
-
-    def initialize(season:, raw_stat:, adj_stat:, adj_stat_allowed:, as_of: Time.current)
+    def initialize(season:, raw_stat:, adj_stat:, adj_stat_allowed:, **options)
+      @ratings_config_version = RatingsConfigVersion.resolve(options[:ratings_config_version])
       @season = season
       @raw_stat = raw_stat
-      @adj_stat = adj_stat
-      @adj_stat_allowed = adj_stat_allowed
-      @as_of = as_of
+      @adjusted_stats = [adj_stat, adj_stat_allowed]
+      @as_of = options.fetch(:as_of, Time.current)
     end
 
     # rubocop:disable-next Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
@@ -26,6 +24,7 @@ module ProphetRatings
                                .select { |ts| finalized_team_game_count(ts) >= 2 }
                                .sort_by(&:team_id)
 
+      qualified_team_seasons.each { |team_season| team_season.validate_model_inputs(@ratings_config_version) }
       team_ids = qualified_team_seasons.map(&:team_id)
       team_index = team_ids.each_with_index.to_h
       num_teams = team_ids.size
@@ -69,7 +68,7 @@ module ProphetRatings
         )
       end
 
-      x_values = StatisticsUtils.solve_least_squares_with_python(rows, b, weights)
+      x_values = StatisticsUtils.solve_least_squares_with_python(rows, b, weights:, ridge_alpha: config.dig(:ridge, :alpha))
 
       team_season_map = TeamSeason.where(season:, team_id: team_ids).index_by(&:team_id)
       team_ids.each_with_index do |team_id, idx|
@@ -77,7 +76,7 @@ module ProphetRatings
         next unless ts
 
         stats_to_write = build_stats_to_write(ts, x_values, season_avg, idx, num_teams)
-        ts.update!(stats_to_write)
+        ts.update!(stats_to_write.merge(ratings_config_version: @ratings_config_version))
       end
 
       Rails.logger.info("Adjustment complete for #{raw_stat}")
@@ -85,7 +84,19 @@ module ProphetRatings
 
     private
 
-    attr_reader :season, :raw_stat, :adj_stat, :adj_stat_allowed, :as_of
+    attr_reader :season, :raw_stat, :as_of
+
+    def adj_stat
+      @adjusted_stats.first
+    end
+
+    def adj_stat_allowed
+      @adjusted_stats.last
+    end
+
+    def config
+      @ratings_config_version.settings
+    end
 
     def average_stat_for_season
       stat_to_avg = raw_stat == :possessions ? :pace : raw_stat
@@ -113,8 +124,8 @@ module ProphetRatings
     def blowout_dampening(team_game)
       return 1.0 unless %i[offensive_rating defensive_rating].include?(raw_stat)
 
-      margin_cap = RATINGS_CONFIG[:blowout][:max_margin]
-      multiplier = config[:cap_multiplier].to_f
+      margin_cap = config[:blowout][:max_margin]
+      multiplier = config.dig(:blowout, :cap_multiplier).to_f
       margin = if team_game.opponent_team_game&.points && team_game.points
                  (team_game.points - team_game.opponent_team_game.points).abs
                else
@@ -137,8 +148,8 @@ module ProphetRatings
     def preseason_weight
       start_date = season.start_date
       days_since_start = [(as_of.to_date - start_date).to_i, 0].max
-      decay_days = RATINGS_CONFIG[:weighting][:preseason_decay_days] || 30
-      min_weight = RATINGS_CONFIG[:weighting][:min_preseason_weight] || 0.0
+      decay_days = config[:weighting][:preseason_decay_days] || 30
+      min_weight = config[:weighting][:min_preseason_weight] || 0.0
       [1.0 - (days_since_start.to_f / decay_days), min_weight].max.round(4)
     end
 
@@ -177,8 +188,8 @@ module ProphetRatings
       weights = []
       row_metadata = [] # Add this to collect game+team context
 
-      hca_stats = Array(RATINGS_CONFIG[:home_court_adjusted_stats]).map(&:to_sym)
-      home_adv = RATINGS_CONFIG[:home_court_advantage].to_f
+      hca_stats = Array(config[:home_court_adjusted_stats]).map(&:to_sym)
+      home_adv = config[:home_court_advantage].to_f
 
       Game.where(season:).final.through_schedule_date(as_of).includes(:home_team_game, :away_team_game).find_each do |game|
         tg1 = game.home_team_game
@@ -208,7 +219,7 @@ module ProphetRatings
 
           rows << row
           b << adjusted_observed.to_f
-          weights << GameWeightingService.new(game: off_tg, season:, as_of:).call
+          weights << GameWeightingService.new(game: off_tg, season:, as_of:, ratings_config_version: @ratings_config_version).call
 
           # ➕ Add metadata
           row_metadata << {
@@ -223,7 +234,7 @@ module ProphetRatings
         end
       end
 
-      anchor_weight = RATINGS_CONFIG.dig(:anchor, :weight).to_f
+      anchor_weight = config.dig(:anchor, :weight).to_f
       anchor_row = Array.new(2 * num_teams, 0.0)
       (0...num_teams).each { |i| anchor_row[i] = 1.0 }
       rows << anchor_row

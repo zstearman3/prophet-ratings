@@ -47,12 +47,12 @@ module StatisticsUtils
   # @param [Array<Numeric>] b_vector - The target vector.
   # @param [Array<Numeric>, nil] weights - Optional weights for each observation; defaults to all ones if not provided.
   # @return [Array<Float>] The solution vector parsed from the Python solver's JSON output.
-  def solve_least_squares_with_python(a_rows, b_vector, weights = nil)
+  def solve_least_squares_with_python(a_rows, b_vector, **options)
     require 'open3'
     require 'json'
 
-    ridge_alpha = Rails.application.config_for(:ratings).dig(:ridge, :alpha) || 0.0
-    weights ||= Array.new(b_vector.length, 1.0)
+    ridge_alpha = options.fetch(:ridge_alpha)
+    weights = options.fetch(:weights, nil) || Array.new(b_vector.length, 1.0)
 
     unless weights.size == b_vector.size
       raise ArgumentError, "Weights size (#{weights.size}) does not match b_vector size (#{b_vector.size})"

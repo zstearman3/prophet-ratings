@@ -3,19 +3,29 @@
 class UpdateRankingsJob < ApplicationJob
   ADVISORY_LOCK_KEY = Season::RATINGS_LOCK_KEY
 
+  include PinnedModelVersion
+
   queue_as :default
   around_perform :run_with_exclusive_lock
 
-  def perform(season = Season.current, enqueue_nightly_predictions: true)
+  def perform(season = Season.current, enqueue_nightly_predictions: true, ratings_config_version_id: nil)
     season = resolve_season(season)
 
-    ProphetRatings::OverallRatingsCalculator.new(season).call
+    version = self.class.recalculate(season, ratings_config_version_id)
     return unless enqueue_nightly_predictions
 
-    ActiveRecord.after_all_transactions_commit { GenerateNightlyPredictionsJob.perform_later(season.id) }
+    ActiveRecord.after_all_transactions_commit do
+      GenerateNightlyPredictionsJob.perform_later(season.id, ratings_config_version_id: version.id)
+    end
   end
 
   private
+
+  public_class_method def self.recalculate(season, version_id)
+    version = RatingsConfigVersion.resolve(version_id)
+    ProphetRatings::OverallRatingsCalculator.new(season, ratings_config_version: version).call
+    version
+  end
 
   def run_with_exclusive_lock
     acquired = GoodJob::Job.advisory_lock_key(ADVISORY_LOCK_KEY) do

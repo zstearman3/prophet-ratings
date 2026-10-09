@@ -76,10 +76,10 @@ RSpec.describe Game do
   describe '#finalize' do
     it 'delegates to ProphetRatings::GameFinalizer' do
       finalizer_double = instance_double(ProphetRatings::GameFinalizer)
-      allow(ProphetRatings::GameFinalizer).to receive(:new).with(game).and_return(finalizer_double)
+      allow(ProphetRatings::GameFinalizer).to receive(:new).with(game, ratings_config_version: nil).and_return(finalizer_double)
       allow(finalizer_double).to receive(:call)
       game.finalize
-      expect(ProphetRatings::GameFinalizer).to have_received(:new).with(game)
+      expect(ProphetRatings::GameFinalizer).to have_received(:new).with(game, ratings_config_version: nil)
       expect(finalizer_double).to have_received(:call)
     end
   end

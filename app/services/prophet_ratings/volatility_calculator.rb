@@ -2,9 +2,6 @@
 
 module ProphetRatings
   class VolatilityCalculator
-    PREDICTION_CONFIG = Rails.application.config_for(:prediction).deep_symbolize_keys
-    CONFIDENCE_LEVELS = PREDICTION_CONFIG[:confidence_levels]
-
     ##
     # Initializes a new VolatilityCalculator with team rating snapshots, upset modifier, neutral flag, and season context.
     # @param home_rating_snapshot [Object] The rating snapshot for the home team.
@@ -12,11 +9,12 @@ module ProphetRatings
     # @param upset_modifier [Float] Multiplier applied to volatility calculations to account for upset potential (default: 1.0).
     # @param neutral [Boolean] Indicates if the game is played at a neutral site (default: false).
     # @param season [Season] The season context for fallback statistics (default: current season).
-    def initialize(home_rating_snapshot:, away_rating_snapshot:, upset_modifier: 1.0, neutral: false, season: Season.current)
+    def initialize(home_rating_snapshot:, away_rating_snapshot:, season: Season.current, **options)
+      @ratings_config_version = ModelConfiguration.for_snapshots(home_rating_snapshot, away_rating_snapshot,
+                                                                 options[:ratings_config_version])
       @home_rating_snapshot = home_rating_snapshot
       @away_rating_snapshot = away_rating_snapshot
-      @upset_modifier = upset_modifier
-      @neutral = neutral
+      @upset_modifier = options.fetch(:upset_modifier, 1.0)
       @season = season
     end
 
@@ -24,28 +22,28 @@ module ProphetRatings
     # Returns the offensive efficiency volatility for the home team, using the rating snapshot if available or falling back to the season's efficiency standard deviation.
     # @return [Float] The home team's offensive efficiency volatility value.
     def home_offensive_volatility
-      home_rating_snapshot.offensive_efficiency_volatility || season.efficiency_std_deviation
+      home_rating_snapshot.offensive_efficiency_volatility || efficiency_fallback
     end
 
     ##
     # Returns the offensive efficiency volatility for the away team, falling back to the season's efficiency standard deviation if unavailable.
     # @return [Float] The away team's offensive volatility value.
     def away_offensive_volatility
-      away_rating_snapshot.offensive_efficiency_volatility || season.efficiency_std_deviation
+      away_rating_snapshot.offensive_efficiency_volatility || efficiency_fallback
     end
 
     ##
     # Returns the defensive efficiency volatility for the home team, using the rating snapshot if available or falling back to the season's efficiency standard deviation.
     # @return [Float] The home team's defensive efficiency volatility value.
     def home_defensive_volatility
-      home_rating_snapshot.defensive_efficiency_volatility || season.efficiency_std_deviation
+      home_rating_snapshot.defensive_efficiency_volatility || efficiency_fallback
     end
 
     ##
     # Returns the defensive efficiency volatility for the away team, falling back to the season's efficiency standard deviation if unavailable.
     # @return [Float] The away team's defensive efficiency volatility value.
     def away_defensive_volatility
-      away_rating_snapshot.defensive_efficiency_volatility || season.efficiency_std_deviation
+      away_rating_snapshot.defensive_efficiency_volatility || efficiency_fallback
     end
 
     ##
@@ -66,14 +64,14 @@ module ProphetRatings
     # Returns the pace volatility for the home team, using the rating snapshot if available or falling back to the season's pace standard deviation.
     # @return [Float] The home team's pace volatility value.
     def home_pace_volatility
-      home_rating_snapshot.pace_volatility || season.pace_std_deviation
+      home_rating_snapshot.pace_volatility || pace_fallback
     end
 
     ##
     # Returns the pace volatility for the away team, using the rating snapshot if available or falling back to the season's pace standard deviation.
     # @return [Float] The away team's pace volatility value.
     def away_pace_volatility
-      away_rating_snapshot.pace_volatility || season.pace_std_deviation
+      away_rating_snapshot.pace_volatility || pace_fallback
     end
 
     ##
@@ -89,9 +87,9 @@ module ProphetRatings
     def confidence_level
       volatility_gap = (total_home_volatility - total_away_volatility).abs
 
-      if volatility_gap < CONFIDENCE_LEVELS[:high_max]
+      if volatility_gap < config.dig(:prediction, :confidence_levels, :high_max)
         'High'
-      elsif volatility_gap < CONFIDENCE_LEVELS[:medium_max]
+      elsif volatility_gap < config.dig(:prediction, :confidence_levels, :medium_max)
         'Medium'
       else
         'Low'
@@ -99,6 +97,18 @@ module ProphetRatings
     end
 
     private
+
+    def config
+      @ratings_config_version.settings
+    end
+
+    def efficiency_fallback
+      season.efficiency_std_deviation || config.dig(:baseline_volatility, :efficiency_volatility)
+    end
+
+    def pace_fallback
+      season.pace_std_deviation || config.dig(:baseline_volatility, :pace_volatility)
+    end
 
     attr_reader :home_rating_snapshot, :away_rating_snapshot, :season, :upset_modifier, :neutral
   end

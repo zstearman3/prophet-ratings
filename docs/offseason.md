@@ -448,3 +448,35 @@ URL without loading Rails or connecting to a database. It parsed 365 unique team
 memberships across 31 conferences from the live page's commented tables.
 Automated specs use a reduced synthetic
 HTML fixture reflecting that structure and do not access Sports Reference.
+
+## Selecting a stored model version
+
+Read [Model configuration versions](model-versions.md) before rollout or changing
+the default. Apply the additive live-input provenance migration and explicitly
+publish the reviewed complete bundle. Publication does not activate it; looking
+up or evaluating a version does not change the active row.
+
+Use `MODEL_VERSION=<stored bundle name>` with `season:initialize_preseason`,
+`season:resume_ratings`, `season:rebuild_ratings`, or `ratings:compare_preseason`
+to select one existing version without activation. Otherwise calculation defaults
+select the active stored row (or an already-published authored bundle if none is
+active). Queued rating/prediction jobs retain the selected version ID even if
+activation or YAML changes later. `SOURCE_CONFIG` in the comparison remains the
+previous-season snapshot source; `MODEL_VERSION` supplies candidate settings.
+
+Fresh seasons can initialize priors/live ratings/snapshots for the selected model.
+Legacy or differently-versioned established live ratings are not relabeled.
+An intentional model switch requires the existing explicitly confirmed and
+scoped rebuild path, starting at season opening with `RUN_PRESEASON=true`;
+review authority, dates and dependencies before running it. The reset applies
+that version's captures and defaults. Other versions' history is preserved.
+Activation is separate:
+
+```bash
+bin/rails ratings_config_version:activate MODEL_VERSION=v1.6-pinned-model
+```
+
+Neither deployment nor activation repairs legacy inputs or freezes mutable data.
+Older already-queued jobs with no version argument need review during rollout;
+their original intended settings were not recorded. No production import,
+backfill, rebuild, migration, or deployment was run to verify this change.

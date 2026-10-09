@@ -3,6 +3,8 @@
 require 'rails_helper'
 
 RSpec.describe ProphetRatings::TeamSeasonStatsAggregator, type: :service do
+  before { RatingsConfigVersion.publish! }
+
   include StatsHelpers
 
   describe '#run' do

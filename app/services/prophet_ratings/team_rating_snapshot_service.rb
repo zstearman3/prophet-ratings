@@ -2,7 +2,9 @@
 
 module ProphetRatings
   class TeamRatingSnapshotService
-    def initialize(season: Season.current, as_of: Time.current)
+    def initialize(season: Season.current, as_of: Time.current, ratings_config_version: nil)
+      @ratings_config_version = RatingsConfigVersion.resolve(ratings_config_version)
+      @ratings_config_version.settings
       @season = season
       @as_of = as_of
     end
@@ -10,10 +12,14 @@ module ProphetRatings
     def call
       # A savepoint also protects callers that rescue a mismatch inside their own transaction.
       TeamRatingSnapshot.transaction(requires_new: true) do
-        current_config = Rails.application.config_for(:ratings).deep_symbolize_keys
-        ratings_config_version = RatingsConfigVersion.find_or_create_by_config(current_config)
+        ratings_config_version = @ratings_config_version
 
         TeamSeason.where(season: @season).find_each do |team_season|
+          team_season.validate_model_inputs(ratings_config_version)
+          unless team_season.ratings_config_version_id == ratings_config_version.id
+            raise ArgumentError, 'Live ratings lack selected model provenance; calculate ratings before snapshot publication'
+          end
+
           TeamRatingSnapshot.find_or_initialize_by(
             team_id: team_season.team_id,
             season_id: @season.id,

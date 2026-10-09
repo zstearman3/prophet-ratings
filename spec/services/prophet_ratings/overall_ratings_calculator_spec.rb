@@ -3,6 +3,8 @@
 require 'rails_helper'
 
 RSpec.describe ProphetRatings::OverallRatingsCalculator, type: :service do
+  before { RatingsConfigVersion.publish! }
+
   include ActiveSupport::Testing::TimeHelpers
 
   describe 'target season and cutoff' do
@@ -27,7 +29,9 @@ RSpec.describe ProphetRatings::OverallRatingsCalculator, type: :service do
       aggregator = instance_double(ProphetRatings::TeamSeasonStatsAggregator, run: true)
       allow(ProphetRatings::TeamSeasonStatsAggregator).to receive(:new).and_return(aggregator)
       calculator.call(as_of: timestamp)
-      expect(ProphetRatings::TeamSeasonStatsAggregator).to have_received(:new).with(season:, as_of: expected_date)
+      expect(ProphetRatings::TeamSeasonStatsAggregator).to have_received(:new).with(
+        season:, as_of: expected_date, ratings_config_version: RatingsConfigVersion.default_version
+      )
       expect(team_season.team_rating_snapshots.sole.snapshot_date).to eq(expected_date)
     end
 
@@ -98,7 +102,7 @@ RSpec.describe ProphetRatings::OverallRatingsCalculator, type: :service do
         end
       end
       # Standard specs stub Python; the separate Docker rehearsal exercises the real solver.
-      allow(StatisticsUtils).to receive(:solve_least_squares_with_python) { |rows, _targets, _weights| Array.new(rows.first.size, 0.0) }
+      allow(StatisticsUtils).to receive(:solve_least_squares_with_python) { |rows, _targets, **_options| Array.new(rows.first.size, 0.0) }
       calculator.call(as_of: as_of - 1.day)
     end
 
@@ -233,9 +237,19 @@ RSpec.describe ProphetRatings::OverallRatingsCalculator, type: :service do
     let(:season) { create(:season) }
     let(:calculator) { described_class.new(season) }
 
+    def attach_prior(team_season)
+      version = RatingsConfigVersion.default_version
+      inputs = { configuration: version.config, baselines: {}, previous_values: {}, profile_values: {} }
+      outputs = team_season.attributes.slice('preseason_adj_offensive_efficiency', 'preseason_adj_defensive_efficiency',
+                                             'preseason_adj_pace').transform_values(&:to_f)
+      prior = PreseasonPrior.create!(team_season:, ratings_config_version: version, inputs:, outputs:)
+      team_season.update!(preseason_prior: prior)
+    end
+
     it 'publishes required ranks/defaults when there are no games before the solver gate' do
       team_season = create(:team_season, season:, preseason_adj_offensive_efficiency: 120,
                                          preseason_adj_defensive_efficiency: 100, preseason_adj_pace: 70)
+      attach_prior(team_season)
       calculator.call(as_of: season.start_date)
       expect([team_season.reload.rating, team_season.overall_rank, team_season.adj_pace]).to eq([20, 1, 70])
       expect(team_season.team_rating_snapshots.first.snapshot_date).to eq(season.start_date)
@@ -246,6 +260,7 @@ RSpec.describe ProphetRatings::OverallRatingsCalculator, type: :service do
         create(:team_season, season:, adj_offensive_efficiency: 120, adj_defensive_efficiency: 100, adj_pace: 70,
                              preseason_adj_offensive_efficiency: 120, preseason_adj_defensive_efficiency: 100, preseason_adj_pace: 70)
       end
+      teams.each { |team_season| attach_prior(team_season) }
       2.times do |index|
         game = create(:game, season:, start_time: season.start_date + (index + 1).days + 12.hours,
                              possessions: 70, minutes: 40, home_team_score: 80, away_team_score: 70)

@@ -3,6 +3,12 @@
 require 'rails_helper'
 
 RSpec.describe ProphetRatings::PreseasonComparison do
+  before do
+    RatingsConfigVersion.publish!
+    create(:team_game, game:, team_season: home, team: home.team, home: true)
+    create(:team_game, game:, team_season: away, team: away.team, home: false)
+  end
+
   let(:version) { create(:ratings_config_version, name: 'historical') }
   let(:previous) { create(:season, year: 2025, start_date: Date.new(2024, 11, 1), end_date: Date.new(2025, 4, 10)) }
   let(:season) { create(:season, year: 2026, start_date: Date.new(2025, 11, 1), end_date: Date.new(2026, 4, 10)) }
@@ -20,11 +26,6 @@ RSpec.describe ProphetRatings::PreseasonComparison do
                                   snapshot_date: previous.end_date, adj_offensive_efficiency: offense,
                                   adj_defensive_efficiency: 100, adj_pace: 69.5,
                                   created_at: Time.utc(2025, 6, 1), updated_at: Time.utc(2025, 6, 1))
-  end
-
-  before do
-    create(:team_game, game:, team_season: home, team: home.team, home: true)
-    create(:team_game, game:, team_season: away, team: away.team, home: false)
   end
 
   it 'compares fixed candidates on pre-opening stored transitions and ignores mutable season averages' do

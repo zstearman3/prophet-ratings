@@ -27,7 +27,7 @@ namespace :season do
         if season.reload.current?
           abort('Existing season outputs must be preserved. Use an explicitly scoped season:rebuild_ratings for an intentional reset.')
         end
-        ProphetRatings::PreseasonInitializer.new(season).call
+        ProphetRatings::PreseasonInitializer.new(season, ratings_config_version: selected_model_version).call
       end
     end
     puts "Preseason values initialized for year=#{season.year}. Review coverage before activation."
@@ -106,13 +106,17 @@ namespace :season do
     first..last
   end
 
+  def selected_model_version
+    ENV['MODEL_VERSION'].present? ? RatingsConfigVersion.find_by!(name: ENV['MODEL_VERSION']) : RatingsConfigVersion.default_version
+  end
+
   def target_year!
     SeasonPreparer.parse_year(ENV.fetch('YEAR', ''))
   end
 
   # Synchronous operator commands must raise failures, not enqueue an ActiveJob retry and report success.
   def run_ratings_job!(job_class, season_id, **)
-    Season.with_ratings_lock { job_class.new.perform(season_id, **) }
+    Season.with_ratings_lock { job_class.new.perform(season_id, ratings_config_version_id: selected_model_version.id, **) }
   end
 
   def target_season!

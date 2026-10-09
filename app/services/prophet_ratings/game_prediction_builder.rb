@@ -6,9 +6,10 @@ module ProphetRatings
     # Initializes a new GamePredictionBuilder for the given game and ratings configuration version.
     # @param game The game for which predictions will be built.
     # @param ratings_config_version The ratings configuration version to use (defaults to the configured bundle).
-    def initialize(game, ratings_config_version: RatingsConfigVersion.find_or_create_by_current_config)
+    def initialize(game, ratings_config_version: nil)
       @game = game
-      @ratings_config_version = ratings_config_version
+      @ratings_config_version = RatingsConfigVersion.resolve(ratings_config_version)
+      @config = @ratings_config_version.settings
     end
 
     ##
@@ -22,7 +23,8 @@ module ProphetRatings
         home_rating_snapshot: home_snapshot,
         away_rating_snapshot: away_snapshot,
         venue: { type: game.venue_type, confidence: game.venue_confidence },
-        season: game.season
+        season: game.season,
+        ratings_config_version:
       ).call
 
       Prediction.find_or_initialize_by(
@@ -53,7 +55,7 @@ module ProphetRatings
       return [nil] unless home_snapshot && away_snapshot
 
       season = game.season
-      deviation = season.efficiency_std_deviation
+      deviation = season.efficiency_std_deviation || @config.dig(:baseline_volatility, :efficiency_volatility)
       [season.average_pace] + [home_snapshot, away_snapshot].flat_map do |snapshot|
         [snapshot.adj_offensive_efficiency, snapshot.adj_defensive_efficiency, snapshot.adj_pace,
          snapshot.offensive_efficiency_volatility || deviation, snapshot.defensive_efficiency_volatility || deviation]

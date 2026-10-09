@@ -3,6 +3,8 @@
 require 'rails_helper'
 
 RSpec.describe ProphetRatings::PreseasonRatingsCalculator, type: :service do
+  before { RatingsConfigVersion.publish! }
+
   describe '#call' do
     let(:previous_season) do
       create(
@@ -77,9 +79,9 @@ RSpec.describe ProphetRatings::PreseasonRatingsCalculator, type: :service do
     it 'preserves a prior when a new model version captures corrected inputs' do
       original = PreseasonPrior.find_by!(team_season:)
       previous_team_season.update!(adj_offensive_efficiency: 120)
-      config = Rails.application.config_for(:ratings).to_h.deep_symbolize_keys.merge(bundle_name: 'corrected-inputs')
-      allow(Rails.application).to receive(:config_for).with(:ratings).and_return(config)
-      described_class.new(season).call
+      config = RatingsConfigVersion.authored_config.merge(bundle_name: 'corrected-inputs')
+      version = RatingsConfigVersion.publish!(config)
+      described_class.new(season, ratings_config_version: version).call
       expect(PreseasonPrior.count).to eq(2)
       expect(original.reload.outputs.fetch('preseason_adj_offensive_efficiency')).to eq(115.25)
       expect(team_season.reload.preseason_adj_offensive_efficiency).to eq(122.05)
