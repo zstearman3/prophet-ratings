@@ -30,7 +30,7 @@ RSpec.describe Importer::Setup::TeamConferencesSynchronizer do
     Tempfile.create(['team-conferences', '.csv']) do |file|
       file.write(contents)
       file.flush
-      return described_class.new(path: file.path).call
+      return described_class.new(path: file.path, apply: true).call
     end
   end
 
@@ -40,6 +40,48 @@ RSpec.describe Importer::Setup::TeamConferencesSynchronizer do
       file.flush
       return described_class.referenced_years(path: file.path)
     end
+  end
+
+  it 'defaults to a read-only preview with the same diff as explicit apply', :aggregate_failures do
+    existing = create(:team_conference, team: alpha, conference: old_conference, start_season: season2025)
+    stale = create(:team_conference, team: beta, conference: old_conference, start_season: season2025)
+    season2027
+    before = TeamConference.order(:id).map(&:attributes)
+    Tempfile.create(['team-conferences', '.csv']) do |file|
+      file.write(csv('Alpha,new,2025,2026', 'Alpha,new,2027,'))
+      file.flush
+      preview = described_class.new(path: file.path)
+      result = preview.call
+      expect(result.to_h).to eq(created: 1, updated: 1, unchanged: 0, deleted: 1)
+      expect(TeamConference.order(:id).map(&:attributes)).to eq(before)
+      expect(preview.changes.map { |change| change[:action] }).to eq(%w[delete update create])
+      update = preview.changes.find { |change| change[:action] == 'update' }
+      expect(update).to include(id: existing.id, team_id: alpha.id,
+                                before: { 'conference_id' => old_conference.id, 'start_season_id' => season2025.id,
+                                          'end_season_id' => nil },
+                                after: { 'conference_id' => new_conference.id, 'start_season_id' => season2025.id,
+                                         'end_season_id' => season2026.id })
+      expect(preview.changes.first[:id]).to eq(stale.id)
+      expect(preview.call).to eq(result)
+      expect(preview.changes.size).to eq(3)
+      applied = described_class.new(path: file.path, apply: true)
+      expect(applied.call).to eq(result)
+      expect(applied.changes).to eq(preview.changes)
+    end
+  end
+
+  it 'rejects non-boolean apply values rather than accidentally enabling writes' do
+    expect { described_class.new(path: 'unused', apply: 'false') }.to raise_error(ArgumentError)
+  end
+
+  it 'validates missing seasons and overlapping ranges in preview without changing rows' do
+    existing = create(:team_conference, team: alpha, conference: old_conference, start_season: season2025)
+    Tempfile.create(['team-conferences', '.csv']) do |file|
+      file.write(csv('Alpha,new,2025,2028', 'Alpha,old,2026,'))
+      file.flush
+      expect { described_class.new(path: file.path).call }.to raise_error(described_class::InvalidData, /end season not found/)
+    end
+    expect(TeamConference.pluck(:id)).to eq([existing.id])
   end
 
   it 'creates a missing natural key' do

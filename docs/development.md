@@ -177,9 +177,11 @@ narrowing a full run. Shared source files, Rails logs and RSpec status files are
 still shared between simultaneous runs.
 
 Tests load the schema instead of running `db:prepare`: on an empty database,
-`db:prepare` invokes application seeds, which import domain data and currently
-fail in `Importer::Setup::BaseDataImporter#import_teams`. That ingestion issue is
-separate from test/environment setup. Tests must use factories, not that seed path.
+`db:prepare` invokes application seeds, which import base domain records. Tests
+must use factories, not that seed path. `db:seed`/`import:base` preserve existing
+seasons and model outputs and do not reconcile memberships; authoritative CSV
+changes use the separate `import:reconcile_conferences` preview and `APPLY=true`
+operation documented in [Offseason Operations](offseason.md).
 
 The normal hooks are:
 

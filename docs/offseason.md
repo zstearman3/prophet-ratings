@@ -95,15 +95,37 @@ Edit:
 db/seeds/team_conferences.csv
 ```
 
-Then run:
+Preview the full authoritative diff, then deliberately apply the reviewed file:
 
 ```bash
-bin/rails db:seed
+bin/rails import:reconcile_conferences
+bin/rails import:reconcile_conferences APPLY=true
 ```
 
-`db:seed` treats the CSV as authoritative. It upserts matching `(team, start season)` rows, updates changed rows, creates missing rows, and deletes database memberships not present in the CSV.
+Use `CSV_PATH=/path/to/reviewed.csv` for an alternative complete file. Preview is
+read-only and prints counts plus each proposed create/update/delete, including
+membership, team, conference and season IDs before/after. `APPLY` accepts only
+`true` or `false`; the default is `false`. Apply recomputes the diff against the
+current database, so rerun preview if the file or memberships changed.
 
-Do not expect RailsAdmin-only rows to survive `db:seed`.
+The complete CSV is authoritative across all stored memberships. Apply upserts
+matching `(team, start season)` rows, preserves unchanged IDs/timestamps, creates
+missing rows, and deletes memberships absent from the CSV, including RailsAdmin
+and live-alignment assignments. This is separate from conservative
+`season:align_conferences`, which preserves unrelated memberships.
+
+Both modes validate all headers, references, duplicate keys and inclusive date
+ranges before writes. Missing teams, conferences or seasons fail with row details;
+this command never imports base records, prepares seasons or activates them.
+Prepare missing references separately (for a season: `season:prepare YEAR=...`),
+then preview again. Apply runs transactionally under the shared ratings lock;
+write failure rolls back deletions and updates. Inspect the diff before applying.
+
+`db:seed` and `import:base` now import only teams/aliases, conferences, an inactive
+2024–25 shell if absent, and missing TeamSeason rows. They preserve existing
+season dates, averages, activation and model outputs. They do not reconcile
+memberships. Identical base reruns preserve records and timestamps; alias
+ownership conflicts fail rather than reassigning an alias.
 
 ## 3. Repeat preparation and conference review safely
 
@@ -417,7 +439,7 @@ Changing `TeamConference` rows does not automatically recalculate historical gam
 - Conference alignment runs during explicit `season:bootstrap` and
   `season:align_conferences` calls, not deploy, application boot, or nightly sync.
 - `import:base` imports teams, seasons, team seasons, and conferences, but does not reconcile conference memberships.
-- `db:seed` is the only authoritative CSV reconciliation entry point.
+- `import:reconcile_conferences` is the authoritative CSV preview/apply entry point; `db:seed` imports base records only.
 
 ## Source smoke verification
 

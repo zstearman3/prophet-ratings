@@ -14,7 +14,23 @@ module Importer
       ParsedRow = Data.define(:number, :school, :conference_slug, :start_year, :end_year)
       References = Data.define(:teams_by_school, :conferences_by_slug, :seasons_by_year)
       ResolvedRowReferences = Data.define(:team, :conference, :start_season, :end_season)
-      Counts = Data.define(:created, :updated, :unchanged)
+      Counts = Data.define(:created, :updated, :unchanged) do
+        def increment(action)
+          key = { 'create' => :created, 'update' => :updated, 'unchanged' => :unchanged }.fetch(action)
+          with(**{ key => public_send(key) + 1 })
+        end
+      end
+      # Captures the proposed membership values before any write.
+      Change = Data.define(:action, :membership) do
+        def to_h
+          attributes = membership.attributes.slice('conference_id', 'start_season_id', 'end_season_id')
+          {
+            action:, id: membership.id, team_id: membership.team_id,
+            before: membership.persisted? ? attributes.merge(membership.changes.transform_values(&:first)) : nil,
+            after: action == 'delete' ? nil : attributes
+          }
+        end
+      end
       Row = Data.define(:number, :team, :conference, :start_season, :end_season, :start_year, :end_year) do
         def natural_key
           [team.id, start_season.id]
@@ -25,15 +41,22 @@ module Importer
         new(path:).referenced_years
       end
 
-      def initialize(path:)
+      attr_reader :changes
+
+      def initialize(path:, **options)
         @path = path
+        @apply = options.fetch(:apply, false)
+        raise ArgumentError, 'apply must be true or false' unless [true, false].include?(@apply)
+
+        @changes = []
       end
 
       def call
-        desired_rows = validated_rows
-
-        TeamConference.transaction do
-          reconcile(desired_rows)
+        @changes = []
+        Season.with_ratings_lock do
+          TeamConference.transaction do
+            reconcile(validated_rows)
+          end
         end
       end
 
@@ -46,7 +69,7 @@ module Importer
 
       private
 
-      attr_reader :path
+      attr_reader :path, :apply
 
       def validated_rows
         parsed_rows, errors = parse_csv_rows
@@ -200,10 +223,12 @@ module Importer
       end
 
       def delete_stale_memberships(existing_by_key, desired_rows)
-        stale_ids = existing_by_key.except(*desired_rows.map(&:natural_key)).values.map(&:id)
-        return 0 if stale_ids.empty?
-
-        TeamConference.where(id: stale_ids).delete_all
+        stale_ids = existing_by_key.except(*desired_rows.map(&:natural_key)).values.map do |membership|
+          record_change('delete', membership)
+          membership.id
+        end
+        TeamConference.where(id: stale_ids).delete_all if apply && stale_ids.any?
+        stale_ids.size
       end
 
       def apply_desired_rows(existing_by_key, desired_rows)
@@ -226,16 +251,20 @@ module Importer
         save_membership(membership, counts)
       end
 
+      def record_change(action, membership)
+        changes << Change.new(action, membership).to_h
+      end
+
       def save_membership(membership, counts)
-        if membership.new_record?
-          membership.save!
-          counts.with(created: counts.created + 1)
-        elsif membership.changed?
-          membership.save!
-          counts.with(updated: counts.updated + 1)
-        else
-          counts.with(unchanged: counts.unchanged + 1)
-        end
+        action = membership.changed? ? apply_membership_change(membership) : 'unchanged'
+        counts.increment(action)
+      end
+
+      def apply_membership_change(membership)
+        action = membership.new_record? ? 'create' : 'update'
+        record_change(action, membership)
+        membership.save! if apply
+        action
       end
     end
   end
