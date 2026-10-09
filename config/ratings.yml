@@ -1,5 +1,5 @@
 default: &default
-  bundle_name: "v1.3-preseason-safety"
+  bundle_name: "v1.5-preseason-publication"
   preseason:
     previous_season_weight: 0.85
     fallback_efficiency: 105.5

@@ -92,4 +92,12 @@ RSpec.describe SyncFullSeasonGamesJob do
     expect(Ingestion::GamesIngestionService).to have_received(:new).with(date: first_date).exactly(7).times
     expect(service).to have_received(:call).twice
   end
+
+  it 'does not let a future scheduled game skip historical resume dates' do
+    season.update!(end_date: today + 20.days)
+    create(:game, season:, start_time: Game.schedule_time_for(today + 10.days), status: :scheduled)
+    described_class.perform_now(season, resume: true)
+    expect(Ingestion::GamesIngestionService).to have_received(:new).with(date: season.start_date)
+    expect(Ingestion::GamesIngestionService).to have_received(:new).with(date: today - 1.day)
+  end
 end

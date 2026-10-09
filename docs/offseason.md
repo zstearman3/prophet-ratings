@@ -9,10 +9,9 @@ example dates are operator-selected windows, not verified season boundaries.
 No schedule is needed to prepare or initialize a season. An empty schedule is
 expected before source publication, but does not establish ingestion success.
 
-This runbook describes the current checkout. Complete preseason publication,
-reliable future-refresh reporting, and frozen prior inputs are still pending
-their linked stories. Keep readiness items below open until those outputs are
-actually present; initialization or successful activation alone is insufficient.
+This runbook includes bounded future refresh, complete preseason publication,
+and captured prior inputs. Verify the readiness items against the deployed
+revision and intended dataset; successful activation alone is insufficient.
 
 ## 1. Prepare the season shell
 
@@ -133,20 +132,40 @@ For a fresh, inactive season:
 bin/rails season:initialize_preseason YEAR=2027
 ```
 
-Initialization is transactional. Existing live adjusted values, snapshots,
-predictions, final games or current-season status cause a clear refusal to reset
-outputs. A failed initialization rolls back all its writes and can be retried.
-Repeated successful initialization preserves outputs by refusing the reset.
-The separate preseason publishing story owns complete ranks, defaults and
-snapshots; this command calls the existing initializer and does not claim those
-publication guarantees. Adding teams after initialization requires review of
-their missing values before activation.
+Initialization atomically captures priors and publishes adjusted offense, defense,
+pace, net ratings, ranks, home boosts and volatility defaults, plus snapshots dated
+one day before the stored season start. Snapshots use the configured bundle and
+include captured prior provenance. Ties break by ascending team ID; unavailable
+Five Factors remain unranked rather than receiving invented values.
 
-Review `TeamSeason` preseason/live offense, defense, pace and rating in `/admin`.
-The current initializer does not publish ranks, prediction volatility/home boost
-defaults, or snapshots. Do not substitute an ordinary rankings run for preseason
-publication: raw aggregation and thin-team defaults can replace usable priors.
-Record missing publication outputs as blockers for a prediction-ready launch.
+A safe repeat reuses captures and snapshot identities, and can initialize newly
+prepared teams. Current-season status, final games, snapshots on other dates or
+live core ratings differing from their preseason values cause a clear refusal.
+Scheduled predictions permit an unchanged repeat. A repeat that would change
+the efficiency or pace baseline while saved predictions exist is refused and
+rolled back; review dependent predictions before changing coverage or inputs. A failed publication rolls
+back all writes and can be retried. Review team coverage and season boundaries
+before activation; changing boundaries after publication requires explicit review.
+
+With scheduled games and both TeamGame associations available, the existing
+prediction builder uses the configured bundle's latest applicable snapshots.
+Missing/incomplete core inputs produce no prediction and a warning in Rails logs.
+Publication does not itself import schedules or generate predictions. Example:
+
+```ruby
+season = Season.find_by!(year: 2027)
+ProphetRatings::GamePredictionBuilder.new(season.games.scheduled.first).call
+```
+
+Only the explicit rebuild job uses the initializer's separate reset entry point;
+it preserves the rebuild's existing date window and publishes no additional
+preseason snapshot outside that window.
+
+Review `TeamSeason` preseason/live offense, defense, pace, rating, ranks and
+prediction defaults in `/admin`, together with the preseason snapshots and captured
+`PreseasonPrior` inputs. Keep missing publication outputs open in the readiness
+record. Use initialization for offseason publication rather than ordinary rankings;
+rankings aggregate observed games and write snapshots at their own cutoff.
 
 ## 5. Refresh schedules separately
 
@@ -156,35 +175,63 @@ Historical catch-up remains explicit and capped at yesterday:
 bin/rails season:sync_games YEAR=2027 SYNC_RESUME=false SYNC_START_DATE=2026-11-01 SYNC_END_DATE=2026-11-15
 ```
 
-Before games begin, the existing future-date path can be called in the Rails
-console with an explicit inactive season and without enqueuing ratings:
+Refresh an explicit target season before activation or whenever schedules change:
 
-```ruby
-season = Season.find_by!(year: 2027)
-SyncNightlyGamesJob.perform_later(season.id, enqueue_rankings: false, future_end_date: Date.new(2026, 11, 15))
+```bash
+bin/rails season:refresh_schedule YEAR=2027 SCHEDULE_START_DATE=2026-11-01 SCHEDULE_END_DATE=2026-11-15
 ```
 
-A reliable refresh command and source-failure/date reconciliation reporting belong
-to the schedule story. Historical SyncFullSeasonGamesJob still logs exhausted
-per-date retries without failing the whole job: inspect its logs, and rerun the
-failed date window with SYNC_RESUME=false. Do not infer completeness from the latest
-imported game; it may be a future scheduled game. Game sync is never a prerequisite
-for preparing the shell or initializing existing preseason values.
+Both dates are required, ordered, inclusive Eastern schedule dates, today or later,
+and entirely inside the stored season. The operation does not activate the season,
+resume from a latest game, enqueue rankings, or generate predictions. Every date
+in the window is requested again on each run. Use small windows to respect Sports
+Reference rate limits and keep synchronous runs manageable.
 
-Repeat the explicit-season nightly call as schedules fill in; it revisits dates
-from the later of today or season start through the requested cutoff, plus the
-recent past window. It does not resume from the latest future game. Earlier
-historical gaps require the bounded historical command above with resume disabled.
-For a single failed date, use `SyncDailyGamesJob.perform_later(Date.new(2026, 11, 3))`
-and inspect its outcome. A daily sync selects by date, not season ID; first verify
-that stored season dates map that date to the intended season without overlaps.
+The command prints a JSON report with each date's imported row count and game
+outcomes (`created`, `updated`, `unchanged`, `protected`, `ambiguous`). `changes`
+contains changed stored Game fields; `unmatched` lists names without a TeamSeason
+association. A unique game-specific URL can move an existing game to a new date
+while retaining its ID. Partial rows with daily placeholders preserve an existing
+game-specific URL. Shared daily schedule URLs are not identity keys.
+`possible_move_ids` lists other scheduled games with the same ordered team names;
+these may be legitimate repeat matchups or ambiguous moves and require review.
+Ambiguous URL/date matches are reported with candidate IDs and left untouched.
 
-Until the refresh story lands, inspect logs for unmatched teams, partial rows,
-and exceptions. Current schedule scraping cannot reliably distinguish every
-unavailable page from a valid empty schedule. No automatic source-absence deletion
-or complete reschedule reconciliation exists. Compare changed dates, missing games
-and venue identities with the source manually; retain ambiguous records for review.
-Do not label an empty import or a completed job as a complete schedule.
+`absent_ids` lists scheduled records missing from successfully refreshed dates,
+excluding games seen elsewhere in the same window. Absence alone never deletes or
+cancels games. Review these IDs and ambiguous changes in Rails admin/console against
+the source before correcting them. Refresh both old and new dates when investigating
+moves; placeholder-only entries across dates are retained separately pending review.
+Manual venue fields and completed games are protected from partial source rows.
+Broken legacy final records without derived completion data retain the existing
+repair behavior. Enrichment failures remain warnings with schedule-row fallback;
+this report does not certify venue coverage.
+
+HTTP errors, unsupported page structures and malformed entries fail the date,
+whereas a recognized empty schedule succeeds with zero rows. Each failed date is
+rolled back and retried up to three times with 5/10/20-second backoff, then reported
+in `failed_dates`; later dates still run. The command exits nonzero for failed dates.
+Successful dates remain committed. Rerun failed windows explicitly after fixing
+source/identity issues; do not infer coverage from stored games. The existing
+nightly job continues to use its rolling window and may enqueue rankings.
+
+Historical SyncFullSeasonGamesJob still logs exhausted per-date retries without
+failing the whole job: inspect its logs, and rerun the failed date window with
+SYNC_RESUME=false. Its latest-game resume heuristic now excludes today/future
+games, but historical game presence is still not proof of complete date coverage.
+Game sync is never a prerequisite for preparing the shell or initializing existing
+preseason values.
+
+Repeat `season:refresh_schedule` with explicit windows as schedules fill in;
+it revisits every requested date without selecting a resume point. Review its
+`failed_dates`, `unmatched`, `ambiguous`, `possible_move_ids` and `absent_ids` after
+every run. Earlier historical gaps require the bounded historical command with
+resume disabled. Historical sync still logs exhausted retries without failing
+the whole job; inspect logs even when it completes. For a single historical failed
+date, use `SyncDailyGamesJob.perform_later(Date.new(2026, 11, 3))` and inspect its
+outcome. That daily path selects the season by date, so first verify stored season
+boundaries do not overlap. Empty successful future-refresh dates differ from failed
+dates, but neither establishes complete source publication or venue coverage.
 
 ## 6. Activate explicitly
 
@@ -278,9 +325,9 @@ or **deferred with a reason**; there is no automatic readiness approval.
 | Memberships/identities | Run alignment and resolve every suggestion. Compare roster teams without memberships separately: local membership ranges cannot identify a wholly missing team. Review stored school URLs, exact conference identity and aliases in `/admin`. Preserve historical ranges; do not infer retirement from absence. |
 | Aliases | List expected teams with no `TeamAlias` and ambiguous/duplicate alias values; inspect unmatched names in sync logs against source spellings. `Team.search` joins aliases, so even an exact school match can fail without an alias. A nonempty alias list alone does not prove matching coverage. |
 | Preseason values | For every expected participant, check finite preseason/live offense, defense, pace and rating, with positive pace; review missing history and optional profiles. Also check every stored team's TeamSeason and live offense/defense/pace because the activation guard currently requires them. Do not reset established outputs to fill a gap. |
-| Ranks/defaults | Check overall/offense/defense/pace ranks for completeness and plausible ordering, plus home boosts and efficiency/pace volatility defaults. The current initializer leaves these absent; track the publishing story before prediction launch. |
-| Snapshots/config | Choose the intended preseason snapshot date and config explicitly. Require one usable snapshot per expected participant for that date/config, with matching team/season, live values, ranks and required prediction stats. Count missing teams rather than all snapshots. Check stored config against `config/ratings.yml`; name reuse does not replace stored config. Frozen prior input capture is still pending. |
-| Schedule/venues | Record requested dates, imported counts and independently reviewed empty dates. Check both TeamGame/team-season associations, duplicate pairs/URLs, shifted/removed entries, missing start times and unknown/unconfirmed venues. Unknown venues receive no home advantage; missing source evidence stays open. No games before schedule publication is an explicit deferred item. |
+| Ranks/defaults | Check overall/offense/defense/pace ranks for completeness and plausible ordering, plus home boosts and efficiency/pace volatility defaults. Initialization publishes these; unavailable Five Factors intentionally remain unranked. Inspect missing core ranks/defaults before prediction launch. |
+| Snapshots/config | Choose the intended preseason snapshot date and config explicitly. Require one usable snapshot per expected participant for that date/config, with matching team/season, live values, ranks and required prediction stats. Count missing teams rather than all snapshots. Check stored config against `config/ratings.yml`; name reuse with changed config is rejected. Inspect `PreseasonPrior` and snapshot `stats.preseason_prior` provenance; legacy outputs may be uncaptured. |
+| Schedule/venues | Record requested dates, imported counts, failed dates and reviewed empty dates from the refresh report. Review `unmatched`, `ambiguous`, `possible_move_ids` and `absent_ids`. Check both TeamGame/team-season associations, duplicate pairs/URLs, shifted/removed entries, missing start times and unknown/unconfirmed venues. Unknown venues receive no home advantage; missing source evidence stays open. No games before schedule publication is an explicit deferred item. |
 | Predictions | Once scheduled games and snapshots exist, inspect prediction coverage and snapshot dates/configs for each matchup. Inspect default uncertainty rather than treating the confidence label as calibration evidence. Zero games can defer predictions, but cannot prove prediction readiness. |
 | Job outcomes | Record job IDs, target season/date arguments, failed/retried/discarded dates, errors and successful recovery. Inspect logs even for completed historical sync jobs: exhausted per-date retries can be swallowed. Confirm queued explicit-season jobs still target the intended season after a switch. |
 
@@ -309,25 +356,27 @@ evidence remains open. Explicit deferrals belong in the operator record.
 ## Local rehearsal and production handoff
 
 Automated rehearsal uses synthetic records and scraper fixtures, with no live
-source requests, imports, production copies or destructive rebuilds:
+source requests, domain imports, production copies or real-data rebuilds:
 
 ```bash
-bin/test spec/tasks/season_preparer_spec.rb spec/tasks/season_conference_alignment_spec.rb spec/services/season_preparer_spec.rb spec/services/season_conference_alignment_spec.rb spec/services/scraper/conference_standings_scraper_spec.rb spec/jobs/sync_nightly_games_job_spec.rb spec/jobs/sync_full_season_games_job_spec.rb spec/jobs/resume_season_ratings_job_spec.rb spec/jobs/generate_season_ratings_job_spec.rb
+bin/test spec/tasks/season_preparer_spec.rb spec/tasks/season_conference_alignment_spec.rb spec/services/season_preparer_spec.rb spec/services/season_conference_alignment_spec.rb spec/services/scraper/conference_standings_scraper_spec.rb spec/jobs/sync_nightly_games_job_spec.rb spec/jobs/sync_full_season_games_job_spec.rb spec/jobs/resume_season_ratings_job_spec.rb spec/jobs/generate_season_ratings_job_spec.rb spec/tasks/ingestion/future_schedule_refresh_spec.rb spec/services/ingestion/future_schedule_refresh_spec.rb spec/services/prophet_ratings/preseason_initializer_spec.rb spec/services/prophet_ratings/team_rating_snapshot_service_spec.rb spec/services/prophet_ratings/overall_ratings_calculator_spec.rb
 bundle exec overcommit --run
 bundle exec overcommit --run pre_push
 ```
 
 Coverage includes no-schedule initialization, repeat preparation with explicit
 dates, unchanged outputs, review-required alignment with safe changes, rollback,
-bounded nightly dates, historical retry exhaustion and transactional rating
-recovery. Solver calls are stubbed; this is operational safety evidence, not a
-real-data model accuracy or live source availability assessment.
+bounded future refresh and partial-date failures, repeat publication/capture reuse,
+thin-team priors, historical retry exhaustion and transactional rating recovery.
+Solver calls are stubbed; this is operational safety evidence, not a real-data
+model accuracy or live source availability assessment.
 
 For an explicitly requested manual local rehearsal, use a separate Compose project
 and distinct app/database ports per [Local development](development.md). Record
 the revision and run preparation twice with explicit dates; compare dates, current
-season and outputs. Review alignment, initialize once, confirm the second call
-refuses a reset, then fill the checklist. Live alignment/refresh requires an
+season and outputs. Review alignment, initialize twice, confirm the repeat reuses
+captured priors and snapshot IDs, then fill the checklist. Run bounded refresh and review its report
+when schedules are available. Live alignment/refresh requires an
 intentional source operation and dataset. Stop only that project's services with
 `bin/stop`; preserve the maintainer's database and stack.
 

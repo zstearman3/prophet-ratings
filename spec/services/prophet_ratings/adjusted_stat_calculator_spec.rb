@@ -3,10 +3,12 @@
 require 'rails_helper'
 
 RSpec.describe ProphetRatings::AdjustedStatCalculator, type: :service do
+  let(:as_of) { season.start_date + 30.days }
+
   describe 'pace observations' do
     let(:season) { create(:season, :current) }
     let(:calculator) do
-      described_class.new(season:, raw_stat: :possessions, adj_stat: :adj_pace, adj_stat_allowed: :adj_pace_allowed)
+      described_class.new(season:, raw_stat: :possessions, adj_stat: :adj_pace, adj_stat_allowed: :adj_pace_allowed, as_of:)
     end
 
     [[70, 40, 70.0], [90, 45, 80.0], [nil, 40, nil], [70, nil, nil], [70, 0, nil], [70, -40, nil]].each do |possessions, minutes, expected|
@@ -18,7 +20,7 @@ RSpec.describe ProphetRatings::AdjustedStatCalculator, type: :service do
     end
 
     it 'skips incomplete games and normalizes regulation and overtime pace in the matrix' do
-      team_seasons = create_three_team_round_robin(season:, stat: :effective_fg_percentage)
+      team_seasons = create_three_team_round_robin(season:, stat: :effective_fg_percentage, date: as_of)
       games = Game.where(season:).order(:start_time).to_a
       games[0].update!(possessions: 80, minutes: 40)
       games[1].update!(possessions: 90, minutes: 45)
@@ -61,7 +63,7 @@ RSpec.describe ProphetRatings::AdjustedStatCalculator, type: :service do
 
   describe '#call' do
     let(:season) { create(:season, :current) }
-    let!(:team_seasons) { create_three_team_round_robin(season:, stat: :effective_fg_percentage) }
+    let!(:team_seasons) { create_three_team_round_robin(season:, stat: :effective_fg_percentage, date: as_of) }
 
     let(:ts1) { team_seasons[0] }
     let(:ts2) { team_seasons[1] }
@@ -69,7 +71,7 @@ RSpec.describe ProphetRatings::AdjustedStatCalculator, type: :service do
 
     let(:calculator) do
       described_class.new(season: season, raw_stat: :effective_fg_percentage, adj_stat: :adj_effective_fg_percentage,
-                          adj_stat_allowed: :adj_effective_fg_percentage_allowed)
+                          adj_stat_allowed: :adj_effective_fg_percentage_allowed, as_of:)
     end
 
     before do

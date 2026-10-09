@@ -21,7 +21,7 @@ class GenerateSeasonRatingsJob < ApplicationJob
 
     Season.transaction do
       clear_current_version_data!(season, date_range)
-      ProphetRatings::PreseasonInitializer.new(season).call if run_preseason
+      ProphetRatings::PreseasonInitializer.new(season).reset if run_preseason
       ResumeSeasonRatingsJob.new.perform(season.id, start_date: date_range.begin, end_date: date_range.end)
     end
   end

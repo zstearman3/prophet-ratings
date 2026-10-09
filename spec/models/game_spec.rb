@@ -31,7 +31,7 @@ RSpec.describe Game do
   let(:game) { create(:game, season:, start_time: Time.zone.today) }
   let(:home_team_season) { create(:team_season, season:) }
   let(:away_team_season) { create(:team_season, season:) }
-  let(:ratings_config_version) { create(:ratings_config_version, current: true) }
+  let(:ratings_config_version) { RatingsConfigVersion.ensure_current! }
   let!(:home_snapshot) do
     create(:team_rating_snapshot,
            team_season: home_team_season,

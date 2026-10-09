@@ -22,13 +22,48 @@ module ProphetRatings
       adjustment_start = Rails.application.config_for(:ratings).dig(:preseason, :adjustment_start_after_days)
       if (as_of.to_date - @season.start_date) > adjustment_start && enough_finalized_data_for_adjustments?(as_of:)
         run_least_squares_adjustments(as_of:)
-        recalculate_all_aggregate_ratings
       end
-      TeamRatingSnapshotService.new(season: @season, as_of:).call
+      publish(as_of:)
+    end
+
+    def publish(as_of:)
+      fill_missing_ratings
+      fill_prediction_baselines
+      recalculate_all_aggregate_ratings
       @season.update_adjusted_averages
+      TeamRatingSnapshotService.new(season: @season, as_of:).call
+    end
+
+    def self.missing_ratings(team_season)
+      attributes = team_season.attributes
+      config = Rails.application.config_for(:ratings).deep_symbolize_keys.fetch(:preseason)
+      { 'adj_offensive_efficiency' => :fallback_efficiency, 'adj_defensive_efficiency' => :fallback_efficiency,
+        'adj_pace' => :fallback_pace }.to_h do |stat, fallback|
+        [stat, attributes[stat] || attributes["preseason_#{stat}"] || config.fetch(fallback)]
+      end
+    end
+
+    def self.sorted_ratings(records, attr, multiplier)
+      records.index_with { |record| record.public_send(attr) }.compact_blank.sort_by do |record, value|
+        [multiplier * value, record.team_id]
+      end.map(&:first)
     end
 
     private
+
+    def fill_prediction_baselines
+      config = Rails.application.config_for(:ratings).deep_symbolize_keys
+      @season.update!(
+        average_efficiency: @season.average_efficiency || @season.team_seasons.average(:preseason_adj_offensive_efficiency) ||
+                            config.dig(:preseason, :fallback_efficiency),
+        efficiency_std_deviation: @season.efficiency_std_deviation || config.dig(:baseline_volatility, :efficiency_volatility),
+        pace_std_deviation: @season.pace_std_deviation || config.dig(:baseline_volatility, :pace_volatility)
+      )
+    end
+
+    def fill_missing_ratings
+      @season.team_seasons.find_each { |team_season| team_season.update!(self.class.missing_ratings(team_season)) }
+    end
 
     # rubocop:disable-next Metrics/AbcSize, Metrics/MethodLength
     def recalculate_all_aggregate_ratings
@@ -47,6 +82,7 @@ module ProphetRatings
         ts.home_defense_boost = home_defense_boost
         ts.offensive_efficiency_volatility = offensive_volatility
         ts.defensive_efficiency_volatility = defensive_volatility
+        ts.pace_volatility ||= ratings_config.dig(:baseline_volatility, :pace_volatility).to_f
         ts.rating = ts.adj_offensive_efficiency - ts.adj_defensive_efficiency
         ts.total_home_boost = home_offense_boost - home_defense_boost
         ts.total_volatility = (offensive_volatility + defensive_volatility) / 2.0
@@ -62,6 +98,7 @@ module ProphetRatings
           rating
           total_home_boost
           total_volatility
+          pace_volatility
         ]
       }
 
@@ -108,14 +145,6 @@ module ProphetRatings
     end
 
     def run_least_squares_adjustments(as_of: nil)
-      # Set default values for adj efficiency/pace before solving
-      # rubocop:disable-next Rails/SkipsModelValidations
-      TeamSeason.where(season: @season).update_all(
-        adj_offensive_efficiency: @season.average_efficiency,
-        adj_defensive_efficiency: @season.average_efficiency,
-        adj_pace: @season.average_pace
-      )
-
       ADJUSTED_STATS.each do |raw_stat, (adj_stat, adj_stat_allowed)|
         ProphetRatings::AdjustedStatCalculator.new(
           season: @season,
@@ -128,9 +157,9 @@ module ProphetRatings
     end
 
     def assign_rank!(records, attr, rank_attr, direction = :desc)
-      sorted = records.sort_by { |r| r.send(attr) }
-      sorted.reverse! if direction == :desc
-      sorted.each_with_index { |r, i| r.send(:"#{rank_attr}=", i + 1) }
+      ranks = self.class.sorted_ratings(records, attr, direction == :desc ? -1 : 1)
+                  .each_with_index.to_h { |record, index| [record, index + 1] }
+      records.each { |record| record.public_send(:"#{rank_attr}=", ranks[record]) }
     end
 
     def enough_finalized_data_for_adjustments?(as_of:)

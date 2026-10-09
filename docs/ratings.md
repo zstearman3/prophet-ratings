@@ -23,16 +23,16 @@ The calculator accepts an `as_of:` cutoff. By default, it uses the earlier of `T
 1. Aggregate raw team-season stats through `TeamSeasonStatsAggregator`.
 2. Update season-level raw averages through `Season#update_average_ratings`.
 3. If the season is far enough along and has enough finalized games, run least-squares adjustments.
-4. Recalculate aggregate ratings, home boost defaults, volatility defaults, and ranks.
-5. Create or update rating snapshots through `TeamRatingSnapshotService`.
-6. Update season-level adjusted averages through `Season#update_adjusted_averages`.
+4. Fill missing core values from stored preseason values or configured baselines, then recalculate aggregate ratings, home boost defaults, volatility defaults, and ranks.
+5. Update season-level adjusted averages through `Season#update_adjusted_averages`.
+6. Create or update rating snapshots through `TeamRatingSnapshotService`.
 
 The adjusted-ratings step only runs when both are true:
 
 - `as_of.to_date - season.start_date > preseason.adjustment_start_after_days` (currently 14)
 - At least two teams have at least two finalized team games as of the cutoff
 
-Snapshots are still written even if adjusted ratings are skipped.
+Ranks, prediction defaults and snapshots are published even if adjusted ratings are skipped.
 
 ## Raw stat aggregation
 
@@ -88,11 +88,11 @@ These averages become anchors/defaults for the adjustment step.
 | `free_throw_rate` | `adj_free_throw_rate` | `adj_free_throw_rate_allowed` |
 | `three_pt_proficiency` | `adj_three_pt_proficiency` | `adj_three_pt_proficiency_allowed` |
 
-Before solving, the calculator initializes all team seasons in the season with defaults:
-
-- `adj_offensive_efficiency = season.average_efficiency`
-- `adj_defensive_efficiency = season.average_efficiency`
-- `adj_pace = season.average_pace`
+The solver writes only qualified teams. It no longer resets all teams to season
+averages: zero/one-game teams retain their published preseason core values. Missing
+core values fall back individually to stored preseason values, then configured
+105.5 efficiency and 69.5 pace. No new game-count blending or coefficient change
+is introduced.
 
 Each raw stat is then processed by `ProphetRatings::AdjustedStatCalculator`.
 
@@ -186,10 +186,35 @@ compatible with existing finite inputs inside the bounds. Partial profiles now
 use only their supplied components, replacing the old assumed +3 recruitment
 and -3 attrition contributions.
 
-Repeated calculation is deterministic for unchanged stored history and profiles.
-Those source records remain mutable; immutable input capture belongs to the
-reproducibility story. The new bundle distinguishes changed assumptions in
-snapshots without rewriting old config versions or historical outputs.
+The `v1.4-captured-priors` bundle retains these coefficients and freezes inputs
+once per team-season/configuration in `PreseasonPrior`. Captures contain source
+identities and timestamps, stored source attributes, per-stat baseline/previous
+values, normalized profile components, the full ratings configuration, and
+calculated outputs rounded to the published three-decimal precision. Invalid legacy profile components retain their original
+representation in source attributes but contribute zero to calculations.
+`PreseasonPriorFormula` replays this contract without reading mutable sources.
+
+The calculator locks the target season and captures/updates all its priors in one
+transaction; partial failure rolls back the entire publication. Repeated runs
+reuse captured outputs even if source history, season averages, or profiles
+change. Corrected inputs require a new `bundle_name`; existing captures are
+read-only through Active Record, and existing configuration names/values cannot
+be edited or silently reused for changed assumptions. This is application-level
+immutability, not a database guarantee against direct SQL. Old configuration
+versions and snapshots are not rewritten or retroactively labeled reproducible.
+
+New rating snapshots embed the matching capture's identity, inputs, outputs, and
+capture time in `stats.preseason_prior`. A snapshot without that metadata is a
+legacy/uncaptured output. Publication rejects a mismatch between a matching
+capture and live preseason fields, preventing model switches or manual edits
+from attaching incorrect provenance. Snapshot publication is atomic across the
+season: a failure rolls back earlier inserts and updates for that run, preserving
+existing snapshots even when an enclosing caller rescues the error. Rerun the
+preseason calculator for the intended bundle to apply its capture before retrying.
+In-season adjusted values remain distinct from the
+captured preseason outputs. Deployment requires the additive `preseason_priors`
+migration before invoking the calculator or snapshot writer; no existing
+historical capture is fabricated by the migration.
 
 Some adjusted values can blend with preseason values on `TeamSeason`:
 
@@ -235,9 +260,10 @@ The existing evaluator's win accuracy and plot do not provide a leakage-safe
 opening-month Brier score, log loss, or reliability report. The prediction builder
 allows snapshots on the game's schedule date, and ratings backfills calculate
 that day's ratings before predictions, potentially including the result being
-predicted. The evaluation story must use strictly pregame inputs and separate
-tuning/evaluation seasons before selecting coefficients or uncertainty changes.
-No historical comparison, import, or backfill was run for this implementation.
+predicted. The separate read-only `ratings:compare_preseason` benchmark avoids these paths;
+see [the comparison report](preseason-comparison.md). It retains the current
+probability arithmetic and does not establish confidence calibration or justify
+changes to the in-season transition. No import or ratings backfill is required.
 
 ## Home court adjustment
 
@@ -287,7 +313,8 @@ rating = adj_offensive_efficiency - adj_defensive_efficiency
 total_home_boost = home_offense_boost - home_defense_boost
 ```
 
-Higher `rating` is better.
+Higher `rating` is better. Ties break by ascending `team_id`; missing adjusted
+stats have no rank. Core ranks/defaults are independent of the solver gate.
 
 Ranks are then assigned across all `TeamSeason` records for the season:
 
@@ -329,25 +356,26 @@ The snapshot stores top-level columns for:
 
 Other adjusted stats, volatility fields, home-court fields, and ranks are copied into the snapshot `stats` JSONB column.
 
-Snapshots are associated with a `RatingsConfigVersion` produced from the active `config/ratings.yml` bundle. The lookup is based on `bundle_name`, so changing rating assumptions should generally include a new bundle name.
+Snapshots are associated with a `RatingsConfigVersion` produced from the active `config/ratings.yml` bundle. The lookup is based on `bundle_name`. Reusing an existing name with different configuration raises an error; changed assumptions or corrected captured prior inputs require a new bundle name.
 
 ## Operational safety
 
-Preseason initialization currently writes prior/live offense, defense, pace and
-rating only. It does not publish ranks, snapshots or prediction defaults. Review
-those outputs with the [offseason readiness checklist](offseason.md#readiness-checklist-and-decision-record)
-before declaring a season prediction-ready. Complete publication and preservation
-of zero/one-game team priors await the publishing story; an ordinary rankings run
-is not a safe substitute because the adjustment path initializes all teams to
-season averages. Inputs still depend on mutable prior-season values and profiles;
-frozen input capture and a leakage-safe historical comparison remain pending.
+Preseason initialization publishes prior/live offense, defense, pace, ratings,
+core ranks, home boosts, volatility defaults and snapshots dated one day before
+season start. Review those outputs and captured prior provenance with the
+[offseason readiness checklist](offseason.md#readiness-checklist-and-decision-record)
+before declaring a season prediction-ready. Safe repeats reuse captures and
+snapshot identities; established in-season outputs are protected. Zero/one-game
+teams retain captured core priors while qualified teams receive observed adjustments.
+The bounded comparison and its coverage/calibration limits are documented in
+[Preseason comparison](preseason-comparison.md); it does not justify an accuracy gain.
 
-This runbook change introduces no model or config changes. Operators should record
-the bundle name and compare the persisted `RatingsConfigVersion#config` with the
-deployed YAML. Lookup uses bundle name, not a content hash, and reusing a name does
-not update an existing stored configuration. Changed assumptions need a new bundle
-name to keep old outputs understandable. Missing history falls back to configured
-baselines; fallback confidence and unknown venues are not evidence of calibration.
+This runbook change introduces no additional model or config changes. Record the
+bundle name and compare the persisted `RatingsConfigVersion#config` with deployed
+YAML. Lookup uses bundle name, with changed configuration under an existing name
+rejected. Corrected prior inputs or assumptions require a new bundle name; do not
+edit or delete existing captures. Missing history falls back to configured baselines;
+fallback confidence and unknown venues are not evidence of calibration.
 
 Season preparation/bootstrap never resets live ratings or deletes predictions or
 snapshots. Activation is a separate atomic operation. Non-deleting
@@ -408,3 +436,25 @@ When changing ratings code:
 - `TeamRatingSnapshot::STORED_STATS` includes `home_total_boost`, while `OverallRatingsCalculator` writes `total_home_boost` on `TeamSeason`. Check naming carefully before relying on that snapshot JSON key.
 - `AdjustedStatCalculator#blowout_dampening` currently checks for `offensive_rating` and `defensive_rating`, while the configured adjusted efficiency raw stat is `offensive_efficiency`. Do not assume blowout dampening is active for efficiency without verifying this behavior.
 - `GameWeightingService` is initialized with a `TeamGame` object in the adjustment loop, despite the parameter name `game:`. Its recency calculation uses `@game.game.start_time`.
+
+## Preseason publication contract
+
+The `v1.5-preseason-publication` bundle distinguishes the changed publication,
+fallback and ranking behavior without changing solver coefficients. The preseason
+initializer publishes atomically at `season.start_date - 1`, reusing the captured
+prior inputs from v1.4's contract. It refuses implicit replacement of in-season
+outputs; see [Offseason Operations](offseason.md) for rerun/reset semantics.
+
+Before results exist, the prediction efficiency baseline is the published teams'
+mean preseason offense; pace is the mean published adjusted pace. Missing season
+efficiency/deviations during daily updates fall back to the mean stored preseason
+offense (then 105.5), 11.5 efficiency volatility and 4.5 pace volatility. Home
+boosts retain +/-2.2 and team volatility uses the existing configured defaults.
+Unavailable Five Factors are left null. Equal baseline teams yield neutral scores
+of `105.5 * 69.5 / 100 = 73.3225` and win probability 0.5. These defaults support
+prediction generation; they do not establish calibrated confidence or accuracy.
+
+The prediction builder defaults to the configured bundle rather than a potentially
+stale global current flag. It skips and logs missing/incomplete core snapshot or
+pace/volatility inputs. Existing same-day snapshot selection and mutable season
+prediction baselines remain limitations for leakage-safe historical evaluation.

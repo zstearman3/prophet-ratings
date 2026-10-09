@@ -24,7 +24,7 @@ namespace :season do
     season = target_season!
     Season.with_ratings_lock do
       Season.transaction do
-        if season.reload.current? || season.rating_outputs?
+        if season.reload.current?
           abort('Existing season outputs must be preserved. Use an explicitly scoped season:rebuild_ratings for an intentional reset.')
         end
         ProphetRatings::PreseasonInitializer.new(season).call
@@ -55,6 +55,18 @@ namespace :season do
       resume: env_bool('SYNC_RESUME', default: true)
     )
     puts "Games sync finished for year=#{season.year}; inspect job logs for exhausted per-date retries."
+  rescue ArgumentError => e
+    abort(e.message)
+  end
+
+  desc 'Refresh a bounded future schedule without activating or generating ratings; requires YEAR and SCHEDULE dates'
+  task refresh_schedule: :environment do
+    result = Ingestion::FutureScheduleRefresh.new(
+      season: target_season!, start_date: parse_date_env('SCHEDULE_START_DATE'), end_date: parse_date_env('SCHEDULE_END_DATE')
+    ).call
+    puts JSON.pretty_generate(result)
+    abort('Schedule refresh incomplete; rerun failed_dates with the same explicit window.') if result[:failed_dates].any?
+    puts 'Schedule refresh complete. Review ambiguous/unmatched/possible_move_ids and absent_ids; no games were deleted.'
   rescue ArgumentError => e
     abort(e.message)
   end

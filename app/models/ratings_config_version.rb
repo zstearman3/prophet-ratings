@@ -22,6 +22,7 @@ class RatingsConfigVersion < ApplicationRecord
   has_many :bet_recommendations, dependent: :nullify
   has_many :team_rating_snapshots, dependent: :nullify
 
+  validate :preserve_model_identity
   validates :config, presence: true
   validates :name, presence: true, uniqueness: true
 
@@ -46,8 +47,20 @@ class RatingsConfigVersion < ApplicationRecord
   end
 
   def self.find_or_create_by_config(config_hash)
-    config_json = config_hash.deep_stringify_keys
-    existing = find_by(name: config_hash[:bundle_name])
-    existing || create!(name: config_hash[:bundle_name], config: config_json)
+    config_json = config_hash.to_h.deep_stringify_keys
+    existing = find_by(name: config_json.fetch('bundle_name'))
+    if existing && existing.config != config_json
+      raise ArgumentError, 'Ratings configuration changed under an existing bundle_name; use a new bundle_name'
+    end
+
+    existing || create!(name: config_json.fetch('bundle_name'), config: config_json)
+  end
+
+  private
+
+  def preserve_model_identity
+    return unless persisted? && (will_save_change_to_config? || will_save_change_to_name?)
+
+    errors.add(:config, 'and name are immutable; create a new model version')
   end
 end

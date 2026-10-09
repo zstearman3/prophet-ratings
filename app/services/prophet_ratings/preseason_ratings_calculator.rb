@@ -8,64 +8,91 @@ module ProphetRatings
     def initialize(season = Season.current)
       @season = season
       @previous_season = Season.find_by(year: @season.year - 1)
+      @config = Rails.application.config_for(:ratings).deep_symbolize_keys
     end
 
     def call
-      @season.team_seasons.includes(:team_offseason_profile).find_each do |team_season|
-        preseason_ratings = calculate_preseason_ratings(team_season)
-
-        team_season.update!(**preseason_ratings)
+      @season.with_lock do
+        version = RatingsConfigVersion.find_or_create_by_config(@config)
+        @season.team_seasons.includes(:team_offseason_profile).find_each do |team_season|
+          prior = captured_prior(team_season, version)
+          team_season.update!(prior.outputs)
+        end
       end
     end
 
-    private
+    def captured_prior(team_season, version)
+      PreseasonPrior.find_by(team_season:, ratings_config_version: version) || begin
+        inputs = capture_inputs(team_season)
+        PreseasonPrior.create!(team_season:, ratings_config_version: version, inputs:,
+                               outputs: PreseasonPriorFormula.new(inputs, version.config).call)
+      end
+    end
 
-    def calculate_preseason_ratings(team_season)
+    def capture_inputs(team_season)
+      previous = @previous_season&.team_seasons&.find_by(team_id: team_season.team_id)
+      profile = team_season.team_offseason_profile
+      serializer = self.class
       {
-        preseason_adj_offensive_efficiency: adj_off_efficiency(team_season),
-        preseason_adj_defensive_efficiency: adj_def_efficiency(team_season),
-        preseason_adj_pace: adj_pace(team_season)
+        contract: 'preseason-v1', configuration: @config,
+        previous_season: serializer.source_identity(@previous_season), previous_team_season: serializer.source_identity(previous),
+        profile: serializer.source_identity(profile),
+        previous_values: serializer.previous_values(previous),
+        baselines: PreseasonPriorFormula::STATS.index_with { |stat| average_for_stat(stat) },
+        profile_values: serializer.normalized_profile(profile)
       }
     end
 
-    def adj_off_efficiency(team_season)
-      blend_stat(team_season, :adj_offensive_efficiency) + (offseason_adjustment(team_season, :adj_off_efficiency) || 0.0)
+    def self.previous_values(previous)
+      PreseasonPriorFormula::STATS.index_with { |stat| previous&.public_send(stat) }
     end
 
-    def adj_def_efficiency(team_season)
-      blend_stat(team_season, :adj_defensive_efficiency) + (offseason_adjustment(team_season, :adj_def_efficiency) || 0.0)
+    def self.source_identity(record)
+      return unless record
+
+      { id: record.id, updated_at: record.updated_at.iso8601(6), attributes: record.attributes.transform_values do |value|
+        value.is_a?(Float) && !value.finite? ? value.to_s : value
+      end }
     end
 
-    def adj_pace(team_season)
-      blend_stat(team_season, :adj_pace) + (offseason_adjustment(team_season, :adj_pace) || 0.0)
+    def self.normalized_profile(profile)
+      return {} unless profile
+
+      values = profile_attributes(profile)
+      values['recruiting_score'] = valid_recruiting_score(values['recruiting_score'])
+      values['returning_minutes_pct'] = valid_returning_fraction(values['returning_minutes_pct'])
+      values
     end
 
-    def blend_stat(team_season, stat_key)
-      mean_value = average_for_stat(stat_key)
-      prev_team_season = @previous_season&.team_seasons&.find_by(team_id: team_season.team_id)
-      previous_value = prev_team_season&.send(stat_key)
-
-      return mean_value unless previous_value
-
-      ((1 - PREVIOUS_SEASON_WEIGHT) * mean_value) + (PREVIOUS_SEASON_WEIGHT * previous_value)
+    def self.profile_attributes(profile)
+      profile.attributes.slice('recruiting_score', 'returning_minutes_pct', 'manual_adjustment')
+             .transform_values { |value| value&.finite? ? value : nil }
     end
 
-    def average_for_stat(stat_key)
-      efficiency_baseline = PRESEASON_CONFIG.fetch(:fallback_efficiency)
-      case stat_key
-      when :adj_offensive_efficiency
-        @previous_season&.avg_adj_offensive_efficiency ||
-          @previous_season&.average_efficiency || efficiency_baseline
-      when :adj_defensive_efficiency
-        @previous_season&.avg_adj_defensive_efficiency ||
-          @previous_season&.average_efficiency || efficiency_baseline
-      when :adj_pace
-        @previous_season&.average_pace || PRESEASON_CONFIG.fetch(:fallback_pace)
+    def self.valid_recruiting_score(value)
+      value if value && value >= 0
+    end
+
+    def self.valid_returning_fraction(value)
+      value if value && (0.0..1.0).cover?(value)
+    end
+
+    def fallback_efficiency
+      @config.fetch(:preseason).fetch(:fallback_efficiency)
+    end
+
+    def average_for_stat(stat)
+      case stat
+      when 'adj_offensive_efficiency'
+        @previous_season&.avg_adj_offensive_efficiency || @previous_season&.average_efficiency ||
+          fallback_efficiency
+      when 'adj_defensive_efficiency'
+        @previous_season&.avg_adj_defensive_efficiency || @previous_season&.average_efficiency ||
+          fallback_efficiency
+      when 'adj_pace'
+        @previous_season&.average_pace || @config.dig(:preseason, :fallback_pace)
       end
     end
-
-    def offseason_adjustment(team_season, stat_key)
-      team_season.team_offseason_profile&.adjustment_for(stat_key) || 0
-    end
+    private :captured_prior, :capture_inputs, :fallback_efficiency, :average_for_stat
   end
 end

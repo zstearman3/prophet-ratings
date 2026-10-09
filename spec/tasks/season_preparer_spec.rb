@@ -52,22 +52,24 @@ RSpec.describe SeasonPreparer do
     expect(Season.count).to eq(0)
   end
 
-  it 'initializes a fresh season transactionally without activating it and rejects an implicit reset' do
+  it 'initializes a fresh season transactionally without activating it and permits a safe repeat' do
     create(:team)
     expect { invoke('season:prepare') }.to output(/Season prepared/).to_stdout
     expect { invoke('season:initialize_preseason') }.to output(/Preseason values initialized/).to_stdout
     expect(Season.current).to be_nil
-    before_values = TeamSeason.first.attributes
-    expect { invoke('season:initialize_preseason') }.to raise_error(SystemExit)
-    expect(TeamSeason.first.attributes).to eq(before_values)
+    before_values = TeamSeason.first.attributes.except('updated_at')
+    expect { invoke('season:initialize_preseason') }.to output(/Preseason values initialized/).to_stdout
+    expect(TeamSeason.first.attributes.except('updated_at')).to eq(before_values)
   end
 
   it 'rehearses no-schedule preparation with reviewed dates and preserves initialized outputs on rerun' do
     create(:team)
     ENV['START_DATE'] = '2026-11-02'
     ENV['END_DATE'] = '2027-04-06'
-    expect { invoke('season:prepare') }.to output(/Season prepared/).to_stdout
-    expect { invoke('season:initialize_preseason') }.to output(/Preseason values initialized/).to_stdout
+    expect do
+      invoke('season:prepare')
+      invoke('season:initialize_preseason')
+    end.to output(/Season prepared.*Preseason values initialized/m).to_stdout
     season = Season.find_by!(year: 2027)
     values = season.team_seasons.first.attributes
     ENV.delete('START_DATE')
@@ -75,8 +77,9 @@ RSpec.describe SeasonPreparer do
 
     expect { 2.times { invoke('season:prepare') } }.to output(/TeamSeasons created: 0/).to_stdout
     expect(season.reload).to have_attributes(start_date: Date.new(2026, 11, 2), end_date: Date.new(2027, 4, 6),
-                                             current: false, games: [], team_rating_snapshots: [])
+                                             current: false, games: [])
     expect(season.team_seasons.first.attributes).to eq(values)
+    expect(season.team_rating_snapshots.pluck(:snapshot_date)).to eq([Date.new(2026, 11, 1)])
   end
 
   it 'rolls back partial initialization and leaves the old current season unchanged' do
