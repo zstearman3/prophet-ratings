@@ -3,6 +3,7 @@
 require 'rails_helper'
 
 RSpec.describe UpdateRankingsJob do
+  let(:model_version) { RatingsConfigVersion.default_version }
   let(:season) do
     create(
       :season,
@@ -15,19 +16,23 @@ RSpec.describe UpdateRankingsJob do
   let(:calculator) { instance_double(ProphetRatings::OverallRatingsCalculator, call: true) }
 
   before do
+    RatingsConfigVersion.publish!
     allow(GoodJob::Job).to receive(:advisory_lock_key).with(described_class::ADVISORY_LOCK_KEY).and_wrap_original do |_method, *, &block|
       block.call
     end
-    allow(ProphetRatings::OverallRatingsCalculator).to receive(:new).with(season).and_return(calculator)
+    allow(ProphetRatings::OverallRatingsCalculator).to receive(:new).with(season,
+                                                                          ratings_config_version: model_version).and_return(calculator)
     allow(GenerateNightlyPredictionsJob).to receive(:perform_later)
   end
 
   it 'recalculates rankings and enqueues nightly predictions' do
     described_class.perform_now(season.id)
 
-    expect(ProphetRatings::OverallRatingsCalculator).to have_received(:new).with(season)
+    expect(ProphetRatings::OverallRatingsCalculator).to have_received(:new).with(season,
+                                                                                 ratings_config_version: model_version)
     expect(calculator).to have_received(:call)
-    expect(GenerateNightlyPredictionsJob).to have_received(:perform_later).with(season.id)
+    expect(GenerateNightlyPredictionsJob).to have_received(:perform_later).with(season.id,
+                                                                                ratings_config_version_id: model_version.id)
     expect(GoodJob::Job).to have_received(:advisory_lock_key).with(described_class::ADVISORY_LOCK_KEY)
   end
 

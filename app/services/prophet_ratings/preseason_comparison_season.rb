@@ -3,10 +3,10 @@
 module ProphetRatings
   # Evaluates one opening month from timestamp-eligible previous-season snapshots.
   class PreseasonComparisonSeason
-    def initialize(season:, source_version:, config:)
+    def initialize(season:, source_version:, ratings_config_version:)
+      @ratings_config_version = ratings_config_version
       @season = season
       @source_version = source_version
-      @config = config
       @data = {}
     end
 
@@ -73,14 +73,16 @@ module ProphetRatings
 
     def candidate_report(weight)
       ratings = candidate_ratings(weight)
+      season = Season.new(average_efficiency: configured('preseason', 'fallback_efficiency'),
+                          average_pace: configured('preseason', 'fallback_pace'))
       rows = eligible.map do |game|
-        PreseasonComparisonSeason.errors(game, PreseasonComparisonSeason.predict(game, ratings, benchmark_season))
+        PreseasonComparisonSeason.errors(game, PreseasonComparisonSeason.predict(game, ratings, season))
       end
       PreseasonComparisonMetrics.new(rows).call
     end
 
     def candidate_ratings(weight)
-      candidate = @config.deep_dup
+      candidate = @ratings_config_version.config.deep_dup
       candidate.fetch('preseason')['previous_season_weight'] = weight
       sources.transform_values { |snapshot| candidate_snapshot(snapshot, candidate) }
     end
@@ -98,15 +100,15 @@ module ProphetRatings
     def candidate_snapshot(snapshot, candidate)
       inputs = { baselines:, previous_values: snapshot.attributes.slice(*PreseasonPriorFormula::STATS), profile_values: {} }
       outputs = PreseasonPriorFormula.new(inputs, candidate).call.transform_keys { |stat| stat.delete_prefix('preseason_') }
-      TeamRatingSnapshot.new(**outputs, team: snapshot.team, stats: volatility_defaults)
+      TeamRatingSnapshot.new(**outputs, team: snapshot.team, stats: volatility_defaults, ratings_config_version: @ratings_config_version)
     end
 
     def volatility_defaults
-      efficiency = @config.dig('baseline_volatility', 'efficiency_volatility')
+      efficiency = configured('baseline_volatility', 'efficiency_volatility')
       {
         offensive_efficiency_volatility: efficiency,
         defensive_efficiency_volatility: efficiency,
-        pace_volatility: @config.dig('baseline_volatility', 'pace_volatility')
+        pace_volatility: configured('baseline_volatility', 'pace_volatility')
       }
     end
 
@@ -117,9 +119,8 @@ module ProphetRatings
                         season:).call
     end
 
-    def benchmark_season
-      Season.new(average_efficiency: @config.dig('preseason', 'fallback_efficiency'),
-                 average_pace: @config.dig('preseason', 'fallback_pace'))
+    def configured(section, key)
+      @ratings_config_version.config.fetch(section).fetch(key)
     end
 
     def self.errors(game, result)
@@ -133,6 +134,6 @@ module ProphetRatings
     end
     private :sources, :transition_snapshots, :games, :opening_date, :opening_end, :eligible,
             :candidate_report, :candidate_ratings, :baselines, :average_source_stat, :candidate_snapshot,
-            :volatility_defaults, :benchmark_season
+            :volatility_defaults
   end
 end

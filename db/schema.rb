@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_08_180000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_09_020000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -451,7 +451,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_08_180000) do
     t.decimal "preseason_adj_defensive_efficiency", precision: 6, scale: 3
     t.decimal "preseason_adj_offensive_efficiency", precision: 6, scale: 3
     t.decimal "preseason_adj_pace", precision: 6, scale: 3
+    t.bigint "preseason_prior_id"
     t.decimal "rating", precision: 6, scale: 3
+    t.bigint "ratings_config_version_id"
     t.bigint "season_id", null: false
     t.bigint "team_id", null: false
     t.decimal "three_pt_attempt_rate", precision: 6, scale: 5
@@ -461,6 +463,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_08_180000) do
     t.decimal "turnover_rate", precision: 6, scale: 5
     t.datetime "updated_at", null: false
     t.integer "wins", default: 0
+    t.index ["preseason_prior_id"], name: "index_team_seasons_on_preseason_prior_id"
+    t.index ["ratings_config_version_id"], name: "index_team_seasons_on_ratings_config_version_id"
     t.index ["season_id"], name: "index_team_seasons_on_season_id"
     t.index ["team_id", "season_id"], name: "index_team_seasons_on_team_id_and_season_id", unique: true
     t.index ["team_id"], name: "index_team_seasons_on_team_id"
@@ -517,4 +521,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_08_180000) do
   add_foreign_key "team_rating_snapshots", "seasons"
   add_foreign_key "team_rating_snapshots", "team_seasons"
   add_foreign_key "team_rating_snapshots", "teams"
+  add_foreign_key "team_seasons", "preseason_priors"
+  add_foreign_key "team_seasons", "ratings_config_versions"
 end

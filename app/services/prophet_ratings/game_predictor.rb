@@ -1,8 +1,6 @@
 # frozen_string_literal: true
 
 module ProphetRatings
-  DEFAULTS = Rails.application.config_for(:defaults).deep_symbolize_keys unless const_defined?(:DEFAULTS)
-
   class GamePredictor
     ##
     # Initializes a new GamePredictor for a given matchup.
@@ -11,12 +9,12 @@ module ProphetRatings
     # @param upset_modifier [Float] Optional modifier to adjust upset likelihood (default: 1.0).
     # @param venue [Hash] Explicit venue classification with optional type and confidence keys.
     # @param season [Season] The season context for the prediction (default: current season).
-    def initialize(home_rating_snapshot:, away_rating_snapshot:, upset_modifier: 1.0, venue: nil, season: Season.current)
+    def initialize(home_rating_snapshot:, away_rating_snapshot:, season: Season.current, **options)
+      @ratings_config_version = ModelConfiguration.for_snapshots(home_rating_snapshot, away_rating_snapshot,
+                                                                 options[:ratings_config_version])
       @home_rating_snapshot = home_rating_snapshot
       @away_rating_snapshot = away_rating_snapshot
-      @upset_modifier = upset_modifier
-      @venue_type = venue&.fetch(:type, nil).presence || 'unknown'
-      @venue_confidence = venue&.fetch(:confidence, nil).presence
+      @options = options
       @season = season
     end
 
@@ -31,6 +29,22 @@ module ProphetRatings
     end
 
     private
+
+    def venue_type
+      @options.dig(:venue, :type).presence || 'unknown'
+    end
+
+    def venue_confidence
+      @options.dig(:venue, :confidence).presence
+    end
+
+    def upset_modifier
+      @options.fetch(:upset_modifier, 1.0)
+    end
+
+    def config
+      @ratings_config_version.settings
+    end
 
     attr_reader :prediction_hash, :home_rating_snapshot, :away_rating_snapshot, :season
 
@@ -70,8 +84,8 @@ module ProphetRatings
         away_offensive_volatility: away_offensive_volatility.round(2),
         home_defensive_volatility: home_defensive_volatility.round(2),
         away_defensive_volatility: away_defensive_volatility.round(2),
-        venue_type: @venue_type,
-        venue_confidence: @venue_confidence,
+        venue_type: venue_type,
+        venue_confidence: venue_confidence,
         home_court_adjustment_applied: home_court_adjustment_applied?,
         venue_confidence_issue:
       }
@@ -120,10 +134,14 @@ module ProphetRatings
     ##
     # Calculates the expected pace of the game as the average adjusted pace of both teams relative to the season average.
     # @return [Float] The estimated number of possessions per team for the game.
+    def season_average_pace
+      season.average_pace || config.dig(:defaults, :season_defaults, :average_pace)
+    end
+
     def expected_pace
-      @expected_pace ||= (home_rating_snapshot.adj_pace - season.average_pace) +
-                         (away_rating_snapshot.adj_pace - season.average_pace) +
-                         season.average_pace
+      @expected_pace ||= (home_rating_snapshot.adj_pace - season_average_pace) +
+                         (away_rating_snapshot.adj_pace - season_average_pace) +
+                         season_average_pace
     end
 
     ##
@@ -186,25 +204,25 @@ module ProphetRatings
     end
 
     def home_court_adjustment_applied?
-      @venue_type == 'home'
+      venue_type == 'home'
     end
 
     def venue_confidence_issue
-      'venue_unknown_home_court_not_applied' if @venue_type == 'unknown'
+      'venue_unknown_home_court_not_applied' if venue_type == 'unknown'
     end
 
     ##
     # Retrieves the default home court advantage value from the ratings configuration.
     # @return [Numeric] The configured home court advantage value.
     def default_home_boost
-      @default_home_boost ||= Rails.application.config_for(:ratings).home_court_advantage
+      @default_home_boost ||= config.fetch(:home_court_advantage)
     end
 
     ##
     # Returns the season's average efficiency, falling back to a default value if unavailable.
     # @return [Float] The average efficiency for the season.
     def season_average_efficiency
-      season.average_efficiency || DEFAULTS[:season_defaults][:average_efficiency]
+      season.average_efficiency || config.dig(:defaults, :season_defaults, :average_efficiency)
     end
 
     ##
@@ -254,7 +272,8 @@ module ProphetRatings
         home_rating_snapshot: home_rating_snapshot,
         away_rating_snapshot: away_rating_snapshot,
         season: season,
-        upset_modifier: @upset_modifier,
+        ratings_config_version: @ratings_config_version,
+        upset_modifier: upset_modifier,
         neutral: !home_court_adjustment_applied?
       )
     end

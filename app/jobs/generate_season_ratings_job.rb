@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 class GenerateSeasonRatingsJob < ApplicationJob
+  include PinnedModelVersion
+
   queue_as :default
   around_perform { |_job, block| Season.with_ratings_lock(&block) }
 
@@ -20,9 +22,11 @@ class GenerateSeasonRatingsJob < ApplicationJob
     end
 
     Season.transaction do
-      clear_current_version_data!(season, date_range)
-      ProphetRatings::PreseasonInitializer.new(season).reset if run_preseason
-      ResumeSeasonRatingsJob.new.perform(season.id, start_date: date_range.begin, end_date: date_range.end)
+      ratings_config_version = RatingsConfigVersion.resolve(options[:ratings_config_version_id])
+      clear_current_version_data!(season, date_range, ratings_config_version)
+      ProphetRatings::PreseasonInitializer.new(season, ratings_config_version: ratings_config_version).reset if run_preseason
+      ResumeSeasonRatingsJob.new.perform(season.id, start_date: date_range.begin, end_date: date_range.end,
+                                                    ratings_config_version_id: ratings_config_version.id)
     end
   end
 
@@ -42,8 +46,7 @@ class GenerateSeasonRatingsJob < ApplicationJob
     raise ArgumentError, 'Rebuild range must be within the season and must not include future dates'
   end
 
-  def clear_current_version_data!(season, date_range)
-    ratings_config_version = RatingsConfigVersion.ensure_current!
+  def clear_current_version_data!(season, date_range, ratings_config_version)
     snapshots = season.team_rating_snapshots.where(ratings_config_version:, snapshot_date: date_range)
     predictions = self.class.predictions_in_range(season, date_range, ratings_config_version)
     destroy_rebuild_outputs!(snapshots, predictions)

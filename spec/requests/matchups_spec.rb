@@ -67,7 +67,7 @@ RSpec.describe 'Matchups' do
     end
 
     it 'returns 422 if snapshots are missing' do
-      # No snapshots created
+      config # Publish an active model but no snapshots
       post '/matchup/submit', params: { home_team_id: ts1.id, away_team_id: ts2.id, neutral: '0', action_type: 'predict' },
                               as: :turbo_stream
       expect(response).to have_http_status(:unprocessable_content)

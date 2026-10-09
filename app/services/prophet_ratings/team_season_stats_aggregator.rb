@@ -20,9 +20,12 @@ module ProphetRatings
       }
     }.freeze
 
-    def initialize(season: Season.current, as_of: Time.current)
+    def initialize(season: Season.current, as_of: Time.current, ratings_config_version: nil)
+      @ratings_config_version = RatingsConfigVersion.resolve(ratings_config_version)
+      @ratings_config_version.settings
       @season = season
       @as_of = as_of
+      @predictions_by_side = {}
     end
 
     ##
@@ -36,6 +39,7 @@ module ProphetRatings
       team_games_by_season_id = finalized_team_games_by_season_id(team_seasons.map(&:id))
 
       team_seasons.each do |team_season|
+        team_season.validate_model_inputs(@ratings_config_version)
         team_games = team_games_by_season_id[team_season.id] || []
 
         aggregates = calculate_average_stats(team_games)
@@ -51,22 +55,28 @@ module ProphetRatings
 
     private
 
-    attr_reader :season, :as_of, :home_preds_by_season, :away_preds_by_season
+    attr_reader :season, :as_of
 
     def preload_predictions
       predictions = Prediction
+                    .where(ratings_config_version: @ratings_config_version)
                     .joins(:game)
+                    .where(games: { season_id: season.id })
                     .merge(Game.final.through_schedule_date(as_of))
                     .includes(:home_team_snapshot, :away_team_snapshot)
                     .to_a
 
-      @home_preds_by_season = predictions
-                              .select { |p| p.home_team_snapshot&.team_season_id }
-                              .group_by { |p| p.home_team_snapshot.team_season_id }
+      predictions.each do |prediction|
+        ModelConfiguration.validate_snapshots([prediction.home_team_snapshot, prediction.away_team_snapshot], @ratings_config_version)
+      end
 
-      @away_preds_by_season = predictions
-                              .select { |p| p.away_team_snapshot&.team_season_id }
-                              .group_by { |p| p.away_team_snapshot.team_season_id }
+      @predictions_by_side[:home] = predictions
+                                    .select { |p| p.home_team_snapshot&.team_season_id }
+                                    .group_by { |p| p.home_team_snapshot.team_season_id }
+
+      @predictions_by_side[:away] = predictions
+                                    .select { |p| p.away_team_snapshot&.team_season_id }
+                                    .group_by { |p| p.away_team_snapshot.team_season_id }
     end
 
     def finalized_team_games_by_season_id(team_season_ids)
@@ -113,54 +123,52 @@ module ProphetRatings
       }
     end
 
+    def baseline_volatility(stat)
+      @ratings_config_version.settings.fetch(:baseline_volatility).fetch(stat).to_f
+    end
+
     def offensive_efficiency_volatility(home_predictions, away_predictions)
-      baseline = Rails.application.config_for(:ratings).baseline_volatility[:efficiency_volatility].to_f
+      baseline = baseline_volatility(:efficiency_volatility)
       offensive_errors = (
         home_predictions.map(&:home_offensive_efficiency_error) +
         away_predictions.map(&:away_offensive_efficiency_error)
       ).compact
 
-      return baseline if offensive_errors.size < 4
-
-      calculated_volatility = StatisticsUtils.stddev(offensive_errors)
-
-      weight = [(offensive_errors.size / 16.0), 0.50].min.round(4)
-
-      (weight * calculated_volatility) + ((1.0 - weight) * baseline)
+      blend_volatility(offensive_errors, baseline)
     end
 
     def defensive_efficiency_volatility(home_predictions, away_predictions)
-      baseline = Rails.application.config_for(:ratings).baseline_volatility[:efficiency_volatility].to_f
+      baseline = baseline_volatility(:efficiency_volatility)
       defensive_errors = (
         home_predictions.map(&:home_defensive_efficiency_error) +
         away_predictions.map(&:away_defensive_efficiency_error)
       ).compact
 
-      return baseline if defensive_errors.size < 4
-
-      calculated_volatility = StatisticsUtils.stddev(defensive_errors)
-
-      weight = [(defensive_errors.size / 16.0), 0.50].min.round(4)
-
-      (weight * calculated_volatility) + ((1.0 - weight) * baseline)
+      blend_volatility(defensive_errors, baseline)
     end
 
     def pace_volatility(home_predictions, away_predictions)
-      baseline = Rails.application.config_for(:ratings).baseline_volatility[:pace_volatility].to_f
+      baseline = baseline_volatility(:pace_volatility)
       pace_errors = (home_predictions.map(&:pace_error) + away_predictions.map(&:pace_error)).compact
 
-      return baseline if pace_errors.size < 4
+      blend_volatility(pace_errors, baseline)
+    end
 
-      calculated_volatility = StatisticsUtils.stddev(pace_errors)
+    public_class_method def self.volatility_weight(count)
+      [(count / 16.0), 0.50].min.round(4)
+    end
 
-      weight = [(pace_errors.size / 16.0), 0.50].min.round(4)
+    def blend_volatility(errors, baseline)
+      count = errors.size
+      return baseline if count < 4
 
-      (weight * calculated_volatility) + ((1.0 - weight) * baseline)
+      weight = self.class.volatility_weight(count)
+      (weight * StatisticsUtils.stddev(errors)) + ((1.0 - weight) * baseline)
     end
 
     def calculate_volatility(team_season)
-      home_preds = home_preds_by_season[team_season.id] || []
-      away_preds = away_preds_by_season[team_season.id] || []
+      home_preds = @predictions_by_side.fetch(:home)[team_season.id] || []
+      away_preds = @predictions_by_side.fetch(:away)[team_season.id] || []
 
       {
         offensive_efficiency_volatility: offensive_efficiency_volatility(home_preds, away_preds),
@@ -179,8 +187,8 @@ module ProphetRatings
     # @param team_season [TeamSeason] The team season for which to calculate home court advantages.
     # @return [Hash] A hash with :home_offense_boost (non-negative) and :home_defense_boost (non-positive), both rounded to three decimals.
     def calculate_home_advantages(team_season)
-      baseline = Rails.application.config_for(:ratings).home_court_advantage.to_f
-      home_preds = (home_preds_by_season[team_season.id] || []).reject { |p| p.game.neutral? }
+      baseline = @ratings_config_version.settings.fetch(:home_court_advantage).to_f
+      home_preds = (@predictions_by_side.fetch(:home)[team_season.id] || []).reject { |p| p.game.neutral? }
       return { home_offense_boost: baseline, home_defense_boost: -baseline } if home_preds.empty?
 
       off_deltas = home_preds.filter_map do |p|

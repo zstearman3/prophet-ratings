@@ -4,6 +4,8 @@ require 'rails_helper'
 require 'rake'
 
 RSpec.describe SeasonPreparer do
+  before { RatingsConfigVersion.publish! }
+
   around do |example|
     original_rake = Rake.application
     original_env = ENV.to_h
@@ -11,7 +13,7 @@ RSpec.describe SeasonPreparer do
     Rake::Task.define_task(:environment)
     load Rails.root.join('lib/tasks/season_bootstrap.rake')
     %w[YEAR START_DATE END_DATE SYNC_GAMES DEDUPE_GAMES RUN_PRESEASON RUN_RATINGS RATINGS_RESUME REBUILD
-       RATINGS_START_DATE RATINGS_END_DATE ALIGN_CONFERENCES].each { |key| ENV.delete(key) }
+       RATINGS_START_DATE RATINGS_END_DATE ALIGN_CONFERENCES MODEL_VERSION].each { |key| ENV.delete(key) }
     ENV['YEAR'] = '2027'
     ENV['ALIGN_CONFERENCES'] = 'false'
     example.run

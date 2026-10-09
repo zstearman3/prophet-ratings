@@ -4,7 +4,10 @@ namespace :ratings do
   desc 'Read-only preseason benchmark; requires YEARS (one to five comma-separated years) and SOURCE_CONFIG'
   task compare_preseason: :environment do
     years = ENV.fetch('YEARS').split(',')
-    report = ProphetRatings::PreseasonComparison.new(years:, source_config_name: ENV.fetch('SOURCE_CONFIG')).call
+    report = ProphetRatings::PreseasonComparison.new(years:, source_config_name: ENV.fetch('SOURCE_CONFIG'),
+                                                     ratings_config_version: (if ENV['MODEL_VERSION']
+                                                                                RatingsConfigVersion.find_by!(name: ENV['MODEL_VERSION'])
+                                                                              end)).call
     puts JSON.pretty_generate(report)
   end
 end

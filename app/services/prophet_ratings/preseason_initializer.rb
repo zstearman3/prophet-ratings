@@ -2,7 +2,9 @@
 
 module ProphetRatings
   class PreseasonInitializer
-    def initialize(season)
+    def initialize(season, ratings_config_version: nil)
+      @ratings_config_version = RatingsConfigVersion.resolve(ratings_config_version)
+      @config = @ratings_config_version.settings
       @season = season
     end
 
@@ -50,11 +52,11 @@ module ProphetRatings
       @season.assign_attributes(publication_baselines)
       validate_prediction_baselines
       @season.save!
-      OverallRatingsCalculator.new(@season).publish(as_of: @season.start_date - 1.day)
+      OverallRatingsCalculator.new(@season, ratings_config_version: @ratings_config_version).publish(as_of: @season.start_date - 1.day)
     end
 
     def publication_baselines
-      config = Rails.application.config_for(:ratings).deep_symbolize_keys.fetch(:baseline_volatility)
+      config = @config.fetch(:baseline_volatility)
       { average_efficiency: @season.team_seasons.average(:adj_offensive_efficiency),
         average_pace: preseason_average_pace,
         efficiency_std_deviation: config.fetch(:efficiency_volatility), pace_std_deviation: config.fetch(:pace_volatility) }
@@ -72,11 +74,29 @@ module ProphetRatings
                            'review them before changing preseason coverage or inputs.'
     end
 
+    def reset_attributes(team_season)
+      stats = OverallRatingsCalculator::ADJUSTED_STATS.values.flatten.map(&:to_s) & team_season.attribute_names
+      stats.index_with(nil).merge(model_defaults)
+    end
+
+    def model_defaults
+      home_boost = @config.fetch(:home_court_advantage)
+      volatility = @config.dig(:baseline_volatility, :efficiency_volatility)
+      {
+        ratings_config_version: @ratings_config_version,
+        home_offense_boost: home_boost,
+        home_defense_boost: -home_boost,
+        offensive_efficiency_volatility: volatility,
+        defensive_efficiency_volatility: volatility,
+        pace_volatility: @config.dig(:baseline_volatility, :pace_volatility)
+      }
+    end
+
     def initialize_ratings
-      ProphetRatings::PreseasonRatingsCalculator.new(@season).call
+      ProphetRatings::PreseasonRatingsCalculator.new(@season, ratings_config_version: @ratings_config_version).call
 
       @season.team_seasons.find_each do |team_season|
-        team_season.update!(self.class.prior_ratings(team_season))
+        team_season.update!(reset_attributes(team_season).merge(self.class.prior_ratings(team_season)))
       end
     end
   end

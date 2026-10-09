@@ -108,22 +108,22 @@ class Game < ApplicationRecord
 
   ##
   # Generates a prediction for the game using the external prediction builder service.
-  def generate_prediction!
-    ProphetRatings::GamePredictionBuilder.new(self).call
+  def generate_prediction!(ratings_config_version: nil)
+    ProphetRatings::GamePredictionBuilder.new(self, ratings_config_version:).call
   end
 
   ##
   # Finalizes the game by delegating to the external game finalizer service.
   # This typically updates the game's status and related statistics.
-  def finalize
-    ProphetRatings::GameFinalizer.new(self).call
+  def finalize(ratings_config_version: nil)
+    ProphetRatings::GameFinalizer.new(self, ratings_config_version:).call
   end
 
   ##
   # Returns the prediction for the game associated with the current ratings configuration version, or nil if none exists.
   # @return [Prediction, nil] The current prediction or nil if not found.
-  def current_prediction
-    current_config_id = RatingsConfigVersion.current&.id
+  def current_prediction(ratings_config_version: RatingsConfigVersion.published_default)
+    current_config_id = ratings_config_version&.id
     return nil unless current_config_id
 
     predictions.find_by(ratings_config_version_id: current_config_id)

@@ -16,16 +16,19 @@ namespace :ratings do
 
   def backfill_for_season(season)
     start_date = season.start_date
+    version = RatingsConfigVersion.default_version
 
     puts "Backfilling ratings for season: #{season.year}"
-    ProphetRatings::PreseasonInitializer.new(season).call
+    ProphetRatings::PreseasonInitializer.new(season, ratings_config_version: version).call
 
     (start_date..season.end_date).each do |date|
       puts "Backfilling for #{date}..."
       games = Game.on_schedule_date(date)
-      ProphetRatings::OverallRatingsCalculator.new(season).call(as_of: date)
-      games.each(&:generate_prediction!)
-      games.each { |game| game.finalize if game.final? }
+      ProphetRatings::OverallRatingsCalculator.new(season, ratings_config_version: version).call(as_of: date)
+      games.each do |game|
+        game.generate_prediction!(ratings_config_version: version)
+        game.finalize(ratings_config_version: version) if game.final?
+      end
     end
 
     puts "✅ Done backfilling ratings for season #{season.year}"

@@ -5,19 +5,20 @@ module ProphetRatings
   class PreseasonComparison
     CANDIDATE_WEIGHTS = [0.85, 0.70, 0.55].freeze
 
-    def initialize(years:, source_config_name:)
+    def initialize(years:, source_config_name:, ratings_config_version: nil)
       @years = years.map { |year| Integer(year) }.uniq.sort
       raise ArgumentError, 'Choose between one and five season years' unless (1..5).cover?(@years.size)
 
       @source_version = RatingsConfigVersion.find_by!(name: source_config_name)
-      @config = Rails.application.config_for(:ratings).to_h.deep_stringify_keys
+      @ratings_config_version = RatingsConfigVersion.resolve(ratings_config_version)
     end
 
     def call
+      config = @ratings_config_version.settings.deep_stringify_keys
       reports = @years.map { |year| season_report(Season.find_by!(year:)) }
       {
         benchmark: 'fixed preseason; no profiles, no in-season transition or confidence labels',
-        source_config: @source_version.name, candidate_config: @config,
+        source_config: @source_version.name, candidate_config: config,
         split: self.class.split_description(reports),
         seasons: reports,
         decision: 'Retain production defaults. This bounded benchmark does not establish improvement or tune coefficients.'
@@ -36,7 +37,7 @@ module ProphetRatings
     private
 
     def season_report(season)
-      PreseasonComparisonSeason.new(season:, source_version: @source_version, config: @config).call
+      PreseasonComparisonSeason.new(season:, source_version: @source_version, ratings_config_version: @ratings_config_version).call
     end
   end
 end

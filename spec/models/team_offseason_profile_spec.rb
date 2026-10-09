@@ -25,6 +25,8 @@ require 'rails_helper'
 RSpec.describe TeamOffseasonProfile do
   subject(:profile) { described_class.new }
 
+  before { RatingsConfigVersion.publish! }
+
   it 'treats missing and unused profile fields as no evidence' do
     profile.assign_attributes(coaching_change: true, lost_starters: 5, recruiting_class_rank: 1, returning_bpm_total: 20)
 

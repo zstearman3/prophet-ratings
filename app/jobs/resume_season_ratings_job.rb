@@ -1,14 +1,16 @@
 # frozen_string_literal: true
 
 class ResumeSeasonRatingsJob < ApplicationJob
+  include PinnedModelVersion
+
   queue_as :default
   around_perform { |_job, block| Season.with_ratings_lock(&block) }
 
   # Backfills ratings, predictions, and finalized game-derived values for a season.
   # Unlike GenerateSeasonRatingsJob, this does not clear existing predictions/snapshots.
-  def perform(season_id, run_preseason: false, start_date: nil, end_date: nil)
+  def perform(season_id, run_preseason: false, start_date: nil, end_date: nil, ratings_config_version_id: nil)
     season = resolve_season(season_id)
-    ratings_config_version = RatingsConfigVersion.ensure_current!
+    ratings_config_version = RatingsConfigVersion.resolve(ratings_config_version_id)
     date_range = backfill_date_range(season:, ratings_config_version:, start_date:, end_date:)
     return if date_range.nil?
 
@@ -18,7 +20,7 @@ class ResumeSeasonRatingsJob < ApplicationJob
       "Resuming ratings backfill for season #{season.year}: #{date_range.begin}..#{date_range.end}"
     end
 
-    backfill_date_range!(season, date_range)
+    backfill_date_range!(season, date_range, ratings_config_version)
 
     Rails.logger.info { "✅ Done resumable ratings backfill for season #{season.year}" }
   end
@@ -61,23 +63,25 @@ class ResumeSeasonRatingsJob < ApplicationJob
   def maybe_initialize_preseason!(season, ratings_config_version, run_preseason)
     return unless run_preseason && should_initialize_preseason?(season, ratings_config_version)
 
-    initialize_preseason_ratings!(season)
+    initialize_preseason_ratings!(season, ratings_config_version)
   end
 
-  def backfill_date_range!(season, date_range)
+  def backfill_date_range!(season, date_range, ratings_config_version)
     date_range.each do |date|
       Season.transaction do
         Rails.logger.debug { "Backfilling for #{date}" }
         games = season.games.on_schedule_date(date)
-        ProphetRatings::OverallRatingsCalculator.new(season).call(as_of: date)
-        games.each(&:generate_prediction!)
-        games.each { |game| game.finalize if game.final? }
+        ProphetRatings::OverallRatingsCalculator.new(season, ratings_config_version: ratings_config_version).call(as_of: date)
+        games.each do |game|
+          game.generate_prediction!(ratings_config_version:)
+          game.finalize(ratings_config_version:) if game.final?
+        end
       end
     end
   end
 
-  def initialize_preseason_ratings!(season)
-    Season.transaction { ProphetRatings::PreseasonInitializer.new(season).call }
+  def initialize_preseason_ratings!(season, ratings_config_version)
+    Season.transaction { ProphetRatings::PreseasonInitializer.new(season, ratings_config_version: ratings_config_version).call }
   end
 
   def coerce_date(value)

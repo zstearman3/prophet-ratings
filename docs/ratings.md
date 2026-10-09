@@ -356,7 +356,7 @@ The snapshot stores top-level columns for:
 
 Other adjusted stats, volatility fields, home-court fields, and ranks are copied into the snapshot `stats` JSONB column.
 
-Snapshots are associated with a `RatingsConfigVersion` produced from the active `config/ratings.yml` bundle. The lookup is based on `bundle_name`. Reusing an existing name with different configuration raises an error; changed assumptions or corrected captured prior inputs require a new bundle name.
+Snapshots are associated with the `RatingsConfigVersion` selected for the calculation run, including stored ratings, prediction and defaults settings. The lookup is based on `bundle_name`. Reusing an existing name with different configuration raises an error; changed assumptions or corrected captured prior inputs require a new bundle name.
 
 ## Operational safety
 
@@ -454,7 +454,21 @@ Unavailable Five Factors are left null. Equal baseline teams yield neutral score
 of `105.5 * 69.5 / 100 = 73.3225` and win probability 0.5. These defaults support
 prediction generation; they do not establish calibrated confidence or accuracy.
 
-The prediction builder defaults to the configured bundle rather than a potentially
-stale global current flag. It skips and logs missing/incomplete core snapshot or
+The prediction builder defaults to the explicitly active stored model, or an
+already-published authored bundle when none is active. It skips and logs missing/incomplete core snapshot or
 pace/volatility inputs. Existing same-day snapshot selection and mutable season
 prediction baselines remain limitations for leakage-safe historical evaluation.
+
+## Explicit model configuration
+
+The `v1.6-pinned-model` bundle introduces complete stored configuration contract
+version 1 without coefficient tuning. All calculation services and solver
+parameters use the selected immutable payload. Jobs pin the version ID at
+enqueueing and propagate it through retries and downstream predictions.
+Publication, read-only selection, and explicit activation are separate operations.
+Incomplete legacy payloads remain readable/evaluable as published outputs but
+cannot be used for new calculations or faithful replay. Live/prior provenance
+must match before snapshot publication; the additive migration fabricates no
+historical identity. See [Model configuration versions](model-versions.md) for
+the contract, author/publish/select/activate commands, rollout and real-solver
+verification. Source-data and calculation-code changes remain replay limits.

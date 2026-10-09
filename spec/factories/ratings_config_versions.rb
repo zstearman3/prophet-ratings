@@ -20,7 +20,7 @@
 FactoryBot.define do
   factory :ratings_config_version do
     sequence(:name) { |n| "bundle_#{n}" }
-    config { { bundle_name: name, sample: true } }
+    config { RatingsConfigVersion.authored_config.merge(bundle_name: name) }
     created_at { Time.zone.now }
     updated_at { Time.zone.now }
   end

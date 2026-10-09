@@ -3,6 +3,8 @@
 require 'rails_helper'
 
 RSpec.describe ProphetRatings::PreseasonInitializer do
+  before { RatingsConfigVersion.publish! }
+
   let(:season) { create(:season, average_pace: nil, average_efficiency: nil) }
   let!(:home) { create(:team_season, season:, offensive_efficiency_volatility: nil, defensive_efficiency_volatility: nil) }
   let!(:away) { create(:team_season, season:, offensive_efficiency_volatility: nil, defensive_efficiency_volatility: nil) }
@@ -41,12 +43,13 @@ RSpec.describe ProphetRatings::PreseasonInitializer do
     expect([home.reload.overall_rank, away.reload.overall_rank]).to eq([1, 2])
   end
 
-  it 'uses published configured snapshots even when a different bundle has the global current flag' do
+  it 'uses an explicitly selected published model even when a different bundle has the global current flag' do
+    version = RatingsConfigVersion.default_version
     stale = create(:ratings_config_version, current: true)
     game = scheduled_game
-    initializer.call
-    prediction = ProphetRatings::GamePredictionBuilder.new(game).call
-    expect(prediction.ratings_config_version.name).to eq('v1.5-preseason-publication')
+    described_class.new(season, ratings_config_version: version).call
+    prediction = ProphetRatings::GamePredictionBuilder.new(game, ratings_config_version: version).call
+    expect(prediction.ratings_config_version).to eq(version)
     expect(stale.reload).to be_current
   end
 

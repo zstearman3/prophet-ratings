@@ -3,6 +3,8 @@
 require 'rails_helper'
 
 RSpec.describe ProphetRatings::AdjustedStatCalculator, type: :service do
+  before { RatingsConfigVersion.publish! }
+
   let(:as_of) { season.start_date + 30.days }
 
   describe 'pace observations' do

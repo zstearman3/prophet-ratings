@@ -2,21 +2,19 @@
 
 module ProphetRatings
   class PreseasonRatingsCalculator
-    PRESEASON_CONFIG = Rails.application.config_for(:ratings).deep_symbolize_keys.fetch(:preseason)
-    PREVIOUS_SEASON_WEIGHT = PRESEASON_CONFIG.fetch(:previous_season_weight)
-
-    def initialize(season = Season.current)
+    def initialize(season = Season.current, ratings_config_version: nil)
+      @ratings_config_version = RatingsConfigVersion.resolve(ratings_config_version)
+      @config = @ratings_config_version.settings
       @season = season
       @previous_season = Season.find_by(year: @season.year - 1)
-      @config = Rails.application.config_for(:ratings).deep_symbolize_keys
     end
 
     def call
       @season.with_lock do
-        version = RatingsConfigVersion.find_or_create_by_config(@config)
+        version = @ratings_config_version
         @season.team_seasons.includes(:team_offseason_profile).find_each do |team_season|
           prior = captured_prior(team_season, version)
-          team_season.update!(prior.outputs)
+          team_season.update!(prior.outputs.merge(preseason_prior: prior))
         end
       end
     end

@@ -3,6 +3,8 @@
 require 'rails_helper'
 
 RSpec.describe GenerateNightlyPredictionsJob do
+  before { RatingsConfigVersion.publish! }
+
   let(:as_of) { Time.zone.parse('2026-02-01 10:00:00') }
   let(:season) do
     create(

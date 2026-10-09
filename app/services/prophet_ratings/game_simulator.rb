@@ -1,8 +1,6 @@
 # frozen_string_literal: true
 
 module ProphetRatings
-  DEFAULTS = Rails.application.config_for(:defaults).deep_symbolize_keys unless const_defined?(:DEFAULTS)
-
   class GameSimulator
     ##
     # Initializes a new game simulator with team rating snapshots, upset modifier, neutral site flag, and season context.
@@ -11,11 +9,12 @@ module ProphetRatings
     # @param upset_modifier [Float] A multiplier affecting the likelihood of upsets (default: 1.0).
     # @param neutral [Boolean] Whether the game is played at a neutral site (default: false).
     # @param season The season context for the simulation (default: current season).
-    def initialize(home_rating_snapshot:, away_rating_snapshot:, upset_modifier: 1.0, neutral: false, season: Season.current)
+    def initialize(home_rating_snapshot:, away_rating_snapshot:, season: Season.current, **options)
+      @ratings_config_version = ModelConfiguration.for_snapshots(home_rating_snapshot, away_rating_snapshot,
+                                                                 options[:ratings_config_version])
       @home_rating_snapshot = home_rating_snapshot
       @away_rating_snapshot = away_rating_snapshot
-      @upset_modifier = upset_modifier
-      @neutral = neutral
+      @options = options
       @season = season
     end
 
@@ -38,6 +37,18 @@ module ProphetRatings
     end
 
     private
+
+    def neutral
+      @options.fetch(:neutral, false)
+    end
+
+    def upset_modifier
+      @options.fetch(:upset_modifier, 1.0)
+    end
+
+    def config
+      @ratings_config_version.settings
+    end
 
     attr_reader :home_rating_snapshot, :away_rating_snapshot, :season
 
@@ -65,10 +76,14 @@ module ProphetRatings
     ##
     # Calculates the expected pace for the simulated game based on both teams' adjusted paces and the season average.
     # @return [Float] The expected number of possessions for the game.
+    def season_average_pace
+      season.average_pace || config.dig(:defaults, :season_defaults, :average_pace)
+    end
+
     def expected_pace
-      @expected_pace ||= (home_rating_snapshot.adj_pace - season.average_pace) +
-                         (away_rating_snapshot.adj_pace - season.average_pace) +
-                         season.average_pace
+      @expected_pace ||= (home_rating_snapshot.adj_pace - season_average_pace) +
+                         (away_rating_snapshot.adj_pace - season_average_pace) +
+                         season_average_pace
     end
 
     ##
@@ -98,13 +113,13 @@ module ProphetRatings
     end
 
     def home_offense_boost
-      return 0 if @neutral
+      return 0 if neutral
 
       home_rating_snapshot&.home_offense_boost || default_home_boost
     end
 
     def home_defense_boost
-      return 0 if @neutral
+      return 0 if neutral
 
       home_rating_snapshot&.home_defense_boost || -default_home_boost
     end
@@ -113,7 +128,7 @@ module ProphetRatings
     # Retrieves the default home court advantage value from the ratings configuration.
     # @return [Numeric] The configured home court advantage value.
     def default_home_boost
-      @default_home_boost ||= Rails.application.config_for(:ratings).home_court_advantage
+      @default_home_boost ||= config.fetch(:home_court_advantage)
     end
 
     ##
@@ -124,7 +139,7 @@ module ProphetRatings
     end
 
     def default_season_average_efficiency
-      @default_season_average_efficiency ||= DEFAULTS[:season_defaults][:average_efficiency]
+      @default_season_average_efficiency ||= config.dig(:defaults, :season_defaults, :average_efficiency)
     end
 
     ##
@@ -156,8 +171,9 @@ module ProphetRatings
         home_rating_snapshot: home_rating_snapshot,
         away_rating_snapshot: away_rating_snapshot,
         season: season,
-        upset_modifier: @upset_modifier,
-        neutral: @neutral
+        ratings_config_version: @ratings_config_version,
+        upset_modifier: upset_modifier,
+        neutral: neutral
       )
     end
   end

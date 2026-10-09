@@ -98,7 +98,7 @@ class Prediction < ApplicationRecord
 
   ##
   # Calculates the standard deviation of the predicted margin between home and away teams.
-  # Uses the pace factor and the offensive and defensive efficiency volatilities from both teams' seasons.
+  # Uses the pace factor and stored snapshot efficiency volatilities.
   ##
   # Calculates the standard deviation of the predicted margin between home and away teams.
   # @return [Float] The standard deviation of the predicted margin.
@@ -111,19 +111,13 @@ class Prediction < ApplicationRecord
 
   ##
   # Calculates the standard deviation of the predicted total score based on the pace factor
-  # and the offensive and defensive efficiency volatilities of both teams' seasons.
+  # and the stored snapshot efficiency volatilities.
   ##
-  # Calculates the estimated standard deviation of the predicted total score based on the offensive and defensive efficiency volatilities of both teams' seasons and the pace factor.
+  # Calculates the estimated standard deviation of the predicted total score using stored snapshot volatility and the pace factor.
   # @return [Float] The estimated standard deviation of the total predicted score.
   def total_std_deviation
-    total_var = (
-      (home_team_snapshot.team_season.offensive_efficiency_volatility**2) +
-      (home_team_snapshot.team_season.defensive_efficiency_volatility**2) +
-      (away_team_snapshot.team_season.offensive_efficiency_volatility**2) +
-      (away_team_snapshot.team_season.defensive_efficiency_volatility**2)
-    )
-
-    Math.sqrt(total_var) * pace_factor
+    values = ProphetRatings::ModelConfiguration.snapshot_volatilities([home_team_snapshot, away_team_snapshot], ratings_config_version)
+    Math.sqrt(values.sum { |value| value**2 }) * pace_factor
   end
 
   # Returns [away_score, home_score] as integers, using tie-breaking logic if needed.
@@ -152,20 +146,16 @@ class Prediction < ApplicationRecord
   # Calculates the variance contribution to the predicted margin from the home team's offensive and the away team's defensive efficiency volatilities, scaled by the pace factor.
   # @return [Float] The variance component for the home team's margin.
   def home_margin_variability
-    pace_factor * (
-      (home_team_snapshot.team_season.offensive_efficiency_volatility**2) +
-      (away_team_snapshot.team_season.defensive_efficiency_volatility**2)
-    )
+    values = ProphetRatings::ModelConfiguration.snapshot_volatilities([home_team_snapshot, away_team_snapshot], ratings_config_version)
+    pace_factor * values.values_at(0, 3).sum { |value| value**2 }
   end
 
   ##
   # Calculates the variance contribution to the predicted margin from the away team's offensive and the home team's defensive efficiency volatilities, scaled by the pace factor.
   # @return [Float] The variance component for the away team's margin.
   def away_margin_variability
-    pace_factor * (
-      (away_team_snapshot.team_season.offensive_efficiency_volatility**2) +
-      (home_team_snapshot.team_season.defensive_efficiency_volatility**2)
-    )
+    values = ProphetRatings::ModelConfiguration.snapshot_volatilities([home_team_snapshot, away_team_snapshot], ratings_config_version)
+    pace_factor * values.values_at(2, 1).sum { |value| value**2 }
   end
 
   ##
@@ -188,8 +178,9 @@ class Prediction < ApplicationRecord
   def snapshots_must_have_same_ratings_version
     return if home_team_snapshot.nil? || away_team_snapshot.nil?
 
-    return unless home_team_snapshot.ratings_config_version_id != away_team_snapshot.ratings_config_version_id
+    version_ids = [home_team_snapshot.ratings_config_version_id, away_team_snapshot.ratings_config_version_id]
+    return if version_ids.uniq.size == 1 && (ratings_config_version_id.nil? || version_ids.first == ratings_config_version_id)
 
-    errors.add(:base, 'Home and away team snapshots must use the same ratings config version')
+    errors.add(:base, 'Home and away team snapshots must use the selected ratings config version')
   end
 end

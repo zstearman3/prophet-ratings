@@ -3,17 +3,18 @@
 require 'rails_helper'
 
 RSpec.describe GenerateSeasonRatingsJob do
+  before do
+    RatingsConfigVersion.publish!
+    allow(RatingsConfigVersion).to receive(:ensure_current!).and_return(config)
+    allow(ProphetRatings::OverallRatingsCalculator).to receive(:new).and_return(calculator)
+    allow(Game).to receive(:current_schedule_date).and_return(last)
+  end
+
   let(:season) { create(:season, year: 2026, start_date: Date.new(2025, 11, 1), end_date: Date.new(2026, 4, 1)) }
   let(:config) { create(:ratings_config_version, current: true) }
   let(:calculator) { instance_double(ProphetRatings::OverallRatingsCalculator, call: true) }
   let(:first) { season.start_date }
   let(:last) { first + 1.day }
-
-  before do
-    allow(RatingsConfigVersion).to receive(:ensure_current!).and_return(config)
-    allow(ProphetRatings::OverallRatingsCalculator).to receive(:new).and_return(calculator)
-    allow(Game).to receive(:current_schedule_date).and_return(last)
-  end
 
   def rebuild(start_date: first, end_date: last)
     described_class.new.perform(season.id, rebuild: true, date_range: start_date..end_date)

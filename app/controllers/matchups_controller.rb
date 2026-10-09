@@ -51,7 +51,8 @@ class MatchupsController < ApplicationController
   def set_prediction_params
     home_team_season = TeamSeason.find_by(id: matchup_params[:home_team_id])
     away_team_season = TeamSeason.find_by(id: matchup_params[:away_team_id])
-    config = RatingsConfigVersion.current
+    config = RatingsConfigVersion.default_version
+    @ratings_config_version = config
 
     @home_snapshot = TeamRatingSnapshot.where(team_season: home_team_season, ratings_config_version: config)
                                        .order(snapshot_date: :desc).first
@@ -81,7 +82,8 @@ class MatchupsController < ApplicationController
       home_rating_snapshot: @home_snapshot,
       away_rating_snapshot: @away_snapshot,
       venue: { type: @neutral ? 'neutral' : 'home' },
-      upset_modifier: @upset_modifier
+      upset_modifier: @upset_modifier,
+      ratings_config_version: @ratings_config_version
     ).call
   end
 
@@ -93,7 +95,8 @@ class MatchupsController < ApplicationController
       home_rating_snapshot: @home_snapshot,
       away_rating_snapshot: @away_snapshot,
       neutral: @neutral,
-      upset_modifier: @upset_modifier
+      upset_modifier: @upset_modifier,
+      ratings_config_version: @ratings_config_version
     ).call
   end
 

@@ -31,19 +31,62 @@ class RatingsConfigVersion < ApplicationRecord
   end
 
   def self.ensure_current!(config_hash = nil)
-    config_hash ||= Rails.application.config_for(:ratings).deep_symbolize_keys
+    config_hash ||= authored_config
 
-    transaction do
-      update_all(current: false)
-      config = find_or_create_by_config(config_hash)
-      config.update!(current: true)
-      config
+    publish!(config_hash).activate
+  end
+
+  def self.authored_config
+    application = Rails.application
+    application.config_for(:ratings).to_h.deep_symbolize_keys.merge(
+      contract_version: 1,
+      prediction: application.config_for(:prediction).to_h.deep_symbolize_keys,
+      defaults: application.config_for(:defaults).to_h.deep_symbolize_keys
+    )
+  end
+
+  def self.publish!(payload = authored_config)
+    ProphetRatings::ModelConfiguration.settings(new(name: payload[:bundle_name] || payload['bundle_name'], config: payload))
+    find_or_create_by_config(payload)
+  end
+
+  def self.default_version
+    published_default || raise(ArgumentError, 'No published default model version; publish and activate a model first')
+  end
+
+  def self.published_default
+    current || find_by(name: Rails.application.config_for(:ratings).bundle_name)
+  end
+
+  def self.resolve(version = nil)
+    return default_version unless version
+
+    version.is_a?(RatingsConfigVersion) ? version : find(version)
+  end
+
+  def settings
+    unless persisted? && !will_save_change_to_config? && !will_save_change_to_name?
+      raise ArgumentError, 'Calculations require an unchanged persisted model version'
     end
+
+    @settings ||= ProphetRatings::ModelConfiguration.settings(self)
+  end
+
+  def activate
+    settings
+    model = self.class
+    model.transaction { model.activate_record(self) }
+    self
+  end
+
+  def self.activate_record(version)
+    lock.order(:id).load
+    update_all(current: false)
+    version.reload.update!(current: true)
   end
 
   def self.find_or_create_by_current_config
-    current_config = Rails.application.config_for(:ratings).deep_symbolize_keys
-    find_or_create_by_config(current_config)
+    publish!
   end
 
   def self.find_or_create_by_config(config_hash)

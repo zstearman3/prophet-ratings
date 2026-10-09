@@ -75,6 +75,8 @@
 class TeamSeason < ApplicationRecord
   belongs_to :team
   belongs_to :season
+  belongs_to :ratings_config_version, optional: true
+  belongs_to :preseason_prior, optional: true
   has_many :team_games, dependent: :destroy
   has_many :games, through: :team_games
   has_many :team_rating_snapshots, dependent: :destroy
@@ -83,11 +85,38 @@ class TeamSeason < ApplicationRecord
 
   scope :current, -> { where(season: Season.current) }
 
-  def rank(as_of: nil)
+  def validate_model_inputs(version)
+    version_id = version.id
+    validate_live_model(version_id)
+    validate_prior_model(version_id)
+  end
+
+  def validate_prior_model(version_id)
+    prior_values = attributes.values_at('preseason_adj_offensive_efficiency', 'preseason_adj_defensive_efficiency', 'preseason_adj_pace')
+    return if prior_values.all?(&:nil?) || matching_prior?(version_id)
+
+    raise ArgumentError, 'Preseason inputs lack matching model provenance; run the selected preseason calculator'
+  end
+
+  def matching_prior?(version_id)
+    identity_matches = [preseason_prior&.ratings_config_version_id, preseason_prior&.team_season_id] == [version_id, id]
+    identity_matches && preseason_prior.outputs.all? { |stat, value| public_send(stat) == value }
+  end
+
+  def validate_live_model(version_id)
+    unless [nil, version_id].include?(ratings_config_version_id)
+      raise ArgumentError, 'Live ratings use another model; explicitly reset/rebuild before switching versions'
+    end
+    return if ratings_config_version_id || attributes.values_at('adj_offensive_efficiency', 'adj_defensive_efficiency',
+                                                                'adj_pace').all?(&:nil?)
+
+    raise ArgumentError, 'Legacy live ratings have no model provenance; explicitly initialize/reset before publication'
+  end
+
+  def rank(as_of: nil, ratings_config_version: RatingsConfigVersion.published_default)
     return overall_rank if as_of.blank?
 
-    config = RatingsConfigVersion.current ||
-             RatingsConfigVersion.find_by(name: Rails.application.config_for(:ratings).bundle_name)
+    config = ratings_config_version
     return if config.blank?
 
     team_rating_snapshots
