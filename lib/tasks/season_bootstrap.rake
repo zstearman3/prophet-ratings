@@ -24,7 +24,7 @@ namespace :season do
     season = target_season!
     Season.with_ratings_lock do
       Season.transaction do
-        if season.reload.current? || season.rating_outputs?
+        if season.reload.current?
           abort('Existing season outputs must be preserved. Use an explicitly scoped season:rebuild_ratings for an intentional reset.')
         end
         ProphetRatings::PreseasonInitializer.new(season).call

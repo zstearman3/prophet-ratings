@@ -121,14 +121,34 @@ For a fresh, inactive season:
 bin/rails season:initialize_preseason YEAR=2027
 ```
 
-Initialization is transactional. Existing live adjusted values, snapshots,
-predictions, final games or current-season status cause a clear refusal to reset
-outputs. A failed initialization rolls back all its writes and can be retried.
-Repeated successful initialization preserves outputs by refusing the reset.
-The separate preseason publishing story owns complete ranks, defaults and
-snapshots; this command calls the existing initializer and does not claim those
-publication guarantees. Adding teams after initialization requires review of
-their missing values before activation.
+Initialization atomically captures priors and publishes adjusted offense, defense,
+pace, net ratings, ranks, home boosts and volatility defaults, plus snapshots dated
+one day before the stored season start. Snapshots use the configured bundle and
+include captured prior provenance. Ties break by ascending team ID; unavailable
+Five Factors remain unranked rather than receiving invented values.
+
+A safe repeat reuses captures and snapshot identities, and can initialize newly
+prepared teams. Current-season status, final games, snapshots on other dates or
+live core ratings differing from their preseason values cause a clear refusal.
+Scheduled predictions permit an unchanged repeat. A repeat that would change
+the efficiency or pace baseline while saved predictions exist is refused and
+rolled back; review dependent predictions before changing coverage or inputs. A failed publication rolls
+back all writes and can be retried. Review team coverage and season boundaries
+before activation; changing boundaries after publication requires explicit review.
+
+With scheduled games and both TeamGame associations available, the existing
+prediction builder uses the configured bundle's latest applicable snapshots.
+Missing/incomplete core inputs produce no prediction and a warning in Rails logs.
+Publication does not itself import schedules or generate predictions. Example:
+
+```ruby
+season = Season.find_by!(year: 2027)
+ProphetRatings::GamePredictionBuilder.new(season.games.scheduled.first).call
+```
+
+Only the explicit rebuild job uses the initializer's separate reset entry point;
+it preserves the rebuild's existing date window and publishes no additional
+preseason snapshot outside that window.
 
 ## 5. Refresh schedules separately
 

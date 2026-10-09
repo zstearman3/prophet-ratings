@@ -74,4 +74,46 @@ RSpec.describe ProphetRatings::OverallRatingsCalculator, type: :service do
       ).to all(be_present)
     end
   end
+
+  describe 'early-season publication' do
+    let(:season) { create(:season) }
+    let(:calculator) { described_class.new(season) }
+
+    it 'publishes required ranks/defaults when there are no games before the solver gate' do
+      team_season = create(:team_season, season:, preseason_adj_offensive_efficiency: 120,
+                                         preseason_adj_defensive_efficiency: 100, preseason_adj_pace: 70)
+      calculator.call(as_of: season.start_date)
+      expect([team_season.reload.rating, team_season.overall_rank, team_season.adj_pace]).to eq([20, 1, 70])
+      expect(team_season.team_rating_snapshots.first.snapshot_date).to eq(season.start_date)
+    end
+
+    it 'preserves zero/one-game priors while qualified teams are solved at the requested cutoff' do
+      teams = Array.new(4) do
+        create(:team_season, season:, adj_offensive_efficiency: 120, adj_defensive_efficiency: 100, adj_pace: 70,
+                             preseason_adj_offensive_efficiency: 120, preseason_adj_defensive_efficiency: 100, preseason_adj_pace: 70)
+      end
+      2.times do |index|
+        game = create(:game, season:, start_time: season.start_date + (index + 1).days + 12.hours,
+                             possessions: 70, minutes: 40, home_team_score: 80, away_team_score: 70)
+        teams.first(2).each_with_index do |team_season, side|
+          create(:team_game, game:, team_season:, team: team_season.team, home: side.zero?, offensive_efficiency: 110)
+        end
+      end
+      game = create(:game, season:, start_time: season.start_date + 3.days + 12.hours,
+                           home_team_score: 80, away_team_score: 70)
+      create(:team_game, game:, team_season: teams[2], team: teams[2].team, home: true, offensive_efficiency: 90)
+      # An additional final outside the cutoff must not qualify this team.
+      future = create(:game, season:, start_time: season.start_date + 35.days + 12.hours)
+      create(:team_game, game: future, team_season: teams[2], team: teams[2].team, home: true)
+      allow(StatisticsUtils).to receive(:solve_least_squares_with_python) { |rows, _targets, _weights| Array.new(rows.first.size, 0.0) }
+      calculator.call(as_of: season.start_date + 20.days)
+      expect(StatisticsUtils).to have_received(:solve_least_squares_with_python).at_least(:once)
+      expect(teams.last(2).map do |team_season|
+        team_season.reload.attributes.values_at('adj_offensive_efficiency', 'adj_defensive_efficiency', 'adj_pace', 'rating')
+      end)
+        .to eq([[120, 100, 70, 20], [120, 100, 70, 20]])
+      # Day 20: 0.5 * 120 + 0.5 * ((110 + 110 + 90) / 3) = 111.667.
+      expect(teams.first.reload.adj_offensive_efficiency).to be_within(0.001).of(111.667)
+    end
+  end
 end
