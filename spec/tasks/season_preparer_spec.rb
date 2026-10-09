@@ -62,6 +62,26 @@ RSpec.describe SeasonPreparer do
     expect(TeamSeason.first.attributes.except('updated_at')).to eq(before_values)
   end
 
+  it 'rehearses no-schedule preparation with reviewed dates and preserves initialized outputs on rerun' do
+    create(:team)
+    ENV['START_DATE'] = '2026-11-02'
+    ENV['END_DATE'] = '2027-04-06'
+    expect do
+      invoke('season:prepare')
+      invoke('season:initialize_preseason')
+    end.to output(/Season prepared.*Preseason values initialized/m).to_stdout
+    season = Season.find_by!(year: 2027)
+    values = season.team_seasons.first.attributes
+    ENV.delete('START_DATE')
+    ENV.delete('END_DATE')
+
+    expect { 2.times { invoke('season:prepare') } }.to output(/TeamSeasons created: 0/).to_stdout
+    expect(season.reload).to have_attributes(start_date: Date.new(2026, 11, 2), end_date: Date.new(2027, 4, 6),
+                                             current: false, games: [])
+    expect(season.team_seasons.first.attributes).to eq(values)
+    expect(season.team_rating_snapshots.pluck(:snapshot_date)).to eq([Date.new(2026, 11, 1)])
+  end
+
   it 'rolls back partial initialization and leaves the old current season unchanged' do
     old_season = create(:season, :current, year: 2026)
     team_season = create(:team_season, season: create(:season, year: 2027))

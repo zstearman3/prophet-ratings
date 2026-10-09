@@ -360,6 +360,23 @@ Snapshots are associated with a `RatingsConfigVersion` produced from the active 
 
 ## Operational safety
 
+Preseason initialization publishes prior/live offense, defense, pace, ratings,
+core ranks, home boosts, volatility defaults and snapshots dated one day before
+season start. Review those outputs and captured prior provenance with the
+[offseason readiness checklist](offseason.md#readiness-checklist-and-decision-record)
+before declaring a season prediction-ready. Safe repeats reuse captures and
+snapshot identities; established in-season outputs are protected. Zero/one-game
+teams retain captured core priors while qualified teams receive observed adjustments.
+The bounded comparison and its coverage/calibration limits are documented in
+[Preseason comparison](preseason-comparison.md); it does not justify an accuracy gain.
+
+This runbook change introduces no additional model or config changes. Record the
+bundle name and compare the persisted `RatingsConfigVersion#config` with deployed
+YAML. Lookup uses bundle name, with changed configuration under an existing name
+rejected. Corrected prior inputs or assumptions require a new bundle name; do not
+edit or delete existing captures. Missing history falls back to configured baselines;
+fallback confidence and unknown venues are not evidence of calibration.
+
 Season preparation/bootstrap never resets live ratings or deletes predictions or
 snapshots. Activation is a separate atomic operation. Non-deleting
 season:resume_ratings is capped at the Eastern schedule date and ignores future
