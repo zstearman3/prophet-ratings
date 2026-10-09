@@ -1,4 +1,5 @@
 default: &default
+  uncertainty_model: shared_pace_v1
   confidence_levels:
     high_max: 2.0
     medium_max: 5.0

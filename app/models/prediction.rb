@@ -96,26 +96,18 @@ class Prediction < ApplicationRecord
     "#{game.away_team_name} #{away} - #{game.home_team_name} #{home}"
   end
 
-  ##
-  # Calculates the standard deviation of the predicted margin between home and away teams.
-  # Uses the pace factor and stored snapshot efficiency volatilities.
-  ##
-  # Calculates the standard deviation of the predicted margin between home and away teams.
-  # @return [Float] The standard deviation of the predicted margin.
+  # Shared-pace versions use exact product moments; legacy versions retain fixed-pace arithmetic.
   def margin_std_deviation
-    Math.sqrt(
-      home_margin_variability +
-      away_margin_variability
-    )
+    return Math.sqrt(score_moments.margin_variance) if shared_pace_model?
+
+    values = ProphetRatings::ModelConfiguration.snapshot_volatilities([home_team_snapshot, away_team_snapshot], ratings_config_version)
+    Math.sqrt(values.sum { |value| value**2 } * pace_factor)
   end
 
-  ##
-  # Calculates the standard deviation of the predicted total score based on the pace factor
-  # and the stored snapshot efficiency volatilities.
-  ##
-  # Calculates the estimated standard deviation of the predicted total score using stored snapshot volatility and the pace factor.
-  # @return [Float] The estimated standard deviation of the total predicted score.
+  # Scores covary through pace, so total and margin uncertainty differ.
   def total_std_deviation
+    return Math.sqrt(score_moments.total_variance) if shared_pace_model?
+
     values = ProphetRatings::ModelConfiguration.snapshot_volatilities([home_team_snapshot, away_team_snapshot], ratings_config_version)
     Math.sqrt(values.sum { |value| value**2 }) * pace_factor
   end
@@ -143,22 +135,6 @@ class Prediction < ApplicationRecord
   end
 
   ##
-  # Calculates the variance contribution to the predicted margin from the home team's offensive and the away team's defensive efficiency volatilities, scaled by the pace factor.
-  # @return [Float] The variance component for the home team's margin.
-  def home_margin_variability
-    values = ProphetRatings::ModelConfiguration.snapshot_volatilities([home_team_snapshot, away_team_snapshot], ratings_config_version)
-    pace_factor * values.values_at(0, 3).sum { |value| value**2 }
-  end
-
-  ##
-  # Calculates the variance contribution to the predicted margin from the away team's offensive and the home team's defensive efficiency volatilities, scaled by the pace factor.
-  # @return [Float] The variance component for the away team's margin.
-  def away_margin_variability
-    values = ProphetRatings::ModelConfiguration.snapshot_volatilities([home_team_snapshot, away_team_snapshot], ratings_config_version)
-    pace_factor * values.values_at(2, 1).sum { |value| value**2 }
-  end
-
-  ##
   # Returns a string indicating the favorite team and the predicted point spread based on rounded scores.
   # The point spread is negative if the home team is favored, positive if the away team is favored.
   # @return [String] The favorite team's name followed by the point spread.
@@ -171,6 +147,25 @@ class Prediction < ApplicationRecord
   end
 
   private
+
+  def shared_pace_model?
+    ratings_config_version.config.dig('prediction', 'uncertainty_model') == 'shared_pace_v1'
+  end
+
+  def score_moments
+    snapshots = [home_team_snapshot, away_team_snapshot]
+    ProphetRatings::ModelConfiguration.snapshot_volatilities(snapshots, ratings_config_version)
+    ProphetRatings::ModelConfiguration.validate_volatilities(snapshots.map(&:pace_volatility))
+    calculator = ProphetRatings::VolatilityCalculator.new(
+      home_rating_snapshot: home_team_snapshot, away_rating_snapshot: away_team_snapshot,
+      season: season, ratings_config_version: ratings_config_version
+    )
+    ProphetRatings::ScoreMoments.new(
+      means: { home: home_offensive_efficiency, away: away_offensive_efficiency, pace: pace },
+      deviations: { home: calculator.total_home_volatility, away: calculator.total_away_volatility,
+                    pace: calculator.total_pace_volatility }
+    )
+  end
 
   ##
   # Validates that the home and away team snapshots reference the same ratings configuration version.

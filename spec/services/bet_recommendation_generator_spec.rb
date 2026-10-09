@@ -35,6 +35,8 @@ describe BetRecommendationGenerator do
            home_score: 75.0,
            away_score: 70.0,
            pace: 70.0,
+           home_offensive_efficiency: 107.143,
+           away_offensive_efficiency: 100.0,
            home_win_probability: 0.6)
   end
   let!(:game_odd) do

@@ -44,11 +44,16 @@ module ProphetRatings
     attr_reader :game, :ratings_config_version
 
     def prediction_inputs_available?
-      values = prediction_input_values.map(&:to_f)
-      return true if values.all? { |value| value.finite? && value.positive? }
+      values = prediction_input_values
+      return true if values.all? { |value| value.is_a?(Numeric) && value.finite? && value >= 0 } &&
+                     game.season.average_pace&.positive? && expected_pace.positive?
 
       Rails.logger.warn("Prediction skipped for game=#{game.id}: missing or invalid rating inputs")
       false
+    end
+
+    def expected_pace
+      home_snapshot.adj_pace + away_snapshot.adj_pace - game.season.average_pace
     end
 
     def prediction_input_values
@@ -58,7 +63,8 @@ module ProphetRatings
       deviation = season.efficiency_std_deviation || @config.dig(:baseline_volatility, :efficiency_volatility)
       [season.average_pace] + [home_snapshot, away_snapshot].flat_map do |snapshot|
         [snapshot.adj_offensive_efficiency, snapshot.adj_defensive_efficiency, snapshot.adj_pace,
-         snapshot.offensive_efficiency_volatility || deviation, snapshot.defensive_efficiency_volatility || deviation]
+         snapshot.offensive_efficiency_volatility || deviation, snapshot.defensive_efficiency_volatility || deviation,
+         snapshot.pace_volatility || season.pace_std_deviation || @config.dig(:baseline_volatility, :pace_volatility)]
       end
     end
 
