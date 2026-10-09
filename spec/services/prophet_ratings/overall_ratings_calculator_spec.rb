@@ -52,6 +52,32 @@ RSpec.describe ProphetRatings::OverallRatingsCalculator, type: :service do
       expect { calculator.call(as_of: 'not-a-date') }.to raise_error(ArgumentError)
       expect(team_season.team_rating_snapshots).to be_empty
     end
+
+    it 'defaults an explicit nil cutoff to today' do
+      travel_to(Time.utc(season.year, 11, 2, 3, 59)) { calculator.call(as_of: nil) }
+      expect(team_season.team_rating_snapshots.sole.snapshot_date).to eq(season.start_date)
+    end
+
+    it 'rejects a false cutoff without changing live state or publishing snapshots' do
+      original_state = [season.attributes, team_season.attributes]
+      expect { calculator.call(as_of: false) }.to raise_error(ArgumentError, /Cutoff must be/)
+      expect([season.reload.attributes, team_season.reload.attributes]).to eq(original_state)
+      expect(team_season.team_rating_snapshots).to be_empty
+    end
+
+    it 'accepts a date-only ISO string with its calendar meaning' do
+      calculator.call(as_of: '2024-11-02')
+      expect(team_season.team_rating_snapshots.sole.snapshot_date).to eq(Date.new(2024, 11, 2))
+    end
+
+    ['2024-11-02T03:59:00Z', '2024-11-02T00:59:00+03:00', '20241102', '2024-W44-6'].each do |cutoff|
+      it "rejects non-date-only string #{cutoff} without writes" do
+        original_state = [season.attributes, team_season.attributes]
+        expect { calculator.call(as_of: cutoff) }.to raise_error(ArgumentError, /YYYY-MM-DD/)
+        expect([season.reload.attributes, team_season.reload.attributes]).to eq(original_state)
+        expect(team_season.team_rating_snapshots).to be_empty
+      end
+    end
   end
 
   describe 'atomic daily publication' do

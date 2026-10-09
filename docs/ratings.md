@@ -15,9 +15,11 @@ ProphetRatings::OverallRatingsCalculator.new(season).call
 ```
 
 The calculator resolves its target season at initialization and requires a persisted
-season with ordered start/end dates. It accepts a Date, a timestamp, or an ISO date
-string as `as_of:`. Timestamps use the Eastern schedule date; dates retain their
-calendar meaning. The default is today's Eastern date, capped at the **target**
+season with ordered start/end dates. It accepts a Date, a time object, or an exact
+`YYYY-MM-DD` string as `as_of:`. Time objects use the Eastern schedule date;
+dates retain their calendar meaning. Timestamp strings are rejected instead of
+discarding their time/offset. Only an omitted or nil cutoff defaults to today's
+Eastern date; invalid values such as false fail before writing. The date is capped at the **target**
 season's end. Explicit cutoffs are also capped at that end. The calculator does
 not consult another current season or require a current season when given a target.
 It permits pre-opening dates for existing callers; preseason publication retains

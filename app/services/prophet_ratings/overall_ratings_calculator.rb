@@ -18,7 +18,7 @@ module ProphetRatings
     end
 
     def call(as_of: nil)
-      as_of = cutoff_date(as_of || Game.current_schedule_date)
+      as_of = cutoff_date(as_of)
       # A savepoint protects callers that rescue a failed day inside an outer transaction.
       Season.transaction(requires_new: true) do
         TeamSeasonStatsAggregator.new(season: @season, as_of:).run
@@ -68,11 +68,19 @@ module ProphetRatings
 
     def cutoff_date(value)
       date = case value
-             when String then Date.iso8601(value)
+             when NilClass then Game.current_schedule_date
+             when String then date_only_cutoff(value)
              when Date, Time, ActiveSupport::TimeWithZone then Game.schedule_day_range(value).begin.to_date
              else raise ArgumentError, 'Cutoff must be a date, time, or ISO date string'
              end
       [date, @season.end_date].min
+    end
+
+    def date_only_cutoff(value)
+      date = Date.iso8601(value)
+      raise ArgumentError, 'String cutoffs must be YYYY-MM-DD; pass timestamps as time objects' unless date.iso8601 == value
+
+      date
     end
 
     def fill_prediction_baselines
