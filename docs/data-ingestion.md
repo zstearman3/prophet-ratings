@@ -459,6 +459,22 @@ It supports:
 - `SYNC_START_DATE`
 - `SYNC_END_DATE`
 
+### `season:refresh_schedule`
+
+Refresh every date in an explicit existing target season's future window:
+
+```bash
+bin/rails season:refresh_schedule YEAR=2027 SCHEDULE_START_DATE=2026-11-01 SCHEDULE_END_DATE=2026-11-15
+```
+
+Both inclusive Eastern dates are required and must be today or later and inside
+the target season. It reuses date scraping, enrichment and game imports without
+activation or ratings. The JSON report distinguishes empty dates from failures,
+records changed/unmatched games and lists ambiguous identities, possible moves and
+source absences for manual review. No absent game is deleted. Exhausted date
+retries produce a nonzero exit while preserving successful dates. See
+[Offseason Operations](offseason.md) for retry, reconciliation and review details.
+
 ### `games:dedupe`
 
 File: `lib/tasks/game_dedupe.rake`
@@ -571,6 +587,6 @@ When changing ingestion code:
 - `SyncFromLastGamesJob` resumes from the latest imported game date, delegates each date to `Ingestion::GamesIngestionService`, and then can enqueue `UpdateRankingsJob`.
 - `SyncFullSeasonGamesJob` handles retry/backoff per date, delegates each date to `Ingestion::GamesIngestionService`, and does not enqueue ratings by itself.
 - `SyncTeamGamesJob` is useful for targeted repair, delegates team-date rows to `Ingestion::GamesIngestionService`, and defaults `season_id` to `Season.last.id`.
-- `Scraper::GamesScraper#scrape_day_batch` slices with `batch_urls[start_at..end_at]`, which is an inclusive range. Be careful if changing batch semantics.
+- `Scraper::GamesScraper#scrape_day_batch` slices with an exact batch size; adjacent batches do not overlap. Schedule responses are cached per scraper and failed/unrecognized pages raise instead of counting as empty dates.
 - `Importer::GamesImporter` logs partial team matches but can still preserve games with missing team-season associations.
 - `GameFinalizer` updates prediction errors if a matching prediction and snapshots already exist.

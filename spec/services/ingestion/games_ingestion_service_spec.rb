@@ -43,4 +43,18 @@ RSpec.describe Ingestion::GamesIngestionService do
     expect(Importer::GamesImporter).to have_received(:import).with(enriched_rows).once
     expect(result[:imported_rows]).to eq(1)
   end
+
+  it 'returns stored game reconciliation reports when an explicit season is provided' do
+    season = create(:season, year: 2026, start_date: date - 1.day, end_date: date + 1.day)
+    result = described_class.new(date:, season:).call
+    expect(result[:games].first).to include(outcome: 'created', unmatched: ['Queens (NC)', 'West Georgia'])
+    expect(season.games.count).to eq(1)
+  end
+
+  it 'rejects a source or enrichment date outside the requested day before importing' do
+    season = create(:season, year: 2026, start_date: date - 1.day, end_date: date + 1.day)
+    allow(row_enricher).to receive(:call).with(rows).and_return([rows.first.merge(date: date + 1.day)])
+    expect { described_class.new(date:, season:).call }.to raise_error(ArgumentError, /does not match requested/)
+    expect(Game.count).to eq(0)
+  end
 end

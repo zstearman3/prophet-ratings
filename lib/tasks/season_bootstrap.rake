@@ -59,6 +59,18 @@ namespace :season do
     abort(e.message)
   end
 
+  desc 'Refresh a bounded future schedule without activating or generating ratings; requires YEAR and SCHEDULE dates'
+  task refresh_schedule: :environment do
+    result = Ingestion::FutureScheduleRefresh.new(
+      season: target_season!, start_date: parse_date_env('SCHEDULE_START_DATE'), end_date: parse_date_env('SCHEDULE_END_DATE')
+    ).call
+    puts JSON.pretty_generate(result)
+    abort('Schedule refresh incomplete; rerun failed_dates with the same explicit window.') if result[:failed_dates].any?
+    puts 'Schedule refresh complete. Review ambiguous/unmatched/possible_move_ids and absent_ids; no games were deleted.'
+  rescue ArgumentError => e
+    abort(e.message)
+  end
+
   desc 'Resume ratings through today without deleting history; requires YEAR'
   task resume_ratings: :environment do
     abort('Use season:initialize_preseason separately.') if env_bool('RUN_PRESEASON', default: false)
