@@ -14,16 +14,21 @@ module ProphetRatings
 
     def initialize(season = Season.current)
       @season = season
+      validate_target_season!
     end
 
-    def call(as_of: [Time.current, Season.current.end_date].min)
-      TeamSeasonStatsAggregator.new(season: @season, as_of:).run
-      @season.update_average_ratings
-      adjustment_start = Rails.application.config_for(:ratings).dig(:preseason, :adjustment_start_after_days)
-      if (as_of.to_date - @season.start_date) > adjustment_start && enough_finalized_data_for_adjustments?(as_of:)
-        run_least_squares_adjustments(as_of:)
+    def call(as_of: nil)
+      as_of = cutoff_date(as_of || Game.current_schedule_date)
+      # A savepoint protects callers that rescue a failed day inside an outer transaction.
+      Season.transaction(requires_new: true) do
+        TeamSeasonStatsAggregator.new(season: @season, as_of:).run
+        @season.update_average_ratings
+        adjustment_start = Rails.application.config_for(:ratings).dig(:preseason, :adjustment_start_after_days)
+        if (as_of - @season.start_date) > adjustment_start && enough_finalized_data_for_adjustments?(as_of:)
+          run_least_squares_adjustments(as_of:)
+        end
+        publish(as_of:)
       end
-      publish(as_of:)
     end
 
     def publish(as_of:)
@@ -50,6 +55,25 @@ module ProphetRatings
     end
 
     private
+
+    def validate_target_season!
+      raise ArgumentError, 'A persisted target season is required' unless @season.is_a?(Season) && @season.persisted?
+
+      start_date = @season.start_date
+      end_date = @season.end_date
+      return if start_date && end_date && start_date < end_date
+
+      raise ArgumentError, 'A persisted target season with valid start/end dates is required'
+    end
+
+    def cutoff_date(value)
+      date = case value
+             when String then Date.iso8601(value)
+             when Date, Time, ActiveSupport::TimeWithZone then Game.schedule_day_range(value).begin.to_date
+             else raise ArgumentError, 'Cutoff must be a date, time, or ISO date string'
+             end
+      [date, @season.end_date].min
+    end
 
     def fill_prediction_baselines
       config = Rails.application.config_for(:ratings).deep_symbolize_keys
