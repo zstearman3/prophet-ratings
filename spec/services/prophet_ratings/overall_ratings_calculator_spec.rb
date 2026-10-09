@@ -5,6 +5,162 @@ require 'rails_helper'
 RSpec.describe ProphetRatings::OverallRatingsCalculator, type: :service do
   before { RatingsConfigVersion.publish! }
 
+  include ActiveSupport::Testing::TimeHelpers
+
+  describe 'target season and cutoff' do
+    let(:season) { create(:season) }
+    let(:calculator) { described_class.new(season) }
+    let!(:team_season) { create(:team_season, season:) }
+
+    it 'defaults to the explicit season end with no current season' do
+      calculator.call
+      expect(team_season.team_rating_snapshots.sole.snapshot_date).to eq(season.end_date)
+    end
+
+    it 'caps an explicit date at the target end even when a newer season is current' do
+      create(:season, :current, year: season.year + 1)
+      calculator.call(as_of: season.end_date + 100.days)
+      expect(team_season.team_rating_snapshots.sole.snapshot_date).to eq(season.end_date)
+    end
+
+    it 'uses the Eastern date for a UTC timestamp and propagates one date throughout the pipeline' do
+      timestamp = Time.utc(season.year, 11, 2, 3, 59)
+      expected_date = Date.new(season.year, 11, 1)
+      aggregator = instance_double(ProphetRatings::TeamSeasonStatsAggregator, run: true)
+      allow(ProphetRatings::TeamSeasonStatsAggregator).to receive(:new).and_return(aggregator)
+      calculator.call(as_of: timestamp)
+      expect(ProphetRatings::TeamSeasonStatsAggregator).to have_received(:new).with(
+        season:, as_of: expected_date, ratings_config_version: RatingsConfigVersion.default_version
+      )
+      expect(team_season.team_rating_snapshots.sole.snapshot_date).to eq(expected_date)
+    end
+
+    it 'changes the default date only at Eastern midnight' do
+      travel_to(Time.utc(season.year, 11, 2, 3, 59)) { calculator.call }
+      travel_to(Time.utc(season.year, 11, 2, 4, 0)) { calculator.call }
+      expect(team_season.team_rating_snapshots.order(:snapshot_date).pluck(:snapshot_date))
+        .to eq([Date.new(season.year, 11, 1), Date.new(season.year, 11, 2)])
+    end
+
+    it 'fails clearly without a target season' do
+      expect { described_class.new }.to raise_error(ArgumentError, /target season/)
+    end
+
+    it 'rejects unsaved targets and invalid season boundaries' do
+      expect { described_class.new(build(:season)) }.to raise_error(ArgumentError, /target season/)
+      season.end_date = season.start_date
+      expect { described_class.new(season) }.to raise_error(ArgumentError, %r{start/end dates})
+    end
+
+    it 'rejects an invalid cutoff before writing' do
+      expect { calculator.call(as_of: 'not-a-date') }.to raise_error(ArgumentError)
+      expect(team_season.team_rating_snapshots).to be_empty
+    end
+
+    it 'defaults an explicit nil cutoff to today' do
+      travel_to(Time.utc(season.year, 11, 2, 3, 59)) { calculator.call(as_of: nil) }
+      expect(team_season.team_rating_snapshots.sole.snapshot_date).to eq(season.start_date)
+    end
+
+    it 'rejects a false cutoff without changing live state or publishing snapshots' do
+      original_state = [season.attributes, team_season.attributes]
+      expect { calculator.call(as_of: false) }.to raise_error(ArgumentError, /Cutoff must be/)
+      expect([season.reload.attributes, team_season.reload.attributes]).to eq(original_state)
+      expect(team_season.team_rating_snapshots).to be_empty
+    end
+
+    it 'accepts a date-only ISO string with its calendar meaning' do
+      calculator.call(as_of: '2024-11-02')
+      expect(team_season.team_rating_snapshots.sole.snapshot_date).to eq(Date.new(2024, 11, 2))
+    end
+
+    ['2024-11-02T03:59:00Z', '2024-11-02T00:59:00+03:00', '20241102', '2024-W44-6'].each do |cutoff|
+      it "rejects non-date-only string #{cutoff} without writes" do
+        original_state = [season.attributes, team_season.attributes]
+        expect { calculator.call(as_of: cutoff) }.to raise_error(ArgumentError, /YYYY-MM-DD/)
+        expect([season.reload.attributes, team_season.reload.attributes]).to eq(original_state)
+        expect(team_season.team_rating_snapshots).to be_empty
+      end
+    end
+  end
+
+  describe 'atomic daily publication' do
+    let(:season) { create(:season) }
+    let(:as_of) { season.start_date + 30.days }
+    let(:calculator) { described_class.new(season) }
+    let!(:teams) do
+      Array.new(2) { create(:team_season, season:, adj_offensive_efficiency: 120, adj_defensive_efficiency: 90, adj_pace: 60) }
+    end
+
+    before do
+      2.times do |index|
+        game = create(:game, season:, start_time: Game.schedule_time_for(as_of - index.days) + 12.hours,
+                             possessions: 70, minutes: 40, home_team_score: 70, away_team_score: 70)
+        teams.each_with_index do |team_season, side|
+          create(:team_game, game:, team_season:, team: team_season.team, home: side.zero?,
+                             offensive_efficiency: 100, defensive_efficiency: 100)
+        end
+      end
+      # Standard specs stub Python; the separate Docker rehearsal exercises the real solver.
+      allow(StatisticsUtils).to receive(:solve_least_squares_with_python) { |rows, _targets, **_options| Array.new(rows.first.size, 0.0) }
+      calculator.call(as_of: as_of - 1.day)
+    end
+
+    def persisted_state
+      [season.reload.attributes, teams.map { |team_season| team_season.reload.attributes },
+       season.team_rating_snapshots.order(:id).map(&:attributes), RatingsConfigVersion.order(:id).map(&:attributes)]
+    end
+
+    def fail_second_snapshot_save
+      saves = 0
+      allow(TeamRatingSnapshot).to receive(:find_or_initialize_by).and_wrap_original do |finder, **args|
+        finder.call(**args).tap do |snapshot|
+          allow(snapshot).to receive(:save!).and_wrap_original do |save, *save_args|
+            saves += 1
+            save.call(*save_args)
+            raise 'snapshot failure' if saves == 2
+          end
+        end
+      end
+    end
+
+    it 'rolls back aggregation, season baselines and earlier stat writes on a later solver failure' do
+      before_state = persisted_state
+      allow(StatisticsUtils).to receive(:solve_least_squares_with_python).and_return([5.0, -5.0, 0.0, 0.0])
+      allow(ProphetRatings::AdjustedStatCalculator).to receive(:new).and_wrap_original do |original, **args|
+        raise 'mid-solver failure' if args[:raw_stat] == :possessions
+
+        original.call(**args)
+      end
+      expect { calculator.call(as_of:) }.to raise_error('mid-solver failure')
+      expect(persisted_state).to eq(before_state)
+    end
+
+    it 'restores live writes and existing snapshots even when the caller rescues inside an outer transaction' do
+      teams.first.update!(rating: 999, overall_rank: 99)
+      season.update!(average_efficiency: 123)
+      before_state = persisted_state
+      fail_second_snapshot_save
+      Season.transaction do
+        expect { calculator.call(as_of: as_of - 1.day) }.to raise_error('snapshot failure')
+        expect(persisted_state).to eq(before_state)
+        season.update!(name: 'Caller work survives')
+      end
+      expect(season.reload.name).to eq('Caller work survives')
+    end
+
+    it 'leaves no partial new date after a snapshot failure and succeeds on retry without duplicates' do
+      before_state = persisted_state
+      fail_second_snapshot_save
+      expect { calculator.call(as_of:) }.to raise_error('snapshot failure')
+      expect(persisted_state).to eq(before_state)
+      calculator.call(as_of:)
+      calculator.call(as_of:)
+      expect(season.team_rating_snapshots.where(snapshot_date: as_of).count).to eq(2)
+      expect(teams.map { |team_season| team_season.reload.rating }).to eq([0, 0])
+    end
+  end
+
   describe '#enough_finalized_data_for_adjustments?' do
     let(:season) { create(:season) }
     let(:as_of) { season.start_date + 30.days }

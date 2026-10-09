@@ -80,6 +80,8 @@ prior; its team, version, and outputs must match before rating publication.
 Live values with another version, or legacy core ratings without a version,
 are rejected before a rating run writes. Snapshots require the live version to
 match; predictions validate both snapshots against their output version.
+Applied captures must contain all three expected preseason outputs and match
+the live preseason values; a partial or empty payload is insufficient provenance.
 
 For fresh seasons, initialize with the selected version before activating the
 season. Switching models for established live ratings requires an explicitly

@@ -199,6 +199,20 @@ RSpec.describe ProphetRatings::ModelConfiguration do
     expect(values).to eq([115, 110])
   end
 
+  [{}, { 'preseason_adj_offensive_efficiency' => 105.5 }].each do |outputs|
+    it "rejects applied prior provenance with incomplete captured outputs #{outputs.keys}" do
+      version = first
+      team = create(:team_season, season:)
+      ProphetRatings::PreseasonInitializer.new(season, ratings_config_version: version).call
+      # Emulate malformed historical JSON without mutating the immutable prior through its model API.
+      PreseasonPrior.where(id: team.reload.preseason_prior_id).update_all(outputs:) # rubocop:disable Rails/SkipsModelValidations
+      expect { team.reload.validate_model_inputs(version) }.to raise_error(ArgumentError, /matching model provenance/)
+      publisher = ProphetRatings::TeamRatingSnapshotService.new(season:, as_of: season.start_date, ratings_config_version: version)
+      expect { publisher.call }.to raise_error(ArgumentError, /matching model provenance/)
+      expect(team.team_rating_snapshots.count).to eq(1)
+    end
+  end
+
   it 'excludes another models residuals from selected volatility and home boost estimates' do
     first.activate
     selected = second

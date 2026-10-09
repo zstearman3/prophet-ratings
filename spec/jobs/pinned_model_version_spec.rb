@@ -3,6 +3,9 @@
 require 'rails_helper'
 
 RSpec.describe PinnedModelVersion do
+  # Rankings dispatch now waits for real enclosing commits before enqueueing predictions.
+  self.use_transactional_tests = false
+
   let(:season) { create(:season, :current) }
   let(:original) { RatingsConfigVersion.publish! }
   let(:replacement) { RatingsConfigVersion.publish!(RatingsConfigVersion.authored_config.merge(bundle_name: 'replacement')) }
@@ -16,6 +19,12 @@ RSpec.describe PinnedModelVersion do
   end
 
   before { original.activate }
+
+  after do
+    Season.destroy_all
+    Team.destroy_all
+    RatingsConfigVersion.destroy_all
+  end
 
   [UpdateRankingsJob, GenerateNightlyPredictionsJob, ResumeSeasonRatingsJob, GenerateSeasonRatingsJob].each do |job_class|
     it "serializes the selected model ID for #{job_class} before the active version changes" do

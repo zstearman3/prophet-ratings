@@ -100,7 +100,11 @@ class TeamSeason < ApplicationRecord
 
   def matching_prior?(version_id)
     identity_matches = [preseason_prior&.ratings_config_version_id, preseason_prior&.team_season_id] == [version_id, id]
-    identity_matches && preseason_prior.outputs.all? { |stat, value| public_send(stat) == value }
+    outputs = preseason_prior&.outputs
+    identity_matches && ProphetRatings::PreseasonPriorFormula::STATS.all? do |stat|
+      key = "preseason_#{stat}"
+      outputs.key?(key) && public_send(key) == outputs[key]
+    end
   end
 
   def validate_live_model(version_id)

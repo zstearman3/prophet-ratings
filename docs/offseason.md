@@ -262,6 +262,15 @@ inserted season when none is current. Jobs already queued with an explicit seaso
 ID retain that target across activation. No deploy or cron changes are performed
 by these commands.
 
+Daily rankings use the supplied season's end to cap both default and explicit
+cutoffs. Timestamps normalize to the Eastern schedule date before aggregation,
+adjustment and snapshot publication. An explicit target works without any current
+season; a missing/invalid target fails visibly instead of silently skipping work.
+All daily rating writes share a savepoint, so a later solver or snapshot failure
+restores the previous live state and snapshots even when an outer caller rescues.
+Predictions are queued only after successful publication and the enclosing commit;
+rollback discards the enqueue callback. The existing bounded retry policy remains.
+
 ## Explicit ratings recovery and rebuilds
 
 Non-deleting resume is separate from setup:

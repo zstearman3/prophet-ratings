@@ -10,12 +10,13 @@ class UpdateRankingsJob < ApplicationJob
 
   def perform(season = Season.current, enqueue_nightly_predictions: true, ratings_config_version_id: nil)
     season = resolve_season(season)
-    return unless season
 
     version = self.class.recalculate(season, ratings_config_version_id)
     return unless enqueue_nightly_predictions
 
-    GenerateNightlyPredictionsJob.perform_later(season.id, ratings_config_version_id: version.id)
+    ActiveRecord.after_all_transactions_commit do
+      GenerateNightlyPredictionsJob.perform_later(season.id, ratings_config_version_id: version.id)
+    end
   end
 
   private
@@ -35,7 +36,7 @@ class UpdateRankingsJob < ApplicationJob
   end
 
   def resolve_season(season)
-    return Season.find_by(id: season) if season.is_a?(Integer)
+    return Season.find(season) if season.is_a?(Integer)
 
     season
   end

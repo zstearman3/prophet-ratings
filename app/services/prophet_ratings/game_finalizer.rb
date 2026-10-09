@@ -70,13 +70,28 @@ module ProphetRatings
     end
 
     def finalize_stored_prediction(prediction)
-      self.class.validate_prediction_version(prediction)
+      return unless prediction_version_valid?(prediction)
+
       update_prediction_errors!(prediction)
+    end
+
+    def prediction_version_valid?(prediction)
+      self.class.validate_prediction_version(prediction)
+      true
+    rescue ArgumentError => error
+      raise if @ratings_config_version
+
+      skip_invalid_prediction(prediction, error)
+    end
+
+    def skip_invalid_prediction(prediction, error)
+      Rails.logger.warn("Skipping prediction=#{prediction.id} for game=#{game.id}: #{error.message}")
+      nil
     end
 
     public_class_method def self.validate_prediction_version(prediction)
       version = prediction.ratings_config_version
-      ModelConfiguration.validate_snapshots([prediction.home_team_snapshot, prediction.away_team_snapshot], version) if version
+      ModelConfiguration.validate_snapshots([prediction.home_team_snapshot, prediction.away_team_snapshot], version)
     end
 
     def update_prediction_errors!(prediction)

@@ -6,7 +6,7 @@ This document explains how Prophet Ratings currently computes team ratings. It i
 
 The main orchestrator is `ProphetRatings::OverallRatingsCalculator` in `app/services/prophet_ratings/overall_ratings_calculator.rb`.
 
-It is invoked by `UpdateRankingsJob`, which defaults to `Season.current` and then optionally enqueues `GenerateNightlyPredictionsJob` after ratings are updated.
+It is invoked by `UpdateRankingsJob`, which defaults to `Season.current` and then optionally enqueues `GenerateNightlyPredictionsJob` after rating publication and the enclosing transaction commit.
 
 Typical call:
 
@@ -14,7 +14,16 @@ Typical call:
 ProphetRatings::OverallRatingsCalculator.new(season).call
 ```
 
-The calculator accepts an `as_of:` cutoff. By default, it uses the earlier of `Time.current` and `Season.current.end_date`.
+The calculator resolves its target season at initialization and requires a persisted
+season with ordered start/end dates. It accepts a Date, a time object, or an exact
+`YYYY-MM-DD` string as `as_of:`. Time objects use the Eastern schedule date;
+dates retain their calendar meaning. Timestamp strings are rejected instead of
+discarding their time/offset. Only an omitted or nil cutoff defaults to today's
+Eastern date; invalid values such as false fail before writing. The date is capped at the **target**
+season's end. Explicit cutoffs are also capped at that end. The calculator does
+not consult another current season or require a current season when given a target.
+It permits pre-opening dates for existing callers; preseason publication retains
+its separate initializer contract.
 
 ## Pipeline overview
 
@@ -33,6 +42,17 @@ The adjusted-ratings step only runs when both are true:
 - At least two teams have at least two finalized team games as of the cutoff
 
 Ranks, prediction defaults and snapshots are published even if adjusted ratings are skipped.
+
+The entire daily pipeline runs in one transaction with a savepoint, including raw
+aggregates, baselines, every stat adjustment, ranks, config creation and snapshots.
+A solver or snapshot failure rolls back all daily writes and propagates to the
+caller, even if that caller rescues inside its own transaction. Existing snapshots
+are restored; a retry reuses the date/config identities. Prediction enqueueing is
+deferred until all enclosing transactions commit and is discarded on rollback.
+The shared advisory lock and scheduled skip-on-contention behavior are unchanged.
+These changes do not alter coefficients or the config bundle and do not repair
+existing historical outputs. Direct `publish` remains the preseason initializer's
+publication step inside its existing atomic transaction.
 
 ## Raw stat aggregation
 

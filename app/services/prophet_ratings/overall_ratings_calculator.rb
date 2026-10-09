@@ -16,9 +16,11 @@ module ProphetRatings
       @ratings_config_version = RatingsConfigVersion.resolve(ratings_config_version)
       @config = @ratings_config_version.settings
       @season = season
+      validate_target_season!
     end
 
-    def call(as_of: [Time.current, @season.end_date].min)
+    def call(as_of: nil)
+      as_of = self.class.cutoff_date(as_of, @season)
       @season.with_lock(requires_new: true) { calculate(as_of:) }
     end
 
@@ -73,6 +75,33 @@ module ProphetRatings
 
     def validate_live_versions!
       @season.team_seasons.find_each { |team_season| team_season.validate_model_inputs(@ratings_config_version) }
+    end
+
+    def validate_target_season!
+      raise ArgumentError, 'A persisted target season is required' unless @season.is_a?(Season) && @season.persisted?
+
+      start_date = @season.start_date
+      end_date = @season.end_date
+      return if start_date && end_date && start_date < end_date
+
+      raise ArgumentError, 'A persisted target season with valid start/end dates is required'
+    end
+
+    public_class_method def self.cutoff_date(value, season)
+      date = case value
+             when NilClass then Game.current_schedule_date
+             when String then date_only_cutoff(value)
+             when Date, Time, ActiveSupport::TimeWithZone then Game.schedule_day_range(value).begin.to_date
+             else raise ArgumentError, 'Cutoff must be a date, time, or ISO date string'
+             end
+      [date, season.end_date].min
+    end
+
+    public_class_method def self.date_only_cutoff(value)
+      date = Date.iso8601(value)
+      raise ArgumentError, 'String cutoffs must be YYYY-MM-DD; pass timestamps as time objects' unless date.iso8601 == value
+
+      date
     end
 
     def fill_prediction_baselines
