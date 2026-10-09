@@ -360,15 +360,20 @@ It runs:
 2. `import_seasons`
 3. `import_team_seasons`
 4. `import_conferences`
-5. `import_team_conferences`
 
 Seed files currently include:
 
 - `db/seeds/scraped_teams.csv`
 - `db/seeds/conferences.csv`
-- `db/seeds/team_conferences.csv`
 
-The importer upserts teams, creates aliases from `secondary_name`, creates seasons, creates `TeamSeason` rows for all teams/seasons, imports conferences, and creates team-conference membership rows.
+`db:seed` and `import:base` run this importer transactionally under the shared
+ratings lock. Teams resolve to persisted records before aliases are created;
+identical team/alias reruns preserve timestamps, and conflicting alias ownership
+fails without reassignment. It creates the inactive 2024–25 historical shell
+(`YEAR=2025`, ending-year convention) only if missing. Existing season dates,
+averages, current status, live ratings, snapshots and predictions are untouched.
+Missing TeamSeason rows are created for stored teams/seasons; this is historical
+storage, not proof of current participation. Conference memberships are separate.
 
 Rake task:
 
@@ -388,11 +393,31 @@ bin/compose exec web bin/rails import:base
 
 File: `lib/tasks/import.rake`
 
-Imports foundational team, season, team-season, conference, and team-conference data.
+Imports foundational teams/aliases, inactive historical season, missing team-season rows and conferences. Does not reconcile memberships or activate a season.
 
 ```bash
 bin/rails import:base
 ```
+
+### `import:reconcile_conferences`
+
+Preview the complete authoritative `db/seeds/team_conferences.csv` diff:
+
+```bash
+bin/rails import:reconcile_conferences
+bin/rails import:reconcile_conferences APPLY=true
+```
+
+`CSV_PATH` selects another complete CSV. Default preview writes nothing; only
+`APPLY=true` permits writes. Other values except `false` fail. Counts and row
+changes expose membership/team IDs and before/after conference and season IDs.
+Apply recomputes the diff; preview again after file/database changes. It preserves
+matching natural-key IDs, updates changed rows and deletes all absent memberships,
+including admin/live-alignment rows. This differs from conservative standings
+alignment. Both modes reject missing references, malformed/empty files, duplicate
+keys and overlapping inclusive ranges. No base import, season creation or
+activation occurs. Prepare references separately, then rerun preview. Apply is
+atomic under the shared ratings lock; failures roll back all membership changes.
 
 ### `import:games`
 
@@ -559,7 +584,10 @@ The broad legacy data setup script is a separate, explicit import/backfill:
 bin/compose exec web bin/setup_data
 ```
 
-`bin/setup_data` is not a routine rollover or verification command. It runs:
+`bin/setup_data` is not a routine rollover or verification command. Its existing
+broad production bootstrap sequence is unchanged. Base seeding no longer activates
+a season or reconciles memberships; review/prepare required seasons and run the
+separate authoritative CSV preview/apply before game ingestion when needed. It runs:
 
 1. `bin/rails db:prepare`
 2. `bin/rails import:base`

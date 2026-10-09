@@ -10,43 +10,51 @@ module Importer
       end
 
       def run
+        Season.with_ratings_lock do
+          ApplicationRecord.transaction do
+            import_foundations
+          end
+        end
+      end
+
+      def self.import_team(row)
+        Team.find_or_initialize_by(school: row['school']).tap do |team|
+          team.assign_attributes(row.to_h.slice('nickname', 'url', 'location', 'slug', 'primary_color',
+                                                'short_name', 'home_venue'))
+          team.save! if team.changed?
+        end
+      end
+
+      def self.import_alias(team, value)
+        return if value.blank?
+
+        team.team_aliases.find_or_create_by!(value:, source: 'sports-reference')
+      rescue ActiveRecord::RecordNotFound
+        raise ArgumentError, "Sports Reference alias #{value.inspect} conflicts with another team; review its stored ownership."
+      end
+
+      private
+
+      def import_foundations
         import_teams
         import_seasons
         import_team_seasons
         import_conferences
       end
 
-      private
-
-      # rubocop:disable Rails/SkipsModelValidations
       def import_teams
-        path = Rails.root.join('db/seeds/scraped_teams.csv')
-        CSV.foreach(path, headers: true) do |row|
-          team = Team.upsert({
-                               school: row['school'],
-                               nickname: row['nickname'],
-                               url: row['url'],
-                               location: row['location'],
-                               slug: row['slug'],
-                               primary_color: row['primary_color'],
-                               short_name: row['short_name'],
-                               home_venue: row['home_venue']
-                             }, unique_by: :school)
-
-          TeamAlias.create(team:, value: row['secondary_name'], source: 'sports-reference') if row['secondary_name'].present?
+        CSV.foreach(Rails.root.join('db/seeds/scraped_teams.csv'), headers: true) do |row|
+          team = self.class.import_team(row)
+          self.class.import_alias(team, row['secondary_name'])
         end
       end
 
       def import_seasons
-        Season.upsert({
-                        name: '2024-05',
-                        year: 2025,
-                        start_date: Date.new(2024, 11, 1),
-                        end_date: Date.new(2025, 4, 10),
-                        average_efficiency: 105.5,
-                        average_pace: 69.0,
-                        current: true
-                      }, unique_by: :year)
+        Season.find_or_create_by!(year: 2025) do |season|
+          season.assign_attributes(name: '2024-25', start_date: Date.new(2024, 11, 1),
+                                   end_date: Date.new(2025, 4, 10), average_efficiency: 105.5,
+                                   average_pace: 69.0, current: false)
+        end
       end
 
       def import_team_seasons
@@ -65,8 +73,6 @@ module Importer
           )
         end
       end
-
-      # rubocop:enable Rails/SkipsModelValidations
     end
   end
 end
