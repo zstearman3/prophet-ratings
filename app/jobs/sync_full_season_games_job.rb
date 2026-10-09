@@ -56,7 +56,9 @@ class SyncFullSeasonGamesJob < ApplicationJob
   end
 
   def resume_start_date(season)
-    latest_imported = season.games.maximum(:start_time)&.then { |start_time| Game.schedule_date_for(start_time) }
+    latest_imported = season.games.through_schedule_date(Game.current_schedule_date - 1.day).maximum(:start_time)&.then do |start_time|
+      Game.schedule_date_for(start_time)
+    end
     latest_imported || season.start_date
   end
 

@@ -6,7 +6,7 @@ RSpec.describe Scraper::GamesScraper do
   let(:date) { Date.new(2026, 2, 18) }
   let(:scraper) { described_class.new(date) }
   let(:schedule_url) { scraper.send(:schedule_url, date) }
-  let(:response) { instance_double(HTTParty::Response, body: schedule_html) }
+  let(:response) { instance_double(HTTParty::Response, body: schedule_html, success?: true) }
   let(:completed_url) { '/cbb/boxscores/2026-02-18-unc-duke.html' }
   let(:schedule_html) do
     <<~HTML
@@ -120,7 +120,7 @@ RSpec.describe Scraper::GamesScraper do
         </div>
       </div>
     HTML
-    completed_only_response = instance_double(HTTParty::Response, body: completed_only_body)
+    completed_only_response = instance_double(HTTParty::Response, body: completed_only_body, success?: true)
     allow(HTTParty).to receive(:get).with(schedule_url).and_return(completed_only_response)
     allow(scraper).to receive(:scrape_game).with(completed_url).and_return(completed_game_payload)
 
@@ -167,7 +167,7 @@ RSpec.describe Scraper::GamesScraper do
         </tfoot>
       </table>
     HTML
-    completed_response = instance_double(HTTParty::Response, body: completed_boxscore_html)
+    completed_response = instance_double(HTTParty::Response, body: completed_boxscore_html, success?: true)
     allow(HTTParty).to receive(:get).with(scraper.send(:game_url, completed_url)).and_return(completed_response)
 
     game = scraper.send(:scrape_game, completed_url)
@@ -175,5 +175,39 @@ RSpec.describe Scraper::GamesScraper do
     expect(game[:date]).to be_a(ActiveSupport::TimeWithZone)
     expect(game[:date].to_date).to eq(date)
     expect(game[:box_score_location]).to eq('Chapel Hill, NC')
+  end
+
+  it 'fetches the schedule once and respects exact batch sizes' do
+    allow(scraper).to receive(:scrape_game).with(completed_url).and_return(completed_game_payload)
+    expect(scraper.game_count).to eq(2)
+    expect(scraper.to_json_in_batches(0, 1)).to eq([completed_game_payload])
+    expect(scraper.to_json_in_batches(1, 1).size).to eq(1)
+    expect(HTTParty).to have_received(:get).with(schedule_url).once
+  end
+
+  it 'recognizes a valid empty schedule' do
+    allow(response).to receive(:body).and_return('<div class="game_summaries"></div>')
+    expect(scraper.game_count).to eq(0)
+  end
+
+  it 'rejects error responses instead of reporting an empty date' do
+    allow(response).to receive_messages(success?: false, code: 503)
+    expect { scraper.game_count }.to raise_error(described_class::SourceError, /503/)
+  end
+
+  it 'rejects unavailable or unrecognized pages with successful HTTP responses' do
+    allow(response).to receive(:body).and_return('<html><h1>Access denied</h1></html>')
+    expect { scraper.game_count }.to raise_error(described_class::SourceError, /Unrecognized/)
+  end
+
+  it 'rejects malformed scheduled rows rather than silently dropping them' do
+    allow(response).to receive(:body).and_return('<div class="game_summaries"><div class="gender-m"></div></div>')
+    expect { scraper.game_count }.to raise_error(described_class::SourceError, /Malformed/)
+  end
+
+  it 'rejects a malformed boxscore instead of returning a nameless scheduled game' do
+    malformed_response = instance_double(HTTParty::Response, body: '<div class="scorebox"><div></div><div></div></div>', success?: true)
+    allow(HTTParty).to receive(:get).with(scraper.send(:game_url, completed_url)).and_return(malformed_response)
+    expect { scraper.to_json_in_batches(0, 1) }.to raise_error(described_class::SourceError, /Missing boxscore teams/)
   end
 end

@@ -158,20 +158,52 @@ Historical catch-up remains explicit and capped at yesterday:
 bin/rails season:sync_games YEAR=2027 SYNC_RESUME=false SYNC_START_DATE=2026-11-01 SYNC_END_DATE=2026-11-15
 ```
 
-Before games begin, the existing future-date path can be called in the Rails
-console with an explicit inactive season and without enqueuing ratings:
+Refresh an explicit target season before activation or whenever schedules change:
 
-```ruby
-season = Season.find_by!(year: 2027)
-SyncNightlyGamesJob.perform_later(season.id, enqueue_rankings: false, future_end_date: Date.new(2026, 11, 15))
+```bash
+bin/rails season:refresh_schedule YEAR=2027 SCHEDULE_START_DATE=2026-11-01 SCHEDULE_END_DATE=2026-11-15
 ```
 
-A reliable refresh command and source-failure/date reconciliation reporting belong
-to the schedule story. Historical SyncFullSeasonGamesJob still logs exhausted
-per-date retries without failing the whole job: inspect its logs, and rerun the
-failed date window with SYNC_RESUME=false. Do not infer completeness from the latest
-imported game; it may be a future scheduled game. Game sync is never a prerequisite
-for preparing the shell or initializing existing preseason values.
+Both dates are required, ordered, inclusive Eastern schedule dates, today or later,
+and entirely inside the stored season. The operation does not activate the season,
+resume from a latest game, enqueue rankings, or generate predictions. Every date
+in the window is requested again on each run. Use small windows to respect Sports
+Reference rate limits and keep synchronous runs manageable.
+
+The command prints a JSON report with each date's imported row count and game
+outcomes (`created`, `updated`, `unchanged`, `protected`, `ambiguous`). `changes`
+contains changed stored Game fields; `unmatched` lists names without a TeamSeason
+association. A unique game-specific URL can move an existing game to a new date
+while retaining its ID. Partial rows with daily placeholders preserve an existing
+game-specific URL. Shared daily schedule URLs are not identity keys.
+`possible_move_ids` lists other scheduled games with the same ordered team names;
+these may be legitimate repeat matchups or ambiguous moves and require review.
+Ambiguous URL/date matches are reported with candidate IDs and left untouched.
+
+`absent_ids` lists scheduled records missing from successfully refreshed dates,
+excluding games seen elsewhere in the same window. Absence alone never deletes or
+cancels games. Review these IDs and ambiguous changes in Rails admin/console against
+the source before correcting them. Refresh both old and new dates when investigating
+moves; placeholder-only entries across dates are retained separately pending review.
+Manual venue fields and completed games are protected from partial source rows.
+Broken legacy final records without derived completion data retain the existing
+repair behavior. Enrichment failures remain warnings with schedule-row fallback;
+this report does not certify venue coverage.
+
+HTTP errors, unsupported page structures and malformed entries fail the date,
+whereas a recognized empty schedule succeeds with zero rows. Each failed date is
+rolled back and retried up to three times with 5/10/20-second backoff, then reported
+in `failed_dates`; later dates still run. The command exits nonzero for failed dates.
+Successful dates remain committed. Rerun failed windows explicitly after fixing
+source/identity issues; do not infer coverage from stored games. The existing
+nightly job continues to use its rolling window and may enqueue rankings.
+
+Historical SyncFullSeasonGamesJob still logs exhausted per-date retries without
+failing the whole job: inspect its logs, and rerun the failed date window with
+SYNC_RESUME=false. Its latest-game resume heuristic now excludes today/future
+games, but historical game presence is still not proof of complete date coverage.
+Game sync is never a prerequisite for preparing the shell or initializing existing
+preseason values.
 
 ## 6. Activate explicitly
 

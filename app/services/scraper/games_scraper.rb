@@ -2,6 +2,9 @@
 
 module Scraper
   class GamesScraper < Scraper
+    # A failed request or unsupported page must never count as an empty schedule.
+    class SourceError < StandardError; end
+
     def initialize(date = Game.current_schedule_date)
       @date = date
     end
@@ -20,11 +23,6 @@ module Scraper
     end
 
     def game_count
-      sleep(SLEEP_COUNT)
-
-      response = HTTParty.get(schedule_url(@date))
-      Nokogiri::HTML(response.body)
-
       game_urls.size
     end
 
@@ -40,8 +38,7 @@ module Scraper
     end
 
     def set_game_urls
-      response = HTTParty.get(schedule_url(@date))
-      document = Nokogiri::HTML(response.body)
+      document = schedule_document
 
       urls = document.css('div.game_summaries div.gender-m').filter_map do |game_div|
         parse_game_entry(game_div)
@@ -50,15 +47,35 @@ module Scraper
       @game_urls = urls
     end
 
+    def schedule_document
+      sleep(SLEEP_COUNT)
+      response = HTTParty.get(schedule_url(@date))
+      document = successful_document(response)
+      raise SourceError, "Unrecognized or unavailable schedule page for #{@date}" unless document.at_css('div.game_summaries')
+
+      document
+    end
+
+    def successful_document(response)
+      validate_response(response)
+
+      Nokogiri::HTML(response.body)
+    end
+
+    def validate_response(response)
+      raise_source_error(response) unless response.success?
+    end
+
+    def raise_source_error(response)
+      raise SourceError, "Request failed for #{@date}: HTTP #{response.code}"
+    end
+
     def game_urls
       @game_urls ||= set_game_urls
     end
 
     def game_urls_for_team!(team)
-      sleep(SLEEP_COUNT)
-
-      response = HTTParty.get(schedule_url(@date))
-      document = Nokogiri::HTML(response.body)
+      document = schedule_document
       aliases = team.team_aliases.pluck(:value)
       all_names = [team.school] + aliases
 
@@ -83,13 +100,13 @@ module Scraper
 
     def parse_scheduled_game(game_div)
       rows = game_rows(game_div)
-      return nil unless rows.size >= 2
+      raise SourceError, "Malformed scheduled game for #{@date}" unless rows.size >= 2
 
       away_row = rows[0]
       home_row = rows[1]
       home_team = team_name_from_row(home_row)
       away_team = team_name_from_row(away_row)
-      return nil if home_team.blank? || away_team.blank?
+      raise SourceError, "Missing scheduled teams for #{@date}" if home_team.blank? || away_team.blank?
 
       {
         home_team:,
@@ -189,11 +206,16 @@ module Scraper
       sleep(SLEEP_COUNT)
 
       response = HTTParty.get(game_url(url))
+      raise SourceError, "Boxscore request failed: HTTP #{response.code}" unless response.success?
+
       document = Nokogiri::HTML(response.body)
+      raise SourceError, "Unrecognized boxscore page: #{url}" unless document.at_css('div.scorebox')
 
       team_boxes = document.css('div.scorebox')&.xpath('./div')
       home_team = team_boxes[1]&.css('strong a')&.text
       away_team = team_boxes[0]&.css('strong a')&.text
+      raise SourceError, "Missing boxscore teams: #{url}" if home_team.blank? || away_team.blank?
+
       home_team_score = parsed_score(team_boxes[1]&.css('div.score')&.text)
       away_team_score = parsed_score(team_boxes[0]&.css('div.score')&.text)
       date = completed_start_time(document.css('div.scorebox_meta div')[0]&.text)
@@ -220,9 +242,7 @@ module Scraper
 
     def scrape_day_batch(start_at, batch_size)
       batch_urls = game_urls
-      end_at = start_at + batch_size
-
-      batch_urls = batch_urls[start_at..end_at]
+      batch_urls = batch_urls.slice(start_at, batch_size) || []
 
       batch_urls.map { |entry| scrape_entry(entry) }
     end

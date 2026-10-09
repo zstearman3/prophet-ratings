@@ -11,6 +11,8 @@ module Importer
     class << self
       def import(data) = data.each { |row| process_game(row) }
 
+      def import_game(row, season:) = process_game(row, season:)
+
       private
 
       def find_existing_game(row, date)
@@ -84,11 +86,11 @@ module Importer
         team_game.update!(attrs)
       end
 
-      def process_game(row)
+      def process_game(row, season: nil)
         start_time = Game.schedule_time_for(row[:date])
         row = row.merge(date: start_time)
         date = Game.schedule_date_for(start_time)
-        season = Season.find_by('start_date <= ? AND end_date >= ?', date, date)
+        season ||= Season.find_by('start_date <= ? AND end_date >= ?', date, date)
 
         home_team_name = row[:home_team]
         away_team_name = row[:away_team]
@@ -104,9 +106,12 @@ module Importer
         game = find_existing_game(row, date) ||
                Game.new(home_team_name: row[:home_team], away_team_name: row[:away_team], start_time:)
 
-        return process_complete_game(game, row, season, home_team_season, away_team_season) if game_complete?(row)
-
-        process_incomplete_game(game, row, season, home_team_season, away_team_season)
+        if game_complete?(row)
+          process_complete_game(game, row, season, home_team_season, away_team_season)
+        else
+          process_incomplete_game(game, row, season, home_team_season, away_team_season)
+        end
+        game
       end
 
       def process_complete_game(game, row, season, home_team_season, away_team_season)
@@ -131,13 +136,16 @@ module Importer
       end
 
       def process_incomplete_game(game, row, season, home_team_season, away_team_season)
-        # Keep unplayed/incomplete games scheduled and avoid clobbering existing finals with partial rows.
+        # Partial source rows cannot revise completed data or its identity/associations.
+        return if game.final? && finalized_game_data_present?(game)
+
+        # Keep unplayed/incomplete games scheduled.
         attrs = {
           season:,
           start_time: row[:date],
           home_team_name: row[:home_team],
           away_team_name: row[:away_team],
-          url: row[:url],
+          url: incomplete_game_url(game, row[:url]),
           home_team_score: game.final? ? game.home_team_score : row[:home_team_score],
           away_team_score: game.final? ? game.away_team_score : row[:away_team_score]
         }
@@ -148,6 +156,13 @@ module Importer
         process_team_game(home_game, {}, home_team_season, away_team_season)
         process_team_game(away_game, {}, away_team_season, home_team_season)
         game.scheduled! unless game.final? && finalized_game_data_present?(game)
+      end
+
+      def incomplete_game_url(game, incoming_url)
+        stored_url = game.url
+        return stored_url if unique_game_url?(stored_url) && !unique_game_url?(incoming_url)
+
+        incoming_url.presence || stored_url
       end
 
       def finalize_game_if_possible(game)
