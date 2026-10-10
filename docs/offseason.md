@@ -725,7 +725,9 @@ At `/admin/coaching_review`, create a row for the year and explicitly check `rea
 after resolving every pending candidate. An intentionally empty year may be ready;
 a missing review row means not ready. The year key cannot be changed after creation.
 New records, changes to any coaching facts/decisions, and deletion invalidate
-existing readiness for the affected old/new years. Unchanged saves preserve it.
+existing readiness for the affected old/new years. Deletion invalidates only the
+current year, even when the same instance was previously moved to another year.
+Unchanged saves preserve it.
 Readiness and candidate writes share transaction-scoped year locks so concurrent
 candidate changes cannot leave an obsolete ready decision. Deleting a review row
 also leaves the year unready. No review operation writes ratings, forecasts,

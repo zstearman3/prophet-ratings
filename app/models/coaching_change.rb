@@ -103,7 +103,7 @@ class CoachingChange < ApplicationRecord
     CoachingReview.with_year_locks([effective_year]) do
       validate_current_inputs
       yield
-      invalidate_reviews
+      CoachingReview.where(year: effective_year).find_each { |review| review.update!(ready: false) }
     end
   end
 

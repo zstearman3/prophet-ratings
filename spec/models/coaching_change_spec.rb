@@ -137,6 +137,20 @@ RSpec.describe CoachingChange do
     expect(review.reload).not_to be_ready
   end
 
+  it 'invalidates only the current year when deleting the same instance after moving it' do
+    change = described_class.create!(facts)
+    old_review = CoachingReview.create!(year: 2027)
+    new_review = CoachingReview.create!(year: 2028)
+    change.update!(effective_year: 2028, reconfirm: true)
+    old_review.update!(ready: true)
+    new_review.update!(ready: true)
+
+    change.destroy!
+
+    expect(old_review.reload).to be_ready
+    expect(new_review.reload).not_to be_ready
+  end
+
   it 'invalidates both source and destination review years when moving a candidate' do
     change = described_class.create!(facts)
     old_review = CoachingReview.create!(year: 2027, ready: true)
