@@ -151,6 +151,28 @@ describe BetRecommendationGenerator do
       expect(moneyline_rec.recommended).to be_in([true, false])
     end
 
+    context 'with deterministic score uncertainty' do
+      before do
+        [home_snapshot, away_snapshot].each do |snapshot|
+          snapshot.update!(offensive_efficiency_volatility: 0, defensive_efficiency_volatility: 0, pace_volatility: 0)
+        end
+        prediction.reload.update!(home_score: 70, away_score: 70, home_offensive_efficiency: 100,
+                                  away_offensive_efficiency: 100, home_win_probability: 0.5)
+      end
+
+      [0, -5, 5].each do |spread|
+        it "skips the deterministic spread at line #{spread} while producing finite moneyline output" do
+          game_odd.update!(spread_point: spread)
+          expect(prediction.margin_std_deviation).to eq(0)
+          recs = described_class.call(game:).compact
+          expect(recs.map(&:bet_type)).to eq(['moneyline'])
+          expect(recs.first.confidence).to be_finite
+          expect(recs.first.ev).to be_finite
+          expect(game.bet_recommendations.where(bet_type: 'spread')).to be_empty
+        end
+      end
+    end
+
     context 'when total points are present' do
       before do
         game_odd.update!(total_points: 145.5, total_over_odds: -110, total_under_odds: -110)

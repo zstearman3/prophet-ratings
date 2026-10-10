@@ -44,12 +44,22 @@ module ProphetRatings
     attr_reader :game, :ratings_config_version
 
     def prediction_inputs_available?
-      values = prediction_input_values
+      values = prediction_input_values + required_snapshot_volatilities
       return true if values.all? { |value| value.is_a?(Numeric) && value.finite? && value >= 0 } &&
                      game.season.average_pace&.positive? && expected_pace.positive?
 
       Rails.logger.warn("Prediction skipped for game=#{game.id}: missing or invalid rating inputs")
       false
+    end
+
+    # Shared-pace persisted diagnostics require snapshot SDs, not mutable fallbacks.
+    def required_snapshot_volatilities
+      return [] unless @config.dig(:prediction, :uncertainty_model) == 'shared_pace_v1'
+      return [nil] unless home_snapshot && away_snapshot
+
+      [home_snapshot, away_snapshot].flat_map do |snapshot|
+        [snapshot.offensive_efficiency_volatility, snapshot.defensive_efficiency_volatility, snapshot.pace_volatility]
+      end
     end
 
     def expected_pace

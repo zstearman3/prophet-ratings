@@ -526,6 +526,12 @@ model baseline fallback. Invalid supplied SDs do not fall back. Missing/nonfinit
 core ratings or nonpositive expected pace raise explicit errors. Persisted
 uncertainty diagnostics require stored snapshot efficiency and pace SDs, and
 use stored prediction means and pace with modifier 1 (the builder's modifier).
+The shared-pace builder skips snapshots missing any of these SDs before saving
+a prediction, so downstream diagnostics never require mutable fallbacks for
+new persisted outputs. Interactive predictor/simulator fallbacks and legacy
+builder behavior remain available. Spread recommendations with zero SD are
+skipped, matching the existing total-market policy; the recommendation EV model
+does not represent push outcomes. Moneyline recommendations remain available.
 Rounded persisted means and mutable season fallback inputs remain replay limits
 until prediction context is frozen by subsequent work.
 

@@ -36,4 +36,21 @@ RSpec.describe ProphetRatings::GamePredictionBuilder do
     expect(described_class.new(game, ratings_config_version: version).call).to be_nil
     expect(game.predictions).to be_empty
   end
+
+  %i[offensive_efficiency_volatility defensive_efficiency_volatility pace_volatility].product([0, 1]).each do |stat, side|
+    it "skips a shared-pace prediction when snapshot #{side} is missing #{stat}" do
+      snapshots[side].update!(stat => nil)
+      expect(described_class.new(game, ratings_config_version: version).call).to be_nil
+      expect(game.predictions).to be_empty
+    end
+  end
+
+  it 'retains legacy builder fallbacks for missing snapshot pace volatility' do
+    payload = version.config.deep_dup
+    payload['bundle_name'] = 'legacy-builder'
+    payload['prediction'].delete('uncertainty_model')
+    legacy = RatingsConfigVersion.publish!(payload)
+    snapshots.each { |snapshot| snapshot.update!(ratings_config_version: legacy, pace_volatility: nil) }
+    expect(described_class.new(game, ratings_config_version: legacy).call).to be_persisted
+  end
 end

@@ -54,6 +54,9 @@ class BetRecommendationGenerator
 
     model_margin = prediction.home_score - prediction.away_score
     stddev = prediction.margin_std_deviation
+    # As with totals, skip deterministic spreads; the EV model has no push outcome.
+    return if stddev.zero?
+
     line = game_odd.spread_point
 
     prob_home_covers = cover_probability(
