@@ -1,6 +1,6 @@
 <%= turbo_frame_tag "team_stats" do %>
   <div class="table-responsive max-h-screen overflow-auto">
-    <table class="text-sm text-left text-gray-500 border-collapse">
+    <table class="text-sm text-left text-gray-500 border-separate border-spacing-0">
       <thead class="text-xs text-gray-700 uppercase bg-gray-50 sticky top-0 z-20">
         <tr>
           <% sortable_columns = {
@@ -73,38 +73,38 @@
       <tbody>
         <% @team_seasons.each_with_index do |ts, i| %>
           <% row_class = i.even? ? 'bg-white' : 'bg-gray-50' %>
-          <tr class="odd:bg-white even:bg-gray-50 border-b">
-            <td class="px-4 py-2 sticky left-0 z-10 <%= row_class %>"><%= i + 1 %></td>
-            <td class="px-4 py-2 sticky left-[60px] z-10 <%= row_class %>"><%= link_to ts.team.school, ts.team, data: { turbo: false }  %></td>
-            <td class="px-4 py-2"><%= ts.rating %></td>
-            <td class="px-4 py-2"><%= ts.adj_offensive_efficiency %></td>
-            <td class="px-4 py-2"><%= ts.adj_defensive_efficiency %></td>
-            <td class="px-4 py-2"><%= ts.adj_pace %></td>
-            <td class="px-4 py-2"><%= ts.adj_turnover_rate %></td>
-            <td class="px-4 py-2"><%= ts.adj_turnover_rate_forced %></td>
-            <td class="px-4 py-2"><%= ts.adj_offensive_rebound_rate %></td>
-            <td class="px-4 py-2"><%= ts.adj_defensive_rebound_rate %></td>
-            <td class="px-4 py-2"><%= ts.adj_free_throw_rate %></td>
-            <td class="px-4 py-2"><%= ts.adj_three_pt_proficiency %></td>
-            <td class="px-4 py-2"><%= ts.adj_three_pt_proficiency_allowed %></td>
-            <td class="px-4 py-2"><%= ts.adj_effective_fg_percentage %></td>
-            <td class="px-4 py-2"><%= ts.adj_effective_fg_percentage_allowed %></td>
-            <td class="px-4 py-2"><%= ts.offensive_efficiency %></td>
-            <td class="px-4 py-2"><%= ts.defensive_efficiency %></td>
-            <td class="px-4 py-2"><%= ts.pace %></td>
-            <td class="px-4 py-2"><%= ts.effective_fg_percentage %></td>
-            <td class="px-4 py-2"><%= ts.free_throw_rate %></td>
-            <td class="px-4 py-2"><%= ts.three_pt_attempt_rate %></td>
-            <td class="px-4 py-2"><%= ts.offensive_rebound_rate %></td>
-            <td class="px-4 py-2"><%= ts.turnover_rate %></td>
-            <td class="px-4 py-2"><%= ts.home_offense_boost %></td>
-            <td class="px-4 py-2"><%= ts.home_defense_boost %></td>
-            <td class="px-4 py-2"><%= ts.total_home_boost %></td>
-            <td class="px-4 py-2"><%= ts.offensive_efficiency_volatility %></td>
-            <td class="px-4 py-2"><%= ts.defensive_efficiency_volatility %></td>
-            <td class="px-4 py-2"><%= ts.pace_volatility %></td>
-            <td class="px-4 py-2"><%= ts.offensive_efficiency_std_dev %></td>
-            <td class="px-4 py-2"><%= ts.defensive_efficiency_std_dev %></td>
+          <tr class="odd:bg-white even:bg-gray-50">
+            <td class="border-b border-gray-300 px-4 py-2 sticky left-0 z-10 <%= row_class %>"><%= i + 1 %></td>
+            <td class="border-b border-gray-300 px-4 py-2 sticky left-[60px] z-10 <%= row_class %>"><%= link_to ts.team.school, ts.team, data: { turbo: false }  %></td>
+            <td class="border-b border-gray-300 px-4 py-2"><%= ts.rating %></td>
+            <td class="border-b border-gray-300 px-4 py-2"><%= ts.adj_offensive_efficiency %></td>
+            <td class="border-b border-gray-300 px-4 py-2"><%= ts.adj_defensive_efficiency %></td>
+            <td class="border-b border-gray-300 px-4 py-2"><%= ts.adj_pace %></td>
+            <td class="border-b border-gray-300 px-4 py-2"><%= ts.adj_turnover_rate %></td>
+            <td class="border-b border-gray-300 px-4 py-2"><%= ts.adj_turnover_rate_forced %></td>
+            <td class="border-b border-gray-300 px-4 py-2"><%= ts.adj_offensive_rebound_rate %></td>
+            <td class="border-b border-gray-300 px-4 py-2"><%= ts.adj_defensive_rebound_rate %></td>
+            <td class="border-b border-gray-300 px-4 py-2"><%= ts.adj_free_throw_rate %></td>
+            <td class="border-b border-gray-300 px-4 py-2"><%= ts.adj_three_pt_proficiency %></td>
+            <td class="border-b border-gray-300 px-4 py-2"><%= ts.adj_three_pt_proficiency_allowed %></td>
+            <td class="border-b border-gray-300 px-4 py-2"><%= ts.adj_effective_fg_percentage %></td>
+            <td class="border-b border-gray-300 px-4 py-2"><%= ts.adj_effective_fg_percentage_allowed %></td>
+            <td class="border-b border-gray-300 px-4 py-2"><%= ts.offensive_efficiency %></td>
+            <td class="border-b border-gray-300 px-4 py-2"><%= ts.defensive_efficiency %></td>
+            <td class="border-b border-gray-300 px-4 py-2"><%= ts.pace %></td>
+            <td class="border-b border-gray-300 px-4 py-2"><%= ts.effective_fg_percentage %></td>
+            <td class="border-b border-gray-300 px-4 py-2"><%= ts.free_throw_rate %></td>
+            <td class="border-b border-gray-300 px-4 py-2"><%= ts.three_pt_attempt_rate %></td>
+            <td class="border-b border-gray-300 px-4 py-2"><%= ts.offensive_rebound_rate %></td>
+            <td class="border-b border-gray-300 px-4 py-2"><%= ts.turnover_rate %></td>
+            <td class="border-b border-gray-300 px-4 py-2"><%= ts.home_offense_boost %></td>
+            <td class="border-b border-gray-300 px-4 py-2"><%= ts.home_defense_boost %></td>
+            <td class="border-b border-gray-300 px-4 py-2"><%= ts.total_home_boost %></td>
+            <td class="border-b border-gray-300 px-4 py-2"><%= ts.offensive_efficiency_volatility %></td>
+            <td class="border-b border-gray-300 px-4 py-2"><%= ts.defensive_efficiency_volatility %></td>
+            <td class="border-b border-gray-300 px-4 py-2"><%= ts.pace_volatility %></td>
+            <td class="border-b border-gray-300 px-4 py-2"><%= ts.offensive_efficiency_std_dev %></td>
+            <td class="border-b border-gray-300 px-4 py-2"><%= ts.defensive_efficiency_std_dev %></td>
           </tr>
         <% end %>
       </tbody>
