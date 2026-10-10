@@ -84,7 +84,13 @@ Applied captures must contain all three expected preseason outputs and match
 the live preseason values; a partial or empty payload is insufficient provenance.
 
 For fresh seasons, initialize with the selected version before activating the
-season. Switching models for established live ratings requires an explicitly
+season. For an eligible inactive preseason, reviewed source corrections or participant
+changes can instead use [deliberate preseason revisions](offseason.md#deliberate-inactive-preseason-revisions)
+with a newly published version and an accepted preview. No daily rebuild is required;
+prior versions and saved forecasts remain intact. Current seasons, finalized games,
+changed adjusted values or later snapshots still require the scoped workflow below.
+
+Switching models for established in-season live ratings requires an explicitly
 reviewed reset/rebuild starting at season opening, with `RUN_PRESEASON=true`;
 see [Offseason Operations](offseason.md). Reset uses captured priors for that
 version and its configured boosts/volatility, clearing old adjusted Five Factors.
