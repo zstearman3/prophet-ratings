@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_10_050000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_10_163200) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -58,6 +58,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_10_050000) do
     t.string "coach_name"
     t.datetime "created_at", null: false
     t.string "destination_school"
+    t.string "discovery_coach_name"
+    t.string "discovery_former_coach"
+    t.boolean "discovery_present"
+    t.bigint "discovery_previous_team_id"
+    t.string "discovery_school"
+    t.bigint "discovery_team_id"
     t.integer "effective_year", null: false
     t.boolean "full_season_head_coach", default: false, null: false
     t.string "previous_role"
@@ -67,6 +73,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_10_050000) do
     t.string "status", default: "pending", null: false
     t.bigint "team_id"
     t.datetime "updated_at", null: false
+    t.index ["effective_year", "discovery_school"], name: "unique_coaching_discovery_school", unique: true, where: "(discovery_school IS NOT NULL)"
     t.index ["effective_year", "status"], name: "index_coaching_changes_on_effective_year_and_status"
     t.index ["previous_team_id"], name: "index_coaching_changes_on_previous_team_id"
     t.index ["team_id", "effective_year"], name: "unique_confirmed_coaching_destination", unique: true, where: "((status)::text = 'confirmed'::text)"
@@ -565,6 +572,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_10_050000) do
   add_foreign_key "bet_recommendations", "ratings_config_versions"
   add_foreign_key "bookmaker_odds", "games"
   add_foreign_key "coaching_changes", "teams"
+  add_foreign_key "coaching_changes", "teams", column: "discovery_previous_team_id"
+  add_foreign_key "coaching_changes", "teams", column: "discovery_team_id"
   add_foreign_key "coaching_changes", "teams", column: "previous_team_id"
   add_foreign_key "game_odds", "games"
   add_foreign_key "game_sync_dates", "seasons"

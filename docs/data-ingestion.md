@@ -653,3 +653,67 @@ date evidence; included teams may be independent. Unresolved identities and miss
 included aliases block rating publication/readiness. Standings absence never
 excludes a team. See [Offseason Operations](offseason.md#1a-review-participation-and-dates-explicitly)
 for the JSON contract and legacy behavior. Imports do not opt seasons into review.
+
+## Coaching-change discovery
+
+```bash
+bin/rails coaching:discover YEAR=2027
+# With an already running, isolated development stack:
+bin/compose exec web bin/rails coaching:discover YEAR=2027
+```
+
+YEAR is required and uses the ending-year convention: 2027 discovers the public
+2026 HoopDirt coaching tracker for 2026–27. No Season preparation is necessary.
+`Scraper::CoachingChangesScraper` reads the annual page, selects its explicitly
+labelled D1 configuration and follows its current public all-data request. Table
+IDs and nonces are discovered afresh on every run. Other divisions are excluded;
+missing/ambiguous tables, limited requests, HTTP failures, malformed rows,
+duplicate schools and empty D1 input fail visibly before any writes. The entire
+candidate import is transactional under the coaching year lock. Failed imports
+preserve existing candidates/decisions/readiness. Retry the same command after
+source recovery; if the page structure changed, repair the adapter and fixtures
+rather than treating the failure as an empty year or deleting candidates.
+
+The JSON report includes D1 coverage, resolved/unresolved destination counts,
+original school/conference/former/incoming coach labels, Team candidate IDs,
+possible prior schools, proposed facts, CoachingChange IDs, reviewed-fact conflicts
+and other records sharing the destination. Coverage describes the source table,
+not proof of complete D1 membership or correct coaching history. No teams or
+aliases are created. Exact canonical school names and existing aliases from all
+sources are combined; case and surrounding whitespace are ignored. Only a unique
+identity resolves. Nicknames, ambiguous aliases, interim annotations and spelling
+variants remain for review; there is no fuzzy coach or team matching. Resolve
+missing labels by adding a reviewed TeamAlias with source `hoopdirt` in Rails Admin,
+then rerun. Inspect all reported Team IDs for ambiguous labels; never reassign an
+existing alias merely to force a match.
+
+An incoming coach is matched to *other rows' former coaches*, never to the
+former coach at the destination. One exact cross-row match proposes a previous
+school/Team; multiple matches list all possible schools without choosing. No
+match leaves history incomplete, including assistants, first-time hires and
+coaches whose previous school is absent. Every proposal requires manual review;
+previous year/role and full-season responsibility are never inferred. Pending
+proposal changes clear unsupported prior responsibility fields if the incoming
+coach or proposed prior school/Team changes.
+
+Discovery retains a normalized source school key and the latest incoming/former
+coach labels, resolved destination/prior Team IDs and a source-presence flag for
+matching, idempotency and detecting changed input. Alias corrections that change
+these resolved proposals also clear readiness once, including newly ambiguous
+identities. There are no
+evidence URLs, snapshots, fingerprints or revision-history records. Reruns use
+that school/year key first, then unique destination Team/year/coach equivalents,
+including manual entries. Colliding equivalents remain intact and receive a
+separate pending candidate with all relevant IDs. Confirmed/rejected facts and
+review decisions are never overwritten; changed proposals are reported alongside
+the candidate ID for manual correction/reconfirmation. Identical reruns preserve
+readiness. New pending candidates and changes in observed coaching labels or
+pending facts clear readiness, including changes to the former-coach label.
+Attaching equivalent discovery labels to a manually reviewed move preserves
+readiness. An already reported, unchanged conflict does not repeatedly invalidate
+an operator's subsequent readiness decision. Source omissions are reported as `absent_candidate_ids` and clear readiness once;
+reappearance also clears it. Neither deletes a candidate nor undoes a decision. Imports never mark a year ready or change ratings,
+pace adjustments, snapshots or the legacy offseason profile flag.
+
+See [Offseason Operations](offseason.md#coaching-discovery-and-proposed-revision-review)
+for the operator's review/revision steps.
