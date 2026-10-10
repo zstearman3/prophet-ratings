@@ -42,13 +42,29 @@ module ProphetRatings
     end
 
     def save_revision(context, result)
-      game.predictions.find_or_create_by!(ratings_config_version:, revision_key: revision_key(context)) do |prediction|
-        prediction.assign_attributes(prediction_attributes(result).merge(provenance_attributes(context)))
+      previous = game.predictions.where(ratings_config_version:).where.not(revision_key: nil)
+                     .order(generated_at: :desc, id: :desc).first
+      return previous if identical_revision?(previous, context)
+
+      game.predictions.create!(prediction_attributes(result).merge(provenance_attributes(context),
+                                                                   ratings_config_version:, revision_key: revision_key(context, previous)))
+    end
+
+    def identical_revision?(previous, context)
+      previous && retry_context(previous.calculation_context) == retry_context(context) && previous.forecast_kind == forecast_kind &&
+        previous.input_cutoff == input_cutoff && previous.forecast_start_time == game.start_time
+    end
+
+    # Republishing identical sources can touch updated_at without changing any forecast input.
+    def retry_context(context)
+      context.as_json.deep_dup.tap do |inputs|
+        inputs.fetch('season_source').delete('updated_at')
+        inputs.fetch('snapshots').each { |snapshot| snapshot.fetch('source').delete('updated_at') }
       end
     end
 
-    def revision_key(context)
-      identity = { context:, kind: forecast_kind, cutoff: input_cutoff, start_time: game.start_time }
+    def revision_key(context, previous)
+      identity = { context:, kind: forecast_kind, cutoff: input_cutoff, start_time: game.start_time, previous_id: previous&.id }
       Digest::SHA256.hexdigest(JSON.generate(identity))
     end
 

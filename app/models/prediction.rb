@@ -55,7 +55,8 @@ class Prediction < ApplicationRecord
 
   validate :snapshots_must_have_same_ratings_version
 
-  validates :game, uniqueness: { scope: %i[home_team_snapshot_id away_team_snapshot_id] }, if: -> { forecast_kind == 'legacy_unverified' }
+  validates :game, uniqueness: { scope: %i[home_team_snapshot_id away_team_snapshot_id forecast_kind] },
+                   if: -> { forecast_kind == 'legacy_unverified' }
 
   def favorite
     home_score > away_score ? game.home_team_game&.team : game.away_team_game&.team

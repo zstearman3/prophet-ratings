@@ -81,6 +81,56 @@ RSpec.describe ProphetRatings::GamePredictionBuilder do
     expect { prediction.update!(calculation_context: {}) }.to raise_error(ActiveRecord::RecordInvalid)
   end
 
+  it 'reuses a consecutive retry after timestamp-only source touches without replacing captured provenance' do
+    snapshots
+    prediction = build_forecast
+    original = prediction.calculation_context
+    travel 1.minute
+    snapshots.each { |snapshot| snapshot.update!(updated_at: Time.current) }
+    season.update!(updated_at: Time.current)
+    expect(build_forecast.id).to eq(prediction.id)
+    expect(prediction.reload.calculation_context).to eq(original)
+  end
+
+  it 'appends and selects a fresh issuance when venue inputs revert, then reuses consecutive retries' do
+    snapshots
+    neutral = build_forecast
+    original_venue = game.attributes.slice('venue_type', 'venue_confidence', 'venue_source', 'venue_name', 'neutral')
+    game.update!(venue_type: 'home', venue_confidence: 'confirmed', neutral: false)
+    home = build_forecast
+    game.update!(original_venue)
+    restored = build_forecast
+    expect([neutral, home, restored].map(&:revision_key).uniq.size).to eq(3)
+    expect(restored.replay).to eq(neutral.replay)
+    expect(build_forecast.id).to eq(restored.id)
+    expect([game.current_prediction(ratings_config_version: version), Prediction.selected_pregame.to_a]).to eq([restored, [restored]])
+    game.update!(home_team_score: 80, away_team_score: 70)
+    allow(game.home_team_game).to receive_messages(offensive_efficiency: 100, defensive_efficiency: 100)
+    allow(game.away_team_game).to receive_messages(offensive_efficiency: 100, defensive_efficiency: 100)
+    allow(game).to receive(:pace).and_return(70)
+    ProphetRatings::GameFinalizer.new(game, ratings_config_version: version).send(:finalize_prediction!)
+    expect([neutral, home, restored].map { |prediction| prediction.reload.pace_error }).to eq([nil, nil, 0])
+  end
+
+  it 'attaches legacy outcomes when a reconstruction shares its snapshot pair and still rejects duplicate legacy rows' do
+    snapshots
+    legacy = create(:prediction, game:, ratings_config_version: version,
+                                 home_team_snapshot: snapshots.first, away_team_snapshot: snapshots.last,
+                                 home_offensive_efficiency: 105, away_offensive_efficiency: 105,
+                                 home_defensive_efficiency: 105, away_defensive_efficiency: 105, pace: 70)
+    game.update!(status: :final, home_team_score: 80, away_team_score: 70)
+    reconstruction = build_forecast
+    expect([reconstruction.home_team_snapshot, reconstruction.away_team_snapshot]).to eq(snapshots)
+    allow(game.home_team_game).to receive_messages(offensive_efficiency: 100, defensive_efficiency: 100)
+    allow(game.away_team_game).to receive_messages(offensive_efficiency: 100, defensive_efficiency: 100)
+    allow(game).to receive(:pace).and_return(70)
+    ProphetRatings::GameFinalizer.new(game, ratings_config_version: version).send(:finalize_prediction!)
+    expect(legacy.reload.home_offensive_efficiency_error).not_to be_nil
+    expect(reconstruction.reload.home_offensive_efficiency_error).to be_nil
+    expect(Prediction.selected_with_legacy).to contain_exactly(legacy)
+    expect(legacy.dup.tap(&:valid?).errors[:game]).to include('has already been taken')
+  end
+
   it 'labels late-created backdated sources as reconstruction after tipoff' do
     snapshots
     game.update!(start_time: 1.hour.ago, status: :final)

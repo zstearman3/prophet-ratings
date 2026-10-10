@@ -569,9 +569,13 @@ with a warning directing the operator to publish complete prior-day snapshots.
 No later source is substituted. Anchors/fallbacks are the values available at
 actual issuance; they are frozen, not retrospectively reconstructed as-of values.
 
-Each changed context appends a revision. A SHA-256 key over context, forecast
-kind, cutoff and captured tipoff provides idempotency for duplicate retries;
-per-game locking serializes writes. The generation timestamp is actual wall-clock
+Each change from the latest issuance appends a revision, including an A → B → A
+input correction. Only consecutive identical inputs reuse the latest issuance.
+Timestamp-only source touches also reuse it; captured source identities, dates,
+values and venue evidence must still match. The original provenance stays frozen.
+A SHA-256 key over context, forecast kind, cutoff, captured tipoff and predecessor
+ID identifies the revision; per-game locking serializes writes and duplicate retries.
+The generation timestamp is actual wall-clock
 time and is excluded from the retry key. Rails validations reject changes to
 saved context, provenance, source identities or numerical outputs; outcome error
 columns remain editable. The database enforces unique game/model/revision keys.
