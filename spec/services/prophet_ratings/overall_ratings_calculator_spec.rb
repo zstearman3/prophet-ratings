@@ -30,7 +30,7 @@ RSpec.describe ProphetRatings::OverallRatingsCalculator, type: :service do
       allow(ProphetRatings::TeamSeasonStatsAggregator).to receive(:new).and_return(aggregator)
       calculator.call(as_of: timestamp)
       expect(ProphetRatings::TeamSeasonStatsAggregator).to have_received(:new).with(
-        season:, as_of: expected_date, ratings_config_version: RatingsConfigVersion.default_version
+        season:, as_of: expected_date, ratings_config_version: RatingsConfigVersion.default_version, verified_only: false
       )
       expect(team_season.team_rating_snapshots.sole.snapshot_date).to eq(expected_date)
     end

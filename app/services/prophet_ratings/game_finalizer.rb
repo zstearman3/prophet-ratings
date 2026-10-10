@@ -97,13 +97,14 @@ module ProphetRatings
     end
 
     def update_prediction_errors!(prediction)
-      error_attributes = prediction_error_attributes(prediction)
+      error_attributes = self.class.prediction_error_attributes(prediction)
       return unless error_attributes
 
       prediction.update!(error_attributes)
     end
 
-    def prediction_error_attributes(prediction)
+    public_class_method def self.prediction_error_attributes(prediction)
+      game = prediction.game
       home_game = game.home_team_game
       away_game = game.away_team_game
       return unless home_game && away_game
