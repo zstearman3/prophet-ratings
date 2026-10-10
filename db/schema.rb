@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_10_030000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_10_040000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -52,6 +52,37 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_10_030000) do
     t.datetime "updated_at", null: false
     t.decimal "value"
     t.index ["game_id"], name: "index_bookmaker_odds_on_game_id"
+  end
+
+  create_table "coaching_changes", force: :cascade do |t|
+    t.string "coach_name"
+    t.datetime "created_at", null: false
+    t.string "destination_school"
+    t.integer "effective_year", null: false
+    t.boolean "full_season_head_coach", default: false, null: false
+    t.string "previous_role"
+    t.string "previous_school"
+    t.bigint "previous_team_id"
+    t.integer "previous_year"
+    t.string "status", default: "pending", null: false
+    t.bigint "team_id"
+    t.datetime "updated_at", null: false
+    t.index ["effective_year", "status"], name: "index_coaching_changes_on_effective_year_and_status"
+    t.index ["previous_team_id"], name: "index_coaching_changes_on_previous_team_id"
+    t.index ["team_id", "effective_year"], name: "unique_confirmed_coaching_destination", unique: true, where: "((status)::text = 'confirmed'::text)"
+    t.index ["team_id"], name: "index_coaching_changes_on_team_id"
+    t.check_constraint "effective_year >= 1 AND effective_year <= 9999", name: "coaching_effective_year"
+    t.check_constraint "previous_year >= 1 AND previous_year <= 9999", name: "coaching_previous_year"
+    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying, 'confirmed'::character varying, 'rejected'::character varying]::text[])", name: "coaching_status"
+  end
+
+  create_table "coaching_reviews", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.boolean "ready", default: false, null: false
+    t.datetime "updated_at", null: false
+    t.integer "year", null: false
+    t.index ["year"], name: "index_coaching_reviews_on_year", unique: true
+    t.check_constraint "year >= 1 AND year <= 9999", name: "coaching_review_year"
   end
 
   create_table "conferences", force: :cascade do |t|
@@ -518,6 +549,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_10_030000) do
   add_foreign_key "bet_recommendations", "predictions"
   add_foreign_key "bet_recommendations", "ratings_config_versions"
   add_foreign_key "bookmaker_odds", "games"
+  add_foreign_key "coaching_changes", "teams"
+  add_foreign_key "coaching_changes", "teams", column: "previous_team_id"
   add_foreign_key "game_odds", "games"
   add_foreign_key "predictions", "ratings_config_versions"
   add_foreign_key "predictions", "team_rating_snapshots", column: "away_team_snapshot_id"
