@@ -662,3 +662,14 @@ The solver, prior weights and authored bundle coefficients are unchanged. Replay
 can reconstruct from identical stored inputs deterministically but does not archive
 source-data availability or old executable code. Captures made after opening are
 usable for a labeled hypothetical reconstruction, not evidence of live issuance.
+
+### Reviewed source corrections
+
+`ProphetRatings::PreseasonRevision` previews and atomically publishes inactive
+preseason corrections under a newly selected immutable version. It uses the same
+captured v1 formula, units, bounds and precision; numerical coefficients and the
+Python boundary are unchanged. Profile source/reference, observation date, unit
+map and manual reason are retained in the captured source attributes. Nil inputs
+remain distinguishable from observed zero. Prior captures and other-version
+snapshots/forecasts are preserved. See the deliberate revision operation in
+[Offseason Operations](offseason.md#deliberate-inactive-preseason-revisions).

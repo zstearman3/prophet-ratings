@@ -32,6 +32,29 @@ class SeasonParticipationReview
     raise ArgumentError, "Season #{@season.id} readiness: #{problems.join('; ')}" if problems.any?
   end
 
+  def validate_revision(version)
+    version.settings
+    missing = missing_revision_teams(version)
+    return if missing.empty?
+
+    raise ArgumentError, "Selected preseason revision #{version.name} lacks included-team coverage #{missing.map(&:team_id).inspect}; " \
+                         'preview/publish complete revision before activation.'
+  end
+
+  def missing_revision_teams(version)
+    date = @season.start_date - 1.day
+    validate_publication(version, date)
+    snapshots = @season.team_rating_snapshots.where(ratings_config_version: version, snapshot_date: date)
+                       .where("stats ->> 'participation_key' IS NOT DISTINCT FROM ?", publication_key)
+    @season.rating_team_seasons.reject { |row| self.class.revision_covered?(row, version, snapshots) }
+  end
+
+  def self.revision_covered?(row, version, snapshots)
+    version_id = version.id
+    row.ratings_config_version_id == version_id && row.preseason_prior&.ratings_config_version_id == version_id &&
+      snapshots.exists?(team_id: row.team_id)
+  end
+
   def validate_publication(version, date)
     validate
     return if @season.participation_review.blank?

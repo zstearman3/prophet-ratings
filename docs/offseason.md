@@ -620,3 +620,60 @@ Only the included observation pair and anchor reach Python; zero centered effect
 must reconstruct offense/defense of 100 while the excluded row stays untouched.
 The existing independent ridge checks also run. These synthetic checks establish
 boundary arithmetic, not live roster coverage or model accuracy.
+
+## Deliberate inactive preseason revisions
+
+Normal `season:initialize_preseason` repeats continue to reuse captured priors.
+To correct a captured profile/history input or add reviewed participants after
+saved forecasts, publish a **new** immutable model bundle (a new `bundle_name`,
+with unchanged coefficients if only source evidence changed). Select that stored
+version explicitly. No daily rebuild or global model activation is needed:
+
+```bash
+bin/rails season:revise_preseason YEAR=2027 MODEL_VERSION=reviewed-revision-name
+bin/rails season:revise_preseason YEAR=2027 MODEL_VERSION=reviewed-revision-name APPLY=true PREVIEW_KEY=<reviewed-key>
+```
+
+The first command is read-only. Review the selected version, included team IDs,
+added teams, old/new profile attributes, prior outputs and old/new efficiency/pace
+anchors. The key binds publication to that exact preview; changes require another
+preview. Publication atomically replaces the included live preseason values,
+sets ranks/anchors, captures new priors and publishes opening-minus-one snapshots
+for the selected model, and records `Season.preseason_revision`. It preserves
+other versions' priors/snapshots and every saved forecast. The exact same inputs
+can be previewed and rerun with the same identities. Later input/coverage changes
+require another new model version; captures are never refreshed implicitly.
+
+Current seasons, finalized games, changed live adjusted ratings and later dated
+snapshots require the existing explicitly scoped rebuild/review workflow instead.
+Incompatible model payloads fail without inheriting current configuration.
+Reviewed participant/date/alias errors still block publication. Activation names
+the selected revision and checks included-team live/prior/snapshot coverage.
+Season activation and global model activation remain separate; explicitly activate
+the intended model for future default jobs using the model-version runbook.
+
+Contract 1 forecasts replay frozen anchors and survive baseline corrections.
+Legacy forecasts still depend on mutable anchors and block changed efficiency/pace
+baselines; review their provenance deliberately rather than deleting or relabeling
+them. New forecasts use the existing append-only, eligible pregame selection
+contract described in `docs/ratings.md`. Publishing a preseason revision does not
+regenerate forecasts or establish production coverage/calibration.
+
+Before applying migration `20261010030000`, run
+`bin/rails season:offseason_profile_duplicates` on the intended environment.
+It lists conflicting TeamSeason/profile IDs without choosing, merging or deleting
+rows. The migration independently aborts before any changes if duplicates exist.
+Resolve conflicts deliberately, retaining evidence as appropriate, then retry.
+The unique index and model enforce one current profile per TeamSeason. Historical
+profile evidence remains in immutable prior captures; this adds no profile archive
+or external feed. Existing rows receive empty units and null source/date/reason;
+the migration invents no provenance. Before editing supplied inputs or publishing
+a revision, record `source_reference`, `observed_on`, `input_units` and a
+`manual_adjustment_reason` even when the manual adjustment is zero.
+
+`input_units` must equal `TeamOffseasonProfile::INPUT_UNITS`: recruiting score is
+`local_score`, returning minutes is `fraction`, and manual adjustment is
+`points_per_100_possessions_per_side`. Nil means missing; zero means observed zero.
+The existing finite bounds, 0–1 returning fraction and +/-5 per-side combined cap
+are unchanged. New captures retain all provenance attributes for replay; no
+unvalidated recruiting conversion or coefficient is introduced.

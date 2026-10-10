@@ -53,6 +53,8 @@ class Season < ApplicationRecord
   validates :year, presence: true, uniqueness: true
   validate :only_one_current_season, if: :current?
 
+  belongs_to :preseason_revision, class_name: 'RatingsConfigVersion', optional: true
+
   has_many :games, dependent: :destroy
   has_many :team_seasons, dependent: :destroy
   has_many :predictions, through: :games
@@ -143,12 +145,14 @@ class Season < ApplicationRecord
   end
 
   def validate_activation!
+    SeasonParticipationReview.new(self).validate_revision(preseason_revision) if preseason_revision
     return SeasonParticipationReview.new(self).validate_activation if participation_review.present?
 
-    missing_teams = Team.where.not(id: team_seasons.select(:team_id)).exists?
     incomplete = team_seasons.where(adj_offensive_efficiency: nil)
                              .or(team_seasons.where(adj_defensive_efficiency: nil)).or(team_seasons.where(adj_pace: nil))
-    return if start_date < end_date && team_seasons.exists? && !missing_teams && !incomplete.exists?
+    if start_date < end_date && team_seasons.exists? && !Team.where.not(id: team_seasons.select(:team_id)).exists? && !incomplete.exists?
+      return
+    end
 
     raise ArgumentError, 'Season is incomplete: prepare missing teams and initialize/review preseason ratings before activation.'
   end
