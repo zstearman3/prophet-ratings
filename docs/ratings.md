@@ -627,7 +627,9 @@ Replay residuals use `selected_pregame` for the target season/model, one latest
 eligible issuance per game/model, excluding legacy rows, reconstructions and late
 revisions. Errors are recomputed in memory from saved means and bounded finalized
 results, so prior execution order or outcome-error attachment does not change the
-sample. Regular live aggregation retains the explicit legacy compatibility cohort.
+sample. An eligible forecast whose finalized game lacks either team-game record
+fails replay visibly and rolls back the date instead of retaining stored errors.
+Regular live aggregation retains the explicit legacy compatibility cohort.
 
 For games on D, replay first reconstructs working ratings/baselines through D-1
 without publishing snapshots. Frozen forecast context contains those numeric

@@ -71,7 +71,12 @@ module ProphetRatings
                     .to_a
 
       predictions.each do |prediction|
-        prediction.assign_attributes(GameFinalizer.prediction_error_attributes(prediction) || {}) if @options[:verified_only]
+        if @options[:verified_only]
+          errors = GameFinalizer.prediction_error_attributes(prediction)
+          raise ArgumentError, "Historical replay requires complete finalized team-game inputs for game=#{prediction.game_id}" unless errors
+
+          prediction.assign_attributes(errors)
+        end
         next if prediction.calculation_context.present?
 
         ModelConfiguration.validate_snapshots([prediction.home_team_snapshot, prediction.away_team_snapshot], @ratings_config_version)

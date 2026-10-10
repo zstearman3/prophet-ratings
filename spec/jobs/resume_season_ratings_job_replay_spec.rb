@@ -117,6 +117,24 @@ RSpec.describe ResumeSeasonRatingsJob do
     expect(teams.first.reload.home_offense_boost).to eq(2.2)
   end
 
+  it 'rejects incomplete finalized residual inputs instead of learning from stored errors' do
+    date = season.start_date + 2
+    game = game_on(date)
+    snapshots = teams.map { |team| team.team_rating_snapshots.sole }
+    prediction = create(:prediction, game:, ratings_config_version: version, home_team_snapshot: snapshots.first,
+                                     away_team_snapshot: snapshots.last,
+                                     calculation_context: ProphetRatings::ForecastContext.capture(game, snapshots, version),
+                                     forecast_kind: 'pregame', forecast_start_time: game.start_time,
+                                     input_cutoff: season.start_date - 1, generated_at: game.start_time - 1.hour,
+                                     revision_key: 'incomplete-game', home_offensive_efficiency_error: 999)
+    game.away_team_game.destroy!
+    teams.first.update!(adj_offensive_efficiency: 125)
+    expect { replay(date + 1) }.to raise_error(ArgumentError, /finalized.*team-game inputs/)
+    expect(teams.first.reload.adj_offensive_efficiency).to eq(125)
+    expect(prediction.reload.home_offensive_efficiency_error).to eq(999)
+    expect(snapshot_values(date + 1)).to be_empty
+  end
+
   it 'rejects missing captured provenance and rolls back earlier restored teams' do
     teams.last.reload.update!(preseason_prior: nil)
     PreseasonPrior.where(team_season: teams.last).delete_all
