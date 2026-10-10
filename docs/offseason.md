@@ -690,3 +690,70 @@ a revision, record `source_reference`, `observed_on`, `input_units` and a
 The existing finite bounds, 0–1 returning fraction and +/-5 per-side combined cap
 are unchanged. New captures retain all provenance attributes for replay; no
 unvalidated recruiting conversion or coefficient is introduced.
+
+## Manual coaching review (before Season preparation)
+
+After applying migration `20261010040000`, admins can create coaching candidates
+at `/admin/coaching_change` without network access or a prepared Season. Year
+2027 means 2026–27. Years are integers from 1 to 9999. Use existing Team selectors;
+inline team creation/editing is disabled. `destination_school` and `previous_school`
+retain unresolved source names. Pending candidates can have no resolved team,
+coach name or previous history, but must have an effective year.
+
+Review the facts, resolve the destination Team and coach name, then manually set
+`status` to `confirmed` or `rejected`. No evidence attachments, reviewer identity
+or audit history are required. Optional previous history uses `previous_team_id`,
+`previous_year` (before `effective_year`) and `previous_role`: `head_coach`,
+`assistant`, `interim` or `other`. Checking `full_season_head_coach` asserts verified
+full-season responsibility and requires a resolved previous Team/year and
+`head_coach` role. Confirmation alone does not imply mathematical eligibility:
+first-time, assistant, interim and partial-season histories are ineligible for
+the first-release pace signal. The downstream calculator must additionally verify
+the immediately preceding completed D1 season from stored history; this story
+stores facts and does not calculate pace or require Season existence.
+
+One confirmed record per destination Team/effective year is enforced by the model
+and a partial unique database index. Pending/rejected alternatives are retained.
+Correcting a confirmed record requires checking the transient `reconfirm` box on
+that save, or returning it to pending and confirming it after review. The checkbox
+resets after saving; it is not a stored fact. Rejection can be corrected manually.
+Stale saves/deletes fail with a reload-and-review error if another operation changed
+the stored facts or decision, so they cannot bypass reconfirmation or invalidate
+the wrong review year.
+
+At `/admin/coaching_review`, create a row for the year and explicitly check `ready`
+after resolving every pending candidate. An intentionally empty year may be ready;
+a missing review row means not ready. The year key cannot be changed after creation.
+New records, changes to any coaching facts/decisions, and deletion invalidate
+existing readiness for the affected old/new years. Deletion invalidates only the
+current year, even when the same instance was previously moved to another year.
+Unchanged saves preserve it.
+Readiness and candidate writes share transaction-scoped year locks so concurrent
+candidate changes cannot leave an obsolete ready decision. Deleting a review row
+also leaves the year unready. No review operation writes ratings, forecasts,
+preseason prior captures or the legacy `TeamOffseasonProfile.coaching_change` field.
+
+### Storage contract for discovery and pace calculation
+
+Read confirmed facts through `CoachingChange.confirmed.where(effective_year: year)`;
+read readiness through `CoachingReview.find_by(year: year)&.ready? == true`.
+Facts use Team foreign keys and year integers, without Season/TeamSeason foreign
+keys, numerical adjustments or evidence fields. Do not synchronize the legacy
+profile boolean. These inputs do not yet gate or alter preseason publication.
+
+The separate discovery implementation must create new candidates as pending,
+resolve matching identities conservatively, and update an existing candidate via
+`candidate.apply_imported_facts(facts)` using only `CoachingChange::FACT_FIELDS`.
+This method returns true for identical reviewed facts, false with an actionable
+base error for conflicts, and only changes pending facts. It never overwrites
+confirmed facts or rejected decisions and rejects imported status/reconfirmation
+fields. Identical imports preserve readiness. New or changed candidates invalidate
+it. Report conflicts for manual correction; do not create an automatic review
+transition. Imports must never set `CoachingReview.ready`, including after partial
+or failed runs; only the operator marks readiness. Automated discovery itself is
+outside this story, as are source identity matching and pace calculation.
+
+For manual acceptance, create an unresolved candidate, confirm/reject it, mark the
+year ready, then correct or delete a fact and verify readiness clears. Try a second
+confirmed destination/year and an edit without reconfirmation to see validation
+errors. Review the list filters and previous-team selectors with an admin account.

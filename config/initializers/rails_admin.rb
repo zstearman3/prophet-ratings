@@ -80,6 +80,60 @@ RailsAdmin.config do |config|
     end
   end
 
+  config.model 'CoachingChange' do
+    list do
+      fields :effective_year, :team, :destination_school, :coach_name, :status, :previous_team, :previous_year, :previous_role,
+             :full_season_head_coach
+    end
+    show do
+      fields :effective_year, :team, :destination_school, :coach_name, :status, :previous_team, :previous_school,
+             :previous_year, :previous_role, :full_season_head_coach
+    end
+    edit do
+      field :effective_year
+      field :team do
+        inline_add false
+        inline_edit false
+      end
+      field :destination_school
+      field :coach_name
+      field :previous_team do
+        inline_add false
+        inline_edit false
+      end
+      field :previous_school
+      field :previous_year
+      field :previous_role, :enum do
+        enum CoachingChange::PREVIOUS_ROLES
+      end
+      field :full_season_head_coach do
+        help 'Only assert a verified full season as head coach at the resolved previous team/year.'
+      end
+      field :status, :enum do
+        enum CoachingChange::STATUSES
+        help 'Confirm or reject manually after reviewing the coaching facts.'
+      end
+      field :reconfirm, :boolean do
+        help 'Check explicitly when correcting facts on a confirmed record; otherwise return it to pending.'
+      end
+    end
+  end
+
+  config.model 'CoachingReview' do
+    list do
+      fields :year, :ready, :updated_at
+    end
+    show do
+      fields :year, :ready, :updated_at
+    end
+    edit do
+      field :year
+      field :ready do
+        help 'Mark ready only after confirming or rejecting every pending candidate. An empty year is allowed.'
+      end
+    end
+  end
+
   ## == CancanCan ==
   # config.authorize_with :cancancan
 
