@@ -620,3 +620,16 @@ Only the included observation pair and anchor reach Python; zero centered effect
 must reconstruct offense/defense of 100 while the excluded row stays untouched.
 The existing independent ridge checks also run. These synthetic checks establish
 boundary arithmetic, not live roster coverage or model accuracy.
+
+## Opening-period prior/transition comparison
+
+`ratings:compare_preseason` now extends the fixed-weight benchmark with three
+preregistered sequential hypotheses: calendar baseline, two-year prior and
+effective-game-count decay. It solves core observations in memory through the
+prior Eastern schedule day, excluding late-created/revised prepared inputs, and
+writes no model outputs. Use Docker Python/NumPy and an explicitly authorized
+local dataset; pin `MODEL_VERSION` and `SOURCE_CONFIG`. See
+[Preseason comparison](preseason-comparison.md) for coefficients, fallback rules,
+coverage fields, chronology, roster follow-up contract and known data gaps.
+The recorded single eligible season cannot support coefficient selection;
+production defaults and published models remain unchanged.

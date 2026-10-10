@@ -60,4 +60,29 @@ RSpec.describe ProphetRatings::PreseasonComparison do
     game.update!(start_time: Time.utc(2025, 12, 1, 5))
     expect(comparison.call[:seasons].first[:opening_final_games]).to eq(0)
   end
+
+  it 'reports one row per common game/candidate and rebuilds only eligible prior-day results' do
+    source(home.team, 120)
+    source(away.team, 100)
+    timestamp = Time.utc(2025, 11, 3, 23)
+    game.update!(possessions: 70, minutes: 40, created_at: timestamp, updated_at: timestamp)
+    [game.home_team_game, game.away_team_game].each do |side|
+      side.update!(offensive_rating: 100, created_at: timestamp, updated_at: timestamp)
+    end
+    later = create(:game, season:, start_time: Time.utc(2025, 11, 19, 22), status: :final, venue_type: :neutral,
+                          home_team_score: 80, away_team_score: 70)
+    create(:team_game, game: later, team_season: home, team: home.team, home: true)
+    create(:team_game, game: later, team_season: away, team: away.team, home: false)
+    sequence = comparison.call[:seasons].first[:sequential]
+    expect(sequence[:candidates].values.map { |candidate| candidate[:forecasts].pluck(:game_id) }).to all(eq([game.id, later.id]))
+    expect(sequence[:observations].fetch('2025-11-02')[:counts]).to eq({})
+    expect(sequence[:observations].fetch('2025-11-19')[:result_game_ids]).to eq([game.id])
+    expect(sequence[:missing_second_year_teams]).to contain_exactly(home.team_id, away.team_id)
+    expect(sequence[:candidates].values.map { |candidate| candidate[:by_prior_game_count].keys }).to all(eq([0, 1]))
+  end
+
+  it 'reserves the latest eligible season for held-out evaluation without selecting coefficients' do
+    expect(described_class.split_description([{ year: 2024, eligible_games: 0 }, { year: 2025, eligible_games: 2 },
+                                              { year: 2026, eligible_games: 3 }])).to include(tuning: [2025], evaluation: [2026])
+  end
 end
