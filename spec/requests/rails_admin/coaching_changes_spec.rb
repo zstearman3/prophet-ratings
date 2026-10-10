@@ -21,7 +21,8 @@ RSpec.describe 'RailsAdmin coaching review', type: :request do
     it 'renders create forms with existing team selectors and independent year fields' do
       get '/admin/coaching_change/new'
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include('coaching_change[effective_year]', 'coaching_change[reconfirm]')
+      expect(response.body).to include('coaching_change[effective_year]', 'coaching_change[reconfirm]',
+                                       'coaching_change[previous_season_d1]')
       %i[team previous_team].each do |name|
         field = RailsAdmin.config(CoachingChange).edit.fields.find { |entry| entry.name == name }
         expect(field.inline_add).to be(false)

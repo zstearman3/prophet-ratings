@@ -28,6 +28,19 @@ RSpec.describe ProphetRatings::PreseasonComparison do
                                   created_at: Time.utc(2025, 6, 1), updated_at: Time.utc(2025, 6, 1))
   end
 
+  it 'rejects coaching models explicitly because the preregistered benchmark has no archived coaching inputs' do
+    source(home.team, 120)
+    source(away.team, 100)
+    payload = RatingsConfigVersion.authored_config.merge(bundle_name: 'coaching-comparison')
+    payload[:preseason][:coaching] = { formula: 'relative_pace_v1', weight: 0.1, max_adjustment: 0.5 }
+    selected = RatingsConfigVersion.publish!(payload)
+    benchmark = described_class.new(years: [2026], source_config_name: version.name, ratings_config_version: selected)
+    expect { benchmark.call }.to raise_error(ArgumentError, /select a model without preseason.coaching.*archived reviewed inputs/)
+    single_season = ProphetRatings::PreseasonComparisonSeason.new(season:, source_version: version, ratings_config_version: selected)
+    expect { single_season.call }.to raise_error(ArgumentError, /archived reviewed inputs/)
+    expect([Prediction.count, PreseasonPrior.count]).to eq([0, 0])
+  end
+
   it 'compares fixed candidates on pre-opening stored transitions and ignores mutable season averages' do
     source(home.team, 120)
     source(away.team, 100)

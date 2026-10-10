@@ -795,3 +795,77 @@ For manual acceptance, create an unresolved candidate, confirm/reject it, mark t
 year ready, then correct or delete a fact and verify readiness clears. Try a second
 confirmed destination/year and an edit without reconfirmation to see validation
 errors. Review the list filters and previous-team selectors with an admin account.
+
+## Reviewed coaching pace publication
+
+Apply `20261010060000_confirm_coaching_source_division` in the intended environment
+before using the new coaching formula. The additive `previous_season_d1` fact
+starts false and clears existing coaching year readiness. In Rails Admin, verify
+that the previous team competed in D1 for `previous_year`, explicitly reconfirm
+corrected confirmed records, resolve all pending candidates and mark CoachingReview
+ready for YEAR=2027. The new fact participates in the existing reconfirmation,
+import-conflict, stale-edit and readiness invalidation rules. It needs a resolved
+previous Team/year; it does not imply full-season responsibility. Historical
+TeamSeason or conference membership alone does not prove D1 eligibility.
+
+Publish the experimental configuration explicitly in a Rails console in the
+intended local environment (no activation is performed):
+
+```ruby
+payload = RatingsConfigVersion.authored_config.merge(
+  Rails.application.config_for(:ratings, env: :coaching_experiment).to_h.deep_symbolize_keys
+)
+version = RatingsConfigVersion.publish!(payload)
+```
+
+The initial settings are weight 0.10 and cap 0.5 possessions/40; see
+[Ratings](ratings.md#experimental-reviewed-coaching-pace) for eligibility and math.
+The test fixture's 0.20 weight is not the authored setting. Coaching records can be
+entered before Season preparation; historical Season/TeamSeason resolution happens
+at capture. Missing history excludes the contribution rather than blocking review.
+No source data imports, historical backfills or automatic activation are needed.
+
+For a fresh inactive season, review a read-only initializer coverage report first:
+
+```bash
+bin/rails season:initialize_preseason YEAR=2027 MODEL_VERSION=v1.8-experimental-coaching-pace PREVIEW=true
+bin/rails season:initialize_preseason YEAR=2027 MODEL_VERSION=v1.8-experimental-coaching-pace
+```
+
+For existing preseason outputs, use the deliberate revision workflow under a new
+version instead:
+
+```bash
+bin/rails season:revise_preseason YEAR=2027 MODEL_VERSION=v1.8-experimental-coaching-pace
+bin/rails season:revise_preseason YEAR=2027 MODEL_VERSION=v1.8-experimental-coaching-pace APPLY=true PREVIEW_KEY=<reviewed-key>
+```
+
+Review every included team's `outputs_before`, `outputs_after` and `coaching`
+report, frozen move facts/source IDs/numbers and baseline changes. `old_pace` in
+`coaching` is the unrounded team-only blend for the selected settings; the signal,
+weight, cap and adjustment show the proposed contribution. Exclusions retain that
+blend. Confirm sufficient eligible coverage and inspect scheduled predictions and
+snapshot `stats.preseason_prior` before separate season/model activation.
+
+Normal initializer repeats and replay reuse captures even if review/history later
+changes; initializer PREVIEW=true reports those reused inputs. Revision previews
+always review fresh inputs and require readiness. A changed move or source number
+invalidates its preview key. After publication, changes require a new bundle name,
+not a refreshed capture. On a failed publication the transaction rolls back; fix
+the reported cause, review a new preview and retry. Active seasons, finalized games,
+in-season outputs and legacy forecast baseline conflicts retain existing guards;
+use the documented recovery workflow instead of deleting outputs. Saved frozen
+forecasts and other versions' captures/snapshots remain intact.
+
+To disable the contribution, publish a new complete model payload with a new
+bundle name and coaching weight zero, then preview/publish that version deliberately.
+Readiness still applies to this coaching contract even at zero weight; an older
+model without coaching settings retains its prior readiness behavior. No settings,
+old captures or historical predictions are mutated. There is no demonstrated
+accuracy gain: this implementation used synthetic fixtures, with no authorized
+historical coaching/common-game evidence comparison.
+
+`ratings:compare_preseason` cannot evaluate coaching-enabled models and rejects
+them explicitly. Its v1 team-history hypotheses lack archived coaching chronology;
+use a non-coaching stored model for that existing benchmark and retain the
+experimental designation for coaching until suitable reviewed evidence is available.

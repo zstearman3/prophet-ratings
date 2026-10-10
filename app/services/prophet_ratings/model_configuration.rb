@@ -53,12 +53,29 @@ module ProphetRatings
         raise ArgumentError, "Model setting must be positive: #{path}" unless payload.dig(*path.split('.').map(&:to_sym)).positive?
       end
       validate_weights(payload)
+      validate_coaching(payload)
     end
 
     def self.validate_weights(payload)
       %w[preseason.previous_season_weight weighting.min_recency_weight weighting.min_preseason_weight].each do |path|
         raise ArgumentError, "Model weight must be in 0..1: #{path}" unless (0..1).cover?(payload.dig(*path.split('.').map(&:to_sym)))
       end
+    end
+
+    def self.validate_coaching(payload)
+      preseason = payload.fetch(:preseason)
+      return unless preseason.key?(:coaching)
+
+      validate_coaching_settings(preseason.fetch(:coaching), payload)
+    end
+
+    def self.validate_coaching_settings(coaching, payload)
+      raise ArgumentError, 'Unsupported preseason coaching formula' unless coaching.is_a?(Hash) && coaching[:formula] == 'relative_pace_v1'
+
+      %w[weight max_adjustment].each { |key| validate_number(payload, "preseason.coaching.#{key}") }
+      return if (0..1).cover?(coaching.fetch(:weight))
+
+      raise ArgumentError, 'Preseason coaching weight must be in 0..1'
     end
 
     def self.freeze_settings(value)

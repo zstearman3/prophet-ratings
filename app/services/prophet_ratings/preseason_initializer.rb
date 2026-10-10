@@ -13,8 +13,30 @@ module ProphetRatings
         validate_publication
         initialize_ratings
         publish
+        captured_report
       end
     end
+
+    def preview
+      @season.with_lock(requires_new: true) do
+        validate_publication
+        captured_report
+      end
+    end
+
+    def captured_report
+      calculator = PreseasonRatingsCalculator.new(@season, ratings_config_version: @ratings_config_version)
+      teams = @season.rating_team_seasons.order(:team_id).map { |row| reported_team(row, calculator) }
+      { season_id: @season.id, model_version: @ratings_config_version.name, teams: }
+    end
+
+    def reported_team(row, calculator)
+      prior = PreseasonPrior.find_by(team_season: row, ratings_config_version: @ratings_config_version)
+      inputs = prior ? prior.inputs : calculator.preview_inputs(row).as_json
+      PreseasonRevision.preview_row(row, inputs, @ratings_config_version.config)
+    end
+
+    private :captured_report, :reported_team
 
     # Used only by the explicitly scoped rebuild job; publication stays inside its window.
     def reset
@@ -43,9 +65,10 @@ module ProphetRatings
     attr_reader :season, :ratings_config_version
 
     def validate_publication
-      SeasonParticipationReview.new(@season).validate_publication(@ratings_config_version, @season.start_date - 1.day)
+      publication_date = @season.start_date - 1.day
+      SeasonParticipationReview.new(@season).validate_publication(@ratings_config_version, publication_date)
       return unless @season.current? || @season.games.final.exists? ||
-                    @season.team_rating_snapshots.where.not(snapshot_date: @season.start_date - 1.day).exists? ||
+                    @season.team_rating_snapshots.where.not(snapshot_date: publication_date).exists? ||
                     @season.rating_team_seasons.any? { |team_season| self.class.changed_ratings?(team_season) }
 
       raise ArgumentError, 'Existing in-season outputs must be preserved; use an explicitly scoped season:rebuild_ratings.'
