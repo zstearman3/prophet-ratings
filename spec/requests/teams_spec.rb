@@ -33,12 +33,12 @@ RSpec.describe 'Teams' do
       }
     end
 
-    it 'renders scheduled games with a dash score and linked prediction' do
+    it 'keeps scheduled and final game content and links inside the scrollable table' do
       season = create(:season, :current, year: 2026, start_date: Date.new(2025, 11, 1), end_date: Date.new(2026, 4, 1))
       config = create(:ratings_config_version, name: 'v1.2-default', current: true)
       conference = create(:conference, name: 'Test Conference', abbreviation: 'TC', slug: 'tc')
       team = create(:team, school: 'Home Team', slug: 'home-team')
-      opponent = create(:team, school: 'Away Team', slug: 'away-team')
+      opponent = create(:team, school: 'University of North Carolina at Asheville', slug: 'away-team')
       team_season = create(:team_season, team:, season:, wins: 10, losses: 5, conference_wins: 4, conference_losses: 2, rating: 25.0)
       opponent_team_season = create(:team_season, team: opponent, season:, rating: 20.0)
       create(:team_conference, team:, conference:, start_season: season)
@@ -92,17 +92,31 @@ RSpec.describe 'Teams' do
         home_win_probability: 0.634,
         pace: 68.0
       )
+      final_game = create(
+        :game,
+        season:,
+        start_time: 1.day.ago,
+        status: :final,
+        home_team_score: 75,
+        away_team_score: 68
+      )
+      create(:team_game, game: final_game, team:, team_season:, home: true)
+      create(:team_game, game: final_game, team: opponent, team_season: opponent_team_season, home: false)
 
       get "/teams/#{team.slug}", params: { year: season.year }
       document = response.parsed_body
-      score_cells = document.css('table tbody tr td').map { |cell| cell.text.strip }
-      prediction_link = document.css("a[href='/games/#{game.id}']").find do |link|
+      table = document.at_css('.overflow-x-auto > table')
+      score_cells = table.css('tbody tr td').map { |cell| cell.text.strip }
+      prediction_link = table.css("a[href='/games/#{game.id}']").find do |link|
         link.text.include?(prediction.predicted_score_string)
       end
 
       expect(response).to have_http_status(:success)
-      expect(score_cells).to include('Scheduled', '-')
+      expect(table.css('th').map { |cell| cell.text.strip }).to eq(['Date', 'Opponent', 'Result', 'Score', 'Prediction', 'Correct?'])
+      expect(score_cells).to include(opponent.school, 'Scheduled', '-', 'W', '68 - 75', '—')
       expect(prediction_link).to be_present
+      expect(table.at_css("a[href='/teams/#{opponent.slug}']").text).to eq(opponent.school)
+      expect(table.at_css("a[href='/games/#{final_game.id}']").text).to include(final_game.start_time.to_date.to_s)
     end
 
     it 'renders when the team season has no conference membership' do
@@ -125,6 +139,7 @@ RSpec.describe 'Teams' do
 
       expect(response).to have_http_status(:success)
       expect(response.body).to include('Independent')
+      expect(response.parsed_body.css('.overflow-x-auto > table tbody tr')).to be_empty
     end
   end
 end
