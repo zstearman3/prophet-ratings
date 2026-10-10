@@ -644,3 +644,12 @@ including a forecast on the survivor. It locks the group's games and checks befo
 merging any fields or dependents. Review forecast provenance before applying a
 repair; there is no automatic reparenting or snapshot-pair deduplication of frozen
 revisions. Dry runs remain available. Legacy-only groups retain existing behavior.
+
+## Reviewed season participation
+
+Historical TeamSeason preparation and conference alignment remain separate from
+participation. `season:review_participation` stores explicit operator decisions and
+date evidence; included teams may be independent. Unresolved identities and missing
+included aliases block rating publication/readiness. Standings absence never
+excludes a team. See [Offseason Operations](offseason.md#1a-review-participation-and-dates-explicitly)
+for the JSON contract and legacy behavior. Imports do not opt seasons into review.

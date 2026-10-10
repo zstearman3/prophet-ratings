@@ -20,11 +20,10 @@ module ProphetRatings
       }
     }.freeze
 
-    def initialize(season: Season.current, as_of: Time.current, ratings_config_version: nil)
+    def initialize(season: Season.current, as_of: Time.current, ratings_config_version: nil, **options)
       @ratings_config_version = RatingsConfigVersion.resolve(ratings_config_version)
-      @ratings_config_version.settings
       @season = season
-      @as_of = as_of
+      @options = options.merge(as_of:)
       @predictions_by_side = {}
     end
 
@@ -35,7 +34,7 @@ module ProphetRatings
     def run
       preload_predictions
 
-      team_seasons = TeamSeason.where(season_id: @season.id).to_a
+      team_seasons = @season.rating_team_seasons.to_a
       team_games_by_season_id = finalized_team_games_by_season_id(team_seasons.map(&:id))
 
       team_seasons.each do |team_season|
@@ -55,18 +54,29 @@ module ProphetRatings
 
     private
 
-    attr_reader :season, :as_of
+    attr_reader :season
+
+    def as_of
+      @options.fetch(:as_of)
+    end
 
     def preload_predictions
-      predictions = Prediction.selected_with_legacy
-                              .where(ratings_config_version: @ratings_config_version)
-                              .joins(:game)
-                              .where(games: { season_id: season.id })
-                              .merge(Game.final.through_schedule_date(as_of))
-                              .includes(:home_team_snapshot, :away_team_snapshot)
-                              .to_a
+      scope = @options[:verified_only] ? Prediction.selected_pregame : Prediction.selected_with_legacy
+      predictions = scope
+                    .where(ratings_config_version: @ratings_config_version)
+                    .joins(:game)
+                    .where(games: { season_id: season.id })
+                    .merge(Game.final.through_schedule_date(as_of))
+                    .includes(:home_team_snapshot, :away_team_snapshot, game: %i[home_team_game away_team_game])
+                    .to_a
 
       predictions.each do |prediction|
+        if @options[:verified_only]
+          errors = GameFinalizer.prediction_error_attributes(prediction)
+          raise ArgumentError, "Historical replay requires complete finalized team-game inputs for game=#{prediction.game_id}" unless errors
+
+          prediction.assign_attributes(errors)
+        end
         next if prediction.calculation_context.present?
 
         ModelConfiguration.validate_snapshots([prediction.home_team_snapshot, prediction.away_team_snapshot], @ratings_config_version)
@@ -102,7 +112,7 @@ module ProphetRatings
       end
 
       possession_vals = team_games.filter_map { |g| g.game&.possessions }
-      aggregates[:pace] = possession_vals.sum / possession_vals.size.to_f if possession_vals.any?
+      aggregates[:pace] = possession_vals.any? ? possession_vals.sum / possession_vals.size.to_f : nil
 
       fgm = team_games.sum { |tg| tg.field_goals_made.to_i }
       fga = team_games.sum { |tg| tg.field_goals_attempted.to_i }

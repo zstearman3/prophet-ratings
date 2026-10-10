@@ -61,7 +61,7 @@ RSpec.describe ProphetRatings::GameFinalizer, type: :service do
                                        home_team_snapshot: snapshot, away_team_snapshot: snapshot)
       game = prediction.game
       finalizer = described_class.new(game)
-      allow(finalizer).to receive(:prediction_error_attributes).and_return(nil)
+      allow(described_class).to receive(:prediction_error_attributes).and_return(nil)
       original = prediction.attributes
 
       finalizer.send(:finalize_prediction!)

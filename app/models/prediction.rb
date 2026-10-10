@@ -45,8 +45,9 @@ class Prediction < ApplicationRecord
   include FrozenForecast
 
   belongs_to :game
-  belongs_to :home_team_snapshot, class_name: 'TeamRatingSnapshot'
-  belongs_to :away_team_snapshot, class_name: 'TeamRatingSnapshot'
+  belongs_to :home_team_snapshot, class_name: 'TeamRatingSnapshot', optional: true
+  belongs_to :away_team_snapshot, class_name: 'TeamRatingSnapshot', optional: true
+  validates :home_team_snapshot, :away_team_snapshot, presence: true, unless: -> { forecast_kind == 'reconstruction' }
   belongs_to :ratings_config_version
   has_one :home_team_game, through: :game
   has_one :away_team_game, through: :game
@@ -63,7 +64,8 @@ class Prediction < ApplicationRecord
   end
 
   def win_probability_for_team(team_id)
-    home_team_snapshot.team_id == team_id ? home_win_probability : (1.0 - home_win_probability)
+    home_id = home_team_snapshot&.team_id || calculation_context.dig('snapshots', 0, 'source', 'team_id')
+    home_id == team_id ? home_win_probability : (1.0 - home_win_probability)
   end
 
   def favorite_win_probability

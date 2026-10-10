@@ -340,7 +340,18 @@ total_home_boost = home_offense_boost - home_defense_boost
 Higher `rating` is better. Ties break by ascending `team_id`; missing adjusted
 stats have no rank. Core ranks/defaults are independent of the solver gate.
 
-Ranks are then assigned across all `TeamSeason` records for the season:
+Ranks are assigned across `season.rating_team_seasons`: all rows in legacy mode,
+or only explicitly reviewed included participants. Reviewed publication clears live
+ranks on excluded historical rows, preserves their other values and old snapshots,
+and creates no new excluded snapshots. The same eligibility relation scopes raw/adjusted
+league means, deviations, priors, aggregation and solver qualification/anchors.
+Games involving excluded teams do not enter the reviewed solver matrix or league
+pace deviation. Coefficients and the Rails/Python wire format are unchanged.
+Unresolved rosters, dates or included aliases block publication. See
+[reviewed participation](offseason.md#1a-review-participation-and-dates-explicitly)
+for legacy mode and safe addition/new-version restrictions.
+
+The ranks are:
 
 - `overall_rank`: higher `rating` is better
 - `adj_offensive_efficiency_rank`: higher is better
@@ -408,8 +419,9 @@ snapshots as resume points. Destructive season:rebuild_ratings requires explicit
 YEAR, REBUILD=true and date boundaries; deletion is restricted to that window and
 the active config, with the entire rebuild rolled back on failure. Live team
 values reflect the final processed date, so follow historical repairs with a
-resume to the intended live cutoff. Backfill prediction ordering is unchanged
-and is not a leakage-safe evaluation path.
+resume to the intended live cutoff. Historical resume/rebuild now reconstruct prior-day working inputs before
+creating explicitly labeled reconstructions, then publish that day's ratings.
+They remain reconstruction tools, not a live forecast archive.
 
 The shared scheduled rankings advisory lock excludes concurrent setup,
 activation, resume, rebuild and nightly prediction writes. Scheduled rankings
@@ -604,3 +616,60 @@ in display/evaluation. Late-created backdated sources cannot prove live issuance
 Historical ratings workflows may create reconstructions; they are not a live
 forecast archive. Nightly prediction jobs now select only scheduled upcoming games.
 This contract adds no fitted coefficients or confidence/calibration claims.
+
+## Bounded historical ratings reconstruction
+
+Resume/rebuild restores each eligible team from the selected immutable `PreseasonPrior`
+on each calculation date. Reviewed seasons restore only included participants;
+excluded rows do not require captures and retain their stored non-rank values.
+Games involving excluded teams are not reconstructed from their untouched live
+ratings. Unreviewed seasons retain the existing reconstruction cohort. It validates all three outputs against the captured
+formula/config, applies the captured preseason fields/model identity, clears
+adjusted Five Factors and core values, then restores captured core values.
+Zero/one-game teams and pre-gate dates therefore use captured priors rather than
+later live values. Missing, incomplete or inconsistent captures fail visibly;
+there is no implicit legacy snapshot/live fallback or new capture from mutable
+source history. An explicit preseason initialization/reset is a separate operator
+decision and does not prove the prior was available historically.
+
+Raw aggregates, empirical volatility, home boosts, season averages, ranks and
+snapshots are recalculated with finalized results bounded by the Eastern cutoff.
+Pace deviation now respects that cutoff for ordinary daily calculations too;
+zero/one pace observation falls back to the stored model baseline instead of NaN.
+No-game raw pace is cleared so an earlier calculation cannot leak into the solve.
+Replay residuals use `selected_pregame` for the target season/model, one latest
+eligible issuance per game/model, excluding legacy rows, reconstructions and late
+revisions. Errors are recomputed in memory from saved means and bounded finalized
+results, so prior execution order or outcome-error attachment does not change the
+sample. An eligible forecast whose finalized game lacks either team-game record
+fails replay visibly and rolls back the date instead of retaining stored errors.
+Regular live aggregation retains the explicit legacy compatibility cohort.
+
+For games on D, replay first reconstructs working ratings/baselines through D-1
+without publishing snapshots. Frozen forecast context contains those numeric
+inputs, each captured prior ID and result cutoff; snapshot source IDs/timestamps
+are null because the working inputs are reconstructed, not archived snapshots.
+Predictions are always labeled `reconstruction`, even for a future tipoff today,
+and retain actual wall-clock generation time. Identical repeats reuse the latest
+revision. Then ratings through D are published at D. The whole day's working
+state, predictions and snapshots share a savepoint; failed days roll back while
+completed resume dates survive. Explicit rebuild retains its complete rollback
+and scoped deletion/dependency guards. No snapshots are created outside its window.
+
+Live state remains at the final processed date. Use an explicit resume date window
+to restore the desired live cutoff; preserved later snapshots never seed replay.
+The solver, prior weights and authored bundle coefficients are unchanged. Replay
+can reconstruct from identical stored inputs deterministically but does not archive
+source-data availability or old executable code. Captures made after opening are
+usable for a labeled hypothetical reconstruction, not evidence of live issuance.
+
+### Reviewed source corrections
+
+`ProphetRatings::PreseasonRevision` previews and atomically publishes inactive
+preseason corrections under a newly selected immutable version. It uses the same
+captured v1 formula, units, bounds and precision; numerical coefficients and the
+Python boundary are unchanged. Profile source/reference, observation date, unit
+map and manual reason are retained in the captured source attributes. Nil inputs
+remain distinguishable from observed zero. Prior captures and other-version
+snapshots/forecasts are preserved. See the deliberate revision operation in
+[Offseason Operations](offseason.md#deliberate-inactive-preseason-revisions).

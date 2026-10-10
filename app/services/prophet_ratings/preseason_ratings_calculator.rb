@@ -12,7 +12,7 @@ module ProphetRatings
     def call
       @season.with_lock do
         version = @ratings_config_version
-        @season.team_seasons.includes(:team_offseason_profile).find_each do |team_season|
+        @season.rating_team_seasons.includes(:team_offseason_profile).find_each do |team_season|
           prior = captured_prior(team_season, version)
           team_season.update!(prior.outputs.merge(preseason_prior: prior))
         end
@@ -21,13 +21,13 @@ module ProphetRatings
 
     def captured_prior(team_season, version)
       PreseasonPrior.find_by(team_season:, ratings_config_version: version) || begin
-        inputs = capture_inputs(team_season)
+        inputs = preview_inputs(team_season)
         PreseasonPrior.create!(team_season:, ratings_config_version: version, inputs:,
                                outputs: PreseasonPriorFormula.new(inputs, version.config).call)
       end
     end
 
-    def capture_inputs(team_season)
+    def preview_inputs(team_season)
       previous = @previous_season&.team_seasons&.find_by(team_id: team_season.team_id)
       profile = team_season.team_offseason_profile
       serializer = self.class
@@ -91,6 +91,6 @@ module ProphetRatings
         @previous_season&.average_pace || @config.dig(:preseason, :fallback_pace)
       end
     end
-    private :captured_prior, :capture_inputs, :fallback_efficiency, :average_for_stat
+    private :captured_prior, :fallback_efficiency, :average_for_stat
   end
 end

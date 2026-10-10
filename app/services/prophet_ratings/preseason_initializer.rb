@@ -40,10 +40,13 @@ module ProphetRatings
 
     private
 
+    attr_reader :season, :ratings_config_version
+
     def validate_publication
+      SeasonParticipationReview.new(@season).validate_publication(@ratings_config_version, @season.start_date - 1.day)
       return unless @season.current? || @season.games.final.exists? ||
                     @season.team_rating_snapshots.where.not(snapshot_date: @season.start_date - 1.day).exists? ||
-                    @season.team_seasons.any? { |team_season| self.class.changed_ratings?(team_season) }
+                    @season.rating_team_seasons.any? { |team_season| self.class.changed_ratings?(team_season) }
 
       raise ArgumentError, 'Existing in-season outputs must be preserved; use an explicitly scoped season:rebuild_ratings.'
     end
@@ -57,13 +60,13 @@ module ProphetRatings
 
     def publication_baselines
       config = @config.fetch(:baseline_volatility)
-      { average_efficiency: @season.team_seasons.average(:adj_offensive_efficiency),
+      { average_efficiency: @season.rating_team_seasons.average(:adj_offensive_efficiency),
         average_pace: preseason_average_pace,
         efficiency_std_deviation: config.fetch(:efficiency_volatility), pace_std_deviation: config.fetch(:pace_volatility) }
     end
 
     def preseason_average_pace
-      @season.team_seasons.average(:adj_pace)
+      @season.rating_team_seasons.average(:adj_pace)
     end
 
     def validate_prediction_baselines
@@ -95,7 +98,7 @@ module ProphetRatings
     def initialize_ratings
       ProphetRatings::PreseasonRatingsCalculator.new(@season, ratings_config_version: @ratings_config_version).call
 
-      @season.team_seasons.find_each do |team_season|
+      @season.rating_team_seasons.find_each do |team_season|
         team_season.update!(reset_attributes(team_season).merge(self.class.prior_ratings(team_season)))
       end
     end

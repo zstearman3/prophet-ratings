@@ -35,7 +35,7 @@ class ResumeSeasonRatingsJob < ApplicationJob
 
   def backfill_date_range(season:, ratings_config_version:, start_date:, end_date:)
     backfill_end_date = [coerce_date(end_date) || Game.current_schedule_date, season.end_date, Game.current_schedule_date].min
-    backfill_start_date = coerce_date(start_date) || resume_start_date(season, ratings_config_version)
+    backfill_start_date = coerce_date(start_date) || resume_start_date(season, ratings_config_version, backfill_end_date)
     backfill_start_date = [backfill_start_date, season.start_date].max
 
     if backfill_start_date > backfill_end_date
@@ -49,10 +49,10 @@ class ResumeSeasonRatingsJob < ApplicationJob
     backfill_start_date..backfill_end_date
   end
 
-  def resume_start_date(season, ratings_config_version)
+  def resume_start_date(season, ratings_config_version, end_date)
     opening_date = season.start_date
     latest_snapshot_date = season.team_rating_snapshots.where(ratings_config_version:)
-                                 .where(snapshot_date: opening_date..Game.current_schedule_date).maximum(:snapshot_date)
+                                 .where(snapshot_date: opening_date..end_date).maximum(:snapshot_date)
     latest_snapshot_date || opening_date
   end
 
@@ -68,14 +68,12 @@ class ResumeSeasonRatingsJob < ApplicationJob
 
   def backfill_date_range!(season, date_range, ratings_config_version)
     date_range.each do |date|
-      Season.transaction do
+      Season.transaction(requires_new: true) do
         Rails.logger.debug { "Backfilling for #{date}" }
         games = season.games.on_schedule_date(date)
-        ProphetRatings::OverallRatingsCalculator.new(season, ratings_config_version: ratings_config_version).call(as_of: date)
-        games.each do |game|
-          game.generate_prediction!(ratings_config_version:)
-          game.finalize(ratings_config_version:) if game.final?
-        end
+        calculator = ProphetRatings::OverallRatingsCalculator.new(season, ratings_config_version:)
+        ProphetRatings::HistoricalRatingsState.new(season, ratings_config_version).reconstruct(games, date) if games.exists?
+        calculator.call(as_of: date, replay: true)
       end
     end
   end

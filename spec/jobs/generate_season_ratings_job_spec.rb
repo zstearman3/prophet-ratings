@@ -34,8 +34,8 @@ RSpec.describe GenerateSeasonRatingsJob do
   it 'recalculates only the requested dates and never initializes preseason implicitly' do
     allow(ProphetRatings::PreseasonInitializer).to receive(:new)
     rebuild
-    expect(calculator).to have_received(:call).with(as_of: first)
-    expect(calculator).to have_received(:call).with(as_of: last)
+    expect(calculator).to have_received(:call).with(replay: true, as_of: first)
+    expect(calculator).to have_received(:call).with(replay: true, as_of: last)
     expect(calculator).to have_received(:call).twice
     expect(ProphetRatings::PreseasonInitializer).not_to have_received(:new)
   end
@@ -59,8 +59,9 @@ RSpec.describe GenerateSeasonRatingsJob do
     selected = create_prediction(inside, config)
     later = create_prediction(outside, config)
     older = create_prediction(inside, create(:ratings_config_version))
-    builder = instance_double(ProphetRatings::GamePredictionBuilder, call: true)
+    builder = instance_double(ProphetRatings::GamePredictionBuilder, reconstruct: true)
     allow(ProphetRatings::GamePredictionBuilder).to receive(:new).and_return(builder)
+    allow(ProphetRatings::HistoricalRatingsState).to receive(:snapshot).and_return(build(:team_rating_snapshot))
     rebuild
     expect(Prediction.exists?(selected.id)).to be(false)
     expect(Prediction.where(id: [later.id, older.id]).count).to eq(2)
@@ -69,7 +70,7 @@ RSpec.describe GenerateSeasonRatingsJob do
   it 'rolls back deletions and live rating writes on a partial failure' do
     team_season = create(:team_season, season:, adj_offensive_efficiency: 110)
     snapshot = create_snapshot(team_season, config, first)
-    allow(calculator).to receive(:call) do |as_of:|
+    allow(calculator).to receive(:call) do |as_of:, **|
       team_season.update!(adj_offensive_efficiency: 120)
       raise 'failed second day' if as_of == last
     end
@@ -80,7 +81,7 @@ RSpec.describe GenerateSeasonRatingsJob do
 
   it 'does not process another seasons games on the same date' do
     other_game = create(:game, season: create(:season, year: 2025), start_time: Game.schedule_time_for(first))
-    builder = instance_double(ProphetRatings::GamePredictionBuilder, call: true)
+    builder = instance_double(ProphetRatings::GamePredictionBuilder, reconstruct: true)
     allow(ProphetRatings::GamePredictionBuilder).to receive(:new).and_return(builder)
     rebuild
     expect(ProphetRatings::GamePredictionBuilder).not_to have_received(:new).with(other_game)

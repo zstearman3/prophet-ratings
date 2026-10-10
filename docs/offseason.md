@@ -35,6 +35,70 @@ bin/rails season:prepare YEAR=2027 START_DATE=2026-11-01 END_DATE=2027-04-10
 
 `season:prepare` is intentionally limited. It does not make the season current, sync games, deduplicate games, initialize preseason ratings, create ratings config, or run ratings.
 
+## 1a. Review participation and dates explicitly
+
+`Season#participation_review` is empty for existing seasons: **legacy mode** keeps
+all stored TeamSeason rows eligible. The additive migration does not change live
+values, snapshots, dates or current status. Preparation still creates historical
+rows and does not infer participation. Opt in by saving a complete operator review:
+
+```bash
+bin/rails season:review_participation YEAR=2027 REVIEW_PATH=/path/to/review.json
+```
+
+The JSON format below is synthetic; replace IDs, dates, reasons and evidence with
+independently verified information for the target season:
+
+```json
+{
+  "evidence": "Authoritative target-season roster source and review date",
+  "reviewed_by": "Operator name",
+  "dates": {
+    "start_date": "2026-11-01",
+    "end_date": "2027-04-10",
+    "evidence": "Independently reviewed schedule boundaries and review date"
+  },
+  "teams": [
+    { "team_id": 1, "status": "included", "reason": "Verified participant, including independents" },
+    { "team_id": 2, "status": "excluded", "reason": "Verified departure, with source evidence" },
+    { "team_id": 3, "status": "unresolved", "reason": "Identity/participation needs verification" }
+  ],
+  "unresolved_identities": ["source ID or name without a resolved stored Team ID; next action"]
+}
+```
+
+Every stored Team needs an explicit decision. Omitted teams are **unresolved**,
+never automatically excluded. New teams added later therefore block readiness
+until reviewed. Duplicate IDs and malformed entries fail before saving. Incomplete
+reviews are saved, then the command exits unsuccessfully with the unresolved IDs,
+missing included TeamSeason/alias IDs, and date action. Clear unresolved identities
+only after resolving them. Repeating an identical review preserves timestamps.
+The review does not create teams, aliases, memberships or rating outputs. Store
+source/review dates in the evidence strings; Season.updated_at records the last save.
+
+Included teams need no conference membership. Dates must match the stored season
+and have independent evidence: inherited dates or later preparation overrides are
+not automatically reviewed. Prepare missing rows with `season:prepare`, correct
+aliases and evidence, then repeat review. Standings alignment remains conservative
+and separate; absence from its page never decides eligibility or retirement.
+
+Initialization and daily publication use `season.rating_team_seasons`: the included
+set in reviewed mode, every row in legacy mode. Excluded rows retain their stats
+and history; publication clears only live ranks and creates no new excluded-team
+snapshots. Historical snapshots stay intact. New snapshots carry a participation
+key derived from the included IDs. Unresolved reviews block publication/activation;
+activation additionally checks finite included offense/defense and positive pace.
+
+A new verified team can be prepared, included and initialized with the existing
+repeat preseason workflow when no saved forecasts or established in-season outputs
+make it unsafe. Removing a team from an already published date requires a new
+date/model so old excluded snapshots remain historical rather than mixed with a
+revised roster. With saved predictions for the selected model, any difference from the
+roster supporting those predictions (including legacy outputs without a participation key) requires
+**deliberate new-version publication**, using the existing model-switch/rebuild
+safeguards. The error preserves predictions and prior outputs. This does not
+implement general input revisions, activate a model, or authorize a rebuild.
+
 ## 2. Align conference memberships
 
 Run the standings comparison after preparing the season:
@@ -305,7 +369,9 @@ Activation repeats conference alignment by default. ALIGN_CONFERENCES=false is a
 explicit operator decision to defer source review; it does not bypass local
 coverage checks. Activation requires ordered dates, at least one TeamSeason, a
 row for every stored team, and non-null adjusted offense, defense and pace for
-every row. This is a minimum coverage check, not a complete publishing/readiness
+every row in legacy mode. Reviewed mode instead enforces the explicit roster/date/alias
+contract above and finite included-team core inputs with positive pace.
+This is a minimum coverage check, not a complete publishing/readiness
 report or proof of Division I participation.
 
 The switch is atomic: any failure leaves the previous current season in place.
@@ -345,8 +411,11 @@ even for explicit end overrides. A future season does no daily work. Legacy futu
 snapshots are ignored when choosing the resume date. Each day's writes are
 transactional; a failed day is rolled back and the command fails, leaving completed
 days available for resume. The latest completed snapshot date is reprocessed.
-Resume can update outputs in its window; it does not delete history or implicitly
-reset preseason values. RUN_PRESEASON=true is rejected by this task.
+Resume can update outputs in its window; it does not delete history or capture
+new preseason inputs. It restores the selected captured priors on each date before
+calculating from bounded results. Every participant requires a complete matching
+capture; missing/invalid provenance fails and rolls back that day.
+RUN_PRESEASON=true is rejected by this task.
 
 An intentional destructive rebuild requires an explicit season, date window and
 confirmation:
@@ -370,9 +439,22 @@ so schedule it during an appropriate maintenance window. Its final day's values
 become the live TeamSeason state even when later snapshots are preserved; resume
 through the desired current cutoff before returning that season to ordinary use.
 These are reconstruction tools, not live pregame archives. New saved predictions
-exclude game-day snapshots and carry reconstruction provenance; historical season
-anchors are not retrospectively reconstructed as-of values. Legacy backfill rows
-may retain same-day leakage.
+use reconstructed prior-day ratings and season anchors, with actual generation
+time and explicit reconstruction provenance. Historical prior-day working state
+is not published outside the requested snapshot window. Reconstruction inputs
+record their capture IDs and result cutoff, without pretending to have persisted
+prior-day snapshot IDs. Replay learns only from one verified pregame issuance per
+game/model; legacy rows and reconstructions are excluded from learning. Legacy
+backfill rows may retain same-day leakage.
+
+Resume leaves live values at its final replay date, too. To restore a desired
+cutoff, run resume with explicit RATINGS_START_DATE and RATINGS_END_DATE (set both
+to that date for a single-date restoration). Later snapshots are preserved and
+are not starting state. Corrected source results and changes to calculation code
+can change reconstruction; the tool does not recover historically available data.
+Prepared finalized game/team-game statistics are inputs: replay no longer invokes
+GameFinalizer to recalculate/import them or rewrites archived outcome errors.
+Review/correct those stored results through the separate ingestion workflow first.
 
 Operator rating commands invoke the job body synchronously under the shared lock
 so exceptions fail the command instead of scheduling a retry and printing success.
@@ -395,7 +477,7 @@ or **deferred with a reason**; there is no automatic readiness approval.
 | Expected participation | Record an independently verified target-year Division I roster/source and expected count. Compare it with active `TeamConference` ranges and target `TeamSeason` rows; list missing, unexpected and duplicate identities. Preparation includes historical teams, so its row count is not the expected participant count. |
 | Memberships/identities | Run alignment and resolve every suggestion. Compare roster teams without memberships separately: local membership ranges cannot identify a wholly missing team. Review stored school URLs, exact conference identity and aliases in `/admin`. Preserve historical ranges; do not infer retirement from absence. |
 | Aliases | List expected teams with no `TeamAlias` and ambiguous/duplicate alias values; inspect unmatched names in sync logs against source spellings. `Team.search` joins aliases, so even an exact school match can fail without an alias. A nonempty alias list alone does not prove matching coverage. |
-| Preseason values | For every expected participant, check finite preseason/live offense, defense, pace and rating, with positive pace; review missing history and optional profiles. Also check every stored team's TeamSeason and live offense/defense/pace because the activation guard currently requires them. Do not reset established outputs to fill a gap. |
+| Preseason values | For every expected participant, check finite preseason/live offense, defense, pace and rating, with positive pace; review missing history and optional profiles. In legacy mode also check every stored team's TeamSeason and live offense/defense/pace; reviewed mode enforces included coverage. Do not reset established outputs to fill a gap. |
 | Ranks/defaults | Check overall/offense/defense/pace ranks for completeness and plausible ordering, plus home boosts and efficiency/pace volatility defaults. Initialization publishes these; unavailable Five Factors intentionally remain unranked. Inspect missing core ranks/defaults before prediction launch. |
 | Snapshots/config | Choose the intended preseason snapshot date and config explicitly. Require one usable snapshot per expected participant for that date/config, with matching team/season, live values, ranks and required prediction stats. Count missing teams rather than all snapshots. Check stored config against `config/ratings.yml`; name reuse with changed config is rejected. Inspect `PreseasonPrior` and snapshot `stats.preseason_prior` provenance; legacy outputs may be uncaptured. |
 | Schedule/venues | Record requested dates, imported counts, failed dates and reviewed empty dates from the refresh report. Review `unmatched`, `ambiguous`, `possible_move_ids` and `absent_ids`. Check both TeamGame/team-season associations, duplicate pairs/URLs, shifted/removed entries, missing start times and unknown/unconfirmed venues. Unknown venues receive no home advantage; missing source evidence stays open. No games before schedule publication is an explicit deferred item. |
@@ -406,7 +488,7 @@ Useful read-only checks in the intended environment's Rails console:
 
 ```ruby
 season = Season.find_by!(year: 2027)
-rows = season.team_seasons
+rows = season.rating_team_seasons
 puts({ dates: [season.start_date, season.end_date], current: Season.current&.year,
        team_seasons: rows.count, games: season.games.count,
        configs: season.team_rating_snapshots.distinct.pluck(:ratings_config_version_id) })
@@ -558,3 +640,158 @@ No production import, backfill or activation is required by the code change.
 Duplicate-game repair previews remain available, but apply refuses any affected
 group with frozen forecasts before mutating it. Review provenance explicitly;
 reassigning a saved forecast's game or collapsing revisions is not supported.
+
+### Synthetic reviewed-roster solver check
+
+The standard spec stubs numerical effects and asserts the included matrix dimensions
+and anchor. Run the same fixture with the real solver in a disposable Docker project:
+
+```bash
+solver_project="prophet-ratings-participation-solver-$$"
+trap 'docker compose -p "$solver_project" -f compose.test.yml down --volumes' EXIT
+docker compose -p "$solver_project" -f compose.test.yml up -d --wait db
+docker compose -p "$solver_project" -f compose.test.yml run --rm --no-deps -T -e REAL_SOLVER=true test bash -c 'bundle exec rails db:schema:load db:abort_if_pending_migrations && bundle exec rspec spec/services/prophet_ratings/adjusted_stat_calculator_participation_spec.rb && bundle exec ruby script/check_model_solver.rb'
+```
+
+The fixture has two included teams at 100 efficiency and an excluded team at 900.
+Only the included observation pair and anchor reach Python; zero centered effects
+must reconstruct offense/defense of 100 while the excluded row stays untouched.
+The existing independent ridge checks also run. These synthetic checks establish
+boundary arithmetic, not live roster coverage or model accuracy.
+
+## Opening-period prior/transition comparison
+
+`ratings:compare_preseason` now extends the fixed-weight benchmark with three
+preregistered sequential hypotheses: calendar baseline, two-year prior and
+effective-game-count decay. It solves core observations in memory through the
+prior Eastern schedule day, excluding late-created/revised prepared inputs, and
+writes no model outputs. Use Docker Python/NumPy and an explicitly authorized
+local dataset; pin `MODEL_VERSION` and `SOURCE_CONFIG`. See
+[Preseason comparison](preseason-comparison.md) for coefficients, fallback rules,
+coverage fields, chronology, roster follow-up contract and known data gaps.
+The recorded single eligible season cannot support coefficient selection;
+production defaults and published models remain unchanged.
+
+## Deliberate inactive preseason revisions
+
+Normal `season:initialize_preseason` repeats continue to reuse captured priors.
+To correct a captured profile/history input or add reviewed participants after
+saved forecasts, publish a **new** immutable model bundle (a new `bundle_name`,
+with unchanged coefficients if only source evidence changed). Select that stored
+version explicitly. No daily rebuild or global model activation is needed:
+
+```bash
+bin/rails season:revise_preseason YEAR=2027 MODEL_VERSION=reviewed-revision-name
+bin/rails season:revise_preseason YEAR=2027 MODEL_VERSION=reviewed-revision-name APPLY=true PREVIEW_KEY=<reviewed-key>
+```
+
+The first command is read-only. Review the selected version, included team IDs,
+added teams, old/new profile attributes, prior outputs and old/new efficiency/pace
+anchors. The key binds publication to that exact preview; changes require another
+preview. Publication atomically replaces the included live preseason values,
+sets ranks/anchors, captures new priors and publishes opening-minus-one snapshots
+for the selected model, and records `Season.preseason_revision`. It preserves
+other versions' priors/snapshots and every saved forecast. The exact same inputs
+can be previewed and rerun with the same identities. Later input/coverage changes
+require another new model version; captures are never refreshed implicitly.
+
+Current seasons, finalized games, changed live adjusted ratings and later dated
+snapshots require the existing explicitly scoped rebuild/review workflow instead.
+Incompatible model payloads fail without inheriting current configuration.
+Reviewed participant/date/alias errors still block publication. Activation names
+the selected revision and checks included-team live/prior/snapshot coverage.
+Season activation and global model activation remain separate; explicitly activate
+the intended model for future default jobs using the model-version runbook.
+
+Contract 1 forecasts replay frozen anchors and survive baseline corrections.
+Legacy forecasts still depend on mutable anchors and block changed efficiency/pace
+baselines; review their provenance deliberately rather than deleting or relabeling
+them. New forecasts use the existing append-only, eligible pregame selection
+contract described in `docs/ratings.md`. Publishing a preseason revision does not
+regenerate forecasts or establish production coverage/calibration.
+
+Before applying migration `20261010030000`, run
+`bin/rails season:offseason_profile_duplicates` on the intended environment.
+It lists conflicting TeamSeason/profile IDs without choosing, merging or deleting
+rows. The migration independently aborts before any changes if duplicates exist.
+Resolve conflicts deliberately, retaining evidence as appropriate, then retry.
+The unique index and model enforce one current profile per TeamSeason. Historical
+profile evidence remains in immutable prior captures; this adds no profile archive
+or external feed. Existing rows receive empty units and null source/date/reason;
+the migration invents no provenance. Before editing supplied inputs or publishing
+a revision, record `source_reference`, `observed_on`, `input_units` and a
+`manual_adjustment_reason` even when the manual adjustment is zero.
+
+`input_units` must equal `TeamOffseasonProfile::INPUT_UNITS`: recruiting score is
+`local_score`, returning minutes is `fraction`, and manual adjustment is
+`points_per_100_possessions_per_side`. Nil means missing; zero means observed zero.
+The existing finite bounds, 0–1 returning fraction and +/-5 per-side combined cap
+are unchanged. New captures retain all provenance attributes for replay; no
+unvalidated recruiting conversion or coefficient is introduced.
+
+## Manual coaching review (before Season preparation)
+
+After applying migration `20261010040000`, admins can create coaching candidates
+at `/admin/coaching_change` without network access or a prepared Season. Year
+2027 means 2026–27. Years are integers from 1 to 9999. Use existing Team selectors;
+inline team creation/editing is disabled. `destination_school` and `previous_school`
+retain unresolved source names. Pending candidates can have no resolved team,
+coach name or previous history, but must have an effective year.
+
+Review the facts, resolve the destination Team and coach name, then manually set
+`status` to `confirmed` or `rejected`. No evidence attachments, reviewer identity
+or audit history are required. Optional previous history uses `previous_team_id`,
+`previous_year` (before `effective_year`) and `previous_role`: `head_coach`,
+`assistant`, `interim` or `other`. Checking `full_season_head_coach` asserts verified
+full-season responsibility and requires a resolved previous Team/year and
+`head_coach` role. Confirmation alone does not imply mathematical eligibility:
+first-time, assistant, interim and partial-season histories are ineligible for
+the first-release pace signal. The downstream calculator must additionally verify
+the immediately preceding completed D1 season from stored history; this story
+stores facts and does not calculate pace or require Season existence.
+
+One confirmed record per destination Team/effective year is enforced by the model
+and a partial unique database index. Pending/rejected alternatives are retained.
+Correcting a confirmed record requires checking the transient `reconfirm` box on
+that save, or returning it to pending and confirming it after review. The checkbox
+resets after saving; it is not a stored fact. Rejection can be corrected manually.
+Stale saves/deletes fail with a reload-and-review error if another operation changed
+the stored facts or decision, so they cannot bypass reconfirmation or invalidate
+the wrong review year.
+
+At `/admin/coaching_review`, create a row for the year and explicitly check `ready`
+after resolving every pending candidate. An intentionally empty year may be ready;
+a missing review row means not ready. The year key cannot be changed after creation.
+New records, changes to any coaching facts/decisions, and deletion invalidate
+existing readiness for the affected old/new years. Deletion invalidates only the
+current year, even when the same instance was previously moved to another year.
+Unchanged saves preserve it.
+Readiness and candidate writes share transaction-scoped year locks so concurrent
+candidate changes cannot leave an obsolete ready decision. Deleting a review row
+also leaves the year unready. No review operation writes ratings, forecasts,
+preseason prior captures or the legacy `TeamOffseasonProfile.coaching_change` field.
+
+### Storage contract for discovery and pace calculation
+
+Read confirmed facts through `CoachingChange.confirmed.where(effective_year: year)`;
+read readiness through `CoachingReview.find_by(year: year)&.ready? == true`.
+Facts use Team foreign keys and year integers, without Season/TeamSeason foreign
+keys, numerical adjustments or evidence fields. Do not synchronize the legacy
+profile boolean. These inputs do not yet gate or alter preseason publication.
+
+The separate discovery implementation must create new candidates as pending,
+resolve matching identities conservatively, and update an existing candidate via
+`candidate.apply_imported_facts(facts)` using only `CoachingChange::FACT_FIELDS`.
+This method returns true for identical reviewed facts, false with an actionable
+base error for conflicts, and only changes pending facts. It never overwrites
+confirmed facts or rejected decisions and rejects imported status/reconfirmation
+fields. Identical imports preserve readiness. New or changed candidates invalidate
+it. Report conflicts for manual correction; do not create an automatic review
+transition. Imports must never set `CoachingReview.ready`, including after partial
+or failed runs; only the operator marks readiness. Automated discovery itself is
+outside this story, as are source identity matching and pace calculation.
+
+For manual acceptance, create an unresolved candidate, confirm/reject it, mark the
+year ready, then correct or delete a fact and verify readiness clears. Try a second
+confirmed destination/year and an edit without reconfirmation to see validation
+errors. Review the list filters and previous-team selectors with an admin account.

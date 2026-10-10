@@ -53,6 +53,8 @@ class Season < ApplicationRecord
   validates :year, presence: true, uniqueness: true
   validate :only_one_current_season, if: :current?
 
+  belongs_to :preseason_revision, class_name: 'RatingsConfigVersion', optional: true
+
   has_many :game_sync_dates, dependent: :destroy
   has_many :games, dependent: :destroy
   has_many :team_seasons, dependent: :destroy
@@ -64,34 +66,42 @@ class Season < ApplicationRecord
     find_by(current: true)
   end
 
+  def rating_team_seasons
+    # Always return a fresh relation: a loaded association can omit newly prepared rows or retain stale prior provenance.
+    return team_seasons.where(nil) if participation_review.blank?
+
+    included_ids = participation_review.fetch('teams').select { |entry| entry['status'] == 'included' }.pluck('team_id')
+    team_seasons.where(team_id: included_ids)
+  end
+
   def rating_outputs?
     initialized = team_seasons.where('adj_offensive_efficiency IS NOT NULL OR adj_defensive_efficiency IS NOT NULL OR adj_pace IS NOT NULL')
     team_rating_snapshots.exists? || predictions.exists? || games.final.exists? || initialized.exists?
   end
 
-  def update_average_ratings
+  def update_average_ratings(as_of: nil)
     update!(
       average_efficiency: calculated_average_efficiency,
       average_pace: calculated_average_pace,
       efficiency_std_deviation: calculated_efficiency_deviation,
-      pace_std_deviation: calculated_pace_deviation
+      pace_std_deviation: calculated_pace_deviation(as_of)
     )
   end
 
   # rubocop:disable-next Metrics/AbcSize
   def update_adjusted_averages
     update!(
-      avg_adj_offensive_efficiency: team_seasons.average(:adj_offensive_efficiency),
-      avg_adj_defensive_efficiency: team_seasons.average(:adj_defensive_efficiency),
-      average_pace: team_seasons.average(:adj_pace),
-      avg_adj_effective_fg_percentage: team_seasons.average(:adj_effective_fg_percentage),
-      avg_adj_effective_fg_percentage_allowed: team_seasons.average(:adj_effective_fg_percentage_allowed),
-      avg_adj_turnover_rate: team_seasons.average(:adj_turnover_rate),
-      avg_adj_turnover_rate_forced: team_seasons.average(:adj_turnover_rate_forced),
-      avg_adj_offensive_rebound_rate: team_seasons.average(:adj_offensive_rebound_rate),
-      avg_adj_defensive_rebound_rate: team_seasons.average(:adj_defensive_rebound_rate),
-      avg_adj_free_throw_rate: team_seasons.average(:adj_free_throw_rate),
-      avg_adj_free_throw_rate_allowed: team_seasons.average(:adj_free_throw_rate_allowed),
+      avg_adj_offensive_efficiency: rating_team_seasons.average(:adj_offensive_efficiency),
+      avg_adj_defensive_efficiency: rating_team_seasons.average(:adj_defensive_efficiency),
+      average_pace: rating_team_seasons.average(:adj_pace),
+      avg_adj_effective_fg_percentage: rating_team_seasons.average(:adj_effective_fg_percentage),
+      avg_adj_effective_fg_percentage_allowed: rating_team_seasons.average(:adj_effective_fg_percentage_allowed),
+      avg_adj_turnover_rate: rating_team_seasons.average(:adj_turnover_rate),
+      avg_adj_turnover_rate_forced: rating_team_seasons.average(:adj_turnover_rate_forced),
+      avg_adj_offensive_rebound_rate: rating_team_seasons.average(:adj_offensive_rebound_rate),
+      avg_adj_defensive_rebound_rate: rating_team_seasons.average(:adj_defensive_rebound_rate),
+      avg_adj_free_throw_rate: rating_team_seasons.average(:adj_free_throw_rate),
+      avg_adj_free_throw_rate_allowed: rating_team_seasons.average(:adj_free_throw_rate_allowed),
 
       stddev_adj_offensive_efficiency: stddev(:adj_offensive_efficiency),
       stddev_adj_defensive_efficiency: stddev(:adj_defensive_efficiency),
@@ -124,9 +134,9 @@ class Season < ApplicationRecord
 
   def switch_current_season!
     reload
+    validate_activation! unless current? && participation_review.blank?
     return if current?
 
-    validate_activation!
     deactivate_current_season!
     update!(current: true)
   end
@@ -136,29 +146,43 @@ class Season < ApplicationRecord
   end
 
   def validate_activation!
-    missing_teams = Team.where.not(id: team_seasons.select(:team_id)).exists?
+    SeasonParticipationReview.new(self).validate_revision(preseason_revision) if preseason_revision
+    return SeasonParticipationReview.new(self).validate_activation if participation_review.present?
+
     incomplete = team_seasons.where(adj_offensive_efficiency: nil)
                              .or(team_seasons.where(adj_defensive_efficiency: nil)).or(team_seasons.where(adj_pace: nil))
-    return if start_date < end_date && team_seasons.exists? && !missing_teams && !incomplete.exists?
+    if start_date < end_date && team_seasons.exists? && !Team.where.not(id: team_seasons.select(:team_id)).exists? && !incomplete.exists?
+      return
+    end
 
     raise ArgumentError, 'Season is incomplete: prepare missing teams and initialize/review preseason ratings before activation.'
   end
 
   def calculated_average_pace
-    team_seasons.average(:pace)
+    rating_team_seasons.average(:pace)
   end
 
   def calculated_average_efficiency
-    team_seasons.average(:offensive_efficiency)
+    rating_team_seasons.average(:offensive_efficiency)
   end
 
   def calculated_efficiency_deviation
-    team_seasons.average(:offensive_efficiency_std_dev)
+    rating_team_seasons.average(:offensive_efficiency_std_dev)
   end
 
-  def calculated_pace_deviation
-    paces = games.final.filter_map(&:pace)
-    return nil if paces.empty?
+  def rating_final_games
+    finals = games.final
+    return finals if participation_review.blank?
+
+    ids = rating_team_seasons.select(:id)
+    finals.where(id: TeamGame.where(team_season_id: ids, home: true).select(:game_id))
+          .where(id: TeamGame.where(team_season_id: ids, home: false).select(:game_id))
+  end
+
+  def calculated_pace_deviation(as_of)
+    results = as_of ? rating_final_games.through_schedule_date(as_of) : rating_final_games
+    paces = results.filter_map(&:pace)
+    return nil if paces.size < 2
 
     paces.stdev
   end
@@ -182,7 +206,7 @@ class Season < ApplicationRecord
 
     ts = TeamSeason.arel_table
     node = Arel::Nodes::NamedFunction.new('STDDEV_POP', [ts[col]])
-    team_seasons.pick(node)
+    rating_team_seasons.pick(node)
   end
 
   def only_one_current_season
