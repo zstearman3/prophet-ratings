@@ -11,14 +11,13 @@ module ProphetRatings
 
     def call
       # A savepoint also protects callers that rescue a mismatch inside their own transaction.
-      TeamRatingSnapshot.transaction(requires_new: true) do
+      @season.with_lock(requires_new: true) do
+        review = SeasonParticipationReview.new(@season)
+        review.validate_publication(@ratings_config_version, @as_of)
         ratings_config_version = @ratings_config_version
 
-        TeamSeason.where(season: @season).find_each do |team_season|
-          team_season.validate_model_inputs(ratings_config_version)
-          unless team_season.ratings_config_version_id == ratings_config_version.id
-            raise ArgumentError, 'Live ratings lack selected model provenance; calculate ratings before snapshot publication'
-          end
+        @season.rating_team_seasons.find_each do |team_season|
+          validate_live_inputs(team_season)
 
           TeamRatingSnapshot.find_or_initialize_by(
             team_id: team_season.team_id,
@@ -40,10 +39,23 @@ module ProphetRatings
 
             self.class.capture_provenance(snapshot, team_season, ratings_config_version)
 
+            capture_participation(snapshot)
             snapshot.save!
           end
         end
       end
+    end
+
+    def capture_participation(snapshot)
+      key = SeasonParticipationReview.new(@season).publication_key
+      snapshot.stats['participation_key'] = key if key
+    end
+
+    def validate_live_inputs(team_season)
+      team_season.validate_model_inputs(@ratings_config_version)
+      return if team_season.ratings_config_version_id == @ratings_config_version.id
+
+      raise ArgumentError, 'Live ratings lack selected model provenance; calculate ratings before snapshot publication'
     end
 
     def self.capture_provenance(snapshot, team_season, ratings_config_version)

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_10_010000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_10_020000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -276,6 +276,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_10_010000) do
     t.date "end_date", null: false
     t.string "name"
     t.decimal "pace_std_deviation", precision: 6, scale: 3
+    t.jsonb "participation_review", default: {}, null: false
     t.date "start_date", null: false
     t.decimal "stddev_adj_defensive_efficiency", precision: 6, scale: 3
     t.decimal "stddev_adj_defensive_rebound_rate", precision: 6, scale: 5

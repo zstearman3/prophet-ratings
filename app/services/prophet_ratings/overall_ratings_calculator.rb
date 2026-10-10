@@ -25,7 +25,7 @@ module ProphetRatings
     end
 
     def calculate(as_of:)
-      validate_live_versions!
+      validate_live_versions!(as_of)
       TeamSeasonStatsAggregator.new(season: @season, as_of:, ratings_config_version: @ratings_config_version).run
       @season.update_average_ratings
       run_least_squares_adjustments(as_of:) if adjustment_period?(as_of) && enough_finalized_data_for_adjustments?(as_of:)
@@ -37,9 +37,9 @@ module ProphetRatings
     end
 
     def publish_ratings(as_of:)
-      validate_live_versions!
+      validate_live_versions!(as_of)
       update_live_ratings
-      @season.team_seasons.find_each { |team_season| team_season.update!(ratings_config_version: @ratings_config_version) }
+      @season.rating_team_seasons.find_each { |team_season| team_season.update!(ratings_config_version: @ratings_config_version) }
       TeamRatingSnapshotService.new(season: @season, as_of:, ratings_config_version: @ratings_config_version).call
     end
 
@@ -60,6 +60,13 @@ module ProphetRatings
       end.map(&:first)
     end
 
+    def self.clear_excluded_ranks(season)
+      return if season.participation_review.blank?
+
+      ranks = (TeamRatingSnapshot::STORED_RANKS + ['pace_rank']).index_with(nil)
+      season.team_seasons.where.not(id: season.rating_team_seasons.select(:id)).find_each { |row| row.update!(ranks) }
+    end
+
     private
 
     def adjustment_period?(as_of)
@@ -67,14 +74,16 @@ module ProphetRatings
     end
 
     def update_live_ratings
+      self.class.clear_excluded_ranks(@season)
       fill_missing_ratings
       fill_prediction_baselines
       recalculate_all_aggregate_ratings
       @season.update_adjusted_averages
     end
 
-    def validate_live_versions!
-      @season.team_seasons.find_each { |team_season| team_season.validate_model_inputs(@ratings_config_version) }
+    def validate_live_versions!(as_of)
+      SeasonParticipationReview.new(@season).validate_publication(@ratings_config_version, as_of)
+      @season.rating_team_seasons.find_each { |team_season| team_season.validate_model_inputs(@ratings_config_version) }
     end
 
     def validate_target_season!
@@ -107,7 +116,7 @@ module ProphetRatings
     def fill_prediction_baselines
       config = @config
       @season.update!(
-        average_efficiency: @season.average_efficiency || @season.team_seasons.average(:preseason_adj_offensive_efficiency) ||
+        average_efficiency: @season.average_efficiency || @season.rating_team_seasons.average(:preseason_adj_offensive_efficiency) ||
                             config.dig(:preseason, :fallback_efficiency),
         efficiency_std_deviation: @season.efficiency_std_deviation || config.dig(:baseline_volatility, :efficiency_volatility),
         pace_std_deviation: @season.pace_std_deviation || config.dig(:baseline_volatility, :pace_volatility)
@@ -115,12 +124,12 @@ module ProphetRatings
     end
 
     def fill_missing_ratings
-      @season.team_seasons.find_each { |team_season| team_season.update!(self.class.missing_ratings(team_season, @config)) }
+      @season.rating_team_seasons.find_each { |team_season| team_season.update!(self.class.missing_ratings(team_season, @config)) }
     end
 
     # rubocop:disable-next Metrics/AbcSize, Metrics/MethodLength
     def recalculate_all_aggregate_ratings
-      team_seasons = TeamSeason.where(season: @season).to_a
+      team_seasons = @season.rating_team_seasons.to_a
       ratings_config = @config
       default_home_boost = ratings_config[:home_court_advantage].to_f
       default_efficiency_volatility = ratings_config.dig(:baseline_volatility, :efficiency_volatility).to_f
@@ -156,7 +165,7 @@ module ProphetRatings
       }
 
       # Refresh records from DB with updated fields (optional but ensures accuracy)
-      team_seasons = TeamSeason.where(season: @season).to_a
+      team_seasons = @season.rating_team_seasons.to_a
 
       # Compute ranks
       assign_rank!(team_seasons, :rating, :overall_rank, :desc)
@@ -219,7 +228,7 @@ module ProphetRatings
     def enough_finalized_data_for_adjustments?(as_of:)
       TeamGame
         .joins(:game, :team_season)
-        .where(team_seasons: { season_id: @season.id })
+        .where(team_season_id: @season.rating_team_seasons.select(:id))
         .merge(Game.final.through_schedule_date(as_of))
         .group(:team_season_id)
         .having('COUNT(*) >= 2')

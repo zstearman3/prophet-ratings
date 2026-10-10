@@ -35,6 +35,70 @@ bin/rails season:prepare YEAR=2027 START_DATE=2026-11-01 END_DATE=2027-04-10
 
 `season:prepare` is intentionally limited. It does not make the season current, sync games, deduplicate games, initialize preseason ratings, create ratings config, or run ratings.
 
+## 1a. Review participation and dates explicitly
+
+`Season#participation_review` is empty for existing seasons: **legacy mode** keeps
+all stored TeamSeason rows eligible. The additive migration does not change live
+values, snapshots, dates or current status. Preparation still creates historical
+rows and does not infer participation. Opt in by saving a complete operator review:
+
+```bash
+bin/rails season:review_participation YEAR=2027 REVIEW_PATH=/path/to/review.json
+```
+
+The JSON format below is synthetic; replace IDs, dates, reasons and evidence with
+independently verified information for the target season:
+
+```json
+{
+  "evidence": "Authoritative target-season roster source and review date",
+  "reviewed_by": "Operator name",
+  "dates": {
+    "start_date": "2026-11-01",
+    "end_date": "2027-04-10",
+    "evidence": "Independently reviewed schedule boundaries and review date"
+  },
+  "teams": [
+    { "team_id": 1, "status": "included", "reason": "Verified participant, including independents" },
+    { "team_id": 2, "status": "excluded", "reason": "Verified departure, with source evidence" },
+    { "team_id": 3, "status": "unresolved", "reason": "Identity/participation needs verification" }
+  ],
+  "unresolved_identities": ["source ID or name without a resolved stored Team ID; next action"]
+}
+```
+
+Every stored Team needs an explicit decision. Omitted teams are **unresolved**,
+never automatically excluded. New teams added later therefore block readiness
+until reviewed. Duplicate IDs and malformed entries fail before saving. Incomplete
+reviews are saved, then the command exits unsuccessfully with the unresolved IDs,
+missing included TeamSeason/alias IDs, and date action. Clear unresolved identities
+only after resolving them. Repeating an identical review preserves timestamps.
+The review does not create teams, aliases, memberships or rating outputs. Store
+source/review dates in the evidence strings; Season.updated_at records the last save.
+
+Included teams need no conference membership. Dates must match the stored season
+and have independent evidence: inherited dates or later preparation overrides are
+not automatically reviewed. Prepare missing rows with `season:prepare`, correct
+aliases and evidence, then repeat review. Standings alignment remains conservative
+and separate; absence from its page never decides eligibility or retirement.
+
+Initialization and daily publication use `season.rating_team_seasons`: the included
+set in reviewed mode, every row in legacy mode. Excluded rows retain their stats
+and history; publication clears only live ranks and creates no new excluded-team
+snapshots. Historical snapshots stay intact. New snapshots carry a participation
+key derived from the included IDs. Unresolved reviews block publication/activation;
+activation additionally checks finite included offense/defense and positive pace.
+
+A new verified team can be prepared, included and initialized with the existing
+repeat preseason workflow when no saved forecasts or established in-season outputs
+make it unsafe. Removing a team from an already published date requires a new
+date/model so old excluded snapshots remain historical rather than mixed with a
+revised roster. With saved predictions for the selected model, any difference from the
+roster supporting those predictions (including legacy outputs without a participation key) requires
+**deliberate new-version publication**, using the existing model-switch/rebuild
+safeguards. The error preserves predictions and prior outputs. This does not
+implement general input revisions, activate a model, or authorize a rebuild.
+
 ## 2. Align conference memberships
 
 Run the standings comparison after preparing the season:
@@ -267,7 +331,9 @@ Activation repeats conference alignment by default. ALIGN_CONFERENCES=false is a
 explicit operator decision to defer source review; it does not bypass local
 coverage checks. Activation requires ordered dates, at least one TeamSeason, a
 row for every stored team, and non-null adjusted offense, defense and pace for
-every row. This is a minimum coverage check, not a complete publishing/readiness
+every row in legacy mode. Reviewed mode instead enforces the explicit roster/date/alias
+contract above and finite included-team core inputs with positive pace.
+This is a minimum coverage check, not a complete publishing/readiness
 report or proof of Division I participation.
 
 The switch is atomic: any failure leaves the previous current season in place.
@@ -357,7 +423,7 @@ or **deferred with a reason**; there is no automatic readiness approval.
 | Expected participation | Record an independently verified target-year Division I roster/source and expected count. Compare it with active `TeamConference` ranges and target `TeamSeason` rows; list missing, unexpected and duplicate identities. Preparation includes historical teams, so its row count is not the expected participant count. |
 | Memberships/identities | Run alignment and resolve every suggestion. Compare roster teams without memberships separately: local membership ranges cannot identify a wholly missing team. Review stored school URLs, exact conference identity and aliases in `/admin`. Preserve historical ranges; do not infer retirement from absence. |
 | Aliases | List expected teams with no `TeamAlias` and ambiguous/duplicate alias values; inspect unmatched names in sync logs against source spellings. `Team.search` joins aliases, so even an exact school match can fail without an alias. A nonempty alias list alone does not prove matching coverage. |
-| Preseason values | For every expected participant, check finite preseason/live offense, defense, pace and rating, with positive pace; review missing history and optional profiles. Also check every stored team's TeamSeason and live offense/defense/pace because the activation guard currently requires them. Do not reset established outputs to fill a gap. |
+| Preseason values | For every expected participant, check finite preseason/live offense, defense, pace and rating, with positive pace; review missing history and optional profiles. In legacy mode also check every stored team's TeamSeason and live offense/defense/pace; reviewed mode enforces included coverage. Do not reset established outputs to fill a gap. |
 | Ranks/defaults | Check overall/offense/defense/pace ranks for completeness and plausible ordering, plus home boosts and efficiency/pace volatility defaults. Initialization publishes these; unavailable Five Factors intentionally remain unranked. Inspect missing core ranks/defaults before prediction launch. |
 | Snapshots/config | Choose the intended preseason snapshot date and config explicitly. Require one usable snapshot per expected participant for that date/config, with matching team/season, live values, ranks and required prediction stats. Count missing teams rather than all snapshots. Check stored config against `config/ratings.yml`; name reuse with changed config is rejected. Inspect `PreseasonPrior` and snapshot `stats.preseason_prior` provenance; legacy outputs may be uncaptured. |
 | Schedule/venues | Record requested dates, imported counts, failed dates and reviewed empty dates from the refresh report. Review `unmatched`, `ambiguous`, `possible_move_ids` and `absent_ids`. Check both TeamGame/team-season associations, duplicate pairs/URLs, shifted/removed entries, missing start times and unknown/unconfirmed venues. Unknown venues receive no home advantage; missing source evidence stays open. No games before schedule publication is an explicit deferred item. |
@@ -368,7 +434,7 @@ Useful read-only checks in the intended environment's Rails console:
 
 ```ruby
 season = Season.find_by!(year: 2027)
-rows = season.team_seasons
+rows = season.rating_team_seasons
 puts({ dates: [season.start_date, season.end_date], current: Season.current&.year,
        team_seasons: rows.count, games: season.games.count,
        configs: season.team_rating_snapshots.distinct.pluck(:ratings_config_version_id) })
@@ -520,3 +586,21 @@ No production import, backfill or activation is required by the code change.
 Duplicate-game repair previews remain available, but apply refuses any affected
 group with frozen forecasts before mutating it. Review provenance explicitly;
 reassigning a saved forecast's game or collapsing revisions is not supported.
+
+### Synthetic reviewed-roster solver check
+
+The standard spec stubs numerical effects and asserts the included matrix dimensions
+and anchor. Run the same fixture with the real solver in a disposable Docker project:
+
+```bash
+solver_project="prophet-ratings-participation-solver-$$"
+trap 'docker compose -p "$solver_project" -f compose.test.yml down --volumes' EXIT
+docker compose -p "$solver_project" -f compose.test.yml up -d --wait db
+docker compose -p "$solver_project" -f compose.test.yml run --rm --no-deps -T -e REAL_SOLVER=true test bash -c 'bundle exec rails db:schema:load db:abort_if_pending_migrations && bundle exec rspec spec/services/prophet_ratings/adjusted_stat_calculator_participation_spec.rb && bundle exec ruby script/check_model_solver.rb'
+```
+
+The fixture has two included teams at 100 efficiency and an excluded team at 900.
+Only the included observation pair and anchor reach Python; zero centered effects
+must reconstruct offense/defense of 100 while the excluded row stays untouched.
+The existing independent ridge checks also run. These synthetic checks establish
+boundary arithmetic, not live roster coverage or model accuracy.

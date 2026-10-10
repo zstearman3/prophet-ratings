@@ -35,7 +35,7 @@ module ProphetRatings
     def run
       preload_predictions
 
-      team_seasons = TeamSeason.where(season_id: @season.id).to_a
+      team_seasons = @season.rating_team_seasons.to_a
       team_games_by_season_id = finalized_team_games_by_season_id(team_seasons.map(&:id))
 
       team_seasons.each do |team_season|

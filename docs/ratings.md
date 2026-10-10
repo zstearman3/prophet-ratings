@@ -340,7 +340,18 @@ total_home_boost = home_offense_boost - home_defense_boost
 Higher `rating` is better. Ties break by ascending `team_id`; missing adjusted
 stats have no rank. Core ranks/defaults are independent of the solver gate.
 
-Ranks are then assigned across all `TeamSeason` records for the season:
+Ranks are assigned across `season.rating_team_seasons`: all rows in legacy mode,
+or only explicitly reviewed included participants. Reviewed publication clears live
+ranks on excluded historical rows, preserves their other values and old snapshots,
+and creates no new excluded snapshots. The same eligibility relation scopes raw/adjusted
+league means, deviations, priors, aggregation and solver qualification/anchors.
+Games involving excluded teams do not enter the reviewed solver matrix or league
+pace deviation. Coefficients and the Rails/Python wire format are unchanged.
+Unresolved rosters, dates or included aliases block publication. See
+[reviewed participation](offseason.md#1a-review-participation-and-dates-explicitly)
+for legacy mode and safe addition/new-version restrictions.
+
+The ranks are:
 
 - `overall_rank`: higher `rating` is better
 - `adj_offensive_efficiency_rank`: higher is better
