@@ -7,7 +7,7 @@ RSpec.describe ProphetRatings::PreseasonRatingsCalculator do
 
   let(:payload) do
     RatingsConfigVersion.authored_config.merge(bundle_name: 'coaching-test').tap do |config|
-      config[:preseason][:coaching] = { formula: 'relative_pace_v1', weight: 0.1, max_adjustment: 0.5 }
+      config[:preseason][:coaching] = { formula: 'relative_pace_v2', weight: 0.5 }
     end
   end
   let(:version) { RatingsConfigVersion.publish!(payload) }
@@ -55,8 +55,8 @@ RSpec.describe ProphetRatings::PreseasonRatingsCalculator do
     home
     ready
     prior = capture
-    # 0.15*69 + 0.85*68 = 68.15; signal 69 + (74-69) = 74; bounded change +0.5.
-    expect(prior.outputs.fetch('preseason_adj_pace')).to eq(68.65)
+    # 0.15*69 + 0.85*68 = 68.15; signal 69 + (74-69) = 74; 50/50 blend gives 71.075.
+    expect(prior.outputs.fetch('preseason_adj_pace')).to eq(71.075)
     expect(prior.inputs.fetch('coaching')).to include('reason' => 'eligible', 'target_anchor' => 69,
                                                       'source_baseline' => 69, 'source_adjusted_pace' => 74,
                                                       'source_season_id' => previous.id, 'source_team_id' => source.id)
@@ -201,7 +201,9 @@ RSpec.describe ProphetRatings::PreseasonRatingsCalculator do
                    TeamRatingSnapshot.where(ratings_config_version: old).map(&:attributes), old_forecast.attributes]
     ready
     report = revision.preview
-    expect(report[:teams].find { |row| row[:team_id] == home.team_id }[:coaching]).to include(signal: 74, cap: 0.5)
+    expect(report[:teams].find { |row| row[:team_id] == home.team_id }[:coaching]).to include(
+      signal: 74, weight: 0.5, adjustment: be_within(1e-9).of(2.925), new_pace: 71.075
+    )
     move.update!(coach_name: 'Corrected Coach', reconfirm: true)
     ready
     expect { revision.call(preview_key: report[:preview_key]) }.to raise_error(ArgumentError, /rerun.*preview/)
@@ -209,7 +211,7 @@ RSpec.describe ProphetRatings::PreseasonRatingsCalculator do
     snapshot = home.team_rating_snapshots.find_by!(ratings_config_version: version)
     expect(snapshot.stats.dig('preseason_prior', 'inputs', 'coaching', 'moves', 0, 'coach_name')).to eq('Corrected Coach')
     forecast = ProphetRatings::GamePredictionBuilder.new(old_forecast.game, ratings_config_version: version).call
-    expect(forecast.pace).to eq(68.83)
+    expect(forecast.pace).to eq(70.04)
     expect([PreseasonPrior.where(ratings_config_version: old).map(&:attributes),
             TeamRatingSnapshot.where(ratings_config_version: old).map(&:attributes), old_forecast.reload.attributes]).to eq(old_outputs)
   end
@@ -239,9 +241,26 @@ RSpec.describe ProphetRatings::PreseasonRatingsCalculator do
   it 'publishes the opt-in authored experimental configuration without changing default selection' do
     experiment = Rails.application.config_for(:ratings, env: :coaching_experiment).to_h.deep_symbolize_keys
     selected = RatingsConfigVersion.publish!(RatingsConfigVersion.authored_config.merge(experiment))
-    expect(selected.settings.dig(:preseason, :coaching)).to eq(formula: 'relative_pace_v1', weight: 0.1, max_adjustment: 0.5)
+    expect(selected.settings.dig(:preseason, :coaching)).to eq(formula: 'relative_pace_v2', weight: 0.5)
     expect(selected.name).to eq('v1.8-experimental-coaching-pace')
     expect(RatingsConfigVersion.current).to be_nil
+  end
+
+  it 'tunes weight through a new immutable configuration while preserving the original capture' do
+    history
+    move
+    home
+    ready
+    original = capture
+    tuned = version.config.deep_dup
+    tuned['bundle_name'] = 'coaching-tuned'
+    tuned['preseason']['coaching']['weight'] = 0.2
+    selected = RatingsConfigVersion.publish!(tuned)
+    described_class.new(season, ratings_config_version: selected).call
+    expect(home.reload.preseason_prior.outputs.fetch('preseason_adj_pace')).to eq(69.32)
+    expect(original.reload.outputs.fetch('preseason_adj_pace')).to eq(71.075)
+    expect(original.inputs.dig('configuration', 'preseason', 'coaching', 'weight')).to eq(0.5)
+    expect(selected.settings.dig(:preseason, :coaching, :weight)).to eq(0.2)
   end
 
   it 'reports fresh initializer coverage without writes and then reports captured reuse without source reads' do
@@ -251,12 +270,12 @@ RSpec.describe ProphetRatings::PreseasonRatingsCalculator do
     ready
     initializer = ProphetRatings::PreseasonInitializer.new(season, ratings_config_version: version)
     report = initializer.preview
-    expect(report[:teams].first[:coaching]).to include(old_pace: 68.15, signal: 74, new_pace: 68.65)
+    expect(report[:teams].first[:coaching]).to include(old_pace: 68.15, signal: 74, new_pace: 71.075)
     expect([PreseasonPrior.count, TeamRatingSnapshot.count, home.reload.adj_pace]).to eq([0, 0, nil])
     initializer.call
     move.update!(coach_name: 'Correction', reconfirm: true)
     allow(CoachingChange).to receive(:where).and_raise('mutable read')
-    expect(initializer.preview[:teams].first[:outputs_after]['preseason_adj_pace']).to eq(68.65)
+    expect(initializer.preview[:teams].first[:outputs_after]['preseason_adj_pace']).to eq(71.075)
   end
 
   it 'treats D1 confirmation as a reviewed fact requiring reconfirmation and readiness invalidation' do

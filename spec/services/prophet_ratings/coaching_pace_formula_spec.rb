@@ -7,10 +7,45 @@ RSpec.describe ProphetRatings::CoachingPaceFormula do
   let(:inputs) { { reason: 'eligible', target_anchor: 69, source_adjusted_pace: 74, source_baseline: 70 } }
   let(:formula) { described_class.new(inputs, settings) }
 
-  it 'expresses source tempo on the captured anchor and caps the weighted change before rounding' do
+  it 'preserves legacy capped replay on the captured anchor' do
     expect(formula.report(68)).to include(old_pace: 68, signal: 73, adjustment: 0.5, new_pace: 68.5)
     settings[:max_adjustment] = 2
     expect(described_class.new(inputs, settings).call(68)).to eq(69)
+  end
+
+  context 'with the uncapped formula' do
+    let(:settings) { { formula: 'relative_pace_v2', weight: 0.5 } }
+
+    it 'averages the existing prior and normalized coach signal without capping' do
+      expect(formula.report(68)).to include(old_pace: 68, signal: 73, weight: 0.5, adjustment: 2.5, new_pace: 70.5)
+      expect(formula.report(68)).not_to have_key(:cap)
+    end
+
+    it 'gives a slower coach signal the same influence' do
+      inputs[:source_adjusted_pace] = 64
+      expect(formula.report(68)).to include(signal: 63, adjustment: -2.5, new_pace: 65.5)
+    end
+
+    it 'uses the configured weight, including both endpoints' do
+      settings[:weight] = 0.2
+      expect(described_class.new(inputs, settings).call(68)).to eq(69)
+      settings[:weight] = 0
+      expect(described_class.new(inputs, settings).call(68.123456)).to eq(68.123456)
+      settings[:weight] = 1
+      expect(described_class.new(inputs, settings).call(68)).to eq(73)
+    end
+
+    it 'rejects a cap setting rather than silently ignoring it' do
+      settings[:max_adjustment] = 0.5
+      expect { formula.call(68) }.to raise_error(ArgumentError, /does not accept max_adjustment/)
+    end
+
+    [nil, -0.1, 1.1, Float::NAN, Float::INFINITY].each do |weight|
+      it "rejects invalid uncapped weight #{weight.inspect}" do
+        settings[:weight] = weight
+        expect { formula.call(68) }.to raise_error(ArgumentError)
+      end
+    end
   end
 
   it 'applies an equally bounded slower signal' do

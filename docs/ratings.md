@@ -678,9 +678,9 @@ snapshots/forecasts are preserved. See the deliberate revision operation in
 
 The opt-in `coaching_experiment` section of `config/ratings.yml` authors
 `v1.8-experimental-coaching-pace`, with `preseason.coaching.formula:
-relative_pace_v1`, weight **0.10** and maximum adjustment **0.5 possessions per
-40 minutes**. These conservative settings were selected before evaluation; they
-are experimental assumptions, not fitted coefficients or proven accuracy gains.
+relative_pace_v2`, weight **0.50** and no adjustment cap. The coach signal and
+existing team prior receive equal weight. This initial assumption was selected
+before evaluation; it is not a fitted coefficient or a proven accuracy gain.
 The normal authored/default v1.7 bundle remains available without coaching settings.
 
 A manually confirmed destination Team/year move qualifies only with confirmed
@@ -701,9 +701,26 @@ source baseline L and target anchor T:
 
 ```text
 signal = T + (S - L)
-change = clamp(weight * (signal - B), -max_adjustment, max_adjustment)
+change = weight * (signal - B)
 pace = round(B + change, 3)
 ```
+
+Weight is configurable in immutable model settings and must be finite and in
+0..1. The uncapped blend stays between the two positive finite inputs. Existing
+B retains its 85% team-history / 15% baseline regression: at weight 0.50, the
+final contributions are 42.5% previous team pace, 7.5% baseline and 50% coach
+signal. The source pace also reflects the coach's former roster; this is a
+portability assumption, not a causal estimate of the coach's influence. Reviewed
+eligibility and positive finite checks remain; no empirical plausible-pace range
+is asserted. Evaluate pace and total errors on common games after the first
+season of data, retaining frozen inputs and configuration for comparison.
+
+Previously captured `relative_pace_v1` settings retain their weighted adjustment
+cap and report it during replay. `relative_pace_v2` rejects `max_adjustment` so a
+stale cap cannot silently appear effective. Publish under a new model name/version
+if the earlier authored bundle was already published; never mutate stored rows.
+The inputs contract remains `preseason-v2-coaching`; formula identity in the
+captured configuration distinguishes capped and uncapped replay.
 
 Offense, defense, profile coefficients and solver behavior are unchanged. Zero
 weight reproduces existing outputs exactly. Disable by publishing/selecting a new
@@ -712,7 +729,8 @@ stored version or capture.
 
 New `preseason-v2-coaching` captures freeze the reviewed move IDs/facts, years,
 resolved source IDs, source numbers, both baselines, existing history/profile
-operands and complete selected configuration, including weight/cap/formula.
+operands and complete selected configuration, including weight/formula and any
+legacy cap.
 Replay and exact normal initialization reuse perform no coaching/readiness/history
 lookups. Old `preseason-v1` models/captures retain their behavior; mismatched or
 unknown contracts fail explicitly. Fresh direct calculator/initializer captures
@@ -721,9 +739,9 @@ an intentionally reviewed empty year. The shared coaching year lock prevents a
 manual edit from racing readiness/capture; pending proposals block fresh capture.
 
 Initializer/revision reports list each included team's original/new outputs,
-coaching signal, weight/cap, bounded change and coverage/exclusion reason. The
-revision key binds the reviewed facts and source numbers; changed inputs need a
-new preview and, after publication, a new immutable model version. Snapshots carry
+coaching signal, weight, change and coverage/exclusion reason (plus cap for legacy
+`relative_pace_v1` settings). The revision key binds the reviewed facts and source
+numbers; changed inputs need a new preview and, after publication, a new immutable model version. Snapshots carry
 the captured provenance and scheduled forecasts consume the published pace through
 the existing frozen forecast contract. Other versions' captures/snapshots/forecasts
 are preserved. No historical coaching evidence or common-game evaluation dataset

@@ -51,6 +51,5 @@ coaching_experiment:
       attrition_multiplier: 5.0
       max_efficiency_adjustment: 5.0
     coaching:
-      formula: relative_pace_v1
-      weight: 0.10
-      max_adjustment: 0.5
+      formula: relative_pace_v2
+      weight: 0.50

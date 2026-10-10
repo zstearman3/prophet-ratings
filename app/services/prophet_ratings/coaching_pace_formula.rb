@@ -16,9 +16,9 @@ module ProphetRatings
 
     def report(existing)
       signal = validated_signal(existing)
-      adjustment = signal ? (@weight * (signal - existing)).clamp(-cap, cap) : 0
+      adjustment = signal ? weighted_change(signal, existing) : 0
       result = validated_result(existing + adjustment)
-      { reason: @inputs.fetch('reason'), old_pace: existing, signal:, weight: @weight, cap:, adjustment:, new_pace: result }
+      { reason: @inputs.fetch('reason'), old_pace: existing, signal:, weight: @weight, adjustment:, new_pace: result }.merge(cap_report)
     end
 
     def self.positive_pace(value)
@@ -60,8 +60,16 @@ module ProphetRatings
       value
     end
 
-    def cap
-      @settings.fetch('max_adjustment')
+    def weighted_change(signal, existing)
+      change = @weight * (signal - existing)
+      return change unless @settings.fetch('formula') == 'relative_pace_v1'
+
+      cap = @settings.fetch('max_adjustment')
+      change.clamp(-cap, cap)
+    end
+
+    def cap_report
+      @settings.fetch('formula') == 'relative_pace_v1' ? { cap: @settings.fetch('max_adjustment') } : {}
     end
   end
 end

@@ -70,12 +70,22 @@ module ProphetRatings
     end
 
     def self.validate_coaching_settings(coaching, payload)
-      raise ArgumentError, 'Unsupported preseason coaching formula' unless coaching.is_a?(Hash) && coaching[:formula] == 'relative_pace_v1'
+      unless coaching.is_a?(Hash) && %w[relative_pace_v1 relative_pace_v2].include?(coaching[:formula])
+        raise ArgumentError, 'Unsupported preseason coaching formula'
+      end
 
-      %w[weight max_adjustment].each { |key| validate_number(payload, "preseason.coaching.#{key}") }
+      validate_number(payload, 'preseason.coaching.weight')
+      validate_coaching_cap(coaching, payload)
       return if (0..1).cover?(coaching.fetch(:weight))
 
       raise ArgumentError, 'Preseason coaching weight must be in 0..1'
+    end
+
+    def self.validate_coaching_cap(coaching, payload)
+      return validate_number(payload, 'preseason.coaching.max_adjustment') if coaching[:formula] == 'relative_pace_v1'
+      return unless coaching.key?(:max_adjustment)
+
+      raise ArgumentError, 'Uncapped coaching formula does not accept max_adjustment'
     end
 
     def self.freeze_settings(value)

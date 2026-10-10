@@ -818,9 +818,11 @@ payload = RatingsConfigVersion.authored_config.merge(
 version = RatingsConfigVersion.publish!(payload)
 ```
 
-The initial settings are weight 0.10 and cap 0.5 possessions/40; see
+The initial settings are weight 0.50 with uncapped `relative_pace_v2`; see
 [Ratings](ratings.md#experimental-reviewed-coaching-pace) for eligibility and math.
-The test fixture's 0.20 weight is not the authored setting. Coaching records can be
+Weight remains configurable in immutable model settings. If the earlier capped
+bundle was already published, choose a new bundle name/version; stored
+`relative_pace_v1` captures keep their cap during replay. Coaching records can be
 entered before Season preparation; historical Season/TeamSeason resolution happens
 at capture. Missing history excludes the contribution rather than blocking review.
 No source data imports, historical backfills or automatic activation are needed.
