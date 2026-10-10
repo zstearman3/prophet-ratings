@@ -237,23 +237,61 @@ Successful dates remain committed. Rerun failed windows explicitly after fixing
 source/identity issues; do not infer coverage from stored games. The existing
 nightly job continues to use its rolling window and may enqueue rankings.
 
-Historical SyncFullSeasonGamesJob still logs exhausted per-date retries without
-failing the whole job: inspect its logs, and rerun the failed date window with
-SYNC_RESUME=false. Its latest-game resume heuristic now excludes today/future
-games, but historical game presence is still not proof of complete date coverage.
-Game sync is never a prerequisite for preparing the shell or initializing existing
-preseason values.
+Historical sync now requires an explicit target season (including direct job
+callers). Optional historical bounds must be ordered, inclusive Eastern dates,
+entirely inside that season and no later than yesterday. Invalid overrides fail
+before requesting source data; omitted bounds use the stored season start and
+`min(season.end_date, Eastern yesterday)`. A future-only season has no valid
+historical window; use `season:refresh_schedule` instead.
 
-Repeat `season:refresh_schedule` with explicit windows as schedules fill in;
-it revisits every requested date without selecting a resume point. Review its
-`failed_dates`, `unmatched`, `ambiguous`, `possible_move_ids` and `absent_ids` after
-every run. Earlier historical gaps require the bounded historical command with
-resume disabled. Historical sync still logs exhausted retries without failing
-the whole job; inspect logs even when it completes. For a single historical failed
-date, use `SyncDailyGamesJob.perform_later(Date.new(2026, 11, 3))` and inspect its
-outcome. That daily path selects the season by date, so first verify stored season
-boundaries do not overlap. Empty successful future-refresh dates differ from failed
-dates, but neither establishes complete source publication or venue coverage.
+`GameSyncDate` stores one checkpoint per season/date: `pending`, `failed`, or
+`completed`, cumulative attempt count, last attempt time, completion time, imported
+row count and last failure evidence. Recognized empty dates complete with zero rows.
+Completion means the source date was successfully ingested; it does not certify
+final box scores, team matching, venue coverage or upstream publication completeness.
+Ambiguous reconciliation fails the date and leaves candidate IDs in its error.
+Imports and completion commit together per date; partial batches roll back.
+Interruptions leave pending checkpoints, which resume retries. Manual venue/final
+protection and conservative matching remain in force. Shared date advisory locks
+prevent overlapping historical, future-refresh, daily or team imports; contention
+is reported/retried rather than allowing concurrent date writes.
+
+There is no checkpoint backfill on migration or deployment. Old game presence,
+including future scheduled games, never establishes date completion. All dates
+without checkpoints remain unknown. `SYNC_RESUME=true` (the default) skips only
+completed checkpoints **within the requested window**, and retries unknown, pending
+and failed dates even when later dates have games. Start with small explicit windows
+when introducing checkpoints to an existing database; invoking an unbounded sync
+explicitly will scan all unknown past dates in that season. No deployment-triggered
+whole-history catch-up is added.
+
+Historical dates get one initial attempt and up to five retries with
+5/10/20/40/80-second backoff. Later independent dates still run after exhaustion.
+The JSON report contains per-date outcomes, exact `failed_dates`, and a bounding
+`retry_window`; synchronous `season:sync_games` exits nonzero without scheduling an
+ActiveJob retry or printing success. Async callers raise `IncompleteSync` with the
+same report and retain the existing bounded job retry policy. Default resume skips
+already completed dates on that retry. Retain reports in the readiness record.
+
+After fixing a failed/interrupted date, repeat its explicit window with resume:
+
+```bash
+bin/rails season:sync_games YEAR=2027 SYNC_RESUME=true SYNC_START_DATE=2026-11-03 SYNC_END_DATE=2026-11-03
+```
+
+For multiple holes, use the report's retry window; completed dates between the holes
+are skipped. To deliberately revisit completed dates for changed source data, use
+`SYNC_RESUME=false` with a small explicit window. A failed rescan invalidates the old
+completion while preserving previously committed games. Retry evidence remains
+stored after later success. Use this historical command for checkpoint recovery;
+the daily job does not write historical checkpoints. Sync defaults still enqueue
+neither ratings nor duplicate repair and do not activate the season.
+
+Repeat `season:refresh_schedule` with explicit windows as schedules fill in; it
+revisits every requested date. Review its `failed_dates`, `unmatched`, `ambiguous`,
+`possible_move_ids` and `absent_ids` after every run. Empty successful future-refresh
+dates differ from failures but do not establish historical completion checkpoints.
+Game sync is never a prerequisite for shell preparation or preseason initialization.
 
 ## 6. Activate explicitly
 
@@ -362,7 +400,7 @@ or **deferred with a reason**; there is no automatic readiness approval.
 | Snapshots/config | Choose the intended preseason snapshot date and config explicitly. Require one usable snapshot per expected participant for that date/config, with matching team/season, live values, ranks and required prediction stats. Count missing teams rather than all snapshots. Check stored config against `config/ratings.yml`; name reuse with changed config is rejected. Inspect `PreseasonPrior` and snapshot `stats.preseason_prior` provenance; legacy outputs may be uncaptured. |
 | Schedule/venues | Record requested dates, imported counts, failed dates and reviewed empty dates from the refresh report. Review `unmatched`, `ambiguous`, `possible_move_ids` and `absent_ids`. Check both TeamGame/team-season associations, duplicate pairs/URLs, shifted/removed entries, missing start times and unknown/unconfirmed venues. Unknown venues receive no home advantage; missing source evidence stays open. No games before schedule publication is an explicit deferred item. |
 | Predictions | Once scheduled games and snapshots exist, inspect prediction coverage and snapshot dates/configs for each matchup. Inspect default uncertainty rather than treating the confidence label as calibration evidence. Zero games can defer predictions, but cannot prove prediction readiness. |
-| Job outcomes | Record job IDs, target season/date arguments, failed/retried/discarded dates, errors and successful recovery. Inspect logs even for completed historical sync jobs: exhausted per-date retries can be swallowed. Confirm queued explicit-season jobs still target the intended season after a switch. |
+| Job outcomes | Record job IDs, target season/date arguments, failed/retried/discarded dates, errors and successful recovery. Retain historical sync JSON reports and verify failed dates have completed checkpoints after recovery. Confirm queued explicit-season jobs still target the intended season after a switch. |
 
 Useful read-only checks in the intended environment's Rails console:
 

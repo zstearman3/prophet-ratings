@@ -57,4 +57,32 @@ RSpec.describe Ingestion::GamesIngestionService do
     expect { described_class.new(date:, season:).call }.to raise_error(ArgumentError, /does not match requested/)
     expect(Game.count).to eq(0)
   end
+
+  it 'rejects overlapping imports for the same date across callers before scraping' do
+    connection = PG.connect(ENV.fetch('TEST_DATABASE_URL'))
+    connection.exec_params("SELECT pg_advisory_lock(('x'||substr(md5($1::text), 1, 16))::bit(64)::bigint)",
+                           ["games-ingestion:#{date}"])
+    expect { described_class.new(date:).call }.to raise_error(described_class::ImportInProgress)
+    expect { described_class.new(date:, team: build_stubbed(:team)).call }.to raise_error(described_class::ImportInProgress)
+    expect(Scraper::GamesScraper).not_to have_received(:new)
+  ensure
+    connection&.close
+  end
+
+  it 'holds a reentrant date lock through the caller transaction and releases it on error' do
+    expect do
+      described_class.with_date_lock(date) do
+        Game.transaction do
+          described_class.new(date:).call
+          connection = PG.connect(ENV.fetch('TEST_DATABASE_URL'))
+          locked = connection.exec_params("SELECT pg_try_advisory_lock(('x'||substr(md5($1::text), 1, 16))::bit(64)::bigint)",
+                                          ["games-ingestion:#{date}"]).first.values.first
+          expect(locked).to eq('f')
+          connection.close
+          raise 'interrupted before commit'
+        end
+      end
+    end.to raise_error('interrupted before commit')
+    expect(described_class.new(date:).call[:imported_rows]).to eq(1)
+  end
 end

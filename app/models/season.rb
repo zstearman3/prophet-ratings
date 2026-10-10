@@ -53,6 +53,7 @@ class Season < ApplicationRecord
   validates :year, presence: true, uniqueness: true
   validate :only_one_current_season, if: :current?
 
+  has_many :game_sync_dates, dependent: :destroy
   has_many :games, dependent: :destroy
   has_many :team_seasons, dependent: :destroy
   has_many :predictions, through: :games

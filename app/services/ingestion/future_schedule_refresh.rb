@@ -40,7 +40,9 @@ module Ingestion
     end
 
     def refresh_day(date, attempt: 0)
-      Game.transaction { GamesIngestionService.new(date:, season:).call }.merge(date:)
+      GamesIngestionService.with_date_lock(date) do
+        Game.transaction { GamesIngestionService.new(date:, season:).call }.merge(date:)
+      end
     rescue StandardError => error
       retry_or_report(date, error, attempt)
     end

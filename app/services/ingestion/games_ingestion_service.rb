@@ -4,6 +4,9 @@ module Ingestion
   class GamesIngestionService
     DEFAULT_BATCH_SIZE = 10
 
+    # A competing date writer must finish before another import can start.
+    class ImportInProgress < StandardError; end
+
     def initialize(date:, batch_size: DEFAULT_BATCH_SIZE, team: nil, season: nil)
       @date = date
       @batch_size = normalized_batch_size(batch_size)
@@ -12,27 +15,34 @@ module Ingestion
     end
 
     def call
-      return import_rows(scraper.to_json_for_team(team)) if team
+      GamesIngestionService.with_date_lock(date) { ingest }
+    end
 
-      imported_rows = 0
-      games = []
-      url_position = 0
+    # Session locks are reentrant so callers can keep this lock through their date transaction's commit.
+    def self.with_date_lock(date)
+      result = GoodJob::Job.advisory_lock_key("games-ingestion:#{date}") { [yield] }
+      raise ImportInProgress, "Another game import is running for #{date}." unless result
 
-      while url_position < game_count
-        next_position = [url_position + batch_size, game_count].min
-        rows = scraper.to_json_in_batches(url_position, next_position - url_position)
-        result = import_rows(rows)
-        imported_rows += result[:imported_rows]
-        games.concat(result[:games])
-        url_position = next_position
-      end
-
-      { imported_rows:, games: }
+      result.first
     end
 
     private
 
     attr_reader :date, :batch_size, :team, :season
+
+    def ingest
+      team ? import_rows(scraper.to_json_for_team(team)) : import_date
+    end
+
+    def import_date
+      results = (0...game_count).step(batch_size).map { |offset| import_batch(offset) }
+      { imported_rows: results.sum { |result| result[:imported_rows] }, games: results.flat_map { |result| result[:games] } }
+    end
+
+    def import_batch(offset)
+      rows = scraper.to_json_in_batches(offset, [batch_size, game_count - offset].min)
+      import_rows(rows)
+    end
 
     def import_rows(rows)
       enriched_rows = game_row_enricher.call(rows)

@@ -24,7 +24,12 @@ namespace :import do
   desc 'Scrape and import games'
   task games: :environment do
     Season.order(year: :asc).each do |season|
-      SyncFullSeasonGamesJob.perform_now(season)
+      puts JSON.pretty_generate(SyncFullSeasonGamesJob.new.perform(season))
     end
+  rescue SyncFullSeasonGamesJob::IncompleteSync => e
+    puts JSON.pretty_generate(e.report)
+    abort(e.message)
+  rescue ArgumentError => e
+    abort(e.message)
   end
 end
