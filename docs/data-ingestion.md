@@ -633,3 +633,9 @@ When changing ingestion code:
 - `Scraper::GamesScraper#scrape_day_batch` slices with an exact batch size; adjacent batches do not overlap. Schedule responses are cached per scraper and failed/unrecognized pages raise instead of counting as empty dates.
 - `Importer::GamesImporter` logs partial team matches but can still preserve games with missing team-season associations.
 - `GameFinalizer` updates prediction errors if a matching prediction and snapshots already exist.
+
+Duplicate repair refuses an affected group containing frozen forecast context,
+including a forecast on the survivor. It locks the group's games and checks before
+merging any fields or dependents. Review forecast provenance before applying a
+repair; there is no automatic reparenting or snapshot-pair deduplication of frozen
+revisions. Dry runs remain available. Legacy-only groups retain existing behavior.

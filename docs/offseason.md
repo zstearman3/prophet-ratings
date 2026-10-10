@@ -331,8 +331,10 @@ values. A long rebuild holds a database transaction and the shared ratings lock,
 so schedule it during an appropriate maintenance window. Its final day's values
 become the live TeamSeason state even when later snapshots are preserved; resume
 through the desired current cutoff before returning that season to ordinary use.
-These are reconstruction tools, not leakage-safe prediction evaluation: existing
-backfill ordering may use same-day results.
+These are reconstruction tools, not live pregame archives. New saved predictions
+exclude game-day snapshots and carry reconstruction provenance; historical season
+anchors are not retrospectively reconstructed as-of values. Legacy backfill rows
+may retain same-day leakage.
 
 Operator rating commands invoke the job body synchronously under the shared lock
 so exceptions fail the command instead of scheduling a retry and printing success.
@@ -491,3 +493,30 @@ The matchup screen reports confidence as Uncalibrated. Inspect numerical outputs
 and coverage without claiming calibration; see [Ratings](ratings.md#shared-pace-uncertainty-baseline).
 Older immutable models retain their numerical behavior and published predictions.
 No import, rebuild, model activation, or production operation is automatic.
+
+### Saved forecast provenance rollout
+
+Apply `20261010010000_freeze_prediction_context` before running prediction jobs.
+The additive fields preserve historical rows as `legacy_unverified`; no historical
+issuance time or live provenance is fabricated. The migration replaces snapshot
+pair uniqueness with game/model/revision uniqueness so corrected inputs append a
+forecast instead of overwriting one. Deploy application and migration together.
+
+Before prediction readiness, publish complete snapshots dated before the Eastern
+game date for the selected model. Missing eligible ratings log a skipped prediction;
+inspect source dates, volatility completeness and publication timing before retrying.
+Nightly jobs forecast scheduled games in the next seven days and no longer fill
+missing forecasts for final games. Historical workflow predictions are labeled
+reconstructions and excluded from live display/evaluation.
+
+For manual review, generate an upcoming forecast twice and confirm one revision;
+correct a source input and confirm a new revision with the old replay unchanged.
+Check `calculation_context`, `input_cutoff`, `generated_at`, `forecast_start_time`
+and `revision_key`. Finalize a synthetic/local game and confirm outcomes attach to
+the latest saved pregame revision. Existing legacy outputs remain labeled unverified;
+this rollout does not repair historical leakage or establish calibrated confidence.
+No production import, backfill or activation is required by the code change.
+
+Duplicate-game repair previews remain available, but apply refuses any affected
+group with frozen forecasts before mutating it. Review provenance explicitly;
+reassigning a saved forecast's game or collapsing revisions is not supported.

@@ -42,6 +42,8 @@
 #  fk_rails_...  (ratings_config_version_id => ratings_config_versions.id)
 #
 class Prediction < ApplicationRecord
+  include FrozenForecast
+
   belongs_to :game
   belongs_to :home_team_snapshot, class_name: 'TeamRatingSnapshot'
   belongs_to :away_team_snapshot, class_name: 'TeamRatingSnapshot'
@@ -51,8 +53,10 @@ class Prediction < ApplicationRecord
   has_one :season, through: :game
   has_many :bet_recommendations, dependent: :destroy
 
-  validates :game, uniqueness: { scope: %i[home_team_snapshot_id away_team_snapshot_id] }
   validate :snapshots_must_have_same_ratings_version
+
+  validates :game, uniqueness: { scope: %i[home_team_snapshot_id away_team_snapshot_id forecast_kind] },
+                   if: -> { forecast_kind == 'legacy_unverified' }
 
   def favorite
     home_score > away_score ? game.home_team_game&.team : game.away_team_game&.team
@@ -98,6 +102,7 @@ class Prediction < ApplicationRecord
 
   # Shared-pace versions use exact product moments; legacy versions retain fixed-pace arithmetic.
   def margin_std_deviation
+    return frozen_context.margin_std_deviation if calculation_context['contract_version'] == 1
     return Math.sqrt(score_moments.margin_variance) if shared_pace_model?
 
     values = ProphetRatings::ModelConfiguration.snapshot_volatilities([home_team_snapshot, away_team_snapshot], ratings_config_version)
@@ -106,6 +111,7 @@ class Prediction < ApplicationRecord
 
   # Scores covary through pace, so total and margin uncertainty differ.
   def total_std_deviation
+    return frozen_context.total_std_deviation if calculation_context['contract_version'] == 1
     return Math.sqrt(score_moments.total_variance) if shared_pace_model?
 
     values = ProphetRatings::ModelConfiguration.snapshot_volatilities([home_team_snapshot, away_team_snapshot], ratings_config_version)
@@ -171,6 +177,7 @@ class Prediction < ApplicationRecord
   # Validates that the home and away team snapshots reference the same ratings configuration version.
   # Adds a validation error if the snapshots use different ratings config versions.
   def snapshots_must_have_same_ratings_version
+    return if calculation_context.present? && persisted?
     return if home_team_snapshot.nil? || away_team_snapshot.nil?
 
     version_ids = [home_team_snapshot.ratings_config_version_id, away_team_snapshot.ratings_config_version_id]

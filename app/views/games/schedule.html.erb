@@ -46,6 +46,7 @@
         <td class="px-4 py-2">
           <% prediction = game.current_prediction %>
           <% if prediction.present? %>
+            <span class="text-xs text-gray-500"><%= prediction.provenance_label %></span>
             <%= link_to prediction.predicted_score_string, game_path(game),
               class: "block text-gray-800 hover:text-blue-600" %>
             <span class="text-xs text-gray-500">Home win: <%= number_to_percentage(prediction.home_win_probability * 100, precision: 1) %></span>

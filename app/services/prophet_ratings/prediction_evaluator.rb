@@ -11,13 +11,9 @@ module ProphetRatings
       ratings_config_version: RatingsConfigVersion.default_version,
       date_range: Season.current.start_date..Season.current.end_date
     )
-      version_id = ratings_config_version.id
-      @predictions = Prediction
-                     .joins(:home_team_snapshot, :away_team_snapshot, :game)
-                     .where(ratings_config_version:,
-                            home_team_snapshot: { ratings_config_version_id: version_id },
-                            away_team_snapshot: { ratings_config_version_id: version_id })
-                     .where(games: { start_time: date_range })
+      @predictions = Prediction.selected_pregame.joins(:game)
+                               .where(ratings_config_version:)
+                               .where(games: { start_time: date_range, status: :final })
     end
 
     def call
@@ -58,25 +54,25 @@ module ProphetRatings
 
     def calculate_overall_mae
       {
-        pace_error_mae: StatisticsUtils.mae(predictions.pluck(:pace_error)),
-        home_off_mae: StatisticsUtils.mae(predictions.pluck(:home_offensive_efficiency_error)),
-        away_off_mae: StatisticsUtils.mae(predictions.pluck(:away_offensive_efficiency_error))
+        pace_error_mae: StatisticsUtils.mae(predictions.pluck(:pace_error).compact),
+        home_off_mae: StatisticsUtils.mae(predictions.pluck(:home_offensive_efficiency_error).compact),
+        away_off_mae: StatisticsUtils.mae(predictions.pluck(:away_offensive_efficiency_error).compact)
       }
     end
 
     def calculate_biases
       {
-        pace_error_avg: StatisticsUtils.average(predictions.pluck(:pace_error)),
-        home_off_avg: StatisticsUtils.average(predictions.pluck(:home_offensive_efficiency_error)),
-        away_off_avg: StatisticsUtils.average(predictions.pluck(:away_offensive_efficiency_error))
+        pace_error_avg: StatisticsUtils.average(predictions.pluck(:pace_error).compact),
+        home_off_avg: StatisticsUtils.average(predictions.pluck(:home_offensive_efficiency_error).compact),
+        away_off_avg: StatisticsUtils.average(predictions.pluck(:away_offensive_efficiency_error).compact)
       }
     end
 
     def calculate_stddevs
       {
-        pace_error_stddev: StatisticsUtils.stddev(predictions.pluck(:pace_error)),
-        home_off_stddev: StatisticsUtils.stddev(predictions.pluck(:home_offensive_efficiency_error)),
-        away_off_stddev: StatisticsUtils.stddev(predictions.pluck(:away_offensive_efficiency_error))
+        pace_error_stddev: StatisticsUtils.stddev(predictions.pluck(:pace_error).compact),
+        home_off_stddev: StatisticsUtils.stddev(predictions.pluck(:home_offensive_efficiency_error).compact),
+        away_off_stddev: StatisticsUtils.stddev(predictions.pluck(:away_offensive_efficiency_error).compact)
       }
     end
 

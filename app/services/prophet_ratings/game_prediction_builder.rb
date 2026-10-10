@@ -9,6 +9,7 @@ module ProphetRatings
     def initialize(game, ratings_config_version: nil)
       @game = game
       @ratings_config_version = RatingsConfigVersion.resolve(ratings_config_version)
+      @generated_at = nil
       @config = @ratings_config_version.settings
     end
 
@@ -17,38 +18,81 @@ module ProphetRatings
     # Returns nil and logs a warning if required prediction inputs are unavailable.
     # @return [Prediction, nil] The saved prediction record, or nil if prediction could not be generated.
     def call
-      return unless prediction_inputs_available?
-
-      result = ProphetRatings::GamePredictor.new(
-        home_rating_snapshot: home_snapshot,
-        away_rating_snapshot: away_snapshot,
-        venue: { type: game.venue_type, confidence: game.venue_confidence },
-        season: game.season,
-        ratings_config_version:
-      ).call
-
-      Prediction.find_or_initialize_by(
-        home_team_snapshot: home_snapshot,
-        away_team_snapshot: away_snapshot,
-        ratings_config_version:,
-        game:
-      ).tap do |prediction|
-        prediction.assign_attributes(prediction_attributes(result))
-
-        prediction.save!
+      game.with_lock do
+        generate_revision
       end
+    rescue ArgumentError => error
+      Rails.logger.warn("Prediction skipped for game=#{game.id}: missing or invalid rating inputs: #{error.message}")
+      nil
     end
 
     private
 
     attr_reader :game, :ratings_config_version
 
-    def prediction_inputs_available?
-      values = prediction_input_values + required_snapshot_volatilities
-      return true if values.all? { |value| value.is_a?(Numeric) && value.finite? && value >= 0 } &&
-                     game.season.average_pace&.positive? && expected_pace.positive?
+    def generate_revision
+      @generated_at = Time.current
+      build_revision if prediction_inputs_available?
+    end
 
-      Rails.logger.warn("Prediction skipped for game=#{game.id}: missing or invalid rating inputs")
+    def build_revision
+      context = ForecastContext.capture(game, [home_snapshot, away_snapshot], ratings_config_version)
+      result = ForecastContext.new(context).predictor.call
+      save_revision(context, result)
+    end
+
+    def save_revision(context, result)
+      previous = game.predictions.where(ratings_config_version:).where.not(revision_key: nil)
+                     .order(generated_at: :desc, id: :desc).first
+      return previous if identical_revision?(previous, context)
+
+      game.predictions.create!(prediction_attributes(result).merge(provenance_attributes(context),
+                                                                   ratings_config_version:, revision_key: revision_key(context, previous)))
+    end
+
+    def identical_revision?(previous, context)
+      previous && retry_context(previous.calculation_context) == retry_context(context) && previous.forecast_kind == forecast_kind &&
+        previous.input_cutoff == input_cutoff && previous.forecast_start_time == game.start_time
+    end
+
+    # Republishing identical sources can touch updated_at without changing any forecast input.
+    def retry_context(context)
+      context.as_json.deep_dup.tap do |inputs|
+        inputs.fetch('season_source').delete('updated_at')
+        inputs.fetch('snapshots').each { |snapshot| snapshot.fetch('source').delete('updated_at') }
+      end
+    end
+
+    def revision_key(context, previous)
+      identity = { context:, kind: forecast_kind, cutoff: input_cutoff, start_time: game.start_time, previous_id: previous&.id }
+      Digest::SHA256.hexdigest(JSON.generate(identity))
+    end
+
+    def provenance_attributes(context)
+      { home_team_snapshot: home_snapshot, away_team_snapshot: away_snapshot,
+        calculation_context: context, forecast_kind:, generated_at: @generated_at,
+        forecast_start_time: game.start_time, input_cutoff: }
+    end
+
+    def forecast_kind
+      if game.scheduled? && game.start_time > @generated_at &&
+         [game.home_team_score, game.away_team_score].compact.empty?
+        'pregame'
+      else
+        'reconstruction'
+      end
+    end
+
+    def input_cutoff
+      [game.schedule_date - 1, Game.schedule_date_for(@generated_at)].min
+    end
+
+    def prediction_inputs_available?
+      return true if home_snapshot && away_snapshot &&
+                     required_snapshot_volatilities.all? { |value| value.is_a?(Numeric) && value.finite? && value >= 0 }
+
+      Rails.logger.warn("Prediction skipped for game=#{game.id}: missing or invalid rating inputs (prior-day only); " \
+                        'publish complete snapshots before the Eastern game date')
       false
     end
 
@@ -59,22 +103,6 @@ module ProphetRatings
 
       [home_snapshot, away_snapshot].flat_map do |snapshot|
         [snapshot.offensive_efficiency_volatility, snapshot.defensive_efficiency_volatility, snapshot.pace_volatility]
-      end
-    end
-
-    def expected_pace
-      home_snapshot.adj_pace + away_snapshot.adj_pace - game.season.average_pace
-    end
-
-    def prediction_input_values
-      return [nil] unless home_snapshot && away_snapshot
-
-      season = game.season
-      deviation = season.efficiency_std_deviation || @config.dig(:baseline_volatility, :efficiency_volatility)
-      [season.average_pace] + [home_snapshot, away_snapshot].flat_map do |snapshot|
-        [snapshot.adj_offensive_efficiency, snapshot.adj_defensive_efficiency, snapshot.adj_pace,
-         snapshot.offensive_efficiency_volatility || deviation, snapshot.defensive_efficiency_volatility || deviation,
-         snapshot.pace_volatility || season.pace_std_deviation || @config.dig(:baseline_volatility, :pace_volatility)]
       end
     end
 
@@ -105,14 +133,15 @@ module ProphetRatings
 
     ##
     # Returns the most recent team rating snapshot for the given team season and ratings configuration version.
-    # Only includes snapshots on or before the game's Eastern schedule date.
+    # Excludes game-day data and sources that did not exist at generation.
     #
     # @param [TeamSeason] team_season - The team season for which to retrieve the snapshot.
     # @return [TeamRatingSnapshot, nil] The latest applicable rating snapshot, or nil if none exist.
     def latest_snapshot(team_season)
       TeamRatingSnapshot
         .where(team_season:, ratings_config_version:)
-        .where(snapshot_date: ..game.schedule_date)
+        .where(snapshot_date: ..input_cutoff)
+        .where(created_at: ..@generated_at, updated_at: ..@generated_at)
         .order(snapshot_date: :desc)
         .first
     end

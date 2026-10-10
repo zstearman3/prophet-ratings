@@ -58,25 +58,27 @@ module ProphetRatings
     attr_reader :season, :as_of
 
     def preload_predictions
-      predictions = Prediction
-                    .where(ratings_config_version: @ratings_config_version)
-                    .joins(:game)
-                    .where(games: { season_id: season.id })
-                    .merge(Game.final.through_schedule_date(as_of))
-                    .includes(:home_team_snapshot, :away_team_snapshot)
-                    .to_a
+      predictions = Prediction.selected_with_legacy
+                              .where(ratings_config_version: @ratings_config_version)
+                              .joins(:game)
+                              .where(games: { season_id: season.id })
+                              .merge(Game.final.through_schedule_date(as_of))
+                              .includes(:home_team_snapshot, :away_team_snapshot)
+                              .to_a
 
       predictions.each do |prediction|
+        next if prediction.calculation_context.present?
+
         ModelConfiguration.validate_snapshots([prediction.home_team_snapshot, prediction.away_team_snapshot], @ratings_config_version)
       end
 
       @predictions_by_side[:home] = predictions
-                                    .select { |p| p.home_team_snapshot&.team_season_id }
-                                    .group_by { |p| p.home_team_snapshot.team_season_id }
+                                    .select { |p| p.forecast_team_season_id(0) }
+                                    .group_by { |p| p.forecast_team_season_id(0) }
 
       @predictions_by_side[:away] = predictions
-                                    .select { |p| p.away_team_snapshot&.team_season_id }
-                                    .group_by { |p| p.away_team_snapshot.team_season_id }
+                                    .select { |p| p.forecast_team_season_id(1) }
+                                    .group_by { |p| p.forecast_team_season_id(1) }
     end
 
     def finalized_team_games_by_season_id(team_season_ids)
@@ -188,20 +190,20 @@ module ProphetRatings
     # @return [Hash] A hash with :home_offense_boost (non-negative) and :home_defense_boost (non-positive), both rounded to three decimals.
     def calculate_home_advantages(team_season)
       baseline = @ratings_config_version.settings.fetch(:home_court_advantage).to_f
-      home_preds = (@predictions_by_side.fetch(:home)[team_season.id] || []).reject { |p| p.game.neutral? }
+      home_preds = (@predictions_by_side.fetch(:home)[team_season.id] || []).select(&:forecast_home_venue?)
       return { home_offense_boost: baseline, home_defense_boost: -baseline } if home_preds.empty?
 
       off_deltas = home_preds.filter_map do |p|
         next if p.home_offensive_efficiency_error.nil?
 
-        used_boost = p.home_team_snapshot&.home_offense_boost || baseline
+        used_boost = p.forecast_home_boost(:home_offense_boost)
         p.home_offensive_efficiency_error - (used_boost - baseline)
       end
 
       def_deltas = home_preds.filter_map do |p|
         next if p.home_defensive_efficiency_error.nil?
 
-        used_boost = p.home_team_snapshot&.home_defense_boost || -baseline
+        used_boost = p.forecast_home_boost(:home_defense_boost)
         p.home_defensive_efficiency_error - (used_boost + baseline)
       end
 

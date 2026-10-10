@@ -101,9 +101,11 @@ neither publishes nor activates a model nor repairs existing live values.
 
 Pinning settings does not freeze source games, mutable season averages,
 previous-season live inputs before capture, or calculation code. Captured priors
-retain their existing input/output replay contract. Same-day rating selection,
-backfill ordering, mutable season prediction baselines and diagnostic data
-remain limits for leakage-safe evaluation. A stored version identifies settings,
+retain their existing input/output replay contract. New saved forecasts separately
+freeze rating inputs, season anchors/fallbacks and venue evidence under
+[calculation context contract 1](ratings.md#frozen-forecast-context-and-revisions),
+with strict prior-Eastern-date selection and explicit reconstruction labels.
+Legacy forecasts retain their historical selection and replay limits. A stored version identifies settings,
 not a full historical data/code environment.
 
 Run the deterministic solver boundary check in Docker's Python/NumPy image:

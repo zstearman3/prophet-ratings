@@ -126,7 +126,8 @@ class Game < ApplicationRecord
     current_config_id = ratings_config_version&.id
     return nil unless current_config_id
 
-    predictions.find_by(ratings_config_version_id: current_config_id)
+    scope = predictions.where(ratings_config_version_id: current_config_id)
+    scope.selected_pregame.first || scope.where(forecast_kind: 'legacy_unverified').order(id: :desc).first
   end
 
   ##

@@ -29,6 +29,15 @@ module ProphetRatings
       @call ||= build_prediction_hash
     end
 
+    # Unrounded effective quantities used by both replay and persisted diagnostics.
+    def calculation_inputs
+      {
+        'means' => { 'home' => home_expected_ortg.to_f, 'away' => away_expected_ortg.to_f, 'pace' => expected_pace.to_f },
+        'deviations' => { 'home' => total_home_volatility.to_f, 'away' => total_away_volatility.to_f,
+                          'pace' => volatility_calculator.total_pace_volatility.to_f }
+      }
+    end
+
     private
 
     def venue_type

@@ -75,10 +75,7 @@ class TeamsController < ApplicationController
       latest_snapshot_date = @snapshots.last&.snapshot_date
       next unless latest_snapshot_date
 
-      prediction = game.predictions.find do |p|
-        p.home_team_snapshot.ratings_config_version_id == @config.id
-      end
-      @predictions_by_game[game.id] = prediction
+      @predictions_by_game[game.id] = game.current_prediction(ratings_config_version: @config)
     end
   end
 
