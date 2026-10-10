@@ -15,24 +15,31 @@ module ProphetRatings
     def initialize(season = Season.current, ratings_config_version: nil)
       @ratings_config_version = RatingsConfigVersion.resolve(ratings_config_version)
       @config = @ratings_config_version.settings
+      @options = {}
       @season = season
       validate_target_season!
     end
 
-    def call(as_of: nil)
+    def call(as_of: nil, **options)
       as_of = self.class.cutoff_date(as_of, @season)
-      @season.with_lock(requires_new: true) { calculate(as_of:) }
+      @options = options
+      @season.with_lock(requires_new: true) do
+        HistoricalRatingsState.new(@season, @ratings_config_version).restore if @options[:replay]
+        calculate(as_of:)
+      end
     end
 
     def calculate(as_of:)
       validate_live_versions!(as_of)
-      TeamSeasonStatsAggregator.new(season: @season, as_of:, ratings_config_version: @ratings_config_version).run
-      @season.update_average_ratings
+      TeamSeasonStatsAggregator.new(season: @season, as_of:, ratings_config_version: @ratings_config_version,
+                                    verified_only: @options.fetch(:replay, false)).run
+      @season.update_average_ratings(as_of:)
       run_least_squares_adjustments(as_of:) if adjustment_period?(as_of) && enough_finalized_data_for_adjustments?(as_of:)
-      publish(as_of:)
+      publish_ratings(as_of:)
     end
 
     def publish(as_of:)
+      @options = {}
       @season.with_lock(requires_new: true) { publish_ratings(as_of:) }
     end
 
@@ -40,7 +47,9 @@ module ProphetRatings
       validate_live_versions!(as_of)
       update_live_ratings
       @season.rating_team_seasons.find_each { |team_season| team_season.update!(ratings_config_version: @ratings_config_version) }
-      TeamRatingSnapshotService.new(season: @season, as_of:, ratings_config_version: @ratings_config_version).call
+      TeamRatingSnapshotService.new(season: @season, as_of:, ratings_config_version: @ratings_config_version).call if @options.fetch(
+        :publish_snapshots, true
+      )
     end
 
     private :calculate, :publish_ratings

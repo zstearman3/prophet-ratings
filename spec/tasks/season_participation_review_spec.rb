@@ -21,8 +21,12 @@ RSpec.describe SeasonParticipationReview do
   end
 
   def run_review(document)
+    run_review_content(JSON.generate(document))
+  end
+
+  def run_review_content(content)
     Tempfile.create(['participation', '.json']) do |file|
-      file.write(JSON.generate(document))
+      file.write(content)
       file.flush
       ENV['YEAR'] = season.year.to_s
       ENV['REVIEW_PATH'] = file.path
@@ -53,5 +57,29 @@ RSpec.describe SeasonParticipationReview do
       expect { run_review(payload) }.to raise_error(SystemExit) { |error| expect(error.status).to eq(1) }
     end.to output(/season:prepare.*#{team.id}.*aliases.*#{team.id}/).to_stderr.and output(/Saved participation review/).to_stdout
     expect(season.reload.participation_review).to eq(payload)
+  end
+
+  it 'reports malformed JSON with a nonzero exit without changing the season' do
+    original = season.attributes
+    expect do
+      expect { run_review_content('{broken') }.to raise_error(SystemExit) { |error| expect(error.status).to eq(1) }
+    end.to output(/unexpected|expected/i).to_stderr
+    expect(season.reload.attributes).to eq(original)
+    expect(TeamRatingSnapshot.count).to eq(0)
+  end
+
+  it 'reports a missing review file with a nonzero exit without changing the season' do
+    original = season.attributes
+    Tempfile.create(['missing-participation', '.json']) do |file|
+      ENV['YEAR'] = season.year.to_s
+      ENV['REVIEW_PATH'] = file.path
+      File.unlink(file.path)
+      expect do
+        expect { Rake::Task['season:review_participation'].invoke }
+          .to raise_error(SystemExit) { |error| expect(error.status).to eq(1) }
+      end.to output(/No such file/).to_stderr
+    end
+    expect(season.reload.attributes).to eq(original)
+    expect(TeamRatingSnapshot.count).to eq(0)
   end
 end

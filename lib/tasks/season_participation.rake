@@ -10,7 +10,7 @@ namespace :season do
     puts "Saved participation review for season ID #{season.id}; no ratings or snapshots changed."
     review.validate
     puts 'Roster/date/alias coverage passed. Initialize and review ratings before activation.'
-  rescue ArgumentError, KeyError, Season::OperationInProgress => e
+  rescue ArgumentError, KeyError, JSON::ParserError, SystemCallError, Season::OperationInProgress => e
     abort(e.message)
   end
 end

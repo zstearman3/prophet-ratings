@@ -14,6 +14,7 @@ module ProphetRatings
       @season.with_lock(requires_new: true) do
         review = SeasonParticipationReview.new(@season)
         review.validate_publication(@ratings_config_version, @as_of)
+        participation_key = review.publication_key
         ratings_config_version = @ratings_config_version
 
         @season.rating_team_seasons.find_each do |team_season|
@@ -39,16 +40,15 @@ module ProphetRatings
 
             self.class.capture_provenance(snapshot, team_season, ratings_config_version)
 
-            capture_participation(snapshot)
+            capture_participation(snapshot, participation_key)
             snapshot.save!
           end
         end
       end
     end
 
-    def capture_participation(snapshot)
-      key = SeasonParticipationReview.new(@season).publication_key
-      snapshot.stats['participation_key'] = key if key
+    def capture_participation(snapshot, participation_key)
+      snapshot.stats['participation_key'] = participation_key if participation_key
     end
 
     def validate_live_inputs(team_season)

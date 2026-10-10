@@ -217,4 +217,34 @@ RSpec.describe SeasonParticipationReview do
     expect { calculator.publish(as_of: season.start_date - 1) }.to raise_error(ArgumentError, /new-version publication/)
     expect(season.team_rating_snapshots.where(snapshot_date: season.start_date - 1).order(:id).map(&:attributes)).to eq(old_snapshots)
   end
+
+  it 'replays included priors without requiring or resetting excluded priors or publishing snapshots' do
+    apply_review
+    ProphetRatings::PreseasonInitializer.new(season).call
+    original_snapshots = season.team_rating_snapshots.order(:id).map(&:attributes)
+    participant.update!(adj_offensive_efficiency: 999)
+    excluded_attributes = departed.reload.attributes.except(*TeamRatingSnapshot::STORED_RANKS, 'pace_rank')
+    expect(departed.preseason_prior).to be_nil
+    ProphetRatings::OverallRatingsCalculator.new(season).call(as_of: season.start_date, replay: true, publish_snapshots: false)
+    expect(participant.reload.adj_offensive_efficiency).to eq(105.5)
+    expect(departed.reload.attributes.except(*TeamRatingSnapshot::STORED_RANKS, 'pace_rank')).to eq(excluded_attributes)
+    expect(season.team_rating_snapshots.order(:id).map(&:attributes)).to eq(original_snapshots)
+  end
+
+  it 'bounds pace deviation to included games through the replay cutoff' do
+    other = create(:team_season, season:)
+    document['teams'] << { 'team_id' => other.team_id, 'status' => 'included', 'reason' => 'Verified opponent' }
+    create(:team_alias, team: other.team, value: other.team.school)
+    apply_review
+    [[other, 70, 0], [other, 80, 1], [other, 95, 2], [departed, 99, 0]].each do |opponent, pace, day|
+      game = create(:game, season:, home_team_name: participant.team.school, away_team_name: opponent.team.school,
+                           start_time: Time.zone.parse("#{season.start_date + day} 12:00"), possessions: pace, minutes: 40)
+      create(:team_game, game:, team_season: participant, team: participant.team, home: true)
+      create(:team_game, game:, team_season: opponent, team: opponent.team, home: false)
+    end
+    season.update_average_ratings(as_of: season.start_date + 1)
+    expect(season.reload.pace_std_deviation.to_f).to be_within(0.001).of([70.0, 80.0].stdev.to_f)
+    season.update_average_ratings(as_of: season.start_date)
+    expect(season.reload.pace_std_deviation).to be_nil
+  end
 end
