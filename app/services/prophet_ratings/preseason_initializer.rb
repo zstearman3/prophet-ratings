@@ -40,6 +40,8 @@ module ProphetRatings
 
     private
 
+    attr_reader :season, :ratings_config_version
+
     def validate_publication
       SeasonParticipationReview.new(@season).validate_publication(@ratings_config_version, @season.start_date - 1.day)
       return unless @season.current? || @season.games.final.exists? ||

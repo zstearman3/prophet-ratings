@@ -35,12 +35,31 @@ namespace :season do
     abort(e.message)
   end
 
+  desc 'Preview a deliberate preseason revision; requires YEAR and MODEL_VERSION; publish with APPLY=true and PREVIEW_KEY'
+  task revise_preseason: :environment do
+    abort('Select a published new MODEL_VERSION explicitly; preview never changes defaults.') if ENV['MODEL_VERSION'].blank?
+    revision = ProphetRatings::PreseasonRevision.new(target_season!, ratings_config_version: selected_model_version)
+    report = ENV['APPLY'] == 'true' ? revision.call(preview_key: ENV.fetch('PREVIEW_KEY', nil)) : revision.preview
+    puts JSON.pretty_generate(report)
+    puts 'Review this version/coverage/evidence and baselines. Publish with APPLY=true and PREVIEW_KEY from this preview.'
+  rescue ArgumentError, Season::OperationInProgress => e
+    abort(e.message)
+  end
+
+  desc 'Report conflicting offseason profiles without choosing or deleting evidence'
+  task offseason_profile_duplicates: :environment do
+    ids = TeamOffseasonProfile.duplicate_team_season_ids
+    puts JSON.pretty_generate(team_season_ids: ids, profile_ids: TeamOffseasonProfile.where(team_season_id: ids).order(:id).pluck(:id))
+    abort('Deliberately resolve conflicting evidence before migrating; no rows were changed.') if ids.any?
+  end
+
   desc 'Explicitly activate a prepared season after reviewing conference alignment; requires YEAR'
   task activate: :environment do
     season = target_season!
     review_conferences!(season) if env_bool('ALIGN_CONFERENCES', default: true)
     season.set_current!
-    puts "Season activated: year=#{season.year}. Scheduled jobs will now select this season."
+    puts "Season activated: year=#{season.year}, preseason_revision=#{season.preseason_revision&.name || 'legacy'}."
+    puts 'Scheduled jobs will now select this season.'
   rescue ArgumentError, Season::OperationInProgress => e
     abort(e.message)
   end
