@@ -126,26 +126,30 @@ SyncFullSeasonGamesJob.perform_later(season, dedupe: true)
 
 Optional parameters:
 
-- `start_date:` override the sync start date.
-- `end_date:` override the sync end date.
-- `resume:` start from the latest imported game date instead of the season start.
-- `dedupe:` enqueue `RepairDuplicateGamesJob` for the synced season after the date loop completes. This defaults to `false`.
+- `start_date:` / `end_date:` inclusive Eastern date bounds, as Date objects or strict `YYYY-MM-DD` strings. Invalid, reversed, future or out-of-season windows raise before scraping. Omitted bounds use season start through the earlier of season end and Eastern yesterday. Future-only seasons have no valid historical window.
+- `resume:` defaults to true and skips only completed `GameSyncDate` checkpoints in the window. False explicitly rescans completed dates.
+- `dedupe:` defaults to false; opt in to enqueue duplicate repair only after a fully successful sync. Ratings are never enqueued by this job.
 
-Date range:
+Each date gets an initial attempt and up to five retries with 5/10/20/40/80-second
+backoff. Imports and completion commit together; failed partial batches roll back.
+Recognized empty dates complete with zero rows; failures and interruptions remain
+failed/pending. Cumulative attempts, timestamps, row counts and last failure evidence
+are persisted. Existing game presence does not create checkpoints automatically.
+Completion certifies ingestion of a recognized source date, not finalization,
+complete publication, team matching or venue coverage. Ambiguous reconciliation
+fails the date rather than recording completion.
 
-- End defaults to season end and is capped at yesterday in the Eastern schedule-date calendar. An explicit end override is not independently clipped to season end; keep it within the reviewed season boundaries.
-- Start is capped at no earlier than the season start date.
-- If `resume: true`, start defaults to the latest imported game date or season start.
+Later dates continue after exhaustion, then `IncompleteSync` raises with a JSON-ready
+report (`days`, exact `failed_dates`, bounding `retry_window`). Historical operator
+tasks invoke the job body directly so failures exit nonzero instead of silently
+enqueuing ActiveJob retries. Async jobs retain the existing job retry policy, with
+default resume skipping completed dates. The shared date lock prevents concurrent
+ingestion across sync/refresh/daily/team callers.
 
-Each date is retried up to five times with exponential backoff:
-
-- Base delay: 5 seconds
-- Max retries: 5
-
-This job is used by `season:sync_games` and import rake tasks, not bootstrap.
-Exhausted per-date retries are logged and the loop continues; a completed job can
-still contain failed dates. Record those dates and rerun a bounded window with
-resume disabled. See the offseason checklist for job-outcome review.
+This job is used by `season:sync_games` and the explicit legacy all-season
+`import:games` task, not bootstrap or deployment. Prefer small, explicit windows to
+adopt checkpoints on old databases. See [Offseason Operations](offseason.md) for
+initial checkpoint adoption, explicit rescan and failed-window recovery.
 
 ### `SyncTeamGamesJob`
 
@@ -429,7 +433,7 @@ atomic under the shared ratings lock; failures roll back all membership changes.
 
 File: `lib/tasks/import.rake`
 
-Runs `SyncFullSeasonGamesJob` for every season ordered by year.
+Runs `SyncFullSeasonGamesJob` synchronously for every season ordered by year, printing reports and exiting nonzero on failure. Future-only seasons require the separate future refresh workflow; prefer `season:sync_games` with an explicit YEAR and small window for controlled checkpoint adoption.
 
 ```bash
 bin/rails import:games
@@ -484,7 +488,7 @@ review steps, and the distinction from destructive authoritative CSV reconciliat
 File: `lib/tasks/season_bootstrap.rake`
 
 Purpose: sync historical games for an explicit existing YEAR, capped at yesterday.
-Inspect job logs for exhausted date retries; completion does not prove every date succeeded.
+Prints a per-date JSON report and exits nonzero for exhausted retries. Historical windows are inclusive Eastern dates inside the target season and no later than yesterday.
 
 Example:
 
@@ -495,7 +499,7 @@ YEAR=2026 SYNC_RESUME=true bin/rails season:sync_games
 It supports:
 
 - `YEAR`
-- `SYNC_RESUME`
+- `SYNC_RESUME` (default true: skip only completed date checkpoints; false explicitly rescans)
 - `SYNC_START_DATE`
 - `SYNC_END_DATE`
 
@@ -628,7 +632,8 @@ When changing ingestion code:
 - `SyncDailyGamesJob` imports one date and does not enqueue ratings.
 - `SyncNightlyGamesJob` imports a rolling window and then can enqueue `UpdateRankingsJob`.
 - `SyncFromLastGamesJob` resumes from the latest imported game date, delegates each date to `Ingestion::GamesIngestionService`, and then can enqueue `UpdateRankingsJob`.
-- `SyncFullSeasonGamesJob` handles retry/backoff per date, delegates each date to `Ingestion::GamesIngestionService`, and does not enqueue ratings by itself.
+- `SyncFullSeasonGamesJob` requires a target season, validates historical bounds, checkpoints successful/empty dates transactionally and retries failed/unknown dates on resume. Exhausted dates raise a structured incomplete-run report after later dates run. It does not enqueue ratings by itself. See [Offseason Operations](offseason.md) for initial checkpoint adoption, bounded rescan and recovery.
+- All ingestion service callers share a per-date advisory lock. Historical sync and future refresh hold it through their date transaction commit; contention fails visibly instead of starting concurrent imports.
 - `SyncTeamGamesJob` is useful for targeted repair, delegates team-date rows to `Ingestion::GamesIngestionService`, and defaults `season_id` to `Season.last.id`.
 - `Scraper::GamesScraper#scrape_day_batch` slices with an exact batch size; adjacent batches do not overlap. Schedule responses are cached per scraper and failed/unrecognized pages raise instead of counting as empty dates.
 - `Importer::GamesImporter` logs partial team matches but can still preserve games with missing team-season associations.

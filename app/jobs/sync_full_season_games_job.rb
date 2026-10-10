@@ -3,83 +3,36 @@
 class SyncFullSeasonGamesJob < ApplicationJob
   queue_as :default
 
-  MAX_RETRIES = 5
-  BASE_DELAY_SECONDS = 5
+  # Carries the complete per-date report through async failures and operator exits.
+  class IncompleteSync < StandardError
+    attr_reader :report
 
-  def perform(season = Season.current, start_date: nil, end_date: nil, resume: false, dedupe: false)
-    season = resolve_season(season)
-    date_range = sync_date_range(season, start_date:, end_date:, resume:)
-    return if date_range.nil?
-
-    date_range.each do |date|
-      retry_count = 0
-      begin
-        import_day(date)
-      rescue StandardError => e
-        if retry_count < MAX_RETRIES
-          delay = BASE_DELAY_SECONDS * (2**retry_count)
-          Rails.logger.warn { "Failed to import games for #{date}: #{e.message}. Retrying in #{delay} seconds..." }
-          sleep delay
-          retry_count += 1
-          retry
-        else
-          Rails.logger.error { "Failed to import games for #{date} after #{MAX_RETRIES} attempts: #{e.message}" }
-        end
-      end
+    def initialize(report)
+      @report = report
+      super("Historical sync incomplete: retry dates #{report[:failed_dates].join(', ')}")
     end
+  end
 
-    enqueue_duplicate_repair(season) if dedupe
+  def perform(season, start_date: nil, end_date: nil, resume: true, dedupe: false)
+    @sync_season = season.is_a?(Season) ? season : Season.find(season)
+    dates = Ingestion::HistoricalSyncWindow.new(season: sync_season, start_date:, end_date:).dates
+    days = dates.map { |date| Ingestion::HistoricalSyncDay.new(season: sync_season, date:, resume:).call }
+    @failed_dates = days.select { |day| day[:error] }.pluck(:date)
+    report = { year: sync_season.year, days:, failed_dates:, retry_window: }
+    Rails.logger.info { "Historical sync: #{report.to_json}" }
+    raise IncompleteSync, report if failed_dates.any?
+
+    RepairDuplicateGamesJob.perform_later(season_id: sync_season.id, apply: true) if dedupe
+    report
   end
 
   private
 
-  def resolve_season(season)
-    return season if season.is_a?(Season)
+  attr_reader :failed_dates, :sync_season
 
-    Season.find(season)
-  end
+  def retry_window
+    return if failed_dates.empty?
 
-  def sync_date_range(season, start_date:, end_date:, resume:)
-    sync_end_date = [coerce_date(end_date) || season.end_date, Game.current_schedule_date - 1.day].min
-    sync_start_date = coerce_date(start_date) || (resume ? resume_start_date(season) : season.start_date)
-    sync_start_date = [sync_start_date, season.start_date].max
-
-    if sync_start_date > sync_end_date
-      Rails.logger.info do
-        "Skipping season sync for #{season.year}: computed empty range " \
-          "(start=#{sync_start_date}, end=#{sync_end_date})"
-      end
-      return nil
-    end
-
-    sync_start_date..sync_end_date
-  end
-
-  def resume_start_date(season)
-    latest_imported = season.games.through_schedule_date(Game.current_schedule_date - 1.day).maximum(:start_time)&.then do |start_time|
-      Game.schedule_date_for(start_time)
-    end
-    latest_imported || season.start_date
-  end
-
-  def coerce_date(value)
-    return value if value.is_a?(Date)
-    return value.to_date if value.respond_to?(:to_date)
-    return if value.blank?
-
-    Date.parse(value.to_s)
-  rescue ArgumentError
-    nil
-  end
-
-  def import_day(date)
-    Rails.logger.info { "Starting game scrape for #{date}" }
-    result = Ingestion::GamesIngestionService.new(date:).call
-    Rails.logger.info { "Imported #{result[:imported_rows]} games for #{date}" }
-  end
-
-  def enqueue_duplicate_repair(season)
-    RepairDuplicateGamesJob.perform_later(season_id: season.id, apply: true)
-    Rails.logger.info { "Enqueued duplicate game repair for #{season.name}" }
+    { start_date: failed_dates.min, end_date: failed_dates.max, resume: true }
   end
 end

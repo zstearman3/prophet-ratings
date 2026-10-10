@@ -67,13 +67,17 @@ namespace :season do
   desc 'Sync historical games for an explicit existing YEAR; supports SYNC_START_DATE/SYNC_END_DATE and SYNC_RESUME'
   task sync_games: :environment do
     season = target_season!
-    SyncFullSeasonGamesJob.perform_now(
+    report = SyncFullSeasonGamesJob.new.perform(
       season,
-      start_date: parse_date_env('SYNC_START_DATE'),
-      end_date: parse_date_env('SYNC_END_DATE'),
+      start_date: ENV.fetch('SYNC_START_DATE', nil),
+      end_date: ENV.fetch('SYNC_END_DATE', nil),
       resume: env_bool('SYNC_RESUME', default: true)
     )
-    puts "Games sync finished for year=#{season.year}; inspect job logs for exhausted per-date retries."
+    puts JSON.pretty_generate(report)
+    puts "Games sync complete for year=#{season.year}. Review unmatched games and venue coverage."
+  rescue SyncFullSeasonGamesJob::IncompleteSync => e
+    puts JSON.pretty_generate(e.report)
+    abort(e.message)
   rescue ArgumentError => e
     abort(e.message)
   end

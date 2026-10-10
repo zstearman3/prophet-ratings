@@ -55,6 +55,7 @@ class Season < ApplicationRecord
 
   belongs_to :preseason_revision, class_name: 'RatingsConfigVersion', optional: true
 
+  has_many :game_sync_dates, dependent: :destroy
   has_many :games, dependent: :destroy
   has_many :team_seasons, dependent: :destroy
   has_many :predictions, through: :games

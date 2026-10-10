@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_10_040000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_10_050000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -109,6 +109,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_10_040000) do
     t.integer "total_under_odds"
     t.datetime "updated_at", null: false
     t.index ["game_id"], name: "index_game_odds_on_game_id_unique", unique: true
+  end
+
+  create_table "game_sync_dates", force: :cascade do |t|
+    t.integer "attempts", default: 0, null: false
+    t.datetime "completed_at"
+    t.datetime "created_at", null: false
+    t.integer "imported_rows"
+    t.datetime "last_attempt_at"
+    t.text "last_error"
+    t.date "schedule_date", null: false
+    t.bigint "season_id", null: false
+    t.string "status", default: "pending", null: false
+    t.datetime "updated_at", null: false
+    t.index ["season_id", "schedule_date"], name: "index_game_sync_dates_on_season_id_and_schedule_date", unique: true
+    t.index ["season_id"], name: "index_game_sync_dates_on_season_id"
   end
 
   create_table "games", force: :cascade do |t|
@@ -552,6 +567,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_10_040000) do
   add_foreign_key "coaching_changes", "teams"
   add_foreign_key "coaching_changes", "teams", column: "previous_team_id"
   add_foreign_key "game_odds", "games"
+  add_foreign_key "game_sync_dates", "seasons"
   add_foreign_key "predictions", "ratings_config_versions"
   add_foreign_key "predictions", "team_rating_snapshots", column: "away_team_snapshot_id"
   add_foreign_key "predictions", "team_rating_snapshots", column: "home_team_snapshot_id"
