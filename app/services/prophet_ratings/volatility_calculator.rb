@@ -14,7 +14,7 @@ module ProphetRatings
                                                                  options[:ratings_config_version])
       @home_rating_snapshot = home_rating_snapshot
       @away_rating_snapshot = away_rating_snapshot
-      @upset_modifier = options.fetch(:upset_modifier, 1.0)
+      @upset_modifier = ModelConfiguration.validated_deviation(options.fetch(:upset_modifier, 1.0))
       @season = season
     end
 
@@ -22,28 +22,28 @@ module ProphetRatings
     # Returns the offensive efficiency volatility for the home team, using the rating snapshot if available or falling back to the season's efficiency standard deviation.
     # @return [Float] The home team's offensive efficiency volatility value.
     def home_offensive_volatility
-      home_rating_snapshot.offensive_efficiency_volatility || efficiency_fallback
+      ModelConfiguration.validated_deviation(home_rating_snapshot.offensive_efficiency_volatility || efficiency_fallback)
     end
 
     ##
     # Returns the offensive efficiency volatility for the away team, falling back to the season's efficiency standard deviation if unavailable.
     # @return [Float] The away team's offensive volatility value.
     def away_offensive_volatility
-      away_rating_snapshot.offensive_efficiency_volatility || efficiency_fallback
+      ModelConfiguration.validated_deviation(away_rating_snapshot.offensive_efficiency_volatility || efficiency_fallback)
     end
 
     ##
     # Returns the defensive efficiency volatility for the home team, using the rating snapshot if available or falling back to the season's efficiency standard deviation.
     # @return [Float] The home team's defensive efficiency volatility value.
     def home_defensive_volatility
-      home_rating_snapshot.defensive_efficiency_volatility || efficiency_fallback
+      ModelConfiguration.validated_deviation(home_rating_snapshot.defensive_efficiency_volatility || efficiency_fallback)
     end
 
     ##
     # Returns the defensive efficiency volatility for the away team, falling back to the season's efficiency standard deviation if unavailable.
     # @return [Float] The away team's defensive efficiency volatility value.
     def away_defensive_volatility
-      away_rating_snapshot.defensive_efficiency_volatility || efficiency_fallback
+      ModelConfiguration.validated_deviation(away_rating_snapshot.defensive_efficiency_volatility || efficiency_fallback)
     end
 
     ##
@@ -64,14 +64,14 @@ module ProphetRatings
     # Returns the pace volatility for the home team, using the rating snapshot if available or falling back to the season's pace standard deviation.
     # @return [Float] The home team's pace volatility value.
     def home_pace_volatility
-      home_rating_snapshot.pace_volatility || pace_fallback
+      ModelConfiguration.validated_deviation(home_rating_snapshot.pace_volatility || pace_fallback)
     end
 
     ##
     # Returns the pace volatility for the away team, using the rating snapshot if available or falling back to the season's pace standard deviation.
     # @return [Float] The away team's pace volatility value.
     def away_pace_volatility
-      away_rating_snapshot.pace_volatility || pace_fallback
+      ModelConfiguration.validated_deviation(away_rating_snapshot.pace_volatility || pace_fallback)
     end
 
     ##
@@ -81,19 +81,9 @@ module ProphetRatings
       Math.sqrt((home_pace_volatility**2) + (away_pace_volatility**2))
     end
 
-    ##
-    # Determines the confidence level based on the absolute difference between total home and away volatilities.
-    # @return [String] The confidence level: 'High', 'Medium', or 'Low'.
+    # Volatility alone does not establish calibrated prediction confidence.
     def confidence_level
-      volatility_gap = (total_home_volatility - total_away_volatility).abs
-
-      if volatility_gap < config.dig(:prediction, :confidence_levels, :high_max)
-        'High'
-      elsif volatility_gap < config.dig(:prediction, :confidence_levels, :medium_max)
-        'Medium'
-      else
-        'Low'
-      end
+      'Uncalibrated'
     end
 
     private

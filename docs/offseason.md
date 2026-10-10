@@ -480,3 +480,14 @@ Neither deployment nor activation repairs legacy inputs or freezes mutable data.
 Older already-queued jobs with no version argument need review during rollout;
 their original intended settings were not recorded. No production import,
 backfill, rebuild, migration, or deployment was run to verify this change.
+
+### Shared-pace model rollout
+
+`v1.7-shared-pace` is the newly authored uncertainty baseline. Publish explicitly,
+then select the stored version for fresh preseason inputs and snapshots before
+activation, following the model-switch safeguards above. Its exact score/margin/
+total moments share one uncertain pace; win probability uses efficiency difference.
+The matchup screen reports confidence as Uncalibrated. Inspect numerical outputs
+and coverage without claiming calibration; see [Ratings](ratings.md#shared-pace-uncertainty-baseline).
+Older immutable models retain their numerical behavior and published predictions.
+No import, rebuild, model activation, or production operation is automatic.

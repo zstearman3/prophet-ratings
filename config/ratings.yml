@@ -1,5 +1,5 @@
 default: &default
-  bundle_name: "v1.6-pinned-model"
+  bundle_name: "v1.7-shared-pace"
   preseason:
     previous_season_weight: 0.85
     fallback_efficiency: 105.5

@@ -54,6 +54,9 @@ class BetRecommendationGenerator
 
     model_margin = prediction.home_score - prediction.away_score
     stddev = prediction.margin_std_deviation
+    # As with totals, skip deterministic spreads; the EV model has no push outcome.
+    return retire_deterministic_spread(prediction) if stddev.zero?
+
     line = game_odd.spread_point
 
     prob_home_covers = cover_probability(
@@ -87,6 +90,15 @@ class BetRecommendationGenerator
       ev: ev.round(4),
       recommended:
     )
+  end
+
+  def retire_deterministic_spread(prediction)
+    if prediction.ratings_config_version.current
+      BetRecommendation.where(game: @game, bet_type: 'spread', current: true).find_each do |recommendation|
+        recommendation.update!(current: false)
+      end
+    end
+    nil
   end
 
   ##

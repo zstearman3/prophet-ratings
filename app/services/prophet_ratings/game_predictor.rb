@@ -25,6 +25,7 @@ module ProphetRatings
     def call
       raise ArgumentError, 'Missing home or away rating snapshot' unless @home_rating_snapshot && @away_rating_snapshot
 
+      score_moments
       @call ||= build_prediction_hash
     end
 
@@ -88,6 +89,18 @@ module ProphetRatings
         venue_confidence: venue_confidence,
         home_court_adjustment_applied: home_court_adjustment_applied?,
         venue_confidence_issue:
+      }.merge(uncertainty_metadata)
+    end
+
+    def uncertainty_metadata
+      return {} unless config.dig(:prediction, :uncertainty_model) == 'shared_pace_v1'
+
+      {
+        home_score_std_deviation: Math.sqrt(score_moments.home_variance),
+        away_score_std_deviation: Math.sqrt(score_moments.away_variance),
+        score_covariance: score_moments.score_covariance,
+        margin_std_deviation: Math.sqrt(score_moments.margin_variance),
+        total_std_deviation: Math.sqrt(score_moments.total_variance)
       }
     end
 
@@ -155,26 +168,30 @@ module ProphetRatings
       @away_expected_score ||= ((away_expected_ortg * expected_pace) / 100.0).round(2)
     end
 
-    ##
-    # Calculates the probability that the home team wins based on expected scores and combined volatilities.
-    ##
-    # Calculates the probability that the home team wins based on expected scores and combined team volatilities.
-    # @return [Float] The probability (between 0 and 1) that the home team wins, rounded to four decimal places.
+    # Select arithmetic from the immutable payload; never relabel historical model behavior.
     def win_probability_home
+      return legacy_win_probability_home unless config.dig(:prediction, :uncertainty_model) == 'shared_pace_v1'
+
+      score_moments.home_win_probability.round(4)
+    end
+
+    def score_moments
+      @score_moments ||= ScoreMoments.new(
+        means: { home: home_expected_ortg, away: away_expected_ortg, pace: expected_pace },
+        deviations: { home: total_home_volatility, away: total_away_volatility, pace: volatility_calculator.total_pace_volatility }
+      )
+    end
+
+    def legacy_win_probability_home
       score_diff = home_expected_score - away_expected_score
-      eff_to_score_scale = (expected_pace**2) / 10_000.0
+      volatility = Math.sqrt((total_home_volatility**2) + (total_away_volatility**2)) * (expected_pace**2) / 10_000.0
+      return score_moments.home_win_probability if volatility.zero?
 
-      home_score_volatility = total_home_volatility * eff_to_score_scale
-      away_score_volatility = total_away_volatility * eff_to_score_scale
-
-      volatility = Math.sqrt((home_score_volatility**2) + (away_score_volatility**2))
-      probability = StatisticsUtils.normal_cdf(score_diff / volatility)
-
-      probability.round(4)
+      StatisticsUtils.normal_cdf(score_diff / volatility).round(4)
     end
 
     ##
-    # Returns the confidence level of the prediction based on volatility calculations.
+    # Returns an explicitly uncalibrated confidence label.
     # @return [String] The confidence level label as determined by the volatility calculator.
     def confidence_level
       volatility_calculator.confidence_level

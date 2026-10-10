@@ -492,3 +492,55 @@ must match before snapshot publication; the additive migration fabricates no
 historical identity. See [Model configuration versions](model-versions.md) for
 the contract, author/publish/select/activate commands, rollout and real-solver
 verification. Source-data and calculation-code changes remain replay limits.
+
+## Shared-pace uncertainty baseline
+
+The authored `v1.7-shared-pace` model selects `prediction.uncertainty_model:
+shared_pace_v1`. Independent matchup efficiencies H and A (points per 100
+possessions) and one independent normal pace P (possessions per 40 minutes)
+produce scores P*H/100 and P*A/100. Offensive performance is the opponent's
+defensive performance; no extra defensive outcome is sampled. Each efficiency
+variance remains the sum of offense/opponent-defense component variances times
+the upset modifier squared. Pace variance remains the sum of both team pace
+variances. Residual-derived components are a baseline assumption, not proven
+isolated sources of variance; coefficients are unchanged.
+
+With means h, a, p and variances vh, va, vp, score variances are
+`((p² + vp)*vh + vp*h²)/10000` and
+`((p² + vp)*va + vp*a²)/10000`. Shared pace induces score covariance
+`vp*h*a/10000`. Margin and total variances are respectively
+`((p² + vp)*(vh + va) + vp*(h-a)²)/10000` and
+`((p² + vp)*(vh + va) + vp*(h+a)²)/10000`. SDs are square roots;
+product-of-variances terms are retained. At fixed pace SD scales by p/100 once.
+
+Home win probability uses `Phi((h-a)/sqrt(vh+va))`, independently of pace.
+With zero efficiency-difference variance it is 1/0 for positive/negative
+mean difference, or 0.5 for tied means. This assumes physical positive pace.
+The unchanged raw normal pace simulation has a possible nonpositive tail;
+its win-frequency agreement is approximate to that tail. There is no clamping,
+truncation or distribution change. Score products are not themselves normal.
+
+Finite nonnegative SDs are required; explicit zero is valid. Missing snapshot
+SDs in predictor/simulator calculations retain the season deviation, then stored
+model baseline fallback. Invalid supplied SDs do not fall back. Missing/nonfinite
+core ratings or nonpositive expected pace raise explicit errors. Persisted
+uncertainty diagnostics require stored snapshot efficiency and pace SDs, and
+use stored prediction means and pace with modifier 1 (the builder's modifier).
+The shared-pace builder skips snapshots missing any of these SDs before saving
+a prediction, so downstream diagnostics never require mutable fallbacks for
+new persisted outputs. Interactive predictor/simulator fallbacks and legacy
+builder behavior remain available. Spread recommendations with zero SD are
+skipped, matching the existing total-market policy; the recommendation EV model
+does not represent push outcomes. For the active model, skipping a deterministic
+spread also retires prior current spread recommendations for that game, retaining
+their historical records. Inactive-model evaluations leave current recommendations
+unchanged. Moneyline recommendations remain available.
+Rounded persisted means and mutable season fallback inputs remain replay limits
+until prediction context is frozen by subsequent work.
+
+The API and matchup UI report confidence as **Uncalibrated**, for every model
+and volatility magnitude. Old confidence thresholds remain in the contract for
+legacy payload compatibility but do not establish confidence. Correct arithmetic
+is not evidence of calibration. Legacy payloads without the uncertainty selector
+retain their prior probability and margin/total diagnostic arithmetic; their
+stored predictions and immutable payloads are not rewritten.

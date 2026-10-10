@@ -38,6 +38,13 @@ module ProphetRatings
 
     private
 
+    def validate_inputs
+      ScoreMoments.new(
+        means: { home: home_expected_ortg, away: away_expected_ortg, pace: expected_pace },
+        deviations: { home: total_home_volatility, away: total_away_volatility, pace: total_pace_volatility }
+      )
+    end
+
     def neutral
       @options.fetch(:neutral, false)
     end
@@ -56,6 +63,7 @@ module ProphetRatings
     # Simulates the game's pace using a Gaussian distribution based on expected pace and total pace volatility.
     # @return [Float] The simulated pace value.
     def simulate_pace
+      validate_inputs
       Gaussian.new(expected_pace, total_pace_volatility).rand
     end
 

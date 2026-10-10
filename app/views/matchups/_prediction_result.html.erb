@@ -3,6 +3,7 @@
     <h2 class="text-lg font-semibold text-gray-800 mb-4">Predicted Result</h2>
 
     <div class="mb-2">
+      <p><strong>Confidence:</strong> <%= prediction[:confidence_level] %></p>
       <p><strong>Home:</strong> <%= prediction[:home_team] %> — <%= number_with_precision(prediction[:home_expected_score], precision: 1) %> pts</p>
       <p><strong>Away:</strong> <%= prediction[:away_team] %> — <%= number_with_precision(prediction[:away_expected_score], precision: 1) %> pts</p>
     </div>

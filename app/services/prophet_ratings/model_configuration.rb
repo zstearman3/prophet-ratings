@@ -32,6 +32,11 @@ module ProphetRatings
       validate_bounds(payload)
     end
 
+    def self.validate_uncertainty_model(payload)
+      model = payload.dig(:prediction, :uncertainty_model)
+      raise ArgumentError, "Unsupported prediction uncertainty model: #{model}" unless [nil, 'shared_pace_v1'].include?(model)
+    end
+
     def self.validate_number(payload, path)
       value = payload.dig(*path.split('.').map(&:to_sym))
       return if value.is_a?(Numeric) && value.finite? && value >= 0
@@ -40,6 +45,7 @@ module ProphetRatings
     end
 
     def self.validate_bounds(payload)
+      validate_uncertainty_model(payload)
       %w[weighting.recency_decay_days weighting.preseason_decay_days blowout.max_margin
          preseason.fallback_efficiency preseason.fallback_pace defaults.season_defaults.average_pace
          defaults.season_defaults.average_efficiency baseline_volatility.efficiency_volatility
@@ -73,7 +79,15 @@ module ProphetRatings
 
       version ||= home.ratings_config_version
       validate_snapshots([home, away], version)
+      validate_prediction_ratings([home, away])
       validated_version(version)
+    end
+
+    def self.validate_prediction_ratings(snapshots)
+      values = snapshots.flat_map { |snapshot| [snapshot.adj_offensive_efficiency, snapshot.adj_defensive_efficiency, snapshot.adj_pace] }
+      return if values.all? { |value| value.is_a?(Numeric) && value.finite? }
+
+      raise ArgumentError, 'Prediction requires finite efficiency and pace ratings'
     end
 
     def self.validated_version(version)
@@ -96,8 +110,13 @@ module ProphetRatings
       values
     end
 
+    def self.validated_deviation(value)
+      validate_volatilities([value])
+      value
+    end
+
     def self.validate_volatilities(values)
-      return if values.all? { |value| value&.finite? && value >= 0 }
+      return if values.all? { |value| value.is_a?(Numeric) && value.finite? && value >= 0 }
 
       raise ArgumentError, 'Stored prediction uncertainty requires valid snapshot volatility'
     end

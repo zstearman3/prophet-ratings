@@ -10,6 +10,7 @@ RSpec.describe ProphetRatings::ModelConfiguration do
   def stored_version(name, home_boost:, efficiency:, pace:, volatility:)
     payload = RatingsConfigVersion.authored_config
     payload[:bundle_name] = name
+    payload[:prediction].delete(:uncertainty_model)
     payload[:home_court_advantage] = home_boost
     payload[:defaults][:season_defaults] = { average_efficiency: efficiency, average_pace: pace }
     payload[:baseline_volatility] = { efficiency_volatility: volatility, pace_volatility: 4 }
@@ -73,6 +74,13 @@ RSpec.describe ProphetRatings::ModelConfiguration do
     expect { RatingsConfigVersion.publish!(payload) }.to raise_error(ArgumentError, /must be positive/)
   end
 
+  it 'rejects an unknown uncertainty model instead of silently using legacy arithmetic' do
+    payload = RatingsConfigVersion.authored_config
+    payload[:bundle_name] = 'unknown-uncertainty'
+    payload[:prediction][:uncertainty_model] = 'future-model'
+    expect { RatingsConfigVersion.publish!(payload) }.to raise_error(ArgumentError, /Unsupported prediction uncertainty model/)
+  end
+
   it 'keeps activation idempotent and accepts a previously active instance after another model is activated' do
     first.activate
     first.activate
@@ -115,10 +123,10 @@ RSpec.describe ProphetRatings::ModelConfiguration do
     result_one = predict(pair_one)
     result_two = predict(pair_two)
     # First: pace 70 + 70 - 70 = 70; efficiencies 100 +/- 3; score SD = 2*2*(70^2/10000) = 1.96.
-    expect(result_one.values_at(:home_expected_score, :away_expected_score, :confidence_level)).to eq([72.1, 67.9, 'High'])
+    expect(result_one.values_at(:home_expected_score, :away_expected_score, :confidence_level)).to eq([72.1, 67.9, 'Uncalibrated'])
     expect(result_one[:win_probability_home]).to eq(StatisticsUtils.normal_cdf(4.2 / 1.96).round(4))
     # Second: pace 70 + 70 - 80 = 60; efficiencies 90 +/- 7; combined score SD = 20*0.36 = 7.2.
-    expect(result_two.values_at(:home_expected_score, :away_expected_score, :confidence_level)).to eq([58.2, 49.8, 'Low'])
+    expect(result_two.values_at(:home_expected_score, :away_expected_score, :confidence_level)).to eq([58.2, 49.8, 'Uncalibrated'])
     expect(result_two[:win_probability_home]).to eq(StatisticsUtils.normal_cdf(8.4 / 7.2).round(4))
     expect(predict(pair_one)).to eq(result_one)
   end
