@@ -531,7 +531,10 @@ a prediction, so downstream diagnostics never require mutable fallbacks for
 new persisted outputs. Interactive predictor/simulator fallbacks and legacy
 builder behavior remain available. Spread recommendations with zero SD are
 skipped, matching the existing total-market policy; the recommendation EV model
-does not represent push outcomes. Moneyline recommendations remain available.
+does not represent push outcomes. For the active model, skipping a deterministic
+spread also retires prior current spread recommendations for that game, retaining
+their historical records. Inactive-model evaluations leave current recommendations
+unchanged. Moneyline recommendations remain available.
 Rounded persisted means and mutable season fallback inputs remain replay limits
 until prediction context is frozen by subsequent work.
 

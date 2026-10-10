@@ -153,11 +153,7 @@ describe BetRecommendationGenerator do
 
     context 'with deterministic score uncertainty' do
       before do
-        [home_snapshot, away_snapshot].each do |snapshot|
-          snapshot.update!(offensive_efficiency_volatility: 0, defensive_efficiency_volatility: 0, pace_volatility: 0)
-        end
-        prediction.reload.update!(home_score: 70, away_score: 70, home_offensive_efficiency: 100,
-                                  away_offensive_efficiency: 100, home_win_probability: 0.5)
+        make_prediction_deterministic
       end
 
       [0, -5, 5].each do |spread|
@@ -170,6 +166,40 @@ describe BetRecommendationGenerator do
           expect(recs.first.ev).to be_finite
           expect(game.bet_recommendations.where(bet_type: 'spread')).to be_empty
         end
+      end
+    end
+
+    context 'when an existing spread becomes deterministic' do
+      let!(:previous_spread) { described_class.call(game:).compact.find { |rec| rec.bet_type == 'spread' } }
+
+      before { make_prediction_deterministic }
+
+      it 'retires the prior current spread while preserving the record and finite moneyline output' do
+        previous_confidence = previous_spread.confidence
+        recs = described_class.call(game:).compact
+        expect(previous_spread.reload).not_to be_current
+        expect(previous_spread.confidence).to eq(previous_confidence)
+        expect(recs.map(&:bet_type)).to eq(['moneyline'])
+        expect(recs.first.confidence).to be_finite
+        expect(recs.first).to be_current
+      end
+
+      it 'does not retire a current recommendation when evaluating an inactive model' do
+        ratings_config_version.update!(current: false)
+        described_class.call(game:)
+        expect(previous_spread.reload).to be_current
+      end
+
+      it 'leaves another games current spread unchanged' do
+        other_game = create(:game, season:, start_time: game.start_time + 1.day)
+        other_prediction = create(:prediction, game: other_game, home_team_snapshot: home_snapshot,
+                                               away_team_snapshot: away_snapshot, ratings_config_version:)
+        other_odd = create(:game_odd, game: other_game, fetched_at: Time.zone.now)
+        other_spread = create(:bet_recommendation, game: other_game, prediction: other_prediction,
+                                                   game_odd: other_odd, ratings_config_version:, current: true)
+        described_class.call(game:)
+        expect(previous_spread.reload).not_to be_current
+        expect(other_spread.reload).to be_current
       end
     end
 
@@ -226,5 +256,13 @@ describe BetRecommendationGenerator do
         expect(total_rec.recommended).to be_in([true, false])
       end
     end
+  end
+
+  def make_prediction_deterministic
+    [home_snapshot, away_snapshot].each do |snapshot|
+      snapshot.update!(offensive_efficiency_volatility: 0, defensive_efficiency_volatility: 0, pace_volatility: 0)
+    end
+    prediction.reload.update!(home_score: 70, away_score: 70, home_offensive_efficiency: 100,
+                              away_offensive_efficiency: 100, home_win_probability: 0.5)
   end
 end
