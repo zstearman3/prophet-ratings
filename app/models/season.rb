@@ -68,12 +68,12 @@ class Season < ApplicationRecord
     team_rating_snapshots.exists? || predictions.exists? || games.final.exists? || initialized.exists?
   end
 
-  def update_average_ratings
+  def update_average_ratings(as_of: nil)
     update!(
       average_efficiency: calculated_average_efficiency,
       average_pace: calculated_average_pace,
       efficiency_std_deviation: calculated_efficiency_deviation,
-      pace_std_deviation: calculated_pace_deviation
+      pace_std_deviation: calculated_pace_deviation(as_of)
     )
   end
 
@@ -155,9 +155,10 @@ class Season < ApplicationRecord
     team_seasons.average(:offensive_efficiency_std_dev)
   end
 
-  def calculated_pace_deviation
-    paces = games.final.filter_map(&:pace)
-    return nil if paces.empty?
+  def calculated_pace_deviation(as_of)
+    results = as_of ? games.final.through_schedule_date(as_of) : games.final
+    paces = results.filter_map(&:pace)
+    return nil if paces.size < 2
 
     paces.stdev
   end

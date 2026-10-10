@@ -307,8 +307,11 @@ even for explicit end overrides. A future season does no daily work. Legacy futu
 snapshots are ignored when choosing the resume date. Each day's writes are
 transactional; a failed day is rolled back and the command fails, leaving completed
 days available for resume. The latest completed snapshot date is reprocessed.
-Resume can update outputs in its window; it does not delete history or implicitly
-reset preseason values. RUN_PRESEASON=true is rejected by this task.
+Resume can update outputs in its window; it does not delete history or capture
+new preseason inputs. It restores the selected captured priors on each date before
+calculating from bounded results. Every participant requires a complete matching
+capture; missing/invalid provenance fails and rolls back that day.
+RUN_PRESEASON=true is rejected by this task.
 
 An intentional destructive rebuild requires an explicit season, date window and
 confirmation:
@@ -332,9 +335,22 @@ so schedule it during an appropriate maintenance window. Its final day's values
 become the live TeamSeason state even when later snapshots are preserved; resume
 through the desired current cutoff before returning that season to ordinary use.
 These are reconstruction tools, not live pregame archives. New saved predictions
-exclude game-day snapshots and carry reconstruction provenance; historical season
-anchors are not retrospectively reconstructed as-of values. Legacy backfill rows
-may retain same-day leakage.
+use reconstructed prior-day ratings and season anchors, with actual generation
+time and explicit reconstruction provenance. Historical prior-day working state
+is not published outside the requested snapshot window. Reconstruction inputs
+record their capture IDs and result cutoff, without pretending to have persisted
+prior-day snapshot IDs. Replay learns only from one verified pregame issuance per
+game/model; legacy rows and reconstructions are excluded from learning. Legacy
+backfill rows may retain same-day leakage.
+
+Resume leaves live values at its final replay date, too. To restore a desired
+cutoff, run resume with explicit RATINGS_START_DATE and RATINGS_END_DATE (set both
+to that date for a single-date restoration). Later snapshots are preserved and
+are not starting state. Corrected source results and changes to calculation code
+can change reconstruction; the tool does not recover historically available data.
+Prepared finalized game/team-game statistics are inputs: replay no longer invokes
+GameFinalizer to recalculate/import them or rewrites archived outcome errors.
+Review/correct those stored results through the separate ingestion workflow first.
 
 Operator rating commands invoke the job body synchronously under the shared lock
 so exceptions fail the command instead of scheduling a retry and printing success.

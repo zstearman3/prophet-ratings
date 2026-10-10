@@ -37,7 +37,8 @@ module ProphetRatings
 
     def self.snapshot_inputs(snapshot)
       {
-        'source' => snapshot.attributes.slice('id', 'team_id', 'team_season_id', 'snapshot_date', 'created_at', 'updated_at'),
+        'source' => snapshot.attributes.slice('id', 'team_id', 'team_season_id', 'snapshot_date', 'created_at', 'updated_at')
+                            .merge(snapshot.stats.slice('reconstruction')),
         'ratings' => numerical_fields(snapshot, RATING_FIELDS),
         'stats' => numerical_fields(snapshot, STATS_FIELDS),
         'school' => snapshot.team.school

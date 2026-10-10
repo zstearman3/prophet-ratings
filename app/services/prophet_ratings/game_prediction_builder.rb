@@ -26,6 +26,15 @@ module ProphetRatings
       nil
     end
 
+    # Historical working inputs are explicit reconstructions, never operational issuances.
+    def reconstruct(snapshots:)
+      game.with_lock do
+        @home_snapshot, @away_snapshot = snapshots
+        @generated_at = Time.current
+        build_revision
+      end
+    end
+
     private
 
     attr_reader :game, :ratings_config_version
@@ -69,12 +78,15 @@ module ProphetRatings
     end
 
     def provenance_attributes(context)
-      { home_team_snapshot: home_snapshot, away_team_snapshot: away_snapshot,
+      { home_team_snapshot: home_snapshot.persisted? ? home_snapshot : nil,
+        away_team_snapshot: away_snapshot.persisted? ? away_snapshot : nil,
         calculation_context: context, forecast_kind:, generated_at: @generated_at,
         forecast_start_time: game.start_time, input_cutoff: }
     end
 
     def forecast_kind
+      return 'reconstruction' unless home_snapshot.persisted? && away_snapshot.persisted?
+
       if game.scheduled? && game.start_time > @generated_at &&
          [game.home_team_score, game.away_team_score].compact.empty?
         'pregame'

@@ -35,7 +35,7 @@ RSpec.describe ResumeSeasonRatingsJob do
     calculator = instance_double(ProphetRatings::OverallRatingsCalculator)
     allow(ProphetRatings::OverallRatingsCalculator).to receive(:new).with(season,
                                                                           ratings_config_version: model_version).and_return(calculator)
-    allow(calculator).to receive(:call) { |as_of:| called_dates << as_of }
+    allow(calculator).to receive(:call) { |as_of:, **| called_dates << as_of }
 
     described_class.perform_now(season.id)
 
@@ -47,7 +47,7 @@ RSpec.describe ResumeSeasonRatingsJob do
     calculator = instance_double(ProphetRatings::OverallRatingsCalculator)
     allow(ProphetRatings::OverallRatingsCalculator).to receive(:new).with(season,
                                                                           ratings_config_version: model_version).and_return(calculator)
-    allow(calculator).to receive(:call) { |as_of:| called_dates << as_of }
+    allow(calculator).to receive(:call) { |as_of:, **| called_dates << as_of }
 
     described_class.perform_now(
       season.id,
@@ -63,8 +63,8 @@ RSpec.describe ResumeSeasonRatingsJob do
     calculator = instance_double(ProphetRatings::OverallRatingsCalculator, call: true)
     allow(ProphetRatings::OverallRatingsCalculator).to receive(:new).and_return(calculator)
     described_class.perform_now(season.id, end_date: season.end_date)
-    expect(calculator).to have_received(:call).with(as_of: season.start_date)
-    expect(calculator).to have_received(:call).with(as_of: season.start_date + 1.day)
+    expect(calculator).to have_received(:call).with(replay: true, as_of: season.start_date)
+    expect(calculator).to have_received(:call).with(replay: true, as_of: season.start_date + 1.day)
     expect(calculator).to have_received(:call).twice
   end
 
@@ -84,7 +84,7 @@ RSpec.describe ResumeSeasonRatingsJob do
     calculator = instance_double(ProphetRatings::OverallRatingsCalculator, call: true)
     allow(ProphetRatings::OverallRatingsCalculator).to receive(:new).and_return(calculator)
     described_class.perform_now(season.id)
-    expect(calculator).to have_received(:call).with(as_of: season.start_date)
+    expect(calculator).to have_received(:call).with(replay: true, as_of: season.start_date)
   end
 
   it 'preserves existing live values when preseason initialization is requested' do
@@ -101,7 +101,7 @@ RSpec.describe ResumeSeasonRatingsJob do
     team_season = create(:team_season, season:)
     calculator = instance_double(ProphetRatings::OverallRatingsCalculator)
     allow(ProphetRatings::OverallRatingsCalculator).to receive(:new).and_return(calculator)
-    allow(calculator).to receive(:call) do |as_of:|
+    allow(calculator).to receive(:call) do |as_of:, **|
       create(:team_rating_snapshot, season:, team_season:, team: team_season.team, ratings_config_version:, snapshot_date: as_of)
       raise 'failed day' if as_of == season.start_date + 1.day
     end
