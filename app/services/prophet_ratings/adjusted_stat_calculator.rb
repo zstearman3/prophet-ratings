@@ -18,11 +18,10 @@ module ProphetRatings
       season_avg = average_stat_for_season
 
       # Preload only teams with at least 2 games
-      qualified_team_seasons = TeamSeason
-                               .includes(team_games: :game)
-                               .where(season:)
-                               .select { |ts| finalized_team_game_count(ts) >= 2 }
-                               .sort_by(&:team_id)
+      qualified_team_seasons = season.rating_team_seasons
+                                     .includes(team_games: :game)
+                                     .select { |ts| finalized_team_game_count(ts) >= 2 }
+                                     .sort_by(&:team_id)
 
       qualified_team_seasons.each { |team_season| team_season.validate_model_inputs(@ratings_config_version) }
       team_ids = qualified_team_seasons.map(&:team_id)
@@ -100,7 +99,7 @@ module ProphetRatings
 
     def average_stat_for_season
       stat_to_avg = raw_stat == :possessions ? :pace : raw_stat
-      TeamSeason.where(season:).average(stat_to_avg).to_f
+      season.rating_team_seasons.average(stat_to_avg).to_f
     end
 
     def finalized_team_game_count(team_season)

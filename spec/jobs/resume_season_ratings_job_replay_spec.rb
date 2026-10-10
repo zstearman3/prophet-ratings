@@ -151,4 +151,26 @@ RSpec.describe ResumeSeasonRatingsJob do
     expect(teams.first.reload.adj_offensive_efficiency).to eq(125)
     expect(game.predictions).to be_empty
   end
+
+  it 'publishes reviewed participants without reconstructing games involving an excluded team lacking priors' do
+    excluded = create(:team_season, season:)
+    review = SeasonParticipationReview.new(season)
+    teams.each { |row| create(:team_alias, team: row.team, value: row.team.school) }
+    review.apply({
+                   'evidence' => 'Synthetic reviewed roster', 'reviewed_by' => 'Test operator',
+                   'dates' => { 'start_date' => season.start_date.iso8601, 'end_date' => season.end_date.iso8601, 'evidence' => 'Dates' },
+                   'teams' => teams.map { |row| { 'team_id' => row.team_id, 'status' => 'included', 'reason' => 'Verified participant' } } +
+                              [{ 'team_id' => excluded.team_id, 'status' => 'excluded', 'reason' => 'Historical-only opponent' }],
+                   'unresolved_identities' => []
+                 })
+    game = game_on(season.start_date)
+    game.away_team_game.update!(team_season: excluded, team: excluded.team)
+    original = excluded.reload.attributes
+    expect(excluded.preseason_prior).to be_nil
+    expect(excluded.adj_offensive_efficiency).to be_nil
+    replay(season.start_date)
+    expect(game.predictions).to be_empty
+    expect(excluded.reload.attributes).to eq(original)
+    expect(season.team_rating_snapshots.where(snapshot_date: season.start_date).pluck(:team_id)).to match_array(teams.map(&:team_id))
+  end
 end

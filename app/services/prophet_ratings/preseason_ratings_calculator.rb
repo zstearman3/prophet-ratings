@@ -12,7 +12,7 @@ module ProphetRatings
     def call
       @season.with_lock do
         version = @ratings_config_version
-        @season.team_seasons.includes(:team_offseason_profile).find_each do |team_season|
+        @season.rating_team_seasons.includes(:team_offseason_profile).find_each do |team_season|
           prior = captured_prior(team_season, version)
           team_season.update!(prior.outputs.merge(preseason_prior: prior))
         end

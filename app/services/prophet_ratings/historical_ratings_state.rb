@@ -9,7 +9,7 @@ module ProphetRatings
     end
 
     def restore
-      records = @season.team_seasons
+      records = @season.rating_team_seasons
       raise ArgumentError, 'Historical replay requires prepared team seasons and captured priors' unless records.exists?
 
       records.find_each { |team_season| restore_team(team_season) }
@@ -19,7 +19,13 @@ module ProphetRatings
       cutoff = date - 1
       OverallRatingsCalculator.new(@season, ratings_config_version: @version)
                               .call(as_of: cutoff, replay: true, publish_snapshots: false)
-      games.each { |game| reconstruct_game(game, cutoff) }
+      included_ids = @season.rating_team_seasons.ids if @season.participation_review.present?
+      games.each do |game|
+        sides = [game.home_team_season&.id, game.away_team_season&.id]
+        next if included_ids && sides.any? { |id| included_ids.exclude?(id) }
+
+        reconstruct_game(game, cutoff)
+      end
     end
 
     def self.snapshot(team_season, date)
