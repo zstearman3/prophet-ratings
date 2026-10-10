@@ -17,10 +17,18 @@ module ProphetRatings
       config = @ratings_config_version.settings.deep_stringify_keys
       reports = @years.map { |year| season_report(Season.find_by!(year:)) }
       {
-        benchmark: 'fixed preseason; no profiles, no in-season transition or confidence labels',
+        benchmark: 'opening-period game-time performance; fixed and sequential no-profile reconstructions',
         source_config: @source_version.name, candidate_config: config,
+        sequential_candidates: {
+          baseline_calendar: 'Configured previous weight, day gate, calendar decay and floor',
+          multiyear_calendar: '0.70 previous + 0.15 second year + 0.15 cohort baseline; absent second year uses baseline',
+          baseline_effective_games: 'Previous prior; two-result qualification; weight 8/(8+sum(recency weights)), no day gate/floor'
+        },
         split: self.class.split_description(reports),
         seasons: reports,
+        required_data: ['At least two timestamp-eligible seasons: earlier selection, latest held-out evaluation',
+                        'Pre-opening previous/two-year snapshots with immutable source timestamps and known venues',
+                        'Prepared paired final efficiency/pace records created and last revised before each prediction date'],
         decision: 'Retain production defaults. This bounded benchmark does not establish improvement or tune coefficients.'
       }
     end

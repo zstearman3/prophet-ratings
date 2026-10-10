@@ -18,8 +18,18 @@ module ProphetRatings
         eligible_games: count, excluded_games: total - count,
         exclusion: 'Missing pre-opening previous-season snapshots, teams, venue evidence, or untied final scores',
         source_snapshot_ids: sources.values.map(&:id).sort,
-        candidates: PreseasonComparison::CANDIDATE_WEIGHTS.index_with { |weight| candidate_report(weight) }
+        candidates: PreseasonComparison::CANDIDATE_WEIGHTS.index_with { |weight| candidate_report(weight) },
+        sequential: sequence_report,
+        coverage_by_prior_game_count: PreseasonComparisonSequence.coverage(games, eligible, @season)
       }
+    end
+
+    def sequence_report
+      older = transition_snapshots(@season.year - 2).each_with_object({}) do |snapshot, result|
+        result[snapshot.team_id] ||= snapshot if self.class.finite_ratings?(snapshot)
+      end
+      PreseasonComparisonSequence.new(season: @season, sources:, older_sources: older, baselines:,
+                                      version: @ratings_config_version).call(eligible)
     end
 
     def sources
@@ -30,8 +40,8 @@ module ProphetRatings
       end
     end
 
-    def transition_snapshots
-      previous = Season.find_by(year: @season.year - 1)
+    def transition_snapshots(year = @season.year - 1)
+      previous = Season.find_by(year:)
       last = previous&.end_date
       return TeamRatingSnapshot.none unless last && last < opening_date
 
@@ -49,7 +59,7 @@ module ProphetRatings
     def games
       @data[:games] ||= @season.games.final
                                .where(start_time: Game.schedule_day_range(opening_date).begin..opening_end)
-                               .includes(:home_team, :away_team).order(:start_time, :id).to_a
+                               .includes(:home_team, :away_team, :home_team_game, :away_team_game).order(:start_time, :id).to_a
     end
 
     def opening_date
@@ -89,12 +99,8 @@ module ProphetRatings
 
     def baselines
       @data[:baselines] ||= PreseasonPriorFormula::STATS.index_with do |stat|
-        average_source_stat(stat)
+        PreseasonComparisonCandidate.source_mean(sources.values, stat)
       end
-    end
-
-    def average_source_stat(stat)
-      StatisticsUtils.average(sources.values.map { |snapshot| snapshot.public_send(stat).to_f })
     end
 
     def candidate_snapshot(snapshot, candidate)
@@ -129,11 +135,15 @@ module ProphetRatings
       {
         margin_error: home_error - away_error,
         total_error: home_error + away_error,
+        efficiency_errors: [game.home_team_game, game.away_team_game].zip(
+          [result.dig(:meta, :home_expected_ortg), result.dig(:meta, :away_expected_ortg)]
+        ).filter_map { |side, expected| expected - side.offensive_efficiency if side&.offensive_efficiency&.finite? },
+        pace_errors: PreseasonComparisonMetrics.pace_errors(game.pace, result.dig(:meta, :expected_pace)),
         probability: result.fetch(:win_probability_home), outcome: game.winning_team == game.home_team ? 1.0 : 0.0
       }
     end
-    private :sources, :transition_snapshots, :games, :opening_date, :opening_end, :eligible,
-            :candidate_report, :candidate_ratings, :baselines, :average_source_stat, :candidate_snapshot,
+    private :sequence_report, :sources, :transition_snapshots, :games, :opening_date, :opening_end, :eligible,
+            :candidate_report, :candidate_ratings, :baselines, :candidate_snapshot,
             :volatility_defaults
   end
 end
