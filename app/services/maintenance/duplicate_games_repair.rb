@@ -18,12 +18,7 @@ module Maintenance
       report(groups)
       apply_repairs(groups) if apply
 
-      Result.new(
-        applied: apply,
-        groups:,
-        deleted_game_ids: deleted_game_ids,
-        reassigned_counts: reassigned_counts
-      )
+      Result.new(applied: apply, groups:, deleted_game_ids:, reassigned_counts:)
     end
 
     private
@@ -192,9 +187,17 @@ module Maintenance
     def apply_repairs(groups)
       groups.each do |group|
         ActiveRecord::Base.transaction do
+          validate_frozen_forecasts!(group)
           group.duplicates.each { |duplicate| merge_duplicate!(group.survivor, duplicate) }
         end
       end
+    end
+
+    def validate_frozen_forecasts!(group)
+      games = group.games.sort_by(&:id).each(&:lock!)
+      return unless Prediction.where(game_id: games.map(&:id)).where.not(calculation_context: {}).exists?
+
+      raise ArgumentError, 'Duplicate repair cannot merge games with frozen forecasts; review provenance before applying repair'
     end
 
     def merge_duplicate!(survivor, duplicate)

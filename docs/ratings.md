@@ -265,6 +265,10 @@ checks establish arithmetic and bounds, not calibration or improved accuracy.
 
 ### Opening-period uncertainty assessment
 
+This records the earlier audit baseline. Shared-pace uncertainty and the frozen
+forecast contract below supersede its confidence/arithmetic and new-forecast
+input-selection limitations; they do not establish empirical calibration.
+
 The configured efficiency volatility fallback remains 11.5 and pace fallback
 4.5. Aggregation uses the efficiency baseline with fewer than four residuals,
 then blends empirical volatility toward it. `VolatilityCalculator` falls back
@@ -476,8 +480,8 @@ prediction generation; they do not establish calibrated confidence or accuracy.
 
 The prediction builder defaults to the explicitly active stored model, or an
 already-published authored bundle when none is active. It skips and logs missing/incomplete core snapshot or
-pace/volatility inputs. Existing same-day snapshot selection and mutable season
-prediction baselines remain limitations for leakage-safe historical evaluation.
+pace/volatility inputs. Legacy rows retain their same-day selection and mutable-baseline replay limits.
+New saved forecasts follow the frozen context contract below.
 
 ## Explicit model configuration
 
@@ -491,7 +495,8 @@ cannot be used for new calculations or faithful replay. Live/prior provenance
 must match before snapshot publication; the additive migration fabricates no
 historical identity. See [Model configuration versions](model-versions.md) for
 the contract, author/publish/select/activate commands, rollout and real-solver
-verification. Source-data and calculation-code changes remain replay limits.
+verification. Source-data and calculation-code changes remain rating replay limits;
+new saved forecast inputs are captured by the context contract below.
 
 ## Shared-pace uncertainty baseline
 
@@ -535,8 +540,8 @@ does not represent push outcomes. For the active model, skipping a deterministic
 spread also retires prior current spread recommendations for that game, retaining
 their historical records. Inactive-model evaluations leave current recommendations
 unchanged. Moneyline recommendations remain available.
-Rounded persisted means and mutable season fallback inputs remain replay limits
-until prediction context is frozen by subsequent work.
+Legacy rows retain rounded-mean and mutable-fallback replay limits. New forecasts
+use the frozen context contract below, including unrounded intermediate inputs.
 
 The API and matchup UI report confidence as **Uncalibrated**, for every model
 and volatility magnitude. Old confidence thresholds remain in the contract for
@@ -544,3 +549,54 @@ legacy payload compatibility but do not establish confidence. Correct arithmetic
 is not evidence of calibration. Legacy payloads without the uncertainty selector
 retain their prior probability and margin/total diagnostic arithmetic; their
 stored predictions and immutable payloads are not rewritten.
+
+## Frozen forecast context and revisions
+
+New saved predictions have calculation context contract 1: both snapshots' exact
+core ratings and optional volatility/home boosts, source IDs/dates/timestamps,
+season efficiency/pace anchors and resolved deviation fallbacks, venue evidence,
+modifier 1, and a copy of the selected immutable model payload. Generation and
+`Prediction#replay` use these captured values, including unrounded intermediate
+means and deviations. Margin/total diagnostics use the same context. Editing a
+source snapshot, TeamSeason, season or venue cannot change a saved forecast's
+calculation. Replay still depends on the implementation of that model's arithmetic;
+this is an input contract, not an archive of historical executable code.
+
+Snapshots must be dated strictly before the game's Eastern schedule date, no
+later than the actual generation date, and created/updated by generation time.
+There is no same-day intraday exception. Missing eligible or complete inputs skip
+with a warning directing the operator to publish complete prior-day snapshots.
+No later source is substituted. Anchors/fallbacks are the values available at
+actual issuance; they are frozen, not retrospectively reconstructed as-of values.
+
+Each changed context appends a revision. A SHA-256 key over context, forecast
+kind, cutoff and captured tipoff provides idempotency for duplicate retries;
+per-game locking serializes writes. The generation timestamp is actual wall-clock
+time and is excluded from the retry key. Rails validations reject changes to
+saved context, provenance, source identities or numerical outputs; outcome error
+columns remain editable. The database enforces unique game/model/revision keys.
+Direct SQL bypasses Rails validations and is not a supported forecast-edit path.
+
+A `pregame` forecast requires a scheduled game, issuance before tipoff, and no
+stored game scores. `Prediction.selected_pregame` chooses the latest eligible
+issuance for each game/model, ordered by generation time then ID. A corrected earlier tipoff or Eastern date
+can disqualify an issuance; both its timestamp and prior-date cutoff must remain
+eligible for the current schedule. Display uses
+that selection, falling back only to a labeled unverified legacy row when none
+exists. Evaluation uses only selected pregame rows for final games. Finalization
+attaches outcome errors to the selected pregame row per model, falling back to
+legacy error attachment only for game/model pairs without verified issuance.
+Residual aggregation uses that same cohort and captured venue, boosts and team
+identity for frozen rows; legacy residual behavior remains explicitly compatible.
+Neither path replaces inputs.
+
+Legacy rows retain empty context and null generation time and display as
+**Unverified legacy forecast**. They remain directly accessible but cannot be
+faithfully replayed and are excluded from the pregame evaluator. Building a game
+that has started, has scores or is no longer scheduled produces an explicit
+**Postgame reconstruction**, with its real generation time. Reconstructions are
+accessible through `game.predictions`, but never substitute for a pregame forecast
+in display/evaluation. Late-created backdated sources cannot prove live issuance.
+Historical ratings workflows may create reconstructions; they are not a live
+forecast archive. Nightly prediction jobs now select only scheduled upcoming games.
+This contract adds no fitted coefficients or confidence/calibration claims.

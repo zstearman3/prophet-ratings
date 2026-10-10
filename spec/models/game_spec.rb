@@ -35,7 +35,7 @@ RSpec.describe Game do
   let!(:home_snapshot) do
     create(:team_rating_snapshot,
            team_season: home_team_season,
-           snapshot_date: game.schedule_date,
+           snapshot_date: game.schedule_date - 1,
            ratings_config_version:,
            adj_offensive_efficiency: 110.0,
            adj_defensive_efficiency: 105.0,
@@ -44,7 +44,7 @@ RSpec.describe Game do
   let!(:away_snapshot) do
     create(:team_rating_snapshot,
            team_season: away_team_season,
-           snapshot_date: game.schedule_date,
+           snapshot_date: game.schedule_date - 1,
            ratings_config_version:,
            adj_offensive_efficiency: 108.0,
            adj_defensive_efficiency: 107.0,

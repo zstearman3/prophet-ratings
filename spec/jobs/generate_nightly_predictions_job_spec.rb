@@ -24,7 +24,7 @@ RSpec.describe GenerateNightlyPredictionsJob do
     expect(ProphetRatings::GamePredictionBuilder).not_to have_received(:new)
   end
 
-  it 'generates predictions for final games missing current-config predictions and scheduled games in the next week' do
+  it 'only generates operational predictions for scheduled games in the next week' do
     final_missing = create(:game, season:, status: :final, start_time: as_of - 2.days)
     final_with_current = create(:game, season:, status: :final, start_time: as_of - 1.day)
     final_with_old_only = create(:game, season:, status: :final, start_time: as_of - 3.days)
@@ -46,12 +46,10 @@ RSpec.describe GenerateNightlyPredictionsJob do
     described_class.perform_now(season.id, as_of:)
 
     expect(generated_game_ids).to contain_exactly(
-      final_missing.id,
-      final_with_old_only.id,
       scheduled_next_week.id,
       scheduled_with_current.id
     )
-    expect(generated_game_ids).not_to include(final_with_current.id, scheduled_outside_window.id)
+    expect(generated_game_ids).not_to include(final_missing.id, final_with_old_only.id, final_with_current.id, scheduled_outside_window.id)
   end
 
   def create_prediction_for(game:, ratings_config_version:)

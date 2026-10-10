@@ -190,6 +190,7 @@
     <div class="mt-8">
       <h2 class="text-xl font-semibold text-prophet-black mb-4">Prediction Analysis</h2>
       <% if @prediction %>
+        <p class="text-sm text-gray-600"><%= @prediction.provenance_label %></p>
         <div class="bg-white p-6 rounded-lg shadow">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>

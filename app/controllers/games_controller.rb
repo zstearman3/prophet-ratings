@@ -10,10 +10,7 @@ class GamesController < ApplicationController
     @home_team_game = @game.home_team_game
     @away_team_game = @game.away_team_game
 
-    @prediction = @game.predictions
-                       .includes(:home_team_snapshot, :away_team_snapshot)
-                       .order(created_at: :desc)
-                       .first
+    @prediction = @game.current_prediction
     @config = RatingsConfigVersion.current
   end
 

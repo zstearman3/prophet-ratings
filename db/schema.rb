@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_09_020000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_10_010000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -204,8 +204,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_09_020000) do
     t.decimal "away_offensive_efficiency_error", precision: 6, scale: 3
     t.decimal "away_score", precision: 6, scale: 3
     t.bigint "away_team_snapshot_id"
+    t.jsonb "calculation_context", default: {}, null: false
     t.datetime "created_at", null: false
+    t.string "forecast_kind", default: "legacy_unverified", null: false
+    t.datetime "forecast_start_time"
     t.bigint "game_id", null: false
+    t.datetime "generated_at"
     t.decimal "home_defensive_efficiency", precision: 6, scale: 3
     t.decimal "home_defensive_efficiency_error", precision: 6, scale: 3
     t.decimal "home_offensive_efficiency", precision: 6, scale: 3
@@ -213,15 +217,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_09_020000) do
     t.decimal "home_score", precision: 6, scale: 3
     t.bigint "home_team_snapshot_id"
     t.decimal "home_win_probability", precision: 5, scale: 4
+    t.date "input_cutoff"
     t.decimal "pace", precision: 6, scale: 3
     t.decimal "pace_error", precision: 6, scale: 3
     t.bigint "ratings_config_version_id"
+    t.string "revision_key"
     t.datetime "updated_at", null: false
     t.decimal "vegas_spread", precision: 6, scale: 3
     t.decimal "vegas_total", precision: 6, scale: 3
     t.index ["away_team_snapshot_id"], name: "index_predictions_on_away_team_snapshot_id"
     t.index ["game_id", "created_at"], name: "index_predictions_on_game_id_and_created_at"
-    t.index ["game_id", "home_team_snapshot_id", "away_team_snapshot_id"], name: "index_predictions_on_game_and_snapshots", unique: true
+    t.index ["game_id", "ratings_config_version_id", "revision_key"], name: "index_predictions_on_revision", unique: true
     t.index ["game_id"], name: "index_predictions_on_game_id"
     t.index ["home_team_snapshot_id"], name: "index_predictions_on_home_team_snapshot_id"
     t.index ["ratings_config_version_id"], name: "index_predictions_on_ratings_config_version_id"

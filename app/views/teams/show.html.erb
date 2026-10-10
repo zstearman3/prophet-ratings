@@ -189,6 +189,7 @@
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-prophet-black">
                   <% prediction = @predictions_by_game[game.id] %>
                   <% if prediction %>
+                    <span class="text-xs text-gray-500"><%= prediction.provenance_label %></span>
                     <%= link_to prediction.predicted_score_string, game_path(game), class: "hover:text-blue-600" %>
                   <% else %>
                     —

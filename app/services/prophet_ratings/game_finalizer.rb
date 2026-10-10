@@ -62,7 +62,7 @@ module ProphetRatings
     # A pinned run updates its model's stored predictions; ingestion updates all stored models.
     # Actual-result errors depend on each prediction's own snapshots, never the active model.
     def finalize_prediction!
-      scope = game.predictions
+      scope = game.predictions.selected_with_legacy
       scope = scope.where(ratings_config_version: @ratings_config_version) if @ratings_config_version
       scope.includes(:home_team_snapshot, :away_team_snapshot).find_each do |prediction|
         finalize_stored_prediction(prediction)
@@ -90,6 +90,8 @@ module ProphetRatings
     end
 
     public_class_method def self.validate_prediction_version(prediction)
+      return if prediction.calculation_context['contract_version'] == 1
+
       version = prediction.ratings_config_version
       ModelConfiguration.validate_snapshots([prediction.home_team_snapshot, prediction.away_team_snapshot], version)
     end
