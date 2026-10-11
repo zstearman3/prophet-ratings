@@ -5,7 +5,7 @@ class CoachingChange < ApplicationRecord
   STATUSES = %w[pending confirmed rejected].freeze
   PREVIOUS_ROLES = %w[head_coach assistant interim other].freeze
   FACT_FIELDS = %w[team_id effective_year coach_name destination_school previous_team_id previous_school previous_year
-                   previous_role full_season_head_coach].freeze
+                   previous_role full_season_head_coach previous_season_d1].freeze
 
   DISCOVERY_FIELDS = %w[discovery_school discovery_coach_name discovery_former_coach discovery_present
                         discovery_team_id discovery_previous_team_id].freeze
@@ -75,11 +75,17 @@ class CoachingChange < ApplicationRecord
 
   def coherent_history
     errors.add(:previous_year, 'must precede the effective year') if previous_year && effective_year && previous_year >= effective_year
-    return unless full_season_head_coach?
+    return unless full_season_head_coach? || previous_season_d1?
 
-    errors.add(:previous_team, 'must be resolved for full-season responsibility') unless previous_team
-    errors.add(:previous_year, 'is required for full-season responsibility') unless previous_year
-    errors.add(:previous_role, 'must be head_coach for full-season responsibility') unless previous_role == 'head_coach'
+    errors.add(:previous_team, 'must be resolved for confirmed previous-season responsibility or D1 coverage') unless previous_team
+    errors.add(:previous_year, 'is required for confirmed previous-season responsibility or D1 coverage') unless previous_year
+    validate_head_coach_role
+  end
+
+  def validate_head_coach_role
+    return unless full_season_head_coach? && previous_role != 'head_coach'
+
+    errors.add(:previous_role, 'must be head_coach for full-season responsibility')
   end
 
   def explicit_reconfirmation

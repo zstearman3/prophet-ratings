@@ -673,3 +673,84 @@ map and manual reason are retained in the captured source attributes. Nil inputs
 remain distinguishable from observed zero. Prior captures and other-version
 snapshots/forecasts are preserved. See the deliberate revision operation in
 [Offseason Operations](offseason.md#deliberate-inactive-preseason-revisions).
+
+### Experimental reviewed coaching pace
+
+The opt-in `coaching_experiment` section of `config/ratings.yml` authors
+`v1.8-experimental-coaching-pace`, with `preseason.coaching.formula:
+relative_pace_v2`, weight **0.50** and no adjustment cap. The coach signal and
+existing team prior receive equal weight. This initial assumption was selected
+before evaluation; it is not a fitted coefficient or a proven accuracy gain.
+The normal authored/default v1.7 bundle remains available without coaching settings.
+
+A manually confirmed destination Team/year move qualifies only with confirmed
+full-season head-coach responsibility, explicit `previous_season_d1`, the immediately
+preceding year, a completed stored Season and matching previous TeamSeason, and
+finite positive source adjusted pace and source season average pace. The D1 flag
+is an operator assertion about the previous team/year, not an inference from a
+TeamSeason row or conference membership. Assistant, first-time, interim/partial,
+stale/gapped, rejected or incomplete cases retain the existing prior and report a
+specific exclusion reason. Historical source numbers are the stored values at
+capture; they are not reconstructed or proof of historical availability.
+
+The target anchor is the existing preseason pace baseline: preceding season
+average pace, or the selected model's fallback pace when unavailable. It is
+captured before publication and never uses the target season's newly calculated
+average. With the unrounded existing history/baseline blend B, source pace S,
+source baseline L and target anchor T:
+
+```text
+signal = T + (S - L)
+change = weight * (signal - B)
+pace = round(B + change, 3)
+```
+
+Weight is configurable in immutable model settings and must be finite and in
+0..1. The uncapped blend stays between the two positive finite inputs. Existing
+B retains its 85% team-history / 15% baseline regression: at weight 0.50, the
+final contributions are 42.5% previous team pace, 7.5% baseline and 50% coach
+signal. The source pace also reflects the coach's former roster; this is a
+portability assumption, not a causal estimate of the coach's influence. Reviewed
+eligibility and positive finite checks remain; no empirical plausible-pace range
+is asserted. Evaluate pace and total errors on common games after the first
+season of data, retaining frozen inputs and configuration for comparison.
+
+Previously captured `relative_pace_v1` settings retain their weighted adjustment
+cap and report it during replay. `relative_pace_v2` rejects `max_adjustment` so a
+stale cap cannot silently appear effective. Publish under a new model name/version
+if the earlier authored bundle was already published; never mutate stored rows.
+The inputs contract remains `preseason-v2-coaching`; formula identity in the
+captured configuration distinguishes capped and uncapped replay.
+
+Offense, defense, profile coefficients and solver behavior are unchanged. Zero
+weight reproduces existing outputs exactly. Disable by publishing/selecting a new
+immutable bundle with weight zero (or without coaching settings); never edit a
+stored version or capture.
+
+New `preseason-v2-coaching` captures freeze the reviewed move IDs/facts, years,
+resolved source IDs, source numbers, both baselines, existing history/profile
+operands and complete selected configuration, including weight/formula and any
+legacy cap.
+Replay and exact normal initialization reuse perform no coaching/readiness/history
+lookups. Old `preseason-v1` models/captures retain their behavior; mismatched or
+unknown contracts fail explicitly. Fresh direct calculator/initializer captures
+and every revision preview/publication require explicit year readiness, including
+an intentionally reviewed empty year. The shared coaching year lock prevents a
+manual edit from racing readiness/capture; pending proposals block fresh capture.
+
+Initializer/revision reports list each included team's original/new outputs,
+coaching signal, weight, change and coverage/exclusion reason (plus cap for legacy
+`relative_pace_v1` settings). The revision key binds the reviewed facts and source
+numbers; changed inputs need a new preview and, after publication, a new immutable model version. Snapshots carry
+the captured provenance and scheduled forecasts consume the published pace through
+the existing frozen forecast contract. Other versions' captures/snapshots/forecasts
+are preserved. No historical coaching evidence or common-game evaluation dataset
+was imported for this change; synthetic checks establish arithmetic and propagation,
+not pace/total accuracy or calibration. Keep the experimental designation until
+an authorized common-game comparison has adequate reviewed coverage.
+
+The existing `ratings:compare_preseason` preregistered v1 comparator explicitly
+rejects coaching-enabled models: it has no archived coaching chronology or input
+coverage. Select a model without coaching settings for that team-history benchmark;
+a coaching accuracy comparison requires separately authorized reviewed evidence
+and common games. See [Preseason comparison](preseason-comparison.md#coaching-model-limitation).

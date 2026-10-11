@@ -104,7 +104,7 @@ module ProphetRatings
         team_id: row.team_id, team_season_id: row.id, added: prior.blank?,
         profile_before: prior&.inputs&.fetch('profile', nil), profile_after: inputs['profile'],
         outputs_before: prior&.outputs, outputs_after: PreseasonPriorFormula.new(inputs, config).call,
-        inputs: inputs
+        coaching: PreseasonPriorFormula.new(inputs, config).pace_report, inputs: inputs
       }
     end
 

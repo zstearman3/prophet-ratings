@@ -6,7 +6,7 @@ module ProphetRatings
       @ratings_config_version = RatingsConfigVersion.resolve(ratings_config_version)
       @config = @ratings_config_version.settings
       @season = season
-      @previous_season = Season.find_by(year: @season.year - 1)
+      @previous_season = nil
     end
 
     def call
@@ -28,7 +28,24 @@ module ProphetRatings
     end
 
     def preview_inputs(team_season)
-      previous = @previous_season&.team_seasons&.find_by(team_id: team_season.team_id)
+      return legacy_inputs(team_season) unless coaching_enabled?
+
+      coaching = CoachingPaceInputs.new(@season)
+      coaching.with_review { coaching_inputs(team_season, coaching) }
+    end
+
+    def coaching_inputs(team_season, coaching)
+      inputs = legacy_inputs(team_season)
+      inputs.merge(contract: 'preseason-v2-coaching',
+                   coaching: coaching.capture(team_season.team_id, average_for_stat('adj_pace')))
+    end
+
+    def coaching_enabled?
+      @config.dig(:preseason, :coaching)
+    end
+
+    def legacy_inputs(team_season)
+      previous = previous_season&.team_seasons&.find_by(team_id: team_season.team_id)
       profile = team_season.team_offseason_profile
       serializer = self.class
       {
@@ -75,6 +92,10 @@ module ProphetRatings
       value if value && (0.0..1.0).cover?(value)
     end
 
+    def previous_season
+      @previous_season = Season.find_by(year: @season.year - 1)
+    end
+
     def fallback_efficiency
       @config.fetch(:preseason).fetch(:fallback_efficiency)
     end
@@ -91,6 +112,6 @@ module ProphetRatings
         @previous_season&.average_pace || @config.dig(:preseason, :fallback_pace)
       end
     end
-    private :captured_prior, :fallback_efficiency, :average_for_stat
+    private :legacy_inputs, :coaching_inputs, :coaching_enabled?, :previous_season, :captured_prior, :fallback_efficiency, :average_for_stat
   end
 end

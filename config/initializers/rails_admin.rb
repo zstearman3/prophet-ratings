@@ -83,12 +83,12 @@ RailsAdmin.config do |config|
   config.model 'CoachingChange' do
     list do
       fields :effective_year, :team, :destination_school, :coach_name, :status, :previous_team, :previous_year, :previous_role,
-             :full_season_head_coach
+             :full_season_head_coach, :previous_season_d1
     end
     show do
       fields :effective_year, :team, :destination_school, :coach_name, :status, :previous_team, :previous_school,
-             :previous_year, :previous_role, :full_season_head_coach, :discovery_school, :discovery_coach_name, :discovery_former_coach,
-             :discovery_present, :discovery_team_id, :discovery_previous_team_id
+             :previous_year, :previous_role, :full_season_head_coach, :previous_season_d1, :discovery_school,
+             :discovery_coach_name, :discovery_former_coach, :discovery_present, :discovery_team_id, :discovery_previous_team_id
     end
     edit do
       field :effective_year
@@ -109,6 +109,9 @@ RailsAdmin.config do |config|
       end
       field :full_season_head_coach do
         help 'Only assert a verified full season as head coach at the resolved previous team/year.'
+      end
+      field :previous_season_d1 do
+        help 'Confirm that the resolved previous team competed in Division I for the stated previous year.'
       end
       field :status, :enum do
         enum CoachingChange::STATUSES

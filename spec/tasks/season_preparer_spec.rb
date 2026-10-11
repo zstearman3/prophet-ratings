@@ -13,7 +13,7 @@ RSpec.describe SeasonPreparer do
     Rake::Task.define_task(:environment)
     load Rails.root.join('lib/tasks/season_bootstrap.rake')
     %w[YEAR START_DATE END_DATE SYNC_GAMES DEDUPE_GAMES RUN_PRESEASON RUN_RATINGS RATINGS_RESUME REBUILD
-       RATINGS_START_DATE RATINGS_END_DATE ALIGN_CONFERENCES MODEL_VERSION].each { |key| ENV.delete(key) }
+       RATINGS_START_DATE RATINGS_END_DATE ALIGN_CONFERENCES MODEL_VERSION PREVIEW].each { |key| ENV.delete(key) }
     ENV['YEAR'] = '2027'
     ENV['ALIGN_CONFERENCES'] = 'false'
     example.run
@@ -62,6 +62,14 @@ RSpec.describe SeasonPreparer do
     before_values = TeamSeason.first.attributes.except('updated_at')
     expect { invoke('season:initialize_preseason') }.to output(/Preseason values initialized/).to_stdout
     expect(TeamSeason.first.attributes.except('updated_at')).to eq(before_values)
+  end
+
+  it 'previews initializer coverage without publishing priors, live outputs or snapshots' do
+    row = create(:team_season, season: create(:season, year: 2027))
+    ENV['PREVIEW'] = 'true'
+    expect { invoke('season:initialize_preseason') }.to output(/outputs_after.*Preseason values previewed/m).to_stdout
+    expect([PreseasonPrior.count, TeamRatingSnapshot.count, row.reload.adj_pace]).to eq([0, 0, nil])
+    expect(Season.current).to be_nil
   end
 
   it 'rehearses no-schedule preparation with reviewed dates and preserves initialized outputs on rerun' do

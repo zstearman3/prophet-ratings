@@ -59,7 +59,9 @@ class CoachingChangeProposal
       candidate.public_send(field) != facts.fetch(field)
     end
     candidate.assign_attributes(facts)
-    candidate.assign_attributes(previous_year: nil, previous_role: nil, full_season_head_coach: false) if history_changed
+    return unless history_changed
+
+    candidate.assign_attributes(previous_year: nil, previous_role: nil, full_season_head_coach: false, previous_season_d1: false)
   end
 
   def record_source
