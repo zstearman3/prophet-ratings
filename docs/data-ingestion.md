@@ -717,3 +717,11 @@ pace adjustments, snapshots or the legacy offseason profile flag.
 
 See [Offseason Operations](offseason.md#coaching-discovery-and-proposed-revision-review)
 for the operator's review/revision steps.
+
+## Saved recruiting evidence
+
+`recruiting:prepare` retains immutable saved 247 Recruit Composite evidence;
+`recruiting:preview` reports conservative source-scoped team matching and coverage,
+with optional separately pinned operator mapping approval. Neither writes domain
+records or invokes ratings. See [Saved recruiting evidence](recruiting.md) for the
+annual JSON contract, year mapping, prepare/preview commands and review workflow.
