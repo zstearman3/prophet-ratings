@@ -7,7 +7,9 @@ class CoachingChange < ApplicationRecord
   FACT_FIELDS = %w[team_id effective_year coach_name destination_school previous_team_id previous_school previous_year
                    previous_role full_season_head_coach].freeze
 
-  REVIEW_FIELDS = (FACT_FIELDS + ['status']).freeze
+  DISCOVERY_FIELDS = %w[discovery_school discovery_coach_name discovery_former_coach discovery_present
+                        discovery_team_id discovery_previous_team_id].freeze
+  REVIEW_FIELDS = (FACT_FIELDS + DISCOVERY_FIELDS + ['status']).freeze
 
   belongs_to :team, optional: true
   belongs_to :previous_team, class_name: 'Team', optional: true
@@ -93,7 +95,7 @@ class CoachingChange < ApplicationRecord
   def serialize_changes
     CoachingReview.with_year_locks([effective_year_in_database, effective_year]) do
       validate_current_inputs
-      changed_inputs = new_record? || facts_changed? || will_save_change_to_status?
+      changed_inputs = new_record? || facts_changed? || will_save_change_to_status? || discovery_changed?
       yield
       invalidate_reviews if changed_inputs
     end
@@ -121,5 +123,9 @@ class CoachingChange < ApplicationRecord
   def invalidate_reviews
     years = [effective_year_before_last_save, effective_year].compact
     CoachingReview.where(year: years).find_each { |review| review.update!(ready: false) }
+  end
+
+  def discovery_changed?
+    discovery_school_in_database.present? && DISCOVERY_FIELDS.any? { |field| will_save_change_to_attribute?(field) }
   end
 end
