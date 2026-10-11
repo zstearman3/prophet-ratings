@@ -1,8 +1,9 @@
 # Saved recruiting evidence
 
 This adapter accepts reviewed saved UTF-8 JSON for **247 men's basketball Recruit
-Composite, all conferences**. Transfer/Overall are unsupported. It never fetches
-network data, creates teams/aliases, writes offseason profiles, or runs ratings.
+Composite, all conferences**. Transfer/Overall are unsupported. The explicit acquisition task can fetch public source pages. Preparation and
+preview never fetch network data, create teams/aliases, write offseason profiles,
+or run ratings.
 Profile persistence and scoring are separate work. Rank is audit evidence, never
 an invented score. Raw class points survive future scoring-curve changes.
 
@@ -10,10 +11,89 @@ Recruit year Y targets the stored ending-year Season.year Y+1 (2026 recruits
 enter season 2027). Historical years use the same workflow. Prepare does not need
 a database season; preview requires an explicit existing target season.
 
+## Create the original file from 247 pages
+
+Try bounded HTTP acquisition first (requires explicit category and both years):
+
+```bash
+bin/compose exec web bin/rails recruiting:acquire \
+  SOURCE_YEAR=2026 YEAR=2027 CATEGORY=recruit_composite \
+  OUTPUT_DIR=/rails/tmp/recruiting MAX_PAGES=20
+```
+
+`Recruiting::Acquisition` requests the annual page and follows its advertised
+Load More links with a one-second pause, 30-second request timeout, no redirects,
+and a configurable 1–100 page bound. `Recruiting::HtmlPage` reads the actual 247
+ranking markup. No browser automation or challenge bypass is involved. The first
+page must identify the correct year, Recruit Basketball Composite, canonical URL
+and ALL conferences. Subsequent responses may be the observed row fragments;
+their URLs must follow that first page's pagination chain. Wrong host/year/category/
+conference URLs, cycles, missing structure and wrong-year team URLs fail.
+
+The JSON output reports status, acquired rows, evidence directory and any pending
+next URL. A page limit produces explicitly partial coverage with a pending URL;
+no advertised next page does not independently establish annual completeness.
+Access, network and parse failures exit nonzero, retaining available page/response
+bytes in a `failed-*` directory. Failed evidence cannot be prepared or previewed
+as a successful dataset. Inspect the report and use saved HTML when access fails.
+
+### Saved-HTML fallback
+
+Open the annual Recruit Composite ALL page in a browser and save its HTML source
+to a local file. The initial source normally contains only the first 50 rows.
+Copy the actual Load More URL (decode `&amp;` to `&`), open it, and save that response
+as another HTML file. Repeat for desired pages. A rendered page saved after Load
+More may contain more rows; inspect coverage and avoid saving those rows again in
+another entry. Save HTML, not a screenshot or browser-generated plain text.
+
+Create a small manifest listing saved files in pagination order. Paths must be
+accessible in the container. For example, use checkout-local ignored `tmp/`:
+
+```json
+{
+  "observed_at": "2026-10-11T00:00:00Z",
+  "retrieved_at": "2026-10-11T00:01:00Z",
+  "captured_at": "2026-10-11T00:02:00Z",
+  "pages": [
+    {
+      "path": "/rails/tmp/247-page1.html",
+      "url": "https://247sports.com/Season/2026-Basketball/CompositeTeamRankings/"
+    }
+  ]
+}
+```
+
+Use actual observation/acquisition/capture times, not the example dates. Each page
+may override these three timestamps when pages were captured at different times.
+Append entries using their exact advertised URL, including query parameters;
+skipped/out-of-order pages are rejected. One saved page is valid partial evidence.
+
+```bash
+bin/compose exec web bin/rails recruiting:acquire \
+  SOURCE_YEAR=2026 YEAR=2027 CATEGORY=recruit_composite \
+  PAGES_PATH=/rails/tmp/pages.json OUTPUT_DIR=/rails/tmp/recruiting
+```
+
+Both paths create `original.json` and the normalized evidence bundle directly:
+use the reported directory with `recruiting:preview`. No hand transcription of
+team rows is required. Success is unreviewed acquisition, not operator approval.
+
+The bundle snapshot is `raw_html_bundle`: a JSON container of exact page bytes
+encoded as base64 with per-page SHA-256, URLs and timestamps. Decode `html_base64`
+with `Base64.strict_decode64` to recover original HTML bytes. The bundle hash is a
+hash of that container, while each page hash is a hash of its raw bytes. Exact DOM
+team link text is retained in `raw_team_label`; surrounding layout whitespace is
+stripped in `team_label` for exact canonical/alias lookup. Displayed numeric strings
+are preserved without recalculating points. Source update text is retained per
+page, with `source_as_of` left null because its displayed timezone has not been
+independently verified. Capture time is never substituted for source availability.
+No profiles, teams, aliases, ratings or snapshots are written.
+
 ## Prepare an annual extract
 
-An operator acquires and reviews the source pages outside this adapter. Direct
-fetch has returned 403; unattended scraping is not required. Visible pages have
+For an existing reviewed JSON transcription, the original prepare path remains
+available. HTTP access has varied between 403 and 200; unattended acquisition
+is not a delivery requirement. Visible pages have
 50 rows: review every desired page and describe actual coverage. Do not claim a
 complete annual dataset from the first page. Omitted teams remain unknown.
 
@@ -27,7 +107,7 @@ publishable evidence. Required metadata:
   Null requires nonempty `source_as_of_reason`. Never substitute capture time.
 - `observed_at`, `retrieved_at`, `captured_at`: explicit ISO8601 timestamps with
   timezone, describing source observation, acquisition and saved-file capture.
-- `snapshot_kind`: `raw_html` or `factual_transcription`; `snapshot_location`:
+- `snapshot_kind`: `raw_html`, `raw_html_bundle` or `factual_transcription`; `snapshot_location`:
   original evidence location/reference; `extraction_version: "247-recruit-json-v1"`;
   `coverage_note`: pages/rows actually reviewed and any omitted scope.
 - `rows`: array, possibly empty. Each row requires exact `team_label`,
@@ -118,6 +198,9 @@ there is no profile importer in this task. A preview without an approval remains
 
 ## Verification
 
-`bin/test spec/services/recruiting/dataset_spec.rb spec/tasks/recruiting_spec.rb`
-uses synthetic rows shaped to the approved source contract; no real annual data,
-network calls, imports, ratings, snapshots or solver changes are involved.
+`bin/test spec/services/recruiting spec/tasks/recruiting_spec.rb` covers the source
+parser, stubbed HTTP failures/pagination, saved-file acquisition, JSON preparation
+and identity preview. JSON fixtures are synthetic; reduced HTML fixtures retain
+observed 247 markup and factual rows from a public 2026 page capture. These are
+parser examples, not approved annual evidence. Automated tests make no network
+calls or domain imports and perform no ratings or solver changes.

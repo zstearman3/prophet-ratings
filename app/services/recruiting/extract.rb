@@ -83,8 +83,8 @@ module Recruiting
     end
 
     def validate_source_snapshot
-      kinds = %w[raw_html factual_transcription]
-      raise ArgumentError, 'Snapshot kind must be raw_html or factual_transcription' unless kinds.include?(document['snapshot_kind'])
+      kinds = %w[raw_html raw_html_bundle factual_transcription]
+      raise ArgumentError, 'Unsupported snapshot kind' unless kinds.include?(document['snapshot_kind'])
 
       expected_url = "https://247sports.com/Season/#{document['source_year']}-Basketball/CompositeTeamRankings/"
       raise ArgumentError, 'Source URL must identify the annual Recruit Composite page' unless document['source_url'] == expected_url

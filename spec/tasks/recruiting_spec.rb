@@ -52,4 +52,34 @@ RSpec.describe Recruiting, type: :task do
       expect { Rake::Task['recruiting:preview'].invoke }.to raise_error(SystemExit) { |error| expect(error.status).to eq(1) }
     end.to output(%r{source/preview failure}).to_stderr
   end
+
+  it 'creates the original annual extract from saved HTML without database inputs' do
+    Dir.mktmpdir do |root|
+      manifest = { 'observed_at' => '2026-10-11T00:00:00Z', 'retrieved_at' => '2026-10-11T00:00:00Z',
+                   'captured_at' => '2026-10-11T00:00:00Z',
+                   'pages' => [{ 'path' => Rails.root.join('spec/fixtures/recruiting/page1.html').to_s,
+                                 'url' => Recruiting::HtmlPage.source_url(2026) }] }
+      input = File.join(root, 'pages.json')
+      File.write(input, JSON.generate(manifest))
+      ENV.update('PAGES_PATH' => input, 'SOURCE_YEAR' => '2026', 'YEAR' => '2027',
+                 'CATEGORY' => 'recruit_composite', 'OUTPUT_DIR' => File.join(root, 'output'))
+      expect { Rake::Task['recruiting:acquire'].invoke }.to output(/"source_status": "ok"/).to_stdout
+      path = Dir.glob(File.join(root, 'output', '*')).first
+      expect(Recruiting::Dataset.load(path).manifest.dig('rows', 0, 'raw', 'team_label')).to eq('Arkansas')
+      expect(Team.count).to eq(0)
+    end
+  end
+
+  it 'preserves failed live acquisition and exits nonzero' do
+    allow(Recruiting::Acquisition).to receive(:sleep)
+    allow(HTTParty).to receive(:get).and_return(double(code: 403, body: 'Access denied'))
+    ENV.delete('PAGES_PATH')
+    Dir.mktmpdir do |root|
+      ENV.update('SOURCE_YEAR' => '2026', 'YEAR' => '2027', 'CATEGORY' => 'recruit_composite', 'OUTPUT_DIR' => root)
+      expect do
+        expect { Rake::Task['recruiting:acquire'].invoke }.to raise_error(SystemExit) { |error| expect(error.status).to eq(1) }
+      end.to output(/"source_status": "access_failure"/).to_stdout.and output(/Acquisition failed/).to_stderr
+      expect(Dir.glob(File.join(root, 'failed-*', 'snapshot')).size).to eq(1)
+    end
+  end
 end
