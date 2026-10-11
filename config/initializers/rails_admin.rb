@@ -87,7 +87,8 @@ RailsAdmin.config do |config|
     end
     show do
       fields :effective_year, :team, :destination_school, :coach_name, :status, :previous_team, :previous_school,
-             :previous_year, :previous_role, :full_season_head_coach, :previous_season_d1
+             :previous_year, :previous_role, :full_season_head_coach, :previous_season_d1, :discovery_school,
+             :discovery_coach_name, :discovery_former_coach, :discovery_present, :discovery_team_id, :discovery_previous_team_id
     end
     edit do
       field :effective_year

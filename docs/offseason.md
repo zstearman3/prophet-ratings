@@ -796,6 +796,46 @@ year ready, then correct or delete a fact and verify readiness clears. Try a sec
 confirmed destination/year and an edit without reconfirmation to see validation
 errors. Review the list filters and previous-team selectors with an admin account.
 
+### Coaching discovery and proposed-revision review
+
+Run `bin/rails coaching:discover YEAR=2027` separately from season preparation and
+ratings. This imports pending review candidates from the 2026 public HoopDirt D1
+tracker. Save the printed JSON report for your review; it contains original
+labels, coverage, ambiguous Team IDs, CoachingChange IDs and conflicting proposals.
+There is no stored research evidence requirement. See
+[Data Ingestion](data-ingestion.md#coaching-change-discovery) for source discovery,
+identity matching, idempotency and failure recovery.
+
+1. Review coverage and every candidate ID through Rails Admin. Resolve destination
+   identities with existing Teams and reviewed aliases (`TeamAlias.source = hoopdirt`),
+   then rerun. Ambiguous aliases require reviewing all candidate owners, not
+   automatic reassignment. Do not create new teams as an import side effect.
+2. Treat cross-row names as proposed moves only. Check spelling, interim labels,
+   multiple possible prior schools, assistant/first-time hires and missing history.
+   Manually enter the supported previous Team/year/role and verify full-season
+   head-coach responsibility when applicable. Leave unsupported history incomplete.
+3. Confirm or reject pending records manually. Confirmed assistant/first-time hires
+   can remain ineligible for the pace signal. Discovery fields appear on the show
+   page for comparison and are excluded from manual edit forms.
+4. For `conflicts`, inspect the proposed facts alongside the reviewed record.
+   Correct verified facts with explicit reconfirmation or return them to pending;
+   reject unwanted proposals. Imports do not replace confirmed/rejected facts.
+   Inspect `conflicting_candidate_ids` and `equivalent_candidate_ids` to resolve
+   destination or manual-record collisions. Re-import after corrections as needed.
+5. Explicitly mark CoachingReview for YEAR ready only after resolving pending
+   candidates and reviewing source changes. New candidates/changed inputs invalidate
+   readiness; unchanged retries preserve it. A repeated unchanged reported conflict
+   preserves a later operator readiness decision. Source absence/reappearance clears readiness once and never deletes
+   candidates. Review `absent_candidate_ids` and resolve obsolete proposals manually.
+
+HTTP, malformed/empty-source and database failures leave the import unchanged.
+Refresh/retry after the source recovers; repair unsupported table structure in the
+adapter with fixture tests. Do not mark a year ready merely because a request
+failed or returned no usable rows. This command does not prepare/activate seasons,
+write pace adjustments or publish ratings. Applying the additive discovery
+migration in the intended environment and running real-data imports remain explicit
+operator steps.
+
 ## Reviewed coaching pace publication
 
 Apply `20261010060000_confirm_coaching_source_division` in the intended environment
@@ -845,7 +885,8 @@ bin/rails season:revise_preseason YEAR=2027 MODEL_VERSION=v1.8-experimental-coac
 Review every included team's `outputs_before`, `outputs_after` and `coaching`
 report, frozen move facts/source IDs/numbers and baseline changes. `old_pace` in
 `coaching` is the unrounded team-only blend for the selected settings; the signal,
-weight, cap and adjustment show the proposed contribution. Exclusions retain that
+weight and adjustment show the proposed contribution (plus cap for legacy v1
+settings). Exclusions retain that
 blend. Confirm sufficient eligible coverage and inspect scheduled predictions and
 snapshot `stats.preseason_prior` before separate season/model activation.
 
