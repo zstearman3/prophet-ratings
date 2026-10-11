@@ -230,9 +230,9 @@ RSpec.describe ProphetRatings::PreseasonRatingsCalculator do
     expect([PreseasonPrior.count, TeamRatingSnapshot.count, home.reload.adj_pace]).to eq([0, 0, nil])
     allow(ProphetRatings::TeamRatingSnapshotService).to receive(:new).and_call_original
     revision.call(preview_key: report[:preview_key])
-    ids = [PreseasonPrior.ids, TeamRatingSnapshot.ids]
+    ids = [PreseasonPrior.ids.sort, TeamRatingSnapshot.ids.sort]
     revision.call(preview_key: revision.preview[:preview_key])
-    expect([PreseasonPrior.ids, TeamRatingSnapshot.ids]).to eq(ids)
+    expect([PreseasonPrior.ids.sort, TeamRatingSnapshot.ids.sort]).to eq(ids)
     move.update!(coach_name: 'Correction', reconfirm: true)
     ready
     expect { revision.preview }.to raise_error(ArgumentError, /new MODEL_VERSION/)
