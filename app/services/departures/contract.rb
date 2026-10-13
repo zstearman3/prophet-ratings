@@ -52,7 +52,7 @@ module Departures
       end
     end
 
-    def self.hash(value)
+    def self.digest(value)
       Digest::SHA256.hexdigest(JSON.generate(canonical(value)))
     end
 

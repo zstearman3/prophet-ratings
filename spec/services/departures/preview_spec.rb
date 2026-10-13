@@ -51,12 +51,12 @@ RSpec.describe Departures::Preview do
     expect(report.fetch('teams').first).to include('known_points_subtotal' => 500, 'team_points' => 2000, 'loss_share' => 0.25)
     expect(report.fetch('teams').last).to include('loss_share' => 0.0, 'reason' => 'verified_zero')
     expect(report.fetch('selections').last.fetch('stints').first).to include('games' => 2, 'player_points' => 0)
-    expect(report.fetch('reviewed_revision')).to eq(Departures::Contract.hash(review))
+    expect(report.fetch('reviewed_revision')).to eq(Departures::Contract.digest(review))
   end
 
   it 'leaves unreviewed professional affiliations unknown rather than no-college' do
     dataset.fetch('selections').last['affiliation_source'] = 'International Club'
-    dataset['dataset_revision'] = Departures::Contract.hash(dataset.except('dataset_revision'))
+    dataset['dataset_revision'] = Departures::Contract.digest(dataset.except('dataset_revision'))
     result = described_class.new(dataset:, identity:).call
     expect(result.fetch('status_counts')).to eq('unknown_participation' => 60)
     expect(result.fetch('teams').pluck('loss_share')).to eq([nil, nil])
@@ -87,7 +87,7 @@ RSpec.describe Departures::Preview do
   it 'does not claim completeness when an expected selection is missing' do
     dataset.fetch('selections').delete_at(58)
     decisions.delete_at(58)
-    dataset['dataset_revision'] = Departures::Contract.hash(dataset.except('dataset_revision'))
+    dataset['dataset_revision'] = Departures::Contract.digest(dataset.except('dataset_revision'))
     expect(report.fetch('draft_complete')).to be false
     expect(report.fetch('teams').pluck('loss_share')).to eq([nil, nil])
   end

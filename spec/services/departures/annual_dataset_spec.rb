@@ -37,7 +37,7 @@ RSpec.describe Departures::AnnualDataset do
     original = dataset
     allow(HTTParty).to receive(:get).and_raise('No network during replay')
     expect(described_class.new(manifest:, directory:).call).to eq(original)
-    expect(original.fetch('dataset_revision')).to eq(Departures::Contract.hash(original.except('dataset_revision')))
+    expect(original.fetch('dataset_revision')).to eq(Departures::Contract.digest(original.except('dataset_revision')))
   end
 
   it 'retains blocked response bytes and reports partial acquisition' do

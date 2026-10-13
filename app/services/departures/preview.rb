@@ -35,7 +35,7 @@ module Departures
 
     def validate_dataset
       Contract.check!(dataset.fetch('schema') == Contract::VERSION, 'Invalid dataset contract')
-      Contract.check!(dataset.fetch('dataset_revision') == Contract.hash(dataset.except('dataset_revision')), 'Invalid dataset hash')
+      Contract.check!(dataset.fetch('dataset_revision') == Contract.digest(dataset.except('dataset_revision')), 'Invalid dataset hash')
     end
 
     def reviewed_rows
@@ -46,7 +46,7 @@ module Departures
     end
 
     def report(rows)
-      { 'dataset_revision' => dataset.fetch('dataset_revision'), 'reviewed_revision' => review.present? ? Contract.hash(review) : nil,
+      { 'dataset_revision' => dataset.fetch('dataset_revision'), 'reviewed_revision' => review.present? ? Contract.digest(review) : nil,
         'draft_complete' => draft_complete?, 'coverage_complete' => coverage_complete?(rows),
         'expected_selections' => dataset.fetch('expected_picks').size,
         'accounted_selections' => rows.size, 'status_counts' => rows.group_by { |row| row.fetch('status') }.transform_values(&:size),

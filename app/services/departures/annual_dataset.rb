@@ -15,7 +15,7 @@ module Departures
       parsed = snapshots.map(&:call)
       dataset = attributes.merge('selections' => parser.selections(parsed), 'production' => parser.production(parsed),
                                  'failures' => parsed.select { |entry| entry['failure'] })
-      dataset.merge('dataset_revision' => Contract.hash(dataset))
+      dataset.merge('dataset_revision' => Contract.digest(dataset))
     end
 
     def self.selections(parsed)
