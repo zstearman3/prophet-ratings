@@ -718,6 +718,17 @@ pace adjustments, snapshots or the legacy offseason profile flag.
 See [Offseason Operations](offseason.md#coaching-discovery-and-proposed-revision-review)
 for the operator's review/revision steps.
 
+## Annual draft departures
+
+Draft departures use an explicit file-only acquisition layer, separate from game
+imports and ratings. See [Annual departure acquisition](departures.md) for
+`departures:acquire`, `departures:replay`, `departures:preview`, supported NBA results
+and official-school Sidearm tables, saved-source recovery, and the reviewed-file
+contract. Sources, response bytes/hashes, capture times, failures, full selection
+ledger and normalized totals are retained. Identity review is a separate immutable
+mapping revision; incomplete evidence never becomes a verified zero. These commands
+perform no database writes, data imports, scoring or scheduled scraping.
+
 ## Saved recruiting evidence
 
 `recruiting:prepare` retains immutable saved 247 Recruit Composite evidence;

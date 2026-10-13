@@ -8,6 +8,7 @@ module ProphetRatings
     def initialize(inputs, config)
       @inputs = inputs.deep_stringify_keys
       @config = config.deep_stringify_keys.fetch('preseason')
+      validate_contract
       @profile = @inputs.fetch('profile_values')
       @profile_config = @config.fetch('profile')
     end
@@ -16,11 +17,43 @@ module ProphetRatings
       {
         preseason_adj_offensive_efficiency: blended_stat('adj_offensive_efficiency') + profile_adjustment,
         preseason_adj_defensive_efficiency: blended_stat('adj_defensive_efficiency') - profile_adjustment,
-        preseason_adj_pace: blended_stat('adj_pace')
+        preseason_adj_pace: pace
       }.stringify_keys.transform_values { |value| value.round(3) }
     end
 
+    def pace_report
+      return unless @inputs.fetch('contract') == 'preseason-v2-coaching'
+
+      validate_team_pace
+      CoachingPaceFormula.new(@inputs.fetch('coaching'), @config.fetch('coaching')).report(blended_stat('adj_pace'))
+    end
+
     private
+
+    def validate_contract
+      contract = @inputs.fetch('contract')
+      supported = @config.key?('coaching') ? 'preseason-v2-coaching' : 'preseason-v1'
+      return if contract == supported
+
+      raise ArgumentError, "Unsupported preseason inputs contract: #{contract} for this model"
+    end
+
+    def pace
+      existing = blended_stat('adj_pace')
+      return existing unless @inputs.fetch('contract') == 'preseason-v2-coaching'
+
+      validate_team_pace
+      CoachingPaceFormula.new(@inputs.fetch('coaching'), @config.fetch('coaching')).call(existing)
+    end
+
+    def validate_team_pace
+      baseline = @inputs.fetch('baselines').fetch('adj_pace')
+      previous = @inputs.fetch('previous_values').fetch('adj_pace')
+      CoachingPaceFormula.positive_pace(Float(baseline, exception: false))
+      [previous].compact.each do |value|
+        CoachingPaceFormula.positive_pace(Float(value, exception: false))
+      end
+    end
 
     def blended_stat(stat)
       baseline = @inputs.fetch('baselines').fetch(stat).to_f

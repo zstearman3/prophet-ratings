@@ -36,3 +36,20 @@ test:
 
 production:
   <<: *default
+
+# Opt-in authored settings; publish/select deliberately, never activate automatically.
+coaching_experiment:
+  <<: *default
+  bundle_name: "v1.8-experimental-coaching-pace"
+  preseason:
+    previous_season_weight: 0.85
+    fallback_efficiency: 105.5
+    fallback_pace: 69.5
+    adjustment_start_after_days: 14
+    profile:
+      recruiting_score_multiplier: 0.1
+      attrition_multiplier: 5.0
+      max_efficiency_adjustment: 5.0
+    coaching:
+      formula: relative_pace_v2
+      weight: 0.50

@@ -11,6 +11,7 @@ module ProphetRatings
     end
 
     def call
+      PreseasonComparison.validate_model(@ratings_config_version.settings.deep_stringify_keys)
       total = games.size
       count = eligible.size
       {
@@ -104,7 +105,7 @@ module ProphetRatings
     end
 
     def candidate_snapshot(snapshot, candidate)
-      inputs = { baselines:, previous_values: snapshot.attributes.slice(*PreseasonPriorFormula::STATS), profile_values: {} }
+      inputs = { contract: 'preseason-v1', baselines:, previous_values: snapshot.attributes.slice(*PreseasonPriorFormula::STATS), profile_values: {} }
       outputs = PreseasonPriorFormula.new(inputs, candidate).call.transform_keys { |stat| stat.delete_prefix('preseason_') }
       TeamRatingSnapshot.new(**outputs, team: snapshot.team, stats: volatility_defaults, ratings_config_version: @ratings_config_version)
     end

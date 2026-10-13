@@ -27,10 +27,13 @@ namespace :season do
         if season.reload.current?
           abort('Existing season outputs must be preserved. Use an explicitly scoped season:rebuild_ratings for an intentional reset.')
         end
-        ProphetRatings::PreseasonInitializer.new(season, ratings_config_version: selected_model_version).call
+        initializer = ProphetRatings::PreseasonInitializer.new(season, ratings_config_version: selected_model_version)
+        report = ENV['PREVIEW'] == 'true' ? initializer.preview : initializer.call
+        puts JSON.pretty_generate(report)
       end
     end
-    puts "Preseason values initialized for year=#{season.year}. Review coverage before activation."
+    action = ENV['PREVIEW'] == 'true' ? 'previewed' : 'initialized'
+    puts "Preseason values #{action} for year=#{season.year}. Review coverage before activation."
   rescue ArgumentError, Season::OperationInProgress => e
     abort(e.message)
   end

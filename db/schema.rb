@@ -68,6 +68,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_10_163200) do
     t.boolean "full_season_head_coach", default: false, null: false
     t.string "previous_role"
     t.string "previous_school"
+    t.boolean "previous_season_d1", default: false, null: false
     t.bigint "previous_team_id"
     t.integer "previous_year"
     t.string "status", default: "pending", null: false

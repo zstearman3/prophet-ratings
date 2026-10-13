@@ -15,6 +15,7 @@ module ProphetRatings
 
     def call
       config = @ratings_config_version.settings.deep_stringify_keys
+      PreseasonComparison.validate_model(config)
       reports = @years.map { |year| season_report(Season.find_by!(year:)) }
       {
         benchmark: 'opening-period game-time performance; fixed and sequential no-profile reconstructions',
@@ -31,6 +32,13 @@ module ProphetRatings
                         'Prepared paired final efficiency/pace records created and last revised before each prediction date'],
         decision: 'Retain production defaults. This bounded benchmark does not establish improvement or tune coefficients.'
       }
+    end
+
+    def self.validate_model(config)
+      return unless config.dig('preseason', 'coaching')
+
+      raise ArgumentError, 'Preseason comparison supports v1 team-history candidates only; select a model without preseason.coaching. ' \
+                           'Coaching evaluation requires archived reviewed inputs and common-game evidence.'
     end
 
     def self.split_description(reports)

@@ -211,3 +211,13 @@ To deliberately incorporate corrected inputs, create a new bundle version and
 review it through the existing season operations; do not edit/delete captures or
 retroactively manufacture historical ones. No deployment or manual publication
 was performed as part of the local comparison.
+
+### Coaching-model limitation
+
+This preregistered v1 team-history comparator does not reconstruct coaching inputs.
+Selecting a model with `preseason.coaching` raises an explicit error before source
+comparison; select a stored model without coaching settings for this benchmark.
+A coaching pace/total comparison needs archived reviewed coaching chronology and
+common-game evidence, which this command does not provide. Do not strip settings
+and label the resulting team-only candidates as an evaluation of the experimental
+coaching model. No accuracy gain is established by the synthetic coaching checks.

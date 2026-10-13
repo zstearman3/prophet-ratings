@@ -14,7 +14,7 @@ RSpec.describe CoachingChangesImport do
     result = importer.call
     candidate = CoachingChange.find(result[:candidates].first[:candidate_id])
     expect(candidate).to have_attributes(team_id: alpha.id, previous_team_id: beta.id, status: 'pending',
-                                         previous_year: nil, previous_role: nil, full_season_head_coach: false)
+                                         previous_year: nil, previous_role: nil, full_season_head_coach: false, previous_season_d1: false)
     expect(result).to include(d1_rows: 2, resolved_destinations: 2, unresolved_destinations: 0)
     expect(Season.count).to eq(0)
     expect(TeamOffseasonProfile.count).to eq(0)
@@ -32,13 +32,15 @@ RSpec.describe CoachingChangesImport do
 
   it 'deduplicates a manual equivalent and preserves verified history and readiness' do
     candidate = CoachingChange.create!(effective_year: 2027, team: alpha, coach_name: 'shared coach', status: 'confirmed',
-                                       previous_team: beta, previous_year: 2026, previous_role: 'head_coach', full_season_head_coach: true)
+                                       previous_team: beta, previous_year: 2026, previous_role: 'head_coach',
+                                       full_season_head_coach: true, previous_season_d1: true)
     CoachingChange.create!(effective_year: 2027, team: beta, coach_name: 'New Beta', status: 'rejected')
     review = CoachingReview.create!(year: 2027, ready: true)
     report = importer.call[:candidates].first
     expect(report[:candidate_id]).to eq(candidate.id)
     expect(report[:conflicts]).to be_empty
-    expect(candidate.reload).to have_attributes(status: 'confirmed', previous_year: 2026, full_season_head_coach: true)
+    expect(candidate.reload).to have_attributes(status: 'confirmed', previous_year: 2026,
+                                                full_season_head_coach: true, previous_season_d1: true)
     expect(review.reload).to be_ready
   end
 
@@ -70,11 +72,12 @@ RSpec.describe CoachingChangesImport do
   it 'updates pending proposals and clears unsupported history when the proposed coach changes' do
     importer.call
     candidate = CoachingChange.find_by!(team: alpha)
-    candidate.update!(previous_year: 2026, previous_role: 'head_coach', full_season_head_coach: true)
+    candidate.update!(previous_year: 2026, previous_role: 'head_coach', full_season_head_coach: true, previous_season_d1: true)
     rows.first[:new_coach] = 'First Time Coach'
     importer.call
     expect(candidate.reload).to have_attributes(coach_name: 'First Time Coach', previous_team_id: nil, previous_year: nil,
-                                                previous_role: nil, full_season_head_coach: false, status: 'pending')
+                                                previous_role: nil, full_season_head_coach: false, previous_season_d1: false,
+                                                status: 'pending')
   end
 
   it 'retains unresolved labels and ambiguous alias candidate IDs without creating teams' do
