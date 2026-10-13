@@ -1,0 +1,21 @@
+{
+  "provider": "247sports",
+  "category": "recruit_composite",
+  "conference_scope": "all",
+  "source_year": 2026,
+  "target_season": 2027,
+  "source_status": "ok",
+  "source_url": "https://247sports.com/Season/2026-Basketball/CompositeTeamRankings/",
+  "source_as_of": null,
+  "source_as_of_reason": "No source update timestamp displayed; synthetic test fixture",
+  "observed_at": "2026-10-10T18:00:00Z",
+  "retrieved_at": "2026-10-10T18:01:00Z",
+  "captured_at": "2026-10-10T18:02:00Z",
+  "snapshot_kind": "factual_transcription",
+  "snapshot_location": "synthetic fixture; not approved annual evidence",
+  "extraction_version": "247-recruit-json-v1",
+  "coverage_note": "Synthetic partial page, not publishable domain data",
+  "rows": [
+    { "team_label": "Test College", "provider_team_id": "test-college", "team_url": "https://247sports.com/college/test-college/", "rank": 1, "class_points": "70.123456789123456789", "average_rating": "99.1", "commit_count": 3 }
+  ]
+}

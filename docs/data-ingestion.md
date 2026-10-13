@@ -728,3 +728,11 @@ contract. Sources, response bytes/hashes, capture times, failures, full selectio
 ledger and normalized totals are retained. Identity review is a separate immutable
 mapping revision; incomplete evidence never becomes a verified zero. These commands
 perform no database writes, data imports, scoring or scheduled scraping.
+
+## Saved recruiting evidence
+
+`recruiting:prepare` retains immutable saved 247 Recruit Composite evidence;
+`recruiting:preview` reports conservative source-scoped team matching and coverage,
+with optional separately pinned operator mapping approval. Neither writes domain
+records or invokes ratings. See [Saved recruiting evidence](recruiting.md) for the
+annual JSON contract, year mapping, prepare/preview commands and review workflow.
