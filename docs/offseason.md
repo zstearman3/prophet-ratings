@@ -912,3 +912,15 @@ historical coaching/common-game evidence comparison.
 them explicitly. Its v1 team-history hypotheses lack archived coaching chronology;
 use a non-coaching stored model for that existing benchmark and retain the
 experimental designation for coaching until suitable reviewed evidence is available.
+
+## Drafted-player departure evidence
+
+Use the separate [annual acquisition and read-only preview workflow](departures.md)
+for every actual NBA selection in both rounds, verified prior-season participation,
+official-school cumulative points and full-team denominators. `departures:acquire`
+fetches explicit sources into an immutable saved bundle; `departures:replay` reparses
+captured bytes without network access; `departures:preview` validates separate
+reviewed player/team mappings and prints coverage with partial loss kept null.
+No penalty or rating input publication is performed. Database storage and scoring
+remain separate downstream work. Review complete draft accounting and evidence
+before using an annual file; an international affiliation is not verified zero.
