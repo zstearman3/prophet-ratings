@@ -53,7 +53,17 @@ module ProphetRatings
         raise ArgumentError, "Model setting must be positive: #{path}" unless payload.dig(*path.split('.').map(&:to_sym)).positive?
       end
       validate_weights(payload)
+      validate_preseason_components(payload)
+    end
+
+    def self.validate_preseason_components(payload)
       validate_coaching(payload)
+      validate_recruiting(payload)
+    end
+
+    def self.validate_recruiting(payload)
+      preseason = payload.fetch(:preseason)
+      RecruitingContributionSettings.validate(preseason[:recruiting]) if preseason.key?(:recruiting)
     end
 
     def self.validate_weights(payload)
