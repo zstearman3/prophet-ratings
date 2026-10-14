@@ -60,6 +60,7 @@ module ProphetRatings
       validate_coaching(payload)
       validate_recruiting(payload)
       validate_departures(payload)
+      ReviewedEfficiencySettings.validate(payload.fetch(:preseason))
     end
 
     def self.validate_recruiting(payload)

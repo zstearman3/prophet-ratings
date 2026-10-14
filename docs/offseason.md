@@ -1025,3 +1025,45 @@ Persist a reviewed tuning only through a newly authored immutable model and the
 future combined/publication contract; do not activate or edit stored versions or
 old captures. No production import, empirical fitting or historical rebuild is
 part of this preview.
+
+## Reviewed efficiency model publication and tuning
+
+After reviewing/importing annual evidence, author a **new** model payload from a
+complete stored configuration. Merge the template's three sections into
+`preseason`, preserving existing blending, baseline, profile and optional coaching
+settings. For example in a Rails console (synthetic model names; select explicitly):
+
+```ruby
+payload = RatingsConfigVersion.find_by!(name: 'your-source-model').config.deep_dup
+payload['bundle_name'] = 'your-experimental-reviewed-r3-model'
+payload['preseason'].merge!(YAML.load_file(Rails.root.join('config/examples/reviewed_efficiency_r3.yml')))
+version = RatingsConfigVersion.publish!(payload)
+```
+
+Publication does not activate the model or season. Preview the selected version:
+
+```bash
+bin/compose exec web bin/rails season:revise_preseason YEAR=2027 MODEL_VERSION=your-experimental-reviewed-r3-model
+```
+
+Review each team's `efficiency` report, including baseline/fallback, reviewed
+class points and draft coverage, component reasons and weights, pre-cap sum,
+combined bounds and allocation, alongside `outputs_before`/`outputs_after` and
+season baselines. Missing input stays unknown with zero effect. Resolve legacy
+profile overlap if either factor is enabled; never copy provider class points
+into `recruiting_score` or infer returning minutes from draft points.
+
+Use the returned unchanged `PREVIEW_KEY` with the same command plus `APPLY=true`
+to publish deliberately. An evidence-pointer change requires a fresh preview;
+corrections after publication require a new model version. Existing prior,
+snapshot and prediction records remain intact; normal initialization reuses the
+capture and does not reread corrected sources.
+
+For config-only tuning, copy that stored model to another new bundle name, change
+named endpoints/weights/magnitudes/bounds, publish it, and preview again. Compare
+old/new final outputs and raw/weighted/capped reports before applying the new key.
+Both weights zero restore the exact legacy/base calculation; one zero disables
+only that factor. Optional coaching still needs its reviewed year readiness.
+Review snapshot provenance and a scheduled forecast after publication. Real annual
+source approval, activation and any historical evaluation remain separate operator
+work; no accuracy or calibration improvement is assumed.

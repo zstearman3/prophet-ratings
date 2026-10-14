@@ -880,3 +880,48 @@ weights are zero. This component does not adjust pace or attribute offense/defen
 to individual players. Curve-shape changes require a supported new formula
 version; parameter tuning uses a new reviewed configuration, without reimporting
 evidence or changing old captures.
+
+### Experimental combined reviewed efficiency
+
+The opt-in `preseason.efficiency_adjustment.formula: reviewed_net_v1` selects
+`preseason-v3-reviewed-efficiency`. Merge `config/examples/reviewed_efficiency_r3.yml`
+into the preseason settings of a newly named immutable model. It requires both
+component configurations; existing component-only preview models and old v1/v2
+captures retain their original formula dispatch. No default model is changed.
+
+With unrounded blended offense O0 and defense D0, recruiting uses N0 = O0 - D0
+before any departure/profile effect. At the initial template settings, reviewed
+class points P produce q = clamp((P - 60)/(70 - 60), 0, 1), attenuation
+a = 1 - .8 * clamp(N0/(30 - 0), 0, 1), and R = recruiting_weight * 5 * q * a.
+Reviewed full-season draft production share L produces
+D = -departure_weight * min(1, 2 * L). Apply one combined net cap
+A = clamp(R + D, -1, 5), then offense = round(O0 + A/2, 3) and
+defense = round(D0 - A/2, 3). There is no second prior-blend multiplier.
+These experimental parameters establish arithmetic, not an accuracy gain.
+
+Each factor's immutable weight controls its effect independently. When either
+weight is positive, individually nonzero legacy recruiting/attrition/manual
+components are rejected before the old profile cap, even if they cancel.
+When both weights are zero, the exact legacy profile formula is used. Supplied
+invalid evidence still fails validation at zero weight. Missing class points and
+unknown/partial loss remain null with separate reasons; verified zero is retained.
+Missing either previous core efficiency suppresses draft loss while recruiting
+retains per-stat baseline fallbacks and their provenance.
+
+Fresh captures freeze team/year, approved evidence/review revision identities and
+hashes, retained recruiting row, complete departure selection/source accounting,
+O0/D0 and baseline/fallback sources, q/a/L, raw/capped/weighted components,
+pre-cap sum, combined bounds, A and symmetric allocation, and complete model
+configuration. Replay requires only these frozen operands and the selected
+immutable configuration; initializer retries reuse existing captures without
+reading mutable evidence/history. Snapshots retain this provenance and forecasts
+consume the final efficiencies once. Coaching remains a separate pace calculation
+under its existing readiness/eligibility requirements; the 14-day gate, decay,
+solver and Rails/Python boundary are unchanged.
+
+Tune endpoints, magnitudes, weights or combined bounds by publishing a newly named
+configuration and reviewing `season:revise_preseason` before/after outputs and
+component reports. No evidence reimport or schema change is needed. New curve
+shapes require an explicitly supported formula version. Publication retains the
+existing season locks, transactions and inactive/finalized-game/legacy-forecast
+safeguards. Old captures, snapshots and forecasts are preserved.
