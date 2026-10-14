@@ -28,7 +28,30 @@ module ProphetRatings
       CoachingPaceFormula.new(@inputs.fetch('coaching'), @config.fetch('coaching')).report(blended_stat('adj_pace'))
     end
 
+    # Before legacy profiles, recruiting, departures or coaching; preserve per-stat fallback.
+    def unadjusted_efficiencies
+      STATS.first(2).index_with { |stat| unadjusted_stat_report(stat) }
+    end
+
+    def self.validate_efficiencies(baseline, previous)
+      finite_efficiency(baseline)
+      [previous].compact.each { |value| finite_efficiency(value) }
+    end
+
+    def self.finite_efficiency(value)
+      return if value.is_a?(Numeric) && value.finite?
+
+      raise ArgumentError, 'Baseline efficiencies must be finite numeric values'
+    end
+
     private
+
+    def unadjusted_stat_report(stat)
+      baseline = @inputs.fetch('baselines').fetch(stat)
+      previous = @inputs.fetch('previous_values').fetch(stat)
+      self.class.validate_efficiencies(baseline, previous)
+      { value: blended_stat(stat), baseline:, previous:, fallback: previous.blank? }
+    end
 
     def validate_contract
       contract = @inputs.fetch('contract')

@@ -263,6 +263,90 @@ The two-week gate, two-game qualification, calendar decay and permanent floor
 remain baseline choices pending comparison with game-count decay. Synthetic
 checks establish arithmetic and bounds, not calibration or improved accuracy.
 
+### Recruiting r3 component preview
+
+`ProphetRatings::RecruitingContribution.new(inputs, config).call` implements only
+the accepted experimental recruiting component, in **net points per 100
+possessions**. It does not alter published priors, pace, profiles, snapshots or
+predictions. No predictive improvement or empirical calibration is established.
+The initial reviewed settings live in `config/examples/recruiting_r3.yml`; this
+preview template is deliberately not loaded by the authored default bundle.
+
+Pass an explicit complete configuration with that template under
+`preseason.recruiting`. All seven numeric parameters and the supported formula
+`class_points_baseline_v1` are required. Class/baseline endpoints must be strictly
+ordered with finite spans; class endpoints and the component ceiling are
+nonnegative, and weight/attenuation floor are in 0..1. Every parameter is finite.
+Existing configurations without the block and legacy formula dispatch remain
+valid; there is no fallback to current recruiting defaults during replay.
+
+The input is an existing captured preseason input hash plus `reviewed_recruiting`,
+containing the stored recruiting `team_input` from an approved
+`OffseasonInputRevision` (or explicit null when absent). The caller must pin the
+revision identity/input hash alongside that evidence; scoring does not query the
+profile's current pointer or approve evidence. Supported statuses are
+`verified_points`, `verified_zero` and `unknown`, with the stored units
+`247_recruit_composite_class_points`. Unknown points are null; inconsistent
+statuses, invalid units and negative/nonfinite points fail even at weight zero.
+Exact provider decimals and source evidence remain in the report's captured input.
+Class rank and the legacy local `recruiting_score` never enter this component.
+
+The unadjusted baseline is computed using the captured previous core efficiencies
+and per-stat baselines with the configured previous-season weight (initial .85),
+before any legacy profile, recruiting, departure or coaching effect. Missing
+history uses the relevant baseline entirely and is flagged independently for
+both sides. Missing/invalid baselines and nonfinite history fail.
+
+```text
+q = clamp((P - class_points_lower) / (class_points_upper - class_points_lower), 0, 1)
+a = 1 - (1 - attenuation_floor) * clamp((N0 - baseline_net_lower) /
+                                      (baseline_net_upper - baseline_net_lower), 0, 1)
+R = weight * max_net_efficiency * q * a
+```
+
+Initial settings are class points 60..70, baseline net 0..30, floor .2,
+ceiling 5 and weight 1. High-class eligibility requires P > 60; P = 60
+is verified below threshold. At P = 70 and N0 = 0/10/20/30, R is
+5/3.666667/2.333333/1. At P = 65 these halve. Stronger baselines receive smaller
+benefits; baseline values outside the band clamp to the endpoints. These are
+heuristic safety choices made before outcome inspection, not fitted forecasts.
+Weight zero returns exactly zero while preserving input eligibility and arithmetic.
+Missing points have reason `missing_class_points`; verified P <= threshold has
+`below_threshold`; eligible weight-zero evidence has `disabled`.
+
+The returned report retains full frozen inputs/configuration, bundle/formula
+identity, raw points, unadjusted core values and fallback flags, N0, q, a,
+unweighted R and weighted contribution. Component precision is retained; task 07
+owns departures, legacy-overlap rejection, one combined team cap, offense/defense
+allocation, final three-decimal output and persistence in new captures. In
+particular, do not add this net contribution to each side or apply the prior
+blend weight again. Adding a preview block alone does not enable a new effect in
+the existing preseason publisher.
+
+For config-only tuning, prepare a separate reviewed configuration with a new
+bundle name and compare the same frozen evidence before any publication:
+
+```ruby
+preview_config = captured_config.deep_dup
+preview_config[:preseason][:recruiting] = YAML.load_file(
+  Rails.root.join('config/examples/recruiting_r3.yml')
+).symbolize_keys
+before = ProphetRatings::RecruitingContribution.new(captured_inputs, preview_config).call
+changed = preview_config.deep_dup
+changed[:bundle_name] = 'reviewed-recruiting-preview-2'
+changed[:preseason][:recruiting][:class_points_upper] = 80.0
+after = ProphetRatings::RecruitingContribution.new(captured_inputs, changed).call
+replayed = ProphetRatings::RecruitingContribution.new(before[:inputs], before[:configuration]).call
+```
+
+For P = 70, N0 = 20 this changes R from 2.333333 to 1.166667; `replayed`
+is identical to `before`. Review numerical differences, missingness and provenance.
+No evidence reimport, historical capture edit or schema change is needed for
+parameter tuning. A new curve shape requires explicit formula-version dispatch
+and focused tests. Model publication remains a deliberate inactive-season revision
+through the downstream integration workflow; old captures/snapshots/predictions
+must remain intact. Future empirical fitting is separate work.
+
 ### Opening-period uncertainty assessment
 
 This records the earlier audit baseline. Shared-pace uncertainty and the frozen
