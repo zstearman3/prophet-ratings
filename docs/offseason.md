@@ -924,3 +924,68 @@ reviewed player/team mappings and prints coverage with partial loss kept null.
 No penalty or rating input publication is performed. Database storage and scoring
 remain separate downstream work. Review complete draft accounting and evidence
 before using an annual file; an international affiliation is not verified zero.
+
+## Reviewed annual recruiting/departure storage
+
+After migration `20261014000000`, use `offseason_inputs:import` to store saved,
+reviewed evidence for an **existing** target Season and its existing TeamSeasons.
+This publishes inputs only; it does not prepare teams, change legacy units or
+coefficients, calculate ratings, activate a model, or modify priors/predictions.
+Recruit/draft year Y targets Season.year Y+1. Follow [recruiting](recruiting.md)
+and [departures](departures.md) for acquisition and source review first.
+
+Recruiting uses `DATASET_DIR` and the approved **mapping report file** from
+`recruiting:preview` (`MAPPING_DIR/<mapping_revision>.json`) as `REVIEW_PATH`,
+not its small approval request. Departure inputs require `CAPTURE_DIR`,
+`DATASET_PATH` and the approved decisions file `REVIEW_PATH`. The importer reloads
+and validates the original files, replays departure source bytes, and rechecks
+canonical/source-scoped identities. It makes no network requests. Resolve fatal
+numeric, duplicate, denominator and ambiguous identity conflicts before applying.
+Failed departure sources and explicit evidence conflicts block publication.
+Unmatched recruiting rows remain excluded and visible. Approved partial departure
+accounting is retained with known subtotals and null loss; unknown participation or
+global identity prevents every team's complete coverage. Pending/rejected file
+approval is refused; not-applicable reviewed participation categories stay explicit.
+
+Example (run in the intended local environment with explicit paths):
+
+```bash
+bin/rails offseason_inputs:import YEAR=2027 KIND=recruiting DATASET_DIR=/path/to/dataset REVIEW_PATH=/path/to/mapping.json VERSION=review-2027-1 REASON='Initial evidence review' INPUT_HASH=inspect
+```
+
+This first read-only validation prints the exact expected `INPUT_HASH`. Pin it and
+rerun the same command to obtain a coverage report and `preview_key`. Review source
+scope, dates, approval identity/time, all exclusions and each team's raw inputs.
+Apply the identical command with `APPLY=true PREVIEW_KEY=<reviewed-key>`. For
+`KIND=departures`, replace `DATASET_DIR` with `CAPTURE_DIR` and `DATASET_PATH`.
+No absent file is accepted or converted into zero. Explicit recruiting zero is
+distinct from missing points. Verified departure zero requires complete accounting.
+Capture time never proves historical pregame availability.
+
+Each `OffseasonInputRevision` retains dataset/review hashes, approval, original
+labels/URLs/timestamps/units, normalized rows, full draft accounting and production,
+coverage, and exact snapshot bytes encoded in JSONB. Recruiting decimal points
+remain decimal strings with source precision. Version names are immutable per
+season/input kind. TeamOffseasonProfile keeps its single team-season identity and
+separate nullable recruiting/departure revision pointers. `reviewed_inputs` exposes
+only the current approved team evidence; omitted coverage is explicitly unknown.
+Existing legacy fields/provenance validation and formula replay remain unchanged.
+The migration creates no historical evidence and enables no new model effects.
+
+An identical import is a no-op, including timestamps. A changed dataset, mapping,
+approval or team coverage requires a new `VERSION`, a correction `REASON` and
+`PREDECESSOR_ID=<latest revision id for this season/kind>`, then a fresh hash and
+preview. Review the latest revision through Rails console before choosing its ID.
+Publication appends an immutable successor and atomically updates profile pointers;
+old revisions and captured evidence remain available. Retrying an older identical
+revision never moves pointers back after a successor. Any file/mapping/profile
+change invalidates the preview. A failure rolls back the whole publication; resolve
+the reported cause and preview again. Legacy profiles with missing required
+provenance must be deliberately corrected, not automatically repaired by import.
+
+Keep file bundles for operational replay even though published revisions retain
+source bytes. Database retention adds storage proportional to source captures;
+there is no artifact pruning or annual bundle requirement in Git. Review/apply a
+small local bundle, retry unchanged, then publish a deliberate correction and
+confirm prior captures/forecasts still replay before using actual annual evidence.
+Scoring and new formula configuration belong to the downstream model ticket.

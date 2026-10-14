@@ -27,6 +27,27 @@ class TeamOffseasonProfile < ApplicationRecord
   }.freeze
 
   belongs_to :team_season
+  belongs_to :recruiting_revision, class_name: 'OffseasonInputRevision', optional: true
+  belongs_to :departure_revision, class_name: 'OffseasonInputRevision', optional: true
+
+  validate :validate_reviewed_revisions
+
+  # Future formula contracts can consume these raw inputs; legacy calculations stay unchanged.
+  def reviewed_inputs
+    team_id = team_season.team_id
+    { 'recruiting' => recruiting_revision&.team_input(team_id),
+      'departures' => departure_revision&.team_input(team_id) }
+  end
+
+  def validate_reviewed_revisions
+    { 'recruiting' => recruiting_revision, 'departures' => departure_revision }.each do |kind, revision|
+      next unless revision
+      next if revision.kind == kind && revision.season_id == team_season.season_id &&
+              revision.payload.fetch('team_inputs').key?(team_season.team_id.to_s)
+
+      errors.add(:base, 'Reviewed revision must cover this team, season and input kind')
+    end
+  end
 
   validates :team_season_id, uniqueness: true
   validate :validate_evidence, if: :evidence_required?

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_10_163200) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_14_000000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -251,6 +251,24 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_10_163200) do
     t.index ["scheduled_at"], name: "index_good_jobs_on_scheduled_at", where: "(finished_at IS NULL)"
   end
 
+  create_table "offseason_input_revisions", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "dataset_hash", null: false
+    t.string "input_hash", null: false
+    t.string "kind", null: false
+    t.jsonb "payload", null: false
+    t.bigint "predecessor_id"
+    t.text "reason", null: false
+    t.string "review_hash", null: false
+    t.bigint "season_id", null: false
+    t.datetime "updated_at", null: false
+    t.string "version", null: false
+    t.index ["predecessor_id"], name: "index_offseason_input_revisions_on_predecessor_id"
+    t.index ["season_id", "kind", "input_hash"], name: "index_offseason_revisions_identity", unique: true
+    t.index ["season_id", "kind", "version"], name: "index_offseason_revisions_version", unique: true
+    t.index ["season_id"], name: "index_offseason_input_revisions_on_season_id"
+  end
+
   create_table "predictions", force: :cascade do |t|
     t.decimal "away_defensive_efficiency", precision: 6, scale: 3
     t.decimal "away_defensive_efficiency_error", precision: 6, scale: 3
@@ -430,18 +448,22 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_10_163200) do
   create_table "team_offseason_profiles", force: :cascade do |t|
     t.boolean "coaching_change"
     t.datetime "created_at", null: false
+    t.bigint "departure_revision_id"
     t.jsonb "input_units", default: {}, null: false
     t.integer "lost_starters"
     t.float "manual_adjustment"
     t.text "manual_adjustment_reason"
     t.date "observed_on"
     t.integer "recruiting_class_rank"
+    t.bigint "recruiting_revision_id"
     t.float "recruiting_score"
     t.float "returning_bpm_total"
     t.float "returning_minutes_pct"
     t.text "source_reference"
     t.bigint "team_season_id", null: false
     t.datetime "updated_at", null: false
+    t.index ["departure_revision_id"], name: "index_team_offseason_profiles_on_departure_revision_id"
+    t.index ["recruiting_revision_id"], name: "index_team_offseason_profiles_on_recruiting_revision_id"
     t.index ["team_season_id"], name: "index_team_offseason_profiles_on_team_season_id", unique: true
   end
 
@@ -578,6 +600,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_10_163200) do
   add_foreign_key "coaching_changes", "teams", column: "previous_team_id"
   add_foreign_key "game_odds", "games"
   add_foreign_key "game_sync_dates", "seasons"
+  add_foreign_key "offseason_input_revisions", "offseason_input_revisions", column: "predecessor_id"
+  add_foreign_key "offseason_input_revisions", "seasons"
   add_foreign_key "predictions", "ratings_config_versions"
   add_foreign_key "predictions", "team_rating_snapshots", column: "away_team_snapshot_id"
   add_foreign_key "predictions", "team_rating_snapshots", column: "home_team_snapshot_id"
@@ -590,6 +614,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_10_163200) do
   add_foreign_key "team_conferences", "seasons", column: "start_season_id"
   add_foreign_key "team_conferences", "teams"
   add_foreign_key "team_games", "team_seasons", column: "opponent_team_season_id"
+  add_foreign_key "team_offseason_profiles", "offseason_input_revisions", column: "departure_revision_id"
+  add_foreign_key "team_offseason_profiles", "offseason_input_revisions", column: "recruiting_revision_id"
   add_foreign_key "team_rating_snapshots", "ratings_config_versions"
   add_foreign_key "team_rating_snapshots", "seasons"
   add_foreign_key "team_rating_snapshots", "team_seasons"
