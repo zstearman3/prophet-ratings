@@ -81,6 +81,21 @@ RSpec.describe OffseasonInputs::DepartureBundle do
     )
   end
 
+  it 'captures imported evidence for pure scoring and replay without mutable revision lookups' do
+    import_bundle
+    revision = OffseasonInputRevision.last
+    captured = ProphetRatings::DepartureContributionEvidence.capture(revision)
+    config = RatingsConfigVersion.authored_config.deep_dup
+    config[:preseason][:departures] = YAML.load_file(Rails.root.join('config/examples/departures_r3.yml')).symbolize_keys
+    inputs = { team_id: team.id, target_year: season.year, profile_values: {},
+               previous_values: { adj_offensive_efficiency: 100, adj_defensive_efficiency: 100 }, reviewed_departures: captured }
+    report = ProphetRatings::DepartureContribution.new(inputs, config).call
+    expect(report).to include(loss_share: 0.25, contribution: -0.5)
+    expect(report[:inputs].dig('reviewed_departures', 'revision')).to include('input_hash' => revision.input_hash)
+    TeamOffseasonProfile.find_each { |profile| profile.update!(departure_revision: nil) }
+    expect(ProphetRatings::DepartureContribution.new(report[:inputs], report[:configuration]).call).to eq(report)
+  end
+
   it 'retains approved partial accounting with unknown losses and explicit exclusions' do
     decisions.pop
     File.write(paths.fetch(:review_path), JSON.generate(review))
