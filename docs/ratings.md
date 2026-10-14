@@ -754,3 +754,45 @@ rejects coaching-enabled models: it has no archived coaching chronology or input
 coverage. Select a model without coaching settings for that team-history benchmark;
 a coaching accuracy comparison requires separately authorized reviewed evidence
 and common games. See [Preseason comparison](preseason-comparison.md#coaching-model-limitation).
+
+### Experimental draft-production-loss component
+
+`ProphetRatings::DepartureContribution` implements the accepted r3 departure
+curve as a pure, read-only report. Optional immutable `preseason.departures`
+settings are shown in `config/examples/departures_r3.yml`: `points_share_v1`,
+weight 1 (finite 0..1), slope 2 and ceiling 1 (finite nonnegative magnitudes).
+These initial experimental constants were fixed before historical outcome
+inspection; they imply no demonstrated accuracy gain. Existing authored bundles,
+legacy formulas, captures and published outputs are unchanged.
+
+For complete reviewed all-selection accounting, L is the sum of eligible players'
+actual prior-season points divided by their common full-season team denominator.
+D = weight * max(-ceiling, -slope * L), in net points per 100 possessions.
+There is no pick cutoff, rank multiplier, extrapolation for limited participation,
+or team-strength weighting. At initial settings, 200/2000 yields -.2,
+(500+300)/2000 yields -.8 and losses of at least half the points yield -1.
+Verified nonparticipants, no-college and outside-prior-season selections contribute
+no production. Zero-point eligible participants remain observed zero.
+
+Absent evidence, incomplete draft accounting, unresolved global identity or
+unknown production for the selected team retain null L and zero effect with a
+reason. Resolved unknown production for another team does not invalidate this
+team's accounting. Missing either previous core efficiency suppresses D with
+`no_complete_previous_core`, retaining the evidence loss share. Invalid numeric
+inputs, duplicate selections/player contributions, inconsistent denominators,
+wrong years, participation scope/units and unapproved evidence fail explicitly,
+even at weight zero. Nonzero legacy recruiting, attrition or manual components
+are rejected individually before their aggregate cap when either new factor
+weight is positive; cancelling components cannot hide overlap.
+
+The report freezes the entire supplied configuration and inputs, including
+previous core values, reviewed eligible/excluded selection evidence, source
+references, approval and input revision identity. It exposes coverage, raw slope
+output, component-capped output, weight and effective output. Replay uses only
+those frozen operands. Source snapshots remain retained by immutable input
+revisions. Task 07 owns persistence into preseason captures, the combined cap,
+symmetric allocation, publication, and exact legacy dispatch when both new
+weights are zero. This component does not adjust pace or attribute offense/defense
+to individual players. Curve-shape changes require a supported new formula
+version; parameter tuning uses a new reviewed configuration, without reimporting
+evidence or changing old captures.

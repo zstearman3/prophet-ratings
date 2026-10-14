@@ -1,0 +1,6 @@
+# Experimental initial curve, fixed before historical outcome inspection.
+# Copy into a newly authored immutable model's preseason.departures section.
+formula: points_share_v1
+weight: 1.0
+slope: 2.0
+max_net_efficiency: 1.0

@@ -54,6 +54,12 @@ module ProphetRatings
       end
       validate_weights(payload)
       validate_coaching(payload)
+      validate_departures(payload)
+    end
+
+    def self.validate_departures(payload)
+      preseason = payload.fetch(:preseason)
+      DepartureContributionSettings.validate(preseason[:departures]) if preseason.key?(:departures)
     end
 
     def self.validate_weights(payload)

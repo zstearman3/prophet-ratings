@@ -989,3 +989,39 @@ there is no artifact pruning or annual bundle requirement in Git. Review/apply a
 small local bundle, retry unchanged, then publish a deliberate correction and
 confirm prior captures/forecasts still replay before using actual annual evidence.
 Scoring and new formula configuration belong to the downstream model ticket.
+
+### Read-only draft-loss scoring preview
+
+After reviewing/importing departure evidence, capture its ledger from the
+immutable revision and supply stored prior efficiencies (nil when unavailable).
+In Rails console, using an existing `profile` and selected `version`:
+
+```ruby
+config = version.settings.deep_dup
+config[:preseason][:departures] = YAML.load_file(Rails.root.join('config/examples/departures_r3.yml')).symbolize_keys
+inputs = {
+  team_id: profile.team_season.team_id,
+  target_year: profile.team_season.season.year,
+  previous_values: { adj_offensive_efficiency: previous_offense, adj_defensive_efficiency: previous_defense },
+  profile_values: profile.attributes.slice('recruiting_score', 'returning_minutes_pct', 'manual_adjustment'),
+  reviewed_departures: ProphetRatings::DepartureContributionEvidence.capture(profile.departure_revision)
+}
+before = ProphetRatings::DepartureContribution.new(inputs, config).call
+candidate = config.deep_dup
+candidate[:bundle_name] = 'reviewed-departure-tuning'
+candidate[:preseason][:departures][:weight] = 0.5
+after = ProphetRatings::DepartureContribution.new(inputs, candidate).call
+[before, after].map { |row| row.slice(:loss_share, :reason, :raw_contribution, :capped_contribution, :weight, :contribution) }
+ProphetRatings::DepartureContribution.new(before[:inputs], before[:configuration]).call == before
+```
+
+Review the full report's underlying selections, exclusions, approval, source
+scope, coverage and revision hashes. The half-weight candidate turns -.8 into
+-.4 for 800/2000; it does not alter evidence. Missing evidence remains null, while
+complete verified zero remains zero. Nonzero legacy profile components block an
+enabled preview; resolve their intended treatment through task 07 rather than
+silently dropping them. These calls write nothing and make no source requests.
+Persist a reviewed tuning only through a newly authored immutable model and the
+future combined/publication contract; do not activate or edit stored versions or
+old captures. No production import, empirical fitting or historical rebuild is
+part of this preview.
