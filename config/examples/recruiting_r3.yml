@@ -1,0 +1,9 @@
+# Explicit preview template; not loaded by RatingsConfigVersion.authored_config.
+formula: class_points_baseline_v1
+weight: 1.0
+class_points_lower: 60.0
+class_points_upper: 70.0
+baseline_net_lower: 0.0
+baseline_net_upper: 30.0
+attenuation_floor: 0.2
+max_net_efficiency: 5.0

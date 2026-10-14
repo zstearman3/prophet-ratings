@@ -183,6 +183,9 @@ RSpec.describe ProphetRatings::DepartureContribution do
     inputs[:profile_values] = { returning_minutes_pct: 0.5 }
     expect { score }.to raise_error(ArgumentError, /overlap/)
     config[:preseason][:departures][:weight] = 0
+    config[:preseason][:recruiting] = YAML.load_file(Rails.root.join('config/examples/recruiting_r3.yml')).symbolize_keys
+    expect { score }.to raise_error(ArgumentError, /overlap/)
+    config[:preseason][:recruiting][:weight] = 0
     expect(score[:contribution]).to eq(0)
   end
 end
