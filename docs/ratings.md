@@ -925,3 +925,38 @@ component reports. No evidence reimport or schema change is needed. New curve
 shapes require an explicitly supported formula version. Publication retains the
 existing season locks, transactions and inactive/finalized-game/legacy-forecast
 safeguards. Old captures, snapshots and forecasts are preserved.
+
+The complete named configuration contract is below. All numeric values must be
+finite; spans are derived from ordered endpoints. Class points use the provider's
+Recruit Composite units, not rank or the legacy local score. Net-efficiency values
+are points per 100 possessions; weights, attenuation and q/L are dimensionless.
+
+| Preseason setting | Initial value | Units / validation |
+| --- | --- | --- |
+| `previous_season_weight` | .85 | Blend fraction, 0..1; preserved from selected model |
+| `recruiting.formula` | `class_points_baseline_v1` | Supported recruiting formula contract |
+| `recruiting.weight` | 1 | Fraction, 0..1; zero disables R |
+| `recruiting.class_points_lower` | 60 | Provider points, nonnegative and below upper |
+| `recruiting.class_points_upper` | 70 | Provider points, strictly above lower |
+| `recruiting.baseline_net_lower` | 0 | Net efficiency, strictly below upper |
+| `recruiting.baseline_net_upper` | 30 | Net efficiency, strictly above lower |
+| `recruiting.attenuation_floor` | .2 | Multiplier, 0..1 |
+| `recruiting.max_net_efficiency` | 5 | Net efficiency, nonnegative recruiting ceiling |
+| `departures.formula` | `points_share_v1` | Supported departure formula contract |
+| `departures.weight` | 1 | Fraction, 0..1; zero disables D |
+| `departures.slope` | 2 | Net efficiency per unit lost-points share, nonnegative |
+| `departures.max_net_efficiency` | 1 | Net efficiency, nonnegative loss magnitude ceiling |
+| `efficiency_adjustment.formula` | `reviewed_net_v1` | Combined contract; captures use `preseason-v3-reviewed-efficiency` |
+| `efficiency_adjustment.lower_bound` | -1 | Net efficiency, ≤ 0 |
+| `efficiency_adjustment.upper_bound` | 5 | Net efficiency, ≥ 0 and ≥ lower |
+
+Use [the annual prepare/review/publication checklist](offseason.md#annual-bundle-checklist-2026-evidence-for-year2027)
+to save a before/after preview, review coverage and largest movers, then publish
+a new immutable config and guarded revision only when authorized. Zero weights
+do not bypass evidence validation. Legacy `preseason-v1` captures replay the original
+profile calculation; neither tuning nor new imports rewrites them. Coaching pace
+remains independent. The saved-file integration specs exercise imported evidence
+through final ranks, snapshots and frozen forecasts, plus config-only tuning and
+atomic rollback. These checks establish arithmetic and reproducibility, not
+calibration or predictive improvement; a real annual preview needs reviewed files
+and stored history separately.

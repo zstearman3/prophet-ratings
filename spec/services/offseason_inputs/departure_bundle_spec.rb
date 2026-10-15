@@ -147,4 +147,130 @@ RSpec.describe OffseasonInputs::DepartureBundle do
     expect { import_bundle }.to raise_error(ArgumentError, /Duplicate review/)
     expect(OffseasonInputRevision.count).to eq(0)
   end
+
+  context 'when publishing the complete saved-file workflow' do
+    include ActiveSupport::Testing::TimeHelpers
+
+    let(:version) do
+      config = RatingsConfigVersion.authored_config.deep_dup
+      config[:bundle_name] = 'saved-file-workflow'
+      config[:preseason].merge!(YAML.load_file(Rails.root.join('config/examples/reviewed_efficiency_r3.yml')).deep_symbolize_keys)
+      RatingsConfigVersion.publish!(config)
+    end
+    let(:operation) { ProphetRatings::PreseasonRevision.new(season, ratings_config_version: version) }
+    let(:home) { season.team_seasons.find_by!(team:) }
+    let(:away) { season.team_seasons.find_by!(team: other_team) }
+
+    before do
+      travel_to((season.start_date - 1.day).in_time_zone + 12.hours)
+      previous = create(:season, year: 2025, average_efficiency: 100, average_pace: 70)
+      [team, other_team].each do |participant|
+        create(:team_season, season: previous, team: participant,
+                             adj_offensive_efficiency: 100, adj_defensive_efficiency: 100, adj_pace: 70)
+      end
+      import_recruiting
+      import_bundle
+    end
+
+    def recruiting_dataset
+      extract = JSON.parse(Rails.root.join('spec/fixtures/recruiting/partial.json').read)
+      extract.merge!('source_year' => 2025, 'target_season' => 2026,
+                     'source_url' => 'https://247sports.com/Season/2025-Basketball/CompositeTeamRankings/')
+      extract['rows'].first.merge!('team_label' => team.school, 'class_points' => '70')
+      Recruiting::Dataset.new(JSON.generate(extract), 'Synthetic recruiting extract').save(directory)
+    end
+
+    def import_recruiting
+      dataset_dir = recruiting_dataset
+      mapping = Recruiting::Preview.new(Recruiting::Dataset.load(dataset_dir), season).call
+      approval = mapping.slice('dataset_revision', 'mapping_revision').merge('approved_by' => 'Test reviewer',
+                                                                             'approved_at' => '2026-10-13T12:00:00Z')
+      review_path = File.join(directory, 'recruiting-review.json')
+      File.write(review_path, JSON.generate(Recruiting::MappingReview.new(mapping).approve(approval)))
+      recruiting_paths = { dataset_dir:, review_path: }
+      payload = OffseasonInputs::RecruitingBundle.new(recruiting_paths, season).call
+      publication = { version: 'recruiting-review-1', reason: 'Synthetic integration review', predecessor_id: nil,
+                      input_hash: Departures::Contract.digest(payload) }
+      importer = OffseasonInputs::Import.new(season:, kind: 'recruiting', paths: recruiting_paths, publication:)
+      importer.call(preview_key: importer.preview.fetch('preview_key'))
+    end
+
+    def publish_reviewed
+      operation.call(preview_key: operation.preview.fetch(:preview_key))
+    end
+
+    def scheduled_prediction
+      game = create(:game, season:, status: :scheduled, start_time: season.start_date.in_time_zone + 12.hours)
+      create(:team_game, game:, team_season: home, team:, home: true)
+      create(:team_game, game:, team_season: away, team: other_team, home: false)
+      ProphetRatings::GamePredictionBuilder.new(game, ratings_config_version: version).call
+    end
+
+    it 'previews the hand-calculated combined adjustment from both reviewed file imports without publishing' do
+      report = operation.preview
+      row = report[:teams].find { |entry| entry[:team_id] == team.id }
+      # P=70, N0=0: R=5; two eligible players total 500/2000: D=-.5; A=4.5.
+      expect(row[:efficiency]).to include(pre_cap_sum: 4.5, adjustment: 4.5, offense_allocation: 2.25, defense_allocation: -2.25)
+      expect(row[:efficiency][:departures]).to include(loss_share: 0.25)
+      expect(PreseasonPrior.count).to eq(0)
+    end
+
+    it 'publishes the combined net adjustment exactly once into core values, ranks and snapshot provenance' do
+      publish_reviewed
+      expect(home.reload.attributes.values_at('adj_offensive_efficiency', 'adj_defensive_efficiency',
+                                              'adj_pace')).to eq([102.25, 97.75, 70])
+      expect([home.overall_rank, away.reload.overall_rank]).to eq([1, 2])
+      snapshot = home.team_rating_snapshots.find_by!(ratings_config_version: version)
+      expect([snapshot.adj_offensive_efficiency, snapshot.adj_defensive_efficiency, snapshot.overall_rank]).to eq([102.25, 97.75, 1])
+      prior = home.preseason_prior
+      expect(snapshot.stats.dig('preseason_prior', 'inputs')).to eq(prior.inputs)
+    end
+
+    it 'preserves all-selection evidence, captures, snapshots and frozen forecasts on unchanged file and initializer reruns' do
+      publish_reviewed
+      expect(home.reload.preseason_prior.inputs.dig('reviewed_departures', 'selections').size).to eq(60)
+      prediction = scheduled_prediction
+      expect(prediction.calculation_context.dig('snapshots', 0, 'ratings', 'adj_offensive_efficiency')).to eq(102.25)
+      before = [OffseasonInputRevision.order(:id).map(&:attributes), PreseasonPrior.order(:id).map(&:attributes),
+                TeamRatingSnapshot.order(:id).map(&:attributes), prediction.attributes]
+      import_bundle
+      import_recruiting
+      ProphetRatings::PreseasonInitializer.new(season, ratings_config_version: version).call
+      expect([OffseasonInputRevision.order(:id).map(&:attributes), PreseasonPrior.order(:id).map(&:attributes),
+              TeamRatingSnapshot.order(:id).map(&:attributes), prediction.reload.attributes]).to eq(before)
+      expect(season.reload).not_to be_current
+    end
+
+    it 'tunes only configuration against unchanged imported evidence and preserves the prior forecast and replay' do
+      publish_reviewed
+      prior = home.reload.preseason_prior
+      prediction = scheduled_prediction
+      frozen_prediction = prediction.attributes
+      frozen_prior = prior.attributes
+      config = version.config.deep_dup
+      config['bundle_name'] = 'saved-file-tuned'
+      config['preseason']['recruiting']['class_points_upper'] = 80
+      tuned = RatingsConfigVersion.publish!(config)
+      revision = ProphetRatings::PreseasonRevision.new(season, ratings_config_version: tuned)
+      preview = revision.preview
+      # The same P=70 now gives q=.5, so A=2.5-.5=2, allocated +/-1.
+      expect(preview[:teams].first[:efficiency]).to include(pre_cap_sum: 2, adjustment: 2)
+      expect { revision.call(preview_key: preview.fetch(:preview_key)) }.not_to change(OffseasonInputRevision, :count)
+      expect(home.reload.attributes.values_at('adj_offensive_efficiency', 'adj_defensive_efficiency')).to eq([101, 99])
+      expect([prior.reload.attributes, prediction.reload.attributes]).to eq([frozen_prior, frozen_prediction])
+      expect(ProphetRatings::PreseasonPriorFormula.new(prior.inputs, prior.inputs.fetch('configuration')).call).to eq(prior.outputs)
+    end
+
+    it 'keeps imported evidence but rolls back all rating publication writes on failure' do
+      original = season.team_seasons.order(:id).map(&:attributes)
+      evidence = OffseasonInputRevision.order(:id).map(&:attributes)
+      snapshots = instance_double(ProphetRatings::TeamRatingSnapshotService)
+      allow(ProphetRatings::TeamRatingSnapshotService).to receive(:new).and_return(snapshots)
+      allow(snapshots).to receive(:call).and_raise('Synthetic publication failure')
+      expect { publish_reviewed }.to raise_error('Synthetic publication failure')
+      expect([PreseasonPrior.count, TeamRatingSnapshot.count, season.reload.preseason_revision_id]).to eq([0, 0, nil])
+      expect(season.team_seasons.order(:id).map(&:attributes)).to eq(original)
+      expect(OffseasonInputRevision.order(:id).map(&:attributes)).to eq(evidence)
+    end
+  end
 end
