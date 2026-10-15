@@ -1,28 +1,28 @@
 # frozen_string_literal: true
 
 module ProphetRatings
-  # Pure replay of the captured v1 preseason contract; no database or runtime defaults.
+  # Pure replay of versioned captured preseason contracts; no database or runtime defaults.
   class PreseasonPriorFormula
     STATS = %w[adj_offensive_efficiency adj_defensive_efficiency adj_pace].freeze
 
     def initialize(inputs, config)
       @inputs = inputs.deep_stringify_keys
-      @config = config.deep_stringify_keys.fetch('preseason')
+      @configuration = config.deep_stringify_keys
+      @config = @configuration.fetch('preseason')
       validate_contract
       @profile = @inputs.fetch('profile_values')
-      @profile_config = @config.fetch('profile')
     end
 
     def call
       {
-        preseason_adj_offensive_efficiency: blended_stat('adj_offensive_efficiency') + profile_adjustment,
-        preseason_adj_defensive_efficiency: blended_stat('adj_defensive_efficiency') - profile_adjustment,
+        preseason_adj_offensive_efficiency: blended_stat('adj_offensive_efficiency') + efficiency_adjustment,
+        preseason_adj_defensive_efficiency: blended_stat('adj_defensive_efficiency') - efficiency_adjustment,
         preseason_adj_pace: pace
       }.stringify_keys.transform_values { |value| value.round(3) }
     end
 
     def pace_report
-      return unless @inputs.fetch('contract') == 'preseason-v2-coaching'
+      return unless @config.key?('coaching')
 
       validate_team_pace
       CoachingPaceFormula.new(@inputs.fetch('coaching'), @config.fetch('coaching')).report(blended_stat('adj_pace'))
@@ -31,6 +31,18 @@ module ProphetRatings
     # Before legacy profiles, recruiting, departures or coaching; preserve per-stat fallback.
     def unadjusted_efficiencies
       STATS.first(2).index_with { |stat| unadjusted_stat_report(stat) }
+    end
+
+    def efficiency_report
+      return unless @config.key?('efficiency_adjustment')
+
+      ReviewedEfficiencyAdjustment.new(@inputs, @configuration).call
+    end
+
+    def self.contract_for(config)
+      return 'preseason-v3-reviewed-efficiency' if config.key?('efficiency_adjustment')
+
+      config.key?('coaching') ? 'preseason-v2-coaching' : 'preseason-v1'
     end
 
     def self.validate_efficiencies(baseline, previous)
@@ -55,15 +67,16 @@ module ProphetRatings
 
     def validate_contract
       contract = @inputs.fetch('contract')
-      supported = @config.key?('coaching') ? 'preseason-v2-coaching' : 'preseason-v1'
+      supported = self.class.contract_for(@config)
       return if contract == supported
 
       raise ArgumentError, "Unsupported preseason inputs contract: #{contract} for this model"
     end
 
     def pace
+      validate_team_pace if @config.key?('efficiency_adjustment')
       existing = blended_stat('adj_pace')
-      return existing unless @inputs.fetch('contract') == 'preseason-v2-coaching'
+      return existing unless @config.key?('coaching')
 
       validate_team_pace
       CoachingPaceFormula.new(@inputs.fetch('coaching'), @config.fetch('coaching')).call(existing)
@@ -87,18 +100,29 @@ module ProphetRatings
       ((1 - weight) * baseline) + (weight * previous.to_f)
     end
 
+    def efficiency_adjustment
+      report = efficiency_report
+      return profile_adjustment unless report&.fetch(:enabled)
+
+      report.fetch(:adjustment) / 2.0
+    end
+
+    def profile_config
+      @config.fetch('profile')
+    end
+
     def profile_adjustment
-      limit = @profile_config.fetch('max_efficiency_adjustment')
+      limit = profile_config.fetch('max_efficiency_adjustment')
       (recruitment - attrition + @profile.fetch('manual_adjustment', nil).to_f).clamp(-limit, limit)
     end
 
     def recruitment
-      @profile.fetch('recruiting_score', nil).to_f * @profile_config.fetch('recruiting_score_multiplier')
+      @profile.fetch('recruiting_score', nil).to_f * profile_config.fetch('recruiting_score_multiplier')
     end
 
     def attrition
       returning = @profile.fetch('returning_minutes_pct', nil)
-      returning ? @profile_config.fetch('attrition_multiplier') * (1 - returning.to_f) : 0.0
+      returning ? profile_config.fetch('attrition_multiplier') * (1 - returning.to_f) : 0.0
     end
   end
 end

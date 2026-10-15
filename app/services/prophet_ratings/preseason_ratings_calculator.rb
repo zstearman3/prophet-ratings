@@ -28,6 +28,13 @@ module ProphetRatings
     end
 
     def preview_inputs(team_season)
+      inputs = base_inputs(team_season)
+      return inputs unless @config.dig(:preseason, :efficiency_adjustment)
+
+      ReviewedEfficiencyInputs.new(team_season).capture(inputs, @config)
+    end
+
+    def base_inputs(team_season)
       return legacy_inputs(team_season) unless coaching_enabled?
 
       coaching = CoachingPaceInputs.new(@season)
@@ -112,6 +119,7 @@ module ProphetRatings
         @previous_season&.average_pace || @config.dig(:preseason, :fallback_pace)
       end
     end
-    private :legacy_inputs, :coaching_inputs, :coaching_enabled?, :previous_season, :captured_prior, :fallback_efficiency, :average_for_stat
+    private :base_inputs, :legacy_inputs, :coaching_inputs, :coaching_enabled?, :previous_season, :captured_prior,
+            :fallback_efficiency, :average_for_stat
   end
 end
