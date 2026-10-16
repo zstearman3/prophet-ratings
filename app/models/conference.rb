@@ -19,6 +19,27 @@
 class Conference < ApplicationRecord
   has_many :team_conferences, dependent: :destroy
 
+  validate :sports_reference_slug_format
+  validate :sports_reference_slug_conflicts
+
+  def save_sports_reference_slug(source_slug)
+    update!(sports_reference_slugs: (sports_reference_slugs + [source_slug]).uniq.sort)
+  end
+
+  def sports_reference_slug_format
+    return if sports_reference_slugs.all? { |value| /\A[a-z0-9]+(?:-[a-z0-9]+)*\z/.match?(value) }
+
+    errors.add(:sports_reference_slugs, 'must contain nonblank lowercase source slugs')
+  end
+
+  def sports_reference_slug_conflicts
+    claimed = (sports_reference_slugs + [slug]).compact
+    return if claimed.empty?
+
+    conflicts = ['slug IN (?) OR sports_reference_slugs && ARRAY[?]::varchar[]', claimed, claimed]
+    errors.add(:sports_reference_slugs, 'are already assigned to another conference') if Conference.where.not(id:).exists?(conflicts)
+  end
+
   def team_seasons_for_season(season = Season.current)
     return TeamSeason.none if season.blank?
 

@@ -124,7 +124,8 @@ RSpec.describe SeasonMembershipReview do
     expect(Team.count).to eq(1)
   end
 
-  it 'blocks ambiguous source conferences' do
+  it 'blocks ambiguous fallback source conferences' do
+    source.first[:conference_slug] = 'no-canonical-match'
     create(:conference, abbreviation: conference.abbreviation)
     review.refresh
     expect { approve }.to raise_error(ArgumentError, /Resolve source identities/)
@@ -136,6 +137,13 @@ RSpec.describe SeasonMembershipReview do
     attributes = approval
     season.update!(membership_proposal: season.membership_proposal.merge('captured_at' => 'changed'))
     expect { approve(attributes) }.to raise_error(ArgumentError, /Proposal changed/)
+  end
+
+  it 'rejects approval after conference source aliases change' do
+    review.refresh
+    attributes = approval
+    conference.update!(sports_reference_slugs: ['alternate-source'])
+    expect { approve(attributes) }.to raise_error(ArgumentError, /Local roster/)
   end
 
   it 'rejects approval after a stored school, alias or membership changed' do

@@ -1,0 +1,22 @@
+<% unmatched = SeasonConferenceMapping.unmatched(proposal) %>
+<% if unmatched.any? %>
+  <h3>Map unmatched conferences</h3>
+  <p>Mappings are remembered for future syncs. Saving rebuilds proposals from this saved scrape and resets unsaved membership decisions; it does not approve memberships.</p>
+  <%= form_tag rails_admin.review_memberships_path(model_name: 'season', id: @object.id, operation: 'map_conferences'), method: :post, id: 'conference-mapping-form', data: { turbo: false } do %>
+    <%= hidden_field_tag 'mapping[proposal_key]', SeasonMembershipProposal.digest(proposal) %>
+    <table class="table table-striped">
+      <thead><tr><th>Source conference</th><th>Schools</th><th>Map to conference</th></tr></thead>
+      <tbody>
+        <% options = Conference.order(:name).pluck(:name, :id) %>
+        <% unmatched.each do |source| %>
+          <tr>
+            <td><%= source.fetch('name') %> (<%= source.fetch('slug') %>)</td>
+            <td><%= source.fetch('schools') %></td>
+            <td><%= select_tag "mapping[conferences][#{source.fetch('slug')}]", options_for_select(options, params.dig(:mapping, :conferences, source.fetch('slug'))), include_blank: 'Choose conference', aria: { label: "Map #{source.fetch('name')} [#{source.fetch('slug')}]" } %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+    <%= button_tag 'Save mappings and refresh proposals', name: nil, class: 'btn btn-secondary' %>
+  <% end %>
+<% end %>

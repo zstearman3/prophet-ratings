@@ -40,6 +40,10 @@ class SeasonMembershipProposal
     end
   end
 
+  def self.issues(matches)
+    matches.flat_map(&:suggestions).tally.map { |issue, count| count > 1 ? "#{issue} (#{count} schools)" : issue }
+  end
+
   def self.membership_label(memberships)
     memberships.map { |membership| membership.conference.name }.join(', ').presence || 'No stored membership'
   end
@@ -72,13 +76,21 @@ class SeasonMembershipProposal
   def call
     scraper = Scraper::ConferenceStandingsScraper.new(year: source_year)
     source = scraper.call
+    build(source, source_url: scraper.source_url, captured_at: Time.current.iso8601)
+  end
+
+  def rebuild(source_rows:, source_url:, captured_at:)
+    build(source_rows.map(&:symbolize_keys), source_url:, captured_at:)
+  end
+
+  def build(source, source_url:, captured_at:)
     Scraper::ConferenceStandingsScraper.validate!(source)
     matches = ConferenceAlignmentMatch.resolve(source)
     {
       'source_year' => source_year, 'target_year' => season.year,
-      'source_url' => scraper.source_url, 'captured_at' => Time.current.iso8601,
+      'source_url' => source_url, 'captured_at' => captured_at,
       'fingerprint' => fingerprint, 'source_rows' => source.as_json,
-      'issues' => matches.flat_map(&:suggestions), 'rows' => proposed_rows(matches)
+      'issues' => self.class.issues(matches), 'rows' => proposed_rows(matches)
     }
   end
 
@@ -86,7 +98,7 @@ class SeasonMembershipProposal
     self.class.digest([
                         season.attributes.slice('year', 'start_date', 'end_date', 'participation_review'),
                         Team.order(:id).pluck(:id, :school, :url), TeamAlias.order(:id).pluck(:team_id, :value, :source),
-                        Conference.order(:id).pluck(:id, :name, :slug, :abbreviation),
+                        Conference.order(:id).pluck(:id, :name, :slug, :abbreviation, :sports_reference_slugs),
                         TeamConference.order(:id).pluck(:id, :team_id, :conference_id, :start_season_id, :end_season_id),
                         Season.order(:id).pluck(:id, :year), season.team_seasons.order(:id).pluck(:team_id)
                       ])

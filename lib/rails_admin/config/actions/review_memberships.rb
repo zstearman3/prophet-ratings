@@ -20,10 +20,11 @@ module RailsAdmin
             if request.post?
               begin
                 case params[:operation]
-                when 'refresh'
-                  review.refresh
-                when 'refresh_previous'
-                  review.refresh(source_year: @object.year - 1)
+                when 'refresh', 'refresh_previous'
+                  review.refresh(source_year: params[:operation] == 'refresh_previous' ? @object.year - 1 : @object.year)
+                when 'map_conferences'
+                  SeasonConferenceMapping.new(@object).call(params[:mapping]&.to_unsafe_h || {})
+                  flash[:success] = I18n.t('admin.actions.review_memberships.mapped')
                 when 'correct_memberships'
                   submission = SeasonMembershipAdminSubmission.build(@object.membership_proposal, @review_values)
                   SeasonConferenceCorrection.new(@object).call(submission, reviewer: _current_user.email)
