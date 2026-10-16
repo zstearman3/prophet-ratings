@@ -40,7 +40,13 @@ is needed for the normal workflow:
    Matching checks canonical slugs first, then source aliases, then exact names/abbreviations.
    Proposals rebuild from the saved scrape without another request to Sports Reference.
    Save mappings before editing memberships: rebuilding resets unsaved decisions.
-   Resolve other unknown/ambiguous identities in RailsAdmin, then fetch again.
+   Under **Schools needing setup**, click **Import / finish setup**, review the
+   Sports Reference name and edit school details, then **Save school and season setup**.
+   This creates or updates the school, preserves its source-name alias and creates
+   its missing TeamSeason for the target year. It uses the saved scrape and rebuilds
+   proposals without approving memberships. Existing schools missing a season row or
+   alias use the same action. Ambiguous team identities still require resolving the
+   duplicate records in RailsAdmin before fetching again.
    For absent schools, explicitly verify participation and select a decision;
    absence never proves retirement. Manual decisions are recorded as **Manual Review**;
    unchanged automatic matches retain their source evidence. Explicitly selected
@@ -51,8 +57,9 @@ is needed for the normal workflow:
    review time, source year/URL/capture, proposed rows and final decisions are retained.
 
 Approval applies conference ranges, dates and participation together or rolls them
-all back. It checks included TeamSeasons and aliases; run `season:prepare` again
-for missing rows. Included independents need no conference membership. Changed
+all back. It checks included TeamSeasons and aliases; use **Import / finish setup**
+for source schools missing those dependencies. `season:prepare` remains available
+for bulk preparation. Included independents need no conference membership. Changed
 local identities, memberships, coverage or dates require a fresh proposal; a failed
 fetch preserves the previous draft and approved review. Full participation/date
 approval remains blocked once ratings exist or the season is current; discovery

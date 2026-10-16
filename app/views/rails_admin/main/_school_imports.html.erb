@@ -1,0 +1,30 @@
+<% if @school_import %>
+  <h3><%= @school_import['existing'] ? 'Finish existing school setup' : 'Review school defaults' %></h3>
+  <% if @school_import['url'] %><p>Source school: <%= link_to @school_import['source_name'], "https://www.sports-reference.com#{@school_import['url']}", target: '_blank', rel: 'noopener' %></p><% end %>
+  <p>Defaults come from the saved Sports Reference standings and any existing school details. Edit them before saving.
+    Saving remembers the source identity and adds the school to <%= @object.year %>, then rebuilds proposals and resets unsaved membership decisions. Membership approval remains separate.</p>
+  <%= form_tag rails_admin.review_memberships_path(model_name: 'season', id: @object.id, operation: 'save_school'), method: :post, id: 'school-import-form', data: { turbo: false } do %>
+    <%= hidden_field_tag 'school_import[team_slug]', @school_import.fetch('team_slug') %>
+    <%= hidden_field_tag 'school_import[proposal_key]', @school_import.fetch('proposal_key') %>
+    <p>Sports Reference school: <%= @school_import['source_name'] || @school_import['team_slug'] %></p>
+    <% SeasonSchoolImport::FIELDS.each do |field| %>
+      <p><%= label_tag "school-import-#{field}", field.humanize %>
+        <%= text_field_tag "school_import[attributes][#{field}]", @school_import.fetch('attributes', {})[field], id: "school-import-#{field}", required: field == 'school', class: 'form-control' %></p>
+    <% end %>
+    <%= button_tag 'Save school and season setup', name: nil, class: 'btn btn-primary' %>
+    <%= link_to 'Cancel', rails_admin.review_memberships_path(model_name: 'season', id: @object.id) %>
+  <% end %>
+<% end %>
+<% pending = SeasonSchoolImport.pending(@object) %>
+<% if pending.any? %>
+  <h3>Schools needing setup</h3>
+  <p>Import an unmatched school or finish setup for an existing school with missing season setup or source identity. This uses the saved scrape; no CSV or separate season preparation is needed.</p>
+  <% pending.each do |source| %>
+    <%= form_tag rails_admin.review_memberships_path(model_name: 'season', id: @object.id, operation: 'prepare_school'), method: :post, data: { turbo: false }, class: 'school-setup-form mb-2' do %>
+      <%= hidden_field_tag 'school_import[team_slug]', source.fetch('team_slug') %>
+      <%= hidden_field_tag 'school_import[proposal_key]', SeasonMembershipProposal.digest(proposal) %>
+      <span><%= source.fetch('team_name') %> (<%= source.fetch('team_slug') %>)</span>
+      <%= button_tag 'Import / finish setup', name: nil, class: 'btn btn-secondary' %>
+    <% end %>
+  <% end %>
+<% end %>
