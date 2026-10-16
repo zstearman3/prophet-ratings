@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require Rails.root.join('lib/rails_admin/config/actions/new_team_conference')
+require Rails.root.join('lib/rails_admin/config/actions/review_memberships')
 
 # rubocop:disable Metrics/BlockLength
 RailsAdmin.config do |config|
@@ -13,6 +14,15 @@ RailsAdmin.config do |config|
     redirect_to main_app.root_path unless current_user.admin?
   end
   config.current_user_method(&:current_user)
+
+  config.model 'Season' do
+    configure :membership_proposal do
+      hide
+    end
+    configure :participation_review do
+      read_only true
+    end
+  end
 
   config.model 'Team' do
     object_label_method :school
@@ -162,6 +172,7 @@ RailsAdmin.config do |config|
       except ['TeamConference']
     end
     new_team_conference
+    review_memberships
     export
     bulk_delete do
       except ['TeamConference']

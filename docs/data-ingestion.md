@@ -647,12 +647,28 @@ revisions. Dry runs remain available. Legacy-only groups retain existing behavio
 
 ## Reviewed season participation
 
-Historical TeamSeason preparation and conference alignment remain separate from
-participation. `season:review_participation` stores explicit operator decisions and
-date evidence; included teams may be independent. Unresolved identities and missing
-included aliases block rating publication/readiness. Standings absence never
-excludes a team. See [Offseason Operations](offseason.md#1a-review-participation-and-dates-explicitly)
-for the JSON contract and legacy behavior. Imports do not opt seasons into review.
+The admin-only **Seasons → Review memberships** action reuses
+`Scraper::ConferenceStandingsScraper` and `ConferenceAlignmentMatch` to save a draft
+in `Season.membership_proposal`. Fetching is explicit (POST), not a GET, deploy or
+nightly side effect. It does not call the applying alignment service. The table
+compares prior-year stored membership with target-year source membership, including
+unresolved schools and source identities. Unchanged matches are collapsed; absent
+teams require an explicit decision and evidence, never automatic exclusion.
+
+Approval atomically applies conference ranges and the existing participation/date/
+alias contract under the season/ratings lock. It records the signed-in reviewer,
+review time, source rows/URL/capture and final decisions in `participation_review`.
+Included independents remain eligible. Source failures preserve prior drafts;
+changed local input or a replaced proposal blocks stale approval. Existing published
+outputs/current seasons are refused. No teams, aliases, ratings, snapshots or
+predictions are created by this review. Apply the additive membership-proposal
+migration before use. Existing seasons are not opted into review by migration.
+
+The file-based `season:review_participation` command remains compatible for scripted
+reviews. CLI alignment/bootstrap still apply safe source changes directly and do
+not create UI proposals. See [Offseason Operations](offseason.md#1a-review-participation-and-dates-explicitly)
+for the recommended prepare → UI review → preseason publication path. After UI
+approval, activation with `ALIGN_CONFERENCES=false` preserves explicit source overrides.
 
 ## Coaching-change discovery
 
@@ -715,7 +731,7 @@ an operator's subsequent readiness decision. Source omissions are reported as `a
 reappearance also clears it. Neither deletes a candidate nor undoes a decision. Imports never mark a year ready or change ratings,
 pace adjustments, snapshots or the legacy offseason profile flag.
 
-See [Offseason Operations](offseason.md#coaching-discovery-and-proposed-revision-review)
+See [annual coaching review](offseason-inputs.md#4-review-coaching-when-the-model-enables-it)
 for the operator's review/revision steps.
 
 ## Annual draft departures
@@ -739,7 +755,7 @@ annual JSON contract, year mapping, prepare/preview commands and review workflow
 
 ## Annual evidence to preseason handoff
 
-Follow the [2026-to-2027 bundle checklist](offseason.md#annual-bundle-checklist-2026-evidence-for-year2027)
+Follow the [2026-to-2027 bundle checklist](offseason-inputs.md)
 for the complete acquire → identity/participation review → input import → model
 preview sequence. Acquisition/parsing and loss arithmetic are automated; approval,
 source scope and ambiguous identities require operator evidence review. Retain raw

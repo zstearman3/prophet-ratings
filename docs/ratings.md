@@ -950,7 +950,7 @@ are points per 100 possessions; weights, attenuation and q/L are dimensionless.
 | `efficiency_adjustment.lower_bound` | -1 | Net efficiency, ≤ 0 |
 | `efficiency_adjustment.upper_bound` | 5 | Net efficiency, ≥ 0 and ≥ lower |
 
-Use [the annual prepare/review/publication checklist](offseason.md#annual-bundle-checklist-2026-evidence-for-year2027)
+Use [the annual prepare/review/publication checklist](offseason-inputs.md)
 to save a before/after preview, review coverage and largest movers, then publish
 a new immutable config and guarded revision only when authorized. Zero weights
 do not bypass evidence validation. Legacy `preseason-v1` captures replay the original

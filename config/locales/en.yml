@@ -28,6 +28,14 @@
 #       enabled: "ON"
 
 en:
+  admin:
+    actions:
+      review_memberships:
+        title: "Review season memberships"
+        menu: "Review memberships"
+        breadcrumb: "Review memberships"
+        link: "Review memberships"
+        approved: "Memberships, participation and dates approved. Review preseason values before activation."
   hello: "Hello world"
   games:
     date_required: "Date is required."
