@@ -1,0 +1,48 @@
+<h2>Review <%= @object.year %> season memberships</h2>
+<p>Compare last season with the source proposals, review exceptions and dates, then approve together. No JSON file is needed.</p>
+<% if @review_error %>
+  <div class="alert alert-danger" role="alert"><%= @review_error %></div>
+<% end %>
+<% if @object.participation_review.present? %>
+  <div class="alert alert-success">Stored participation review by <%= @object.participation_review['reviewed_by'] %>.
+    Approved <%= @object.participation_review['reviewed_at'] %>. Refresh only if another review is needed.</div>
+<% end %>
+<%= form_tag rails_admin.review_memberships_path(model_name: 'season', id: @object.id), method: :post do %>
+  <%= hidden_field_tag :operation, 'refresh' %>
+  <%= submit_tag 'Fetch proposals from Sports Reference', class: 'btn btn-secondary' %>
+<% end %>
+<% proposal = @object.membership_proposal %>
+<% if proposal.present? %>
+  <p>Source: <%= link_to proposal.fetch('source_url'), proposal.fetch('source_url'), target: '_blank', rel: 'noopener' %>
+    · Captured <%= proposal.fetch('captured_at') %> · <%= proposal.fetch('source_rows').size %> source schools.</p>
+  <% if proposal.fetch('issues').any? %>
+    <div class="alert alert-warning">
+      <p>Resolve these source identities in RailsAdmin, then fetch again. Approval is blocked until they resolve.</p>
+      <ul><% proposal.fetch('issues').each do |issue| %><li><%= issue %></li><% end %></ul>
+    </div>
+  <% end %>
+  <%= form_tag rails_admin.review_memberships_path(model_name: 'season', id: @object.id), method: :post do %>
+    <%= hidden_field_tag :operation, 'approve' %>
+    <%= hidden_field_tag 'review[proposal_key]', @review_values.fetch('proposal_key', SeasonMembershipReview.new(@object).proposal_key) %>
+    <% conferences = Conference.order(:name).pluck(:name, :id) %>
+    <% changes, unchanged = proposal.fetch('rows').partition { |row| row.fetch('changed') || row.fetch('note').present? } %>
+    <%= render partial: 'membership_rows', locals: { rows: changes, conferences: conferences } %>
+    <details>
+      <summary><%= unchanged.size %> unchanged source memberships (included in approval)</summary>
+      <%= render partial: 'membership_rows', locals: { rows: unchanged, conferences: conferences } %>
+    </details>
+    <div class="mb-3">
+      <%= label_tag 'review_start_date', 'Season start' %>
+      <%= date_field_tag 'review[start_date]', @review_values.fetch('start_date', @object.start_date.iso8601), required: true %>
+      <%= label_tag 'review_end_date', 'Season end' %>
+      <%= date_field_tag 'review[end_date]', @review_values.fetch('end_date', @object.end_date.iso8601), required: true %>
+    </div>
+    <div class="mb-3">
+      <%= label_tag 'review_evidence', 'Roster and date evidence (source links and review notes)' %>
+      <%= text_area_tag 'review[evidence]', @review_values['evidence'], required: true, class: 'form-control' %>
+    </div>
+    <p>Absence from the source does not prove departure from Division I. Explicitly choose N/A only after checking.
+      Independent teams can remain included. Approval saves all displayed decisions and dates; it does not publish ratings or activate the season.</p>
+    <%= submit_tag 'Approve memberships, participation and dates', class: 'btn btn-primary', disabled: proposal.fetch('issues').any? %>
+  <% end %>
+<% end %>

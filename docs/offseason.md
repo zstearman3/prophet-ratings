@@ -23,65 +23,55 @@ It does not import games, initialize ratings, publish a model or activate anythi
 
 ## 1a. Review participation and dates explicitly
 
-Save independently verified roster/date evidence in a JSON file, then run:
+Open **RailsAdmin → Seasons → target season → Review memberships**. No JSON file
+is needed for the normal workflow:
 
-```bash
-bin/rails season:review_participation YEAR=2027 REVIEW_PATH=/path/to/review.json
-```
+1. Click **Fetch proposals from Sports Reference**. This saves a draft using the
+   existing standings scraper without changing memberships or the approved roster.
+2. Review **School | prior-year Membership | target-year Proposed Membership**.
+   Changes and absent schools appear first; unchanged source memberships are
+   collapsed and included in approval. The decision selector accepts a conference,
+   **Independent (included)** or **N/A (not in D1)**.
+3. Resolve unknown/ambiguous source identities in RailsAdmin, then fetch again.
+   For absent schools, explicitly verify participation and select a decision;
+   absence never proves retirement. Provide a reason/source for exceptions.
+4. Verify the displayed season start/end dates and enter roster/date evidence.
+   Click **Approve memberships, participation and dates**. The signed-in admin,
+   review time, source URL/capture, proposed rows and final decisions are retained.
 
-Example structure; replace all IDs and evidence with reviewed target-season facts:
-
-```json
-{
-  "evidence": "Target-season roster source and review date",
-  "reviewed_by": "Operator name",
-  "dates": {
-    "start_date": "2026-11-01",
-    "end_date": "2027-04-10",
-    "evidence": "Verified season boundaries and review date"
-  },
-  "teams": [
-    { "team_id": 1, "status": "included", "reason": "Verified participant" },
-    { "team_id": 2, "status": "excluded", "reason": "Verified departure and source" },
-    { "team_id": 3, "status": "unresolved", "reason": "Needs identity review" }
-  ],
-  "unresolved_identities": ["Unmatched source identity and next action"]
-}
-```
-
-Every stored Team needs a decision; omitted or newly added teams are unresolved.
-Incomplete reviews are saved but exit nonzero. Resolve identities, prepare missing
-TeamSeasons, correct aliases and repeat until coverage passes. Included independents
-need no conference membership. Date evidence must match the stored boundaries;
-inherited dates are not automatically reviewed.
+Approval applies conference ranges, dates and participation together or rolls them
+all back. It checks included TeamSeasons and aliases; run `season:prepare` again
+for missing rows. Included independents need no conference membership. Changed
+local identities, memberships, coverage or dates require a fresh proposal; a failed
+fetch preserves the previous draft and approved review. Once ratings exist or the
+season is current, use the existing revision/recovery workflow rather than this UI.
 
 Without a participation review, **legacy mode includes every stored TeamSeason**.
 Reviewed publication uses only included teams; excluded history remains intact and
 live ranks are cleared. Unresolved roster/date/alias coverage blocks publication
-and activation. Standings absence never establishes exclusion or retirement.
+and activation. The file-based `season:review_participation YEAR=... REVIEW_PATH=...`
+command remains available for existing scripted reviews.
 
-## 2. Align conference memberships
+## 2. Conference alignment alternatives
+
+The review UI applies approved conference changes; no separate alignment command
+is needed for that path. Existing CLI operations remain available:
 
 ```bash
 bin/rails season:align_conferences YEAR=2027
 ```
 
-Review all printed suggestions in `/admin`: unresolved school/conference identities,
-absent memberships and conflicting ranges. Matching uses stored school URLs and
-exact names/aliases; verified aliases should resolve source spelling differences.
-Safe changes persist even when suggestions cause a nonzero exit. Correct verified
-identities/ranges and rerun until clear; no teams or conferences are automatically
-created or retired. Incomplete future standings may require a later rerun.
+This command immediately saves recognized changes and reports identity/range
+suggestions. `season:bootstrap YEAR=2027` combines preparation and this alignment;
+it does not produce or approve the UI proposal. Prefer `season:prepare` followed
+by the review UI when approval before writes is desired.
 
 For manual realignment, create a TeamConference in RailsAdmin with its target start
 season. The prior overlapping/open membership closes at YEAR−1, which must exist.
 For a complete authoritative CSV replacement, use the separate
 [conference reconciliation workflow](data-ingestion.md#importreconcile_conferences):
 preview before `APPLY=true`, which deletes memberships absent from that file.
-
-`season:bootstrap YEAR=2027` combines preparation and alignment only. It is optional;
-`ALIGN_CONFERENCES=false` defers source review. Old combined sync/dedupe/preseason/
-ratings flags are rejected. Base seeds do not reconcile memberships or activate seasons.
+Base seeds do not reconcile memberships or activate seasons.
 
 ## 3. Select the model and review offseason inputs
 
@@ -158,7 +148,7 @@ operator record. Activation checks minimum coverage; it does not certify readine
 | Check | Evidence to retain |
 | --- | --- |
 | Dates and participants | Verified boundaries, independent target-year roster/count, included/excluded/unresolved IDs, missing TeamSeasons and aliases. Historical rows and conference memberships alone do not establish participation. |
-| Conferences and identities | Alignment report with every suggestion resolved; independently reviewed aliases, memberships and teams without conferences. |
+| Conferences and identities | Approved UI proposal or CLI alignment report, with source identities resolved; reviewed aliases, membership changes and teams without conferences. |
 | Preseason publication | Selected model/date, one usable snapshot and matching captured prior per included team; finite live/preseason offense, defense, net and positive pace; ranks, home boosts, volatility and fallback review. |
 | Schedule and venues | Requested windows, counts, failed/empty dates, completed historical checkpoints and reviewed unmatched/ambiguous/moved/absent records. Unknown venues receive no home advantage. |
 | Predictions | Once games exist, verify matchup coverage, eligible prior-date snapshots, model and frozen inputs. Inspect uncertainty defaults; confidence labels are uncalibrated. No schedule means prediction readiness remains deferred. |
@@ -175,11 +165,12 @@ for code checks; imports and manual rehearsals need an intentional target datase
 After completing the review:
 
 ```bash
-bin/rails season:activate YEAR=2027
+bin/rails season:activate YEAR=2027 ALIGN_CONFERENCES=false
 ```
 
-Activation reruns alignment by default; `ALIGN_CONFERENCES=false` explicitly defers
-source review but preserves local coverage checks. Reviewed mode enforces roster,
+After UI approval, use `ALIGN_CONFERENCES=false` to preserve the reviewed decisions
+rather than rerunning automatic source alignment. Without that flag, activation
+reruns CLI alignment. Both paths preserve local coverage checks. Reviewed mode enforces roster,
 date, alias and finite core-input coverage with positive pace. Legacy mode requires
 a TeamSeason for every stored team and non-null core values. Failure leaves the
 previous current season intact; reactivation is a no-op.
