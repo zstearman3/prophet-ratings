@@ -40,9 +40,11 @@
     </div>
   <% end %>
   <% default_operation = established ? 'correct_memberships' : 'approve' %>
-  <p>To save conference corrections, select the checkbox beside each school, choose its membership, enter evidence and check the scope confirmation below.</p>
+  <p>To save conference corrections, select the checkbox beside each school, choose its membership and check the scope confirmation below. Manual decisions are recorded as “Manual Review”.</p>
   <%= form_tag rails_admin.review_memberships_path(model_name: 'season', id: @object.id, operation: default_operation), method: :post, id: 'membership-review-form', data: { turbo: false } do %>
     <%= hidden_field_tag 'review[proposal_key]', @review_values.fetch('proposal_key', SeasonMembershipReview.new(@object).proposal_key) %>
+    <p><%= check_box_tag 'select_all_corrections', '1', false, id: 'select-all-corrections', onchange: "this.form.querySelectorAll('.membership-correction-selection').forEach((checkbox) => { checkbox.checked = this.checked; });" %>
+      <%= label_tag 'select-all-corrections', 'Select all schools for correction (including collapsed rows)' %></p>
     <% conferences = Conference.order(:name).pluck(:name, :id) %>
     <% changes, unchanged = proposal.fetch('rows').partition { |row| row.fetch('changed') || row.fetch('choice') == 'unresolved' } %>
     <%= render partial: 'membership_rows', locals: { rows: changes, conferences: conferences, established: established } %>
@@ -58,10 +60,6 @@
       <%= date_field_tag 'review[end_date]', @review_values.fetch('end_date', @object.end_date.iso8601), required: true %>
     </div>
     <% end %>
-    <div class="mb-3">
-      <%= label_tag 'review_evidence', 'Review evidence (source links and notes; include verified dates for full approval)' %>
-      <%= text_area_tag 'review[evidence]', @review_values['evidence'], required: true, class: 'form-control' %>
-    </div>
     <% if carried_forward %>
       <p><%= check_box_tag 'review[confirm_target_year]', '1', @review_values['confirm_target_year'] == '1' %>
         <%= label_tag 'review_confirm_target_year', "I verified the rows being approved against target-year #{@object.year} evidence, including carried-forward memberships." %></p>

@@ -25,10 +25,12 @@ module RailsAdmin
                 when 'refresh_previous'
                   review.refresh(source_year: @object.year - 1)
                 when 'correct_memberships'
-                  SeasonConferenceCorrection.new(@object).call(@review_values, reviewer: _current_user.email)
+                  submission = SeasonMembershipAdminSubmission.build(@object.membership_proposal, @review_values)
+                  SeasonConferenceCorrection.new(@object).call(submission, reviewer: _current_user.email)
                   flash[:success] = I18n.t('admin.actions.review_memberships.corrected')
                 when 'approve'
-                  review.apply(@review_values, reviewer: _current_user.email)
+                  submission = SeasonMembershipAdminSubmission.build(@object.membership_proposal, @review_values)
+                  review.apply(submission, reviewer: _current_user.email)
                   flash[:success] = I18n.t('admin.actions.review_memberships.approved')
                 else
                   raise ArgumentError, 'Choose an action using the review form buttons; your entered values have been retained.'
