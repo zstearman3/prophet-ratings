@@ -19,6 +19,24 @@
 require 'rails_helper'
 
 RSpec.describe Conference do
+  describe 'Sports Reference slug aliases' do
+    it 'stores multiple aliases on the existing conference record' do
+      conference = create(:conference, sports_reference_slugs: %w[american another-source])
+      expect(conference.reload.sports_reference_slugs).to eq(%w[american another-source])
+    end
+
+    it 'rejects aliases claimed by another canonical slug or alias' do
+      create(:conference, slug: 'aac', sports_reference_slugs: ['american'])
+      expect(build(:conference, sports_reference_slugs: ['aac'])).not_to be_valid
+      expect(build(:conference, sports_reference_slugs: ['american'])).not_to be_valid
+      expect(build(:conference, slug: 'american')).not_to be_valid
+    end
+
+    it 'rejects empty and malformed aliases' do
+      expect(build(:conference, sports_reference_slugs: ['', 'American Conference'])).not_to be_valid
+    end
+  end
+
   describe '#team_seasons_for_season' do
     let(:team) { create(:team) }
     let(:conference) { create(:conference, name: 'Range Conference', slug: 'range-conference') }

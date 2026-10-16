@@ -7,9 +7,7 @@ class ConferenceAlignmentMatch
   def self.resolve(rows)
     local_teams = Team.all.to_a
     local_conferences = Conference.all.to_a
-    matches = rows.map { |row| new(row, local_teams:, local_conferences:) }
-    validate_matches(matches)
-    matches
+    rows.map { |row| new(row, local_teams:, local_conferences:) }.tap { |matches| validate_matches(matches) }
   end
 
   def self.validate_matches(matches)
@@ -30,11 +28,7 @@ class ConferenceAlignmentMatch
   end
 
   def conferences
-    @conferences ||= local_conferences.select do |conference|
-      conference.slug == row.fetch(:conference_slug) ||
-        conference.name == row.fetch(:conference_name) ||
-        conference.abbreviation == row.fetch(:conference_abbreviation)
-    end
+    @conferences ||= canonical_conferences.presence || alias_conferences.presence || fallback_conferences
   end
 
   def team
@@ -69,6 +63,20 @@ class ConferenceAlignmentMatch
   private
 
   attr_reader :row, :local_teams, :local_conferences
+
+  def canonical_conferences
+    local_conferences.select { |candidate| candidate.slug == row.fetch(:conference_slug) }
+  end
+
+  def alias_conferences
+    local_conferences.select { |candidate| candidate.sports_reference_slugs.include?(row.fetch(:conference_slug)) }
+  end
+
+  def fallback_conferences
+    local_conferences.select do |candidate|
+      candidate.name == row.fetch(:conference_name) || candidate.abbreviation == row.fetch(:conference_abbreviation)
+    end
+  end
 
   def stable_teams
     slug = row.fetch(:team_slug)

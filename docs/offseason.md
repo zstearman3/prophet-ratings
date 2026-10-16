@@ -33,7 +33,14 @@ is needed for the normal workflow:
    Changes and absent schools appear first; unchanged source memberships are
    collapsed and included in approval. The decision selector accepts a conference,
    **Independent (included)** or **N/A (not in D1)**.
-3. Resolve unknown/ambiguous source identities in RailsAdmin, then fetch again.
+3. Map unmatched conferences on this screen using the conference dropdowns and
+   **Save mappings and refresh proposals**. Each source slug is stored in the selected
+   conference's `sports_reference_slugs` array for future syncs. Canonical conference
+   IDs, slugs and membership history are preserved; conflicting mappings are rejected.
+   Matching checks canonical slugs first, then source aliases, then exact names/abbreviations.
+   Proposals rebuild from the saved scrape without another request to Sports Reference.
+   Save mappings before editing memberships: rebuilding resets unsaved decisions.
+   Resolve other unknown/ambiguous identities in RailsAdmin, then fetch again.
    For absent schools, explicitly verify participation and select a decision;
    absence never proves retirement. Manual decisions are recorded as **Manual Review**;
    unchanged automatic matches retain their source evidence. Explicitly selected

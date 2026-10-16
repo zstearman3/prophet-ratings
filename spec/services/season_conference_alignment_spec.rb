@@ -107,7 +107,22 @@ RSpec.describe SeasonConferenceAlignment do
     expect(alignment.created.size).to eq(1)
   end
 
-  it 'reports conflicting conference identity matches as ambiguous' do
+  it 'prefers an exact canonical slug over conflicting display names or abbreviations' do
+    create(:conference, abbreviation: 'ALP')
+    expect(alignment.created.size).to eq(1)
+    expect(team.conference_for(season)).to eq(conference)
+  end
+
+  it 'matches a source slug alias before conflicting display identities' do
+    conference.update!(sports_reference_slugs: ['american'])
+    other = create(:conference, name: 'American Conference', abbreviation: 'AMER')
+    row.merge!(conference_slug: 'american', conference_name: other.name, conference_abbreviation: other.abbreviation)
+    expect(alignment.created.size).to eq(1)
+    expect(team.conference_for(season)).to eq(conference)
+  end
+
+  it 'reports conflicting fallback conference identity matches as ambiguous' do
+    row[:conference_slug] = 'no-canonical-match'
     create(:conference, abbreviation: 'ALP')
     expect(alignment.suggestions.join).to include('ambiguous_conference')
     expect(TeamConference.count).to eq(0)
