@@ -12,7 +12,9 @@ class SeasonConferenceCorrection
 
   def self.selected_rows(submission)
     selected = submission.fetch('teams').select { |_id, values| values['selected'] == '1' }
-    raise ArgumentError, 'Select at least one school for conference-only correction.' if selected.empty?
+    if selected.empty?
+      raise ArgumentError, 'Select at least one school using its row checkbox; the scope confirmation does not select schools.'
+    end
 
     selected
   end

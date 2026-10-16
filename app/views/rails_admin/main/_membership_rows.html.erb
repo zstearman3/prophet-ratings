@@ -1,6 +1,6 @@
 <div class="table-responsive">
   <table class="table table-striped">
-    <thead><tr><th>Correct membership only</th><th>School</th><th><%= @object.year - 1 %> Membership</th><th><%= @object.year %> Proposed Membership</th><th>Review decision</th><th>Exception reason / evidence</th></tr></thead>
+    <thead><tr><th>Select for correction</th><th>School</th><th><%= @object.year - 1 %> Membership</th><th><%= @object.year %> Proposed Membership</th><th>Review decision</th><th>Exception reason / evidence</th></tr></thead>
     <tbody>
       <% rows.each do |row| %>
         <% team_id = row.fetch('team_id').to_s %>

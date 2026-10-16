@@ -16,11 +16,13 @@
     <% end %>
     Refresh only if another review is needed.</div>
 <% end %>
-<%= form_tag rails_admin.review_memberships_path(model_name: 'season', id: @object.id), method: :post do %>
-  <%= button_tag 'Fetch proposals from Sports Reference', name: :operation, value: 'refresh', class: 'btn btn-secondary' %>
-  <%= button_tag "Start from previous season (#{@object.year - 1})", name: :operation, value: 'refresh_previous', class: 'btn btn-secondary', disabled: @object.year <= 1 %>
-  <p>The previous-season option explicitly fetches that year's standings. It never silently substitutes older data.</p>
+<%= form_tag rails_admin.review_memberships_path(model_name: 'season', id: @object.id, operation: 'refresh'), method: :post, id: 'membership-refresh-form', data: { turbo: false }, class: 'd-inline-block' do %>
+  <%= button_tag 'Fetch proposals from Sports Reference', name: nil, class: 'btn btn-secondary' %>
 <% end %>
+<%= form_tag rails_admin.review_memberships_path(model_name: 'season', id: @object.id, operation: 'refresh_previous'), method: :post, id: 'membership-previous-form', data: { turbo: false }, class: 'd-inline-block' do %>
+  <%= button_tag "Start from previous season (#{@object.year - 1})", name: nil, class: 'btn btn-secondary', disabled: @object.year <= 1 %>
+<% end %>
+<p>The previous-season option explicitly fetches that year's standings. It never silently substitutes older data.</p>
 <% proposal = @object.membership_proposal %>
 <% if proposal.present? %>
   <% carried_forward = proposal['source_year'].present? && proposal['source_year'] != proposal['target_year'] %>
@@ -37,7 +39,9 @@
       <ul><% proposal.fetch('issues').each do |issue| %><li><%= issue %></li><% end %></ul>
     </div>
   <% end %>
-  <%= form_tag rails_admin.review_memberships_path(model_name: 'season', id: @object.id), method: :post do %>
+  <% default_operation = established ? 'correct_memberships' : 'approve' %>
+  <p>To save conference corrections, select the checkbox beside each school, choose its membership, enter evidence and check the scope confirmation below.</p>
+  <%= form_tag rails_admin.review_memberships_path(model_name: 'season', id: @object.id, operation: default_operation), method: :post, id: 'membership-review-form', data: { turbo: false } do %>
     <%= hidden_field_tag 'review[proposal_key]', @review_values.fetch('proposal_key', SeasonMembershipReview.new(@object).proposal_key) %>
     <% conferences = Conference.order(:name).pluck(:name, :id) %>
     <% changes, unchanged = proposal.fetch('rows').partition { |row| row.fetch('changed') || row.fetch('choice') == 'unresolved' } %>
@@ -67,14 +71,14 @@
         it does not publish ratings or activate the season.</p>
     <% end %>
     <% unless established %>
-      <%= button_tag 'Approve memberships, participation and dates', name: :operation, value: 'approve', class: 'btn btn-primary', disabled: proposal.fetch('issues').any? %>
+      <%= button_tag 'Approve memberships, participation and dates', name: nil, formaction: rails_admin.review_memberships_path(model_name: 'season', id: @object.id, operation: 'approve'), class: 'btn btn-primary', disabled: proposal.fetch('issues').any? %>
     <% end %>
     <hr>
     <p>For conference-only corrections, select schools in the table. Changes are scoped to this year and preserve surrounding membership ranges.
       Missing boundary seasons must be prepared first. Other unresolved schools do not prevent selected corrections.</p>
     <p><%= check_box_tag 'review[confirm_memberships_only]', '1', @review_values['confirm_memberships_only'] == '1' %>
       <%= label_tag 'review_confirm_memberships_only', 'I am correcting conference metadata only. Participation, dates, ratings, predictions and stored game conference flags will not be recalculated.' %></p>
-    <%= button_tag 'Apply selected conference corrections only', name: :operation, value: 'correct_memberships', class: 'btn btn-secondary' %>
+    <%= button_tag 'Apply selected conference corrections only', name: nil, formaction: rails_admin.review_memberships_path(model_name: 'season', id: @object.id, operation: 'correct_memberships'), class: 'btn btn-secondary' %>
   <% end %>
 <% end %>
 <% if @object.membership_corrections.any? %>
