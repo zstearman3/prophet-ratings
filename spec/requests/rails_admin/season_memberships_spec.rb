@@ -85,11 +85,11 @@ RSpec.describe 'RailsAdmin season membership review', type: :request do
       season.reload
       post path, params: { operation: 'approve', review: {
         proposal_key: SeasonMembershipReview.new(season).proposal_key,
-        teams: { team.id.to_s => { choice: 'excluded', reason: 'Pending verification' } },
+        teams: { team.id.to_s => { choice: 'unresolved' } },
         start_date: '2026-11-01', end_date: '2027-04-10', evidence: ''
       } }
       expect(response).to have_http_status(:unprocessable_content)
-      expect(response.body).to include('Provide roster/date evidence', 'Pending verification')
+      expect(response.body).to include('choose a membership or explicitly exclude the school.')
       expect(season.reload.participation_review).to eq({})
     end
 

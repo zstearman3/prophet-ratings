@@ -35,8 +35,9 @@ is needed for the normal workflow:
    **Independent (included)** or **N/A (not in D1)**.
 3. Resolve unknown/ambiguous source identities in RailsAdmin, then fetch again.
    For absent schools, explicitly verify participation and select a decision;
-   absence never proves retirement. Provide a reason/source for exceptions.
-4. Verify the displayed season start/end dates and enter roster/date evidence.
+   absence never proves retirement. Manual decisions are recorded as **Manual Review**;
+   unchanged automatic matches retain their source evidence. No typed notes are required.
+4. Verify the displayed season start/end dates.
    Click **Approve memberships, participation and dates**. The signed-in admin,
    review time, source year/URL/capture, proposed rows and final decisions are retained.
 
@@ -62,10 +63,13 @@ if it has ratings. This writes a proposal only; it does not reset any outputs.
 ### Correct conference memberships without replacing the roster
 
 Select the **Select for correction** row checkboxes for the schools to fix, choose
-conferences (or **Independent / no conference**), enter evidence, confirm the limited
+conferences (or **Independent / no conference**), confirm the limited
 scope, and click **Apply selected conference corrections only**. Other unresolved
 schools do not block selected corrections. The scope confirmation does not select
-schools; check each affected row explicitly. N/A participation exclusions require the
+schools. Use **Select all schools for correction** to toggle every row, including
+collapsed rows, or select individual schools. Unresolved decisions must still be
+resolved before applying selected rows. Approval records **Manual Review** as overall
+evidence; scripted reviews retain their explicit evidence requirements. N/A participation exclusions require the
 full preseason review rather than this metadata-only action.
 
 Corrections apply to the selected year only, splitting membership ranges to retain

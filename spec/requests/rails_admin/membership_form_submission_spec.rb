@@ -69,19 +69,21 @@ RSpec.describe 'Membership review form submission', type: :request do
   it 'approves a fresh season using the rendered form action without an operation in the body' do
     form = review_form
     values = form_values(form)
-    values['review']['evidence'] = 'Reviewed roster and season dates'
     expect(values).not_to have_key('operation')
     expect(form['data-turbo']).to eq('false')
     post form['action'], params: values
     expect(response).to redirect_to(path)
-    expect(season.reload.participation_review).to be_present
+    expect(season.reload.participation_review).to include('evidence' => 'Manual Review')
+    expect(season.participation_review.fetch('membership_decisions').sole.fetch('reason')).to eq(
+      'Reviewed source membership: https://example.test/standings'
+    )
   end
 
   it 'defaults an established season to selected corrections without relying on the submitter value' do
     season.update!(current: true)
     form = review_form
     values = form_values(form)
-    values['review'].merge!('evidence' => 'Reviewed conference record', 'confirm_memberships_only' => '1')
+    values['review']['confirm_memberships_only'] = '1'
     values['review']['teams'][team.id.to_s]['selected'] = '1'
     post form['action'], params: values
     expect(response).to redirect_to(path)
@@ -93,7 +95,7 @@ RSpec.describe 'Membership review form submission', type: :request do
     form = review_form
     button = form.css('button').find { |candidate| candidate.text == 'Apply selected conference corrections only' }
     values = form_values(form)
-    values['review'].merge!('evidence' => 'Reviewed conference record', 'confirm_memberships_only' => '1')
+    values['review']['confirm_memberships_only'] = '1'
     values['review']['teams'][team.id.to_s]['selected'] = '1'
     expect(button['name']).to be_nil
     post button['formaction'], params: values
@@ -102,14 +104,33 @@ RSpec.describe 'Membership review form submission', type: :request do
     expect(season.participation_review).to eq({})
   end
 
-  it 'explains missing row selections and preserves entered evidence without changing memberships' do
+  it 'records manual corrections without per-school or overall evidence inputs' do
+    season.update!(current: true)
+    other_conference = create(:conference, name: 'Reviewed Conference')
+    form = review_form
+    expect(form.css('[name="review[evidence]"], [name$="[reason]"]')).to be_empty
+    expect(form.at_css('#select-all-corrections')['onchange']).to include('.membership-correction-selection')
+    expect(form.css('input.membership-correction-selection').size).to eq(1)
+    values = form_values(form)
+    values['review']['confirm_memberships_only'] = '1'
+    values['review']['teams'][team.id.to_s].merge!('selected' => '1', 'choice' => other_conference.id.to_s)
+    post form['action'], params: values
+    expect(response).to redirect_to(path)
+    audit = season.reload.membership_corrections.sole
+    expect(audit).to include('evidence' => 'Manual Review')
+    expect(audit.fetch('decisions').sole).to include('reason' => 'Manual Review')
+    expect(team.conference_for(season)).to eq(other_conference)
+  end
+
+  it 'explains missing row selections and preserves the confirmation without changing memberships' do
     season.update!(current: true)
     form = review_form
     values = form_values(form)
-    values['review'].merge!('evidence' => 'Reviewed conference record', 'confirm_memberships_only' => '1')
+    values['review']['confirm_memberships_only'] = '1'
     post form['action'], params: values
     expect(response).to have_http_status(:unprocessable_content)
-    expect(response.body).to include('Select at least one school using its row checkbox', 'Reviewed conference record')
+    expect(response.body).to include('Select at least one school using its row checkbox')
+    expect(response.parsed_body.at_css('input[name="review[confirm_memberships_only]"]')['checked']).to be_present
     expect(TeamConference.count).to eq(0)
   end
 end
