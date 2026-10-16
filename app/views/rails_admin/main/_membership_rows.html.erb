@@ -1,17 +1,18 @@
 <div class="table-responsive">
   <table class="table table-striped">
-    <thead><tr><th>School</th><th><%= @object.year - 1 %> Membership</th><th><%= @object.year %> Proposed Membership</th><th>Review decision</th><th>Exception reason / evidence</th></tr></thead>
+    <thead><tr><th>Correct membership only</th><th>School</th><th><%= @object.year - 1 %> Membership</th><th><%= @object.year %> Proposed Membership</th><th>Review decision</th><th>Exception reason / evidence</th></tr></thead>
     <tbody>
       <% rows.each do |row| %>
         <% team_id = row.fetch('team_id').to_s %>
         <% decision = @review_values.fetch('teams', {}).fetch(team_id, {}) %>
         <% field = "review[teams][#{team_id}]" %>
         <tr>
+          <td><%= check_box_tag "#{field}[selected]", '1', decision['selected'] == '1', aria: { label: "Select #{row.fetch('school')} for conference-only correction" } %></td>
           <td><%= row.fetch('school') %><br><small>Team #<%= team_id %></small></td>
           <td><%= row.fetch('previous') %></td>
-          <td><%= row.fetch('proposed') %><br><small><%= row.fetch('note') %></small>
+          <td><%= row.fetch('proposed') %><% if row['carried_forward'] %><br><strong>Carried forward — unverified</strong><% end %><br><small><%= row.fetch('note') %></small>
             <% if row.fetch('current') != row.fetch('previous') %><br><small>Currently stored: <%= row.fetch('current') %></small><% end %></td>
-          <td><%= select_tag "#{field}[choice]", options_for_select([['Needs review', 'unresolved'], ['Independent (included)', 'independent'], ['N/A (not in D1)', 'excluded']] + conferences, decision.fetch('choice', row.fetch('choice'))), aria: { label: "#{row.fetch('school')} membership decision" } %></td>
+          <td><%= select_tag "#{field}[choice]", options_for_select([['Needs review', 'unresolved'], [established ? 'Independent / no conference (metadata only)' : 'Independent (included)', 'independent']] + (established ? [] : [['N/A (not in D1)', 'excluded']]) + conferences, decision.fetch('choice', row.fetch('choice'))), aria: { label: "#{row.fetch('school')} membership decision" } %></td>
           <td><%= text_field_tag "#{field}[reason]", decision['reason'], aria: { label: "#{row.fetch('school')} exception evidence" } %></td>
         </tr>
       <% end %>

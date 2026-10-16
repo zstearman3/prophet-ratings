@@ -651,18 +651,44 @@ The admin-only **Seasons → Review memberships** action reuses
 `Scraper::ConferenceStandingsScraper` and `ConferenceAlignmentMatch` to save a draft
 in `Season.membership_proposal`. Fetching is explicit (POST), not a GET, deploy or
 nightly side effect. It does not call the applying alignment service. The table
-compares prior-year stored membership with target-year source membership, including
+compares prior-year stored membership with the explicitly chosen source membership, including
 unresolved schools and source identities. Unchanged matches are collapsed; absent
 teams require an explicit decision and evidence, never automatic exclusion.
+Discovery is allowed for current/historical seasons with established outputs;
+publication guards apply to full participation/date approval, not fetching drafts.
+
+The separate **Start from previous season** action fetches exactly YEAR−1 into a
+YEAR draft. It stores `source_year` and `target_year` independently, labels every
+carried-forward row unverified and requires explicit target-year verification plus
+evidence before applying. HTTP/parse failures never cause an automatic source-year
+fallback. Only the target year or its immediate predecessor is supported. The
+scraper still validates links against its actual requested source year.
 
 Approval atomically applies conference ranges and the existing participation/date/
 alias contract under the season/ratings lock. It records the signed-in reviewer,
 review time, source rows/URL/capture and final decisions in `participation_review`.
 Included independents remain eligible. Source failures preserve prior drafts;
-changed local input or a replaced proposal blocks stale approval. Existing published
-outputs/current seasons are refused. No teams, aliases, ratings, snapshots or
+changed local input or a replaced proposal blocks stale approval. Full approval
+for existing published outputs/current seasons is refused. No teams, aliases, ratings, snapshots or
 predictions are created by this review. Apply the additive membership-proposal
 migration before use. Existing seasons are not opted into review by migration.
+
+**Apply selected conference corrections only** is separate from full approval and
+can run on established seasons. It accepts only explicitly selected local school
+IDs, membership choices, evidence and scope confirmation. Other unresolved schools
+can remain open. Source-year verification is still required for previous-season
+drafts. The action changes only the target year's conference metadata, preserving
+surrounding ranges and unchanged assignments; missing adjacent boundary seasons
+fail visibly rather than creating implicit shells. A selected N/A participation
+exclusion is refused; use no conference for metadata-only changes.
+
+Corrections run atomically under the same season/ratings lock. They append an audit
+to `Season.membership_corrections` and clear the consumed proposal. The audit retains
+reviewer/time, source years/rows, scope/evidence, selected decisions and before/after
+membership records. Apply migration `20261016010000` before using this action.
+No existing participation review, dates, live ratings, captures, snapshots, predictions
+or stored game conference flags are recalculated. Historical re-finalization or
+rating reconstruction still requires the separately reviewed ingestion/recovery flow.
 
 The file-based `season:review_participation` command remains compatible for scripted
 reviews. CLI alignment/bootstrap still apply safe source changes directly and do
