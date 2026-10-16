@@ -16,11 +16,37 @@ RailsAdmin.config do |config|
   config.current_user_method(&:current_user)
 
   config.model 'Season' do
+    # Default association fields materialize entire seasons of games/JSON snapshots.
+    %i[game_sync_dates games team_seasons predictions team_rating_snapshots bet_recommendations].each do |association|
+      configure association do
+        hide
+      end
+    end
+    list do
+      fields :year, :name, :start_date, :end_date, :current
+    end
+    show do
+      fields :year, :name, :start_date, :end_date, :current, :preseason_revision, :average_efficiency, :average_pace
+    end
     configure :membership_proposal do
       hide
     end
     configure :participation_review do
       read_only true
+    end
+  end
+
+  config.model 'RatingsConfigVersion' do
+    %i[predictions bet_recommendations team_rating_snapshots].each do |association|
+      configure association do
+        hide
+      end
+    end
+    list do
+      fields :name, :description, :current, :created_at
+    end
+    show do
+      fields :name, :description, :current, :config, :created_at, :updated_at
     end
   end
 

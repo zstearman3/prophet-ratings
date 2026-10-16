@@ -32,7 +32,7 @@ In another terminal, or from an agent:
 | `bin/check` | Native RuboCop, Reek, Brakeman, then native specs |
 | `bin/dev --detach` | Explicitly keep development running in the background |
 | `bin/stop` | Stop a detached session; preserve data and images |
-| `bin/compose logs -f web worker` | Follow application/job logs |
+| `bin/compose logs --tail=100 -f web worker` | Follow recent application/job logs |
 | `bin/compose ps` | Check this project's containers |
 | `bin/console` | Rails console in the running app; accepts Rails console arguments |
 | `bin/migrate` | Apply migrations and update the tracked schema; no running app required |
@@ -45,6 +45,14 @@ run at a time and stop development while running a large batch of checks.
 The Makefile remains as a compatibility layer: `make up` means
 `bin/dev --detach`, `make down` means `bin/stop`, and `make test` means
 `bin/test`. Use `make help` for the remaining aliases.
+
+Detached development keeps logs in Docker. Run `bin/compose logs --tail=100 web`
+for recent server requests/errors, or add `-f` to follow them live. Ctrl-C exits
+the log viewer without stopping services. `bin/compose ps -a` also shows exited
+containers; logs remain available after a crash. An exit code of 137 can indicate
+an out-of-memory kill; confirm `OOMKilled` in the container's Docker inspect state
+before changing memory limits. The Seasons and model-version admin pages omit
+large history associations to avoid loading entire ratings archives into memory.
 
 ## First-time setup
 
