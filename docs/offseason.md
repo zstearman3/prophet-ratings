@@ -1067,3 +1067,141 @@ only that factor. Optional coaching still needs its reviewed year readiness.
 Review snapshot provenance and a scheduled forecast after publication. Real annual
 source approval, activation and any historical evaluation remain separate operator
 work; no accuracy or calibration improvement is assumed.
+
+## Annual bundle checklist: 2026 evidence for YEAR=2027
+
+The tools build the bundle files; the operator reviews their facts. You do not need
+to hand-enter recruiting points or calculate draft losses. Recruiting pagination,
+supported NBA/Sidearm parsing, hashing, matching, loss arithmetic and reports are
+automated. Selecting official school sources, verifying participation and player
+identity, resolving ambiguous matches, and signing approval files require review.
+Unsupported school layouts require an adapter change; do not transcribe unsupported
+totals into a file labelled as parsed HTML.
+
+Use an existing local dataset with stored teams, previous-season ratings and a
+prepared inactive 2027 season. A fresh development database lacks that evidence.
+Follow [development setup](development.md) for an isolated stack; do not copy
+production credentials or restore production as routine preparation. All commands
+below use `bin/compose exec web`; `/rails/tmp/` maps to this checkout's `tmp/`.
+Keep durable copies of captures and approvals outside disposable containers.
+
+1. **Acquire recruiting automatically.** Run:
+
+   ```bash
+   bin/compose exec web bin/rails recruiting:acquire SOURCE_YEAR=2026 YEAR=2027 CATEGORY=recruit_composite OUTPUT_DIR=/rails/tmp/offseason-2027/recruiting MAX_PAGES=20
+   ```
+
+   Record the reported dataset directory. If blocked, use the
+   [saved-HTML manifest fallback](recruiting.md#saved-html-fallback); no manual row
+   transcription is needed. Preserve partial/access failures and original bytes.
+   Preview using that exact directory:
+
+   ```bash
+   bin/compose exec web bin/rails recruiting:preview YEAR=2027 DATASET_DIR=/rails/tmp/offseason-2027/recruiting/<dataset-revision> > tmp/offseason-2027/recruiting-preview.json
+   ```
+
+2. **Review and approve recruiting.** Inspect pages/coverage, category, source year,
+   points and every excluded/ambiguous identity. Correct verified source aliases
+   using existing Teams, then preview again. Create `tmp/offseason-2027/approval.json`
+   with `dataset_revision`, `mapping_revision` from the preview and your actual
+   `approved_by` / ISO-8601 `approved_at`. See the exact
+   [approval example](recruiting.md#pin-an-operator-review). Then run:
+
+   ```bash
+   bin/compose exec web bin/rails recruiting:preview YEAR=2027 DATASET_DIR=/rails/tmp/offseason-2027/recruiting/<dataset-revision> REVIEW_PATH=/rails/tmp/offseason-2027/approval.json MAPPING_DIR=/rails/tmp/offseason-2027/mappings
+   ```
+
+   Retain the resulting `mappings/<mapping_revision>.json`; **that report**, rather
+   than `approval.json`, is the recruiting import's `REVIEW_PATH`.
+
+3. **Create the departure source plan, then acquire.** Copy the JSON shape from
+   [departure acquisition](departures.md#prepare-and-capture-sources) to
+   `tmp/offseason-2027/departure-plan.json`. Set `draft_year=2026`,
+   `prior_season_year=2026`, `target_year=2027`. Independently verify the actual
+   2026 results URL and selection range (including rescinded picks); list every
+   actual pick. Add official 2025–26 final cumulative school-stat URLs for all
+   potential college participants, plus roster/identity/participation proof URLs.
+   School source selection and final-scope assertions are manual. Do not reuse
+   synthetic `.example` URLs or assume an international affiliation proves zero.
+
+   ```bash
+   bin/compose exec web bin/rails departures:acquire PLAN_PATH=/rails/tmp/offseason-2027/departure-plan.json OUTPUT_DIR=/rails/tmp/offseason-2027/draft-capture-1
+   bin/compose exec web bin/rails departures:preview CAPTURE_DIR=/rails/tmp/offseason-2027/draft-capture-1 DATASET_PATH=/rails/tmp/offseason-2027/draft-capture-1/dataset.json > tmp/offseason-2027/departure-unreviewed.json
+   ```
+
+   Acquisition writes `manifest.json`, `dataset.json` and hashed HTML. Inspect all
+   failures before proceeding. Access failures can use the documented
+   [saved-source successor workflow](departures.md#saved-source-fallback-and-deterministic-replay).
+   Preserve failed captures; a new source plan needs a new output directory.
+
+4. **Review every selection, then save departure decisions.** Use the
+   [decision-file example](departures.md#review-identity-and-participation-separately)
+   for `tmp/offseason-2027/departure-review-1.json`, referencing the exact dataset
+   hash and actual reviewer/time. Use selection keys `2026/<pick>`. Check every
+   eligible player's actual 2025–26 participation, school roster URL, stored Team
+   ID and all relevant stints. The parser supplies points and team totals; the
+   review supplies identities, category, evidence IDs and reasons. Check multiple
+   departures and denominators, including high picks from modest programs. Keep
+   unresolved cases explicit; approval must never turn missing evidence into zero.
+
+   ```bash
+   bin/compose exec web bin/rails departures:preview CAPTURE_DIR=/rails/tmp/offseason-2027/draft-capture-1 DATASET_PATH=/rails/tmp/offseason-2027/draft-capture-1/dataset.json REVIEW_PATH=/rails/tmp/offseason-2027/departure-review-1.json > tmp/offseason-2027/departure-preview.json
+   ```
+
+   Nonzero exit with null losses means incomplete evidence, not verified zero.
+   Review the report and save it even if completion needs more sources.
+
+5. **Import reviewed inputs only into the intended local dataset.** Follow
+   [reviewed annual storage](#reviewed-annual-recruitingdeparture-storage): inspect
+   the expected input hash, pin `INPUT_HASH`, review the import preview, then apply
+   its unchanged key for each kind. For departures supply `CAPTURE_DIR`,
+   `DATASET_PATH` and the decision `REVIEW_PATH`; for recruiting supply
+   `DATASET_DIR` and the approved mapping report. This deliberately writes input
+   revisions/profiles but publishes no ratings. Use immutable successor versions
+   and predecessor IDs for corrections, retaining original bundles and approvals.
+
+6. **Save a read-only model preview and review movers.** Publish a newly named
+   experimental config as described above, without activating it. Save the report:
+
+   ```bash
+   bin/compose exec web bin/rails season:revise_preseason YEAR=2027 MODEL_VERSION=<new-reviewed-model> > tmp/offseason-2027/model-preview.txt
+   ```
+
+   This task prints a JSON report followed by an operator instruction line; keep
+   the whole capture as text. For JSON tooling, copy just the complete JSON object
+   into a separate `.json` file, leaving the instruction line in the original.
+   Review `teams[].inputs` for source/revision/reviewer hashes, coverage, excluded
+   selections and baseline provenance. `teams[].efficiency` contains R, D, reasons,
+   weights, pre-cap sum, bounds, A and allocations; `outputs_after` contains final
+   offense/defense/pace. Compute preview net as offense minus defense, sort descending
+   with ascending Team ID for ties to inspect proposed ranks. Compare with the
+   similarly sorted unadjusted O0−D0 (recruiting baseline report), and sort by
+   absolute A to review largest efficiency movers. Review every eligible drafted
+   loss separately, including zero-point participants. Include excluded/unresolved
+   season participants from `participation_review`; do not treat omitted teams as
+   Division I participants. Record both model and evidence gaps with the report.
+
+   Config-only tuning repeats this step under a new bundle name against unchanged
+   evidence. Inspect before/after effects before any deliberate rating publication.
+   Both new weights zero select legacy behavior; one zero isolates the other.
+   Optional coaching pace has separate readiness and is not part of R or D.
+
+7. **Keep publication separate.** The saved preview does not authorize real-season
+   rating publication, activation or production writes. When separately approved,
+   apply the unchanged model `PREVIEW_KEY` using the guarded revision command,
+   inspect ranks/snapshots and a scheduled forecast, then consider activation.
+   Changed facts/config invalidate the preview; obtain a fresh report. Failed
+   publication rolls back rating writes while previously imported input revisions
+   remain. Preserve old captures/forecasts; recover with a new reviewed version,
+   never by deleting history or changing an old configuration.
+
+### Current-season preview readiness
+
+As of 2026-10-14, the task-08 implementation session has **no supplied reviewed
+2026 annual bundles or designated local historical dataset**. A real YEAR=2027
+effects/rank/movers report has therefore not been generated. Source, participation,
+production and prior-history coverage are unassessed; no real team is assigned a
+zero loss or recruiting input. The synthetic automated workflow checks do not
+substitute for this evidence review. Complete steps 1–6 and retain the reports to
+close that acceptance item. The initial effects remain experimental and predictive
+accuracy is unproven.

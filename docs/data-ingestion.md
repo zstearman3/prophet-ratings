@@ -736,3 +736,23 @@ perform no database writes, data imports, scoring or scheduled scraping.
 with optional separately pinned operator mapping approval. Neither writes domain
 records or invokes ratings. See [Saved recruiting evidence](recruiting.md) for the
 annual JSON contract, year mapping, prepare/preview commands and review workflow.
+
+## Annual evidence to preseason handoff
+
+Follow the [2026-to-2027 bundle checklist](offseason.md#annual-bundle-checklist-2026-evidence-for-year2027)
+for the complete acquire → identity/participation review → input import → model
+preview sequence. Acquisition/parsing and loss arithmetic are automated; approval,
+source scope and ambiguous identities require operator evidence review. Retain raw
+captures, immutable mapping/decision files and coverage reports. Missing recruiting
+points or incomplete draft accounting remain unknown, including in approved partial
+inputs; never infer zero from source absence. Recruiting import uses the approved
+mapping **report**, while departure import uses the decisions file and original
+replayable capture. Each import has its own hash and guarded preview key.
+
+Input imports only write reviewed revisions and profile pointers. They do not
+publish/activate a season. Revised sources/reviews need immutable successors and
+a fresh import preview. Model publication has a separate preview key and transaction;
+its rollback does not undo earlier deliberate input imports. Old captures retain
+their original evidence, so a correction requires a new model revision to affect
+future publication. See the checklist for explicit incomplete-preview reporting
+when annual evidence or stored history has not yet been supplied.
