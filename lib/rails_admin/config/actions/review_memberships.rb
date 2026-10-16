@@ -31,7 +31,7 @@ module RailsAdmin
                   review.apply(@review_values, reviewer: _current_user.email)
                   flash[:success] = I18n.t('admin.actions.review_memberships.approved')
                 else
-                  raise ArgumentError, 'Choose refresh or approve.'
+                  raise ArgumentError, 'Choose an action using the review form buttons; your entered values have been retained.'
                 end
                 redirect_to rails_admin.review_memberships_path(model_name: 'season', id: @object.id)
               rescue ArgumentError, ActiveRecord::ActiveRecordError, Season::OperationInProgress,

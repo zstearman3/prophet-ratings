@@ -61,10 +61,11 @@ if it has ratings. This writes a proposal only; it does not reset any outputs.
 
 ### Correct conference memberships without replacing the roster
 
-Select the **Correct membership only** checkboxes for the schools to fix, choose
+Select the **Select for correction** row checkboxes for the schools to fix, choose
 conferences (or **Independent / no conference**), enter evidence, confirm the limited
 scope, and click **Apply selected conference corrections only**. Other unresolved
-schools do not block selected corrections. N/A participation exclusions require the
+schools do not block selected corrections. The scope confirmation does not select
+schools; check each affected row explicitly. N/A participation exclusions require the
 full preseason review rather than this metadata-only action.
 
 Corrections apply to the selected year only, splitting membership ranges to retain
