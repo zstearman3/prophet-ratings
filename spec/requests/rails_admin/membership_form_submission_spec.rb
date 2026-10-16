@@ -79,15 +79,21 @@ RSpec.describe 'Membership review form submission', type: :request do
     )
   end
 
-  it 'defaults an established season to selected corrections without relying on the submitter value' do
+  it 'records manual provenance when a selected correction restores the source proposal without submitter values' do
     season.update!(current: true)
+    previous = create(:season, year: 2026)
+    old_conference = create(:conference, name: 'Old Conference')
+    create(:team_conference, team:, conference: old_conference, start_season: previous, end_season: season)
     form = review_form
     values = form_values(form)
     values['review']['confirm_memberships_only'] = '1'
     values['review']['teams'][team.id.to_s]['selected'] = '1'
     post form['action'], params: values
     expect(response).to redirect_to(path)
-    expect(season.reload.membership_corrections.size).to eq(1)
+    audit = season.reload.membership_corrections.sole
+    expect(audit.fetch('decisions').sole).to include('choice' => conference.id.to_s, 'reason' => 'Manual Review')
+    expect(team.conference_for(season)).to eq(conference)
+    expect(team.conference_for(previous)).to eq(old_conference)
     expect(season.participation_review).to eq({})
   end
 

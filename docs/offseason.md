@@ -36,7 +36,9 @@ is needed for the normal workflow:
 3. Resolve unknown/ambiguous source identities in RailsAdmin, then fetch again.
    For absent schools, explicitly verify participation and select a decision;
    absence never proves retirement. Manual decisions are recorded as **Manual Review**;
-   unchanged automatic matches retain their source evidence. No typed notes are required.
+   unchanged automatic matches retain their source evidence. Explicitly selected
+   corrections record **Manual Review** even when accepting the source proposal.
+   No typed notes are required.
 4. Verify the displayed season start/end dates.
    Click **Approve memberships, participation and dates**. The signed-in admin,
    review time, source year/URL/capture, proposed rows and final decisions are retained.

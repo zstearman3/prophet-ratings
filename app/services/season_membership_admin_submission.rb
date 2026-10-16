@@ -12,6 +12,8 @@ class SeasonMembershipAdminSubmission
   end
 
   def self.reason(row, decision)
+    return 'Manual Review' if decision['selected'] == '1'
+
     choice = decision['choice']
     return '' if row && choice == row['choice'] && choice != 'excluded'
 
