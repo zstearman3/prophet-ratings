@@ -715,7 +715,7 @@ an operator's subsequent readiness decision. Source omissions are reported as `a
 reappearance also clears it. Neither deletes a candidate nor undoes a decision. Imports never mark a year ready or change ratings,
 pace adjustments, snapshots or the legacy offseason profile flag.
 
-See [Offseason Operations](offseason.md#coaching-discovery-and-proposed-revision-review)
+See [annual coaching review](offseason-inputs.md#4-review-coaching-when-the-model-enables-it)
 for the operator's review/revision steps.
 
 ## Annual draft departures
@@ -739,7 +739,7 @@ annual JSON contract, year mapping, prepare/preview commands and review workflow
 
 ## Annual evidence to preseason handoff
 
-Follow the [2026-to-2027 bundle checklist](offseason.md#annual-bundle-checklist-2026-evidence-for-year2027)
+Follow the [2026-to-2027 bundle checklist](offseason-inputs.md)
 for the complete acquire → identity/participation review → input import → model
 preview sequence. Acquisition/parsing and loss arithmetic are automated; approval,
 source scope and ambiguous identities require operator evidence review. Retain raw
