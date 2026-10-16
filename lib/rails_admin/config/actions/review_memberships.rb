@@ -16,29 +16,19 @@ module RailsAdmin
           proc do
             @review_error = nil
             @review_values = params[:review]&.to_unsafe_h || {}
-            review = SeasonMembershipReview.new(@object)
             if request.post?
               begin
-                case params[:operation]
-                when 'refresh', 'refresh_previous'
-                  review.refresh(source_year: params[:operation] == 'refresh_previous' ? @object.year - 1 : @object.year)
-                when 'map_conferences'
-                  SeasonConferenceMapping.new(@object).call(params[:mapping]&.to_unsafe_h || {})
-                  flash[:success] = I18n.t('admin.actions.review_memberships.mapped')
-                when 'correct_memberships'
-                  submission = SeasonMembershipAdminSubmission.build(@object.membership_proposal, @review_values)
-                  SeasonConferenceCorrection.new(@object).call(submission, reviewer: _current_user.email)
-                  flash[:success] = I18n.t('admin.actions.review_memberships.corrected')
-                when 'approve'
-                  submission = SeasonMembershipAdminSubmission.build(@object.membership_proposal, @review_values)
-                  review.apply(submission, reviewer: _current_user.email)
-                  flash[:success] = I18n.t('admin.actions.review_memberships.approved')
+                result = SeasonMembershipAdminAction.new(@object, reviewer: _current_user.email).call(params.to_unsafe_h)
+                @school_import = result.school
+                if @school_import
+                  render :review_memberships
                 else
-                  raise ArgumentError, 'Choose an action using the review form buttons; your entered values have been retained.'
+                  flash[:success] = I18n.t("admin.actions.review_memberships.#{result.notice}") if result.notice
+                  redirect_to rails_admin.review_memberships_path(model_name: 'season', id: @object.id)
                 end
-                redirect_to rails_admin.review_memberships_path(model_name: 'season', id: @object.id)
               rescue ArgumentError, ActiveRecord::ActiveRecordError, Season::OperationInProgress,
                      Scraper::ConferenceStandingsScraper::Error, SeasonConferenceAlignment::Error => error
+                @school_import = params[:school_import]&.to_unsafe_h if params[:operation] == 'save_school'
                 @review_error = error.message
                 @object.reload
                 render :review_memberships, status: :unprocessable_content

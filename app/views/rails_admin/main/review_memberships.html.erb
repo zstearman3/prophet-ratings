@@ -35,10 +35,11 @@
     · Captured <%= proposal.fetch('captured_at') %> · <%= proposal.fetch('source_rows').size %> source schools.</p>
   <% if proposal.fetch('issues').any? %>
     <div class="alert alert-warning">
-      <p>Map unmatched conferences below. Resolve other source identities in RailsAdmin, then fetch again. Full roster approval is blocked until they resolve. Selected conference-only corrections remain available.</p>
+      <p>Map unmatched conferences below. Import or finish school setup below. Resolve ambiguous identities in RailsAdmin, then fetch again. Full roster approval is blocked until they resolve. Selected conference-only corrections remain available.</p>
       <ul><% proposal.fetch('issues').each do |issue| %><li><%= issue %></li><% end %></ul>
     </div>
   <% end %>
+  <%= render partial: 'school_imports', locals: { proposal: proposal } %>
   <%= render partial: 'conference_mappings', locals: { proposal: proposal } %>
   <% default_operation = established ? 'correct_memberships' : 'approve' %>
   <p>To save conference corrections, select the checkbox beside each school, choose its membership and check the scope confirmation below. Manual decisions are recorded as “Manual Review”.</p>
