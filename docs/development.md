@@ -34,7 +34,7 @@ In another terminal, or from an agent:
 | `bin/stop` | Stop a detached session; preserve data and images |
 | `bin/compose logs -f web worker` | Follow application/job logs |
 | `bin/compose ps` | Check this project's containers |
-| `bin/compose exec web bin/rails console` | Rails console in the running app |
+| `bin/console` | Rails console in the running app; accepts Rails console arguments |
 | `bin/migrate` | Apply migrations and update the tracked schema; no running app required |
 | `bin/repair-collation` | Repair local PostgreSQL collation mismatches after an image/OS upgrade |
 | `bin/compose exec web bash` | Shell in the app container |
