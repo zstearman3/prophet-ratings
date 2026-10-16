@@ -39,9 +39,8 @@ class SeasonMembershipReview
     @season = season
   end
 
-  def refresh
-    ensure_editable
-    proposal = SeasonMembershipProposal.new(season.reload).capture
+  def refresh(source_year: season.year)
+    proposal = SeasonMembershipProposal.new(season.reload, source_year:).capture
     locked do
       verify_capture(proposal)
       season.update!(membership_proposal: proposal)
@@ -65,10 +64,7 @@ class SeasonMembershipReview
 
   def locked(&)
     Season.with_ratings_lock do
-      season.with_lock do
-        ensure_editable
-        yield
-      end
+      season.with_lock(&)
     end
   end
 
@@ -86,27 +82,21 @@ class SeasonMembershipReview
   end
 
   def publish_review
-    validate_proposal
-    decisions = self.class.reviewed_decisions(season.membership_proposal, submission.fetch('teams'))
+    decisions = review_decisions
     SeasonMembershipAssignment.new(season).call(decisions)
     save_participation(decisions)
     season.update!(membership_proposal: {})
   end
 
-  def validate_proposal
-    proposal = current_proposal
-    raise ArgumentError, 'Resolve source identities and refresh before approval.' if proposal.fetch('issues').any?
-    return if proposal.fetch('fingerprint') == SeasonMembershipProposal.new(season).fingerprint
-
-    raise ArgumentError, 'Local roster, dates or memberships changed; refresh and review again.'
+  def review_decisions
+    ensure_editable
+    validate_proposal
+    self.class.reviewed_decisions(season.membership_proposal, submission.fetch('teams'))
   end
 
-  def current_proposal
-    proposal = season.membership_proposal
-    raise ArgumentError, 'Refresh proposals before approval.' if proposal.blank?
-    raise ArgumentError, 'Proposal changed; reload and review again.' unless submission.fetch('proposal_key') == proposal_key
-
-    proposal
+  def validate_proposal
+    proposal = SeasonMembershipProposal.new(season).reviewed(submission)
+    raise ArgumentError, 'Resolve source identities and refresh before approval.' if proposal.fetch('issues').any?
   end
 
   def save_participation(decisions)
@@ -124,7 +114,8 @@ class SeasonMembershipReview
       'evidence' => evidence, 'reviewed_by' => submission.fetch('reviewed_by'), 'reviewed_at' => Time.current.iso8601,
       'dates' => { 'start_date' => season.start_date.iso8601, 'end_date' => season.end_date.iso8601, 'evidence' => evidence },
       'teams' => decisions.map { |decision| decision.slice('team_id', 'status', 'reason') }, 'unresolved_identities' => [],
-      'membership_source' => season.membership_proposal, 'membership_decisions' => decisions
+      'membership_source' => season.membership_proposal, 'membership_decisions' => decisions,
+      'target_year_confirmed' => submission['confirm_target_year'] == '1'
     }
   end
 end

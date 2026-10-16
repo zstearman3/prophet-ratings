@@ -35,6 +35,7 @@ en:
         menu: "Review memberships"
         breadcrumb: "Review memberships"
         link: "Review memberships"
+        corrected: "Selected conference memberships corrected for this year. Stored ratings and game conference flags were not recalculated."
         approved: "Memberships, participation and dates approved. Review preseason values before activation."
   hello: "Hello world"
   games:

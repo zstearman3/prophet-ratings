@@ -28,13 +28,17 @@ RSpec.describe 'RailsAdmin season membership review', type: :request do
   it 'protects viewing and mutation with the admin login' do
     get path
     expect(response).to redirect_to('/users/sign_in')
-    post path, params: { operation: 'refresh' }
-    expect(response).to redirect_to('/users/sign_in')
+    %w[refresh refresh_previous correct_memberships].each do |operation|
+      post path, params: { operation: }
+      expect(response).to redirect_to('/users/sign_in')
+    end
     sign_in create(:user)
     get path
     expect(response).to redirect_to('/')
-    post path, params: { operation: 'refresh' }
-    expect(response).to redirect_to('/')
+    %w[refresh refresh_previous correct_memberships].each do |operation|
+      post path, params: { operation: }
+      expect(response).to redirect_to('/')
+    end
     expect(scraper).not_to have_received(:call)
     expect(season.reload.membership_proposal).to eq({})
   end
@@ -87,6 +91,60 @@ RSpec.describe 'RailsAdmin season membership review', type: :request do
       expect(response).to have_http_status(:unprocessable_content)
       expect(response.body).to include('Provide roster/date evidence', 'Pending verification')
       expect(season.reload.participation_review).to eq({})
+    end
+
+    it 'fetches and displays proposals for an established season while hiding full approval and date inputs' do
+      season.update!(current: true)
+      post path, params: { operation: 'refresh' }
+      expect(response).to redirect_to(path)
+      follow_redirect!
+      expect(response.body).to include('established outputs', 'Example U', 'Apply selected conference corrections only')
+      expect(response.body).not_to include('Approve memberships, participation and dates', 'review[start_date]')
+      expect(season.reload).to be_current
+      expect(season.participation_review).to eq({})
+    end
+
+    it 'keeps full approval guarded even when it is posted directly for an established season' do
+      season.update!(current: true)
+      post path, params: { operation: 'refresh' }
+      post path, params: { operation: 'approve', review: { proposal_key: SeasonMembershipReview.new(season.reload).proposal_key } }
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.body).to include('existing season outputs must be preserved')
+      expect(season.reload.participation_review).to eq({})
+    end
+
+    it 'offers a separately selected previous-season draft with source/target years and verification confirmation' do
+      prior = instance_double(Scraper::ConferenceStandingsScraper, call: rows,
+                                                                   source_url: 'https://www.sports-reference.com/cbb/seasons/men/2026-standings.html')
+      allow(Scraper::ConferenceStandingsScraper).to receive(:new).with(year: 2026).and_return(prior)
+      post path, params: { operation: 'refresh_previous' }
+      expect(response).to redirect_to(path)
+      follow_redirect!
+      expect(response.body).to include('Target 2027 proposal based on 2026 memberships', 'Carried forward', 'review[confirm_target_year]')
+      expect(season.reload.membership_proposal).to include('source_year' => 2026, 'target_year' => 2027)
+      expect(TeamConference.count).to eq(0)
+    end
+
+    it 'applies selected conference-only corrections without accepting submitted date or roster changes' do
+      previous = create(:season, year: 2026)
+      following = create(:season, year: 2028)
+      old = create(:conference, name: 'SEC')
+      create(:team_conference, team:, conference: old, start_season: previous)
+      season.update!(current: true)
+      before = season.attributes.slice('start_date', 'end_date', 'participation_review')
+      post path, params: { operation: 'refresh' }
+      post path, params: { operation: 'correct_memberships', review: {
+        proposal_key: SeasonMembershipReview.new(season.reload).proposal_key,
+        teams: { team.id.to_s => { selected: '1', choice: conference.id.to_s } },
+        confirm_memberships_only: '1', evidence: 'Official conference records reviewed',
+        start_date: '2000-01-01', end_date: '2000-02-01', participation_review: { teams: [] }
+      } }
+      expect(response).to redirect_to(path)
+      follow_redirect!
+      expect(response.body).to include('Last conference-only correction', admin.email)
+      expect([previous, season, following].map { |year| team.conference_for(year) }).to eq([old, conference, old])
+      expect(season.reload.attributes.slice('start_date', 'end_date', 'participation_review')).to eq(before)
+      expect(season.membership_corrections.sole.fetch('reviewed_by')).to eq(admin.email)
     end
 
     it 'preserves a proposal after scraper failures' do

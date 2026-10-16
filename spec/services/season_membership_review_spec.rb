@@ -261,11 +261,66 @@ RSpec.describe SeasonMembershipReview do
     expect(membership.reload.end_season).to be_nil
   end
 
-  it 'refuses to refresh or approve once the season has published outputs' do
+  context 'with an explicit previous-season source' do
+    let(:prior_scraper) do
+      instance_double(Scraper::ConferenceStandingsScraper, call: source,
+                                                           source_url: 'https://www.sports-reference.com/cbb/seasons/men/2026-standings.html')
+    end
+
+    before do
+      allow(Scraper::ConferenceStandingsScraper).to receive(:new).with(year: 2026).and_return(prior_scraper)
+    end
+
+    it 'keeps target/source years distinct and marks carried-forward rows unverified' do
+      review.refresh(source_year: 2026)
+      proposal = season.reload.membership_proposal
+      expect(proposal).to include('source_year' => 2026, 'target_year' => 2027)
+      expect(proposal.fetch('rows').sole).to include('carried_forward' => true)
+      expect(team.conference_for(season)).to eq(old_conference)
+      expect(season.participation_review).to eq({})
+    end
+
+    it 'requires explicit target-year confirmation before applying a previous-season draft' do
+      review.refresh(source_year: 2026)
+      attributes = approval
+      expect { approve(attributes) }.to raise_error(ArgumentError, /Confirm target-year verification/)
+      attributes['confirm_target_year'] = '1'
+      approve(attributes)
+      expect(season.reload.participation_review).to include('target_year_confirmed' => true)
+      expect(season.participation_review.fetch('membership_source')).to include('source_year' => 2026, 'target_year' => 2027)
+    end
+
+    it 'does not silently fall back when the requested target page returns 404' do
+      allow(scraper).to receive(:call).and_raise(Scraper::ConferenceStandingsScraper::Error, 'HTTP 404')
+      expect { review.refresh }.to raise_error(Scraper::ConferenceStandingsScraper::Error, /404/)
+      expect(prior_scraper).not_to have_received(:call)
+      expect(season.reload.membership_proposal).to eq({})
+    end
+
+    it 'rejects older or future source years before making a request' do
+      expect { review.refresh(source_year: 2025) }.to raise_error(ArgumentError, /preceding source year/)
+      expect { review.refresh(source_year: 2028) }.to raise_error(ArgumentError, /preceding source year/)
+      expect(scraper).not_to have_received(:call)
+      expect(prior_scraper).not_to have_received(:call)
+    end
+  end
+
+  it 'allows discovery for the current season without changing its current status or roster' do
+    season.update!(current: true)
+    review.refresh
+    expect(season.reload.membership_proposal).to be_present
+    expect(season).to be_current
+    expect(season.participation_review).to eq({})
+    expect { approve }.to raise_error(ArgumentError, /existing season outputs/)
+  end
+
+  it 'allows proposal discovery but refuses full approval once the season has published outputs' do
     review.refresh
     attributes = approval
     season.team_seasons.sole.update!(adj_pace: 70)
     expect { approve(attributes) }.to raise_error(ArgumentError, /existing season outputs/)
-    expect { review.refresh }.to raise_error(ArgumentError, /existing season outputs/)
+    review.refresh
+    expect(season.reload.membership_proposal).to be_present
+    expect(season.team_seasons.sole.adj_pace).to eq(70)
   end
 end

@@ -22,6 +22,11 @@ module RailsAdmin
                 case params[:operation]
                 when 'refresh'
                   review.refresh
+                when 'refresh_previous'
+                  review.refresh(source_year: @object.year - 1)
+                when 'correct_memberships'
+                  SeasonConferenceCorrection.new(@object).call(@review_values, reviewer: _current_user.email)
+                  flash[:success] = I18n.t('admin.actions.review_memberships.corrected')
                 when 'approve'
                   review.apply(@review_values, reviewer: _current_user.email)
                   flash[:success] = I18n.t('admin.actions.review_memberships.approved')

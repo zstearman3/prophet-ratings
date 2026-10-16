@@ -28,8 +28,10 @@ RailsAdmin.config do |config|
     show do
       fields :year, :name, :start_date, :end_date, :current, :preseason_revision, :average_efficiency, :average_pace
     end
-    configure :membership_proposal do
-      hide
+    %i[membership_proposal membership_corrections].each do |payload|
+      configure payload do
+        hide
+      end
     end
     configure :participation_review do
       read_only true

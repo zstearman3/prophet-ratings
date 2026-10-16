@@ -28,6 +28,7 @@ is needed for the normal workflow:
 
 1. Click **Fetch proposals from Sports Reference**. This saves a draft using the
    existing standings scraper without changing memberships or the approved roster.
+   Fetching/viewing also works for current or historical seasons with published data.
 2. Review **School | prior-year Membership | target-year Proposed Membership**.
    Changes and absent schools appear first; unchanged source memberships are
    collapsed and included in approval. The decision selector accepts a conference,
@@ -37,14 +38,43 @@ is needed for the normal workflow:
    absence never proves retirement. Provide a reason/source for exceptions.
 4. Verify the displayed season start/end dates and enter roster/date evidence.
    Click **Approve memberships, participation and dates**. The signed-in admin,
-   review time, source URL/capture, proposed rows and final decisions are retained.
+   review time, source year/URL/capture, proposed rows and final decisions are retained.
 
 Approval applies conference ranges, dates and participation together or rolls them
 all back. It checks included TeamSeasons and aliases; run `season:prepare` again
 for missing rows. Included independents need no conference membership. Changed
 local identities, memberships, coverage or dates require a fresh proposal; a failed
-fetch preserves the previous draft and approved review. Once ratings exist or the
-season is current, use the existing revision/recovery workflow rather than this UI.
+fetch preserves the previous draft and approved review. Full participation/date
+approval remains blocked once ratings exist or the season is current; discovery
+and the conference-only correction action remain available.
+
+If the target page is unavailable (for example HTTP 404 for YEAR=2027), click
+**Start from previous season (2026)** explicitly. This fetches 2026 standings to
+seed a 2027 draft; it does not silently retry against another year. The source and
+target years are stored/displayed separately, and carried-forward rows are marked
+**unverified**. Verify realignment, arrivals, departures and target-season evidence,
+then check the target-year confirmation before either approval action. Previous-year
+source coverage alone never establishes target-year participation.
+
+To inspect the known 2026 source, open the **2026 Season** and fetch normally, even
+if it has ratings. This writes a proposal only; it does not reset any outputs.
+
+### Correct conference memberships without replacing the roster
+
+Select the **Correct membership only** checkboxes for the schools to fix, choose
+conferences (or **Independent / no conference**), enter evidence, confirm the limited
+scope, and click **Apply selected conference corrections only**. Other unresolved
+schools do not block selected corrections. N/A participation exclusions require the
+full preseason review rather than this metadata-only action.
+
+Corrections apply to the selected year only, splitting membership ranges to retain
+preceding/following years. Prepare any missing adjacent boundary Season reported
+by the action, then fetch/review again. All selected changes roll back if one fails.
+`Season.membership_corrections` retains source years/rows, reviewer/time, evidence,
+decisions and before/after memberships. Existing participation decisions, dates,
+live ratings, priors, snapshots, forecasts and stored game `in_conference` flags
+are preserved. Historical result/rating recalculation remains a separate explicit
+operation; correcting metadata does not rewrite published model history.
 
 Without a participation review, **legacy mode includes every stored TeamSeason**.
 Reviewed publication uses only included teams; excluded history remains intact and

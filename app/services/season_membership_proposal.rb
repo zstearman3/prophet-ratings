@@ -27,6 +27,19 @@ class SeasonMembershipProposal
     }
   end
 
+  def self.source_row(team, match, years)
+    year = years.fetch(:target)
+    proposed_row(team, match, year).merge('carried_forward' => years.fetch(:source) != year)
+  end
+
+  def self.build_rows(matches, years)
+    by_team = matches.index_by { |match| match.team&.id }
+    builder = self
+    Team.includes(team_conferences: %i[conference start_season end_season]).order(:school).map do |team|
+      builder.source_row(team, by_team[team.id], years)
+    end
+  end
+
   def self.membership_label(memberships)
     memberships.map { |membership| membership.conference.name }.join(', ').presence || 'No stored membership'
   end
@@ -38,8 +51,17 @@ class SeasonMembershipProposal
     end
   end
 
-  def initialize(season)
+  def self.validate_target_year(proposal, submission)
+    return if proposal['source_year'] == proposal['target_year']
+    return if submission['confirm_target_year'] == '1'
+
+    raise ArgumentError, 'Confirm target-year verification of the unverified previous-season draft before approval.'
+  end
+
+  def initialize(season, source_year: season.year)
     @season = season
+    @source_year = SeasonPreparer.parse_year(source_year)
+    validate_source_year
   end
 
   def capture
@@ -48,11 +70,12 @@ class SeasonMembershipProposal
   end
 
   def call
-    scraper = Scraper::ConferenceStandingsScraper.new(year: season.year)
+    scraper = Scraper::ConferenceStandingsScraper.new(year: source_year)
     source = scraper.call
     Scraper::ConferenceStandingsScraper.validate!(source)
     matches = ConferenceAlignmentMatch.resolve(source)
     {
+      'source_year' => source_year, 'target_year' => season.year,
       'source_url' => scraper.source_url, 'captured_at' => Time.current.iso8601,
       'fingerprint' => fingerprint, 'source_rows' => source.as_json,
       'issues' => matches.flat_map(&:suggestions), 'rows' => proposed_rows(matches)
@@ -69,15 +92,36 @@ class SeasonMembershipProposal
                       ])
   end
 
+  def reviewed(submission)
+    proposal = season.membership_proposal
+    raise ArgumentError, 'Refresh proposals before approval.' if proposal.blank?
+
+    validate_snapshot(proposal, submission)
+    proposal
+  end
+
   private
 
-  attr_reader :season
+  attr_reader :season, :source_year
+
+  def validate_source_year
+    year = season.year
+    return if [year, year - 1].include?(source_year)
+
+    raise ArgumentError, 'Choose the target season or its immediately preceding source year.'
+  end
+
+  def validate_snapshot(proposal, submission)
+    validator = self.class
+    raise ArgumentError, 'Proposal changed; reload and review again.' unless submission.fetch('proposal_key') == validator.digest(proposal)
+    unless proposal.fetch('fingerprint') == fingerprint
+      raise ArgumentError, 'Local roster, dates or memberships changed; refresh and review again.'
+    end
+
+    validator.validate_target_year(proposal, submission)
+  end
 
   def proposed_rows(matches)
-    by_team = matches.index_by { |match| match.team&.id }
-    builder = self.class
-    Team.includes(team_conferences: %i[conference start_season end_season]).order(:school).map do |team|
-      builder.proposed_row(team, by_team[team.id], season.year)
-    end
+    self.class.build_rows(matches, { target: season.year, source: source_year })
   end
 end
