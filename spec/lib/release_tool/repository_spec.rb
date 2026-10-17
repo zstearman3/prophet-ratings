@@ -12,6 +12,10 @@ RSpec.describe ReleaseTool::Repository do
   let(:plan) { { version: tag, target: git('rev-parse', 'HEAD').strip, previous_tag: nil, update: false } }
 
   around do |example|
+    # Hooks export GIT_DIR and other repository selectors. Never let the fixture
+    # commands operate on the caller's repository instead of the temporary one.
+    git_environment = ENV.to_h.select { |key, _value| key.start_with?('GIT_') }
+    git_environment.each_key { |key| ENV.delete(key) }
     ReleaseTool.capture('git', 'init', '--bare', remote)
     ReleaseTool.capture('git', 'init', checkout)
     Dir.chdir(checkout) do
@@ -28,6 +32,7 @@ RSpec.describe ReleaseTool::Repository do
       example.run
     end
   ensure
+    ENV.update(git_environment)
     FileUtils.remove_entry(sandbox)
   end
 
