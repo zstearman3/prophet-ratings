@@ -3,6 +3,29 @@
 require 'rails_helper'
 
 RSpec.describe Team do
+  describe '.matching_school_or_alias' do
+    let!(:team) { create(:team, school: 'Test College') }
+
+    it 'matches canonical schools without requiring aliases and returns a chainable relation' do
+      expect(described_class.matching_school_or_alias(' test COLLEGE ').where(id: team.id)).to eq([team])
+    end
+
+    it 'returns distinct candidates across all alias sources, preserving conflicts' do
+      other = create(:team)
+      create(:team_alias, team:, source: nil, value: 'Shared label')
+      create(:team_alias, team:, source: 'sports_reference', value: ' SHARED LABEL ')
+      create(:team_alias, team: other, source: '247sports', value: 'shared label')
+
+      expect(described_class.matching_school_or_alias(' Shared Label ').ids).to eq([team.id, other.id].sort)
+    end
+
+    it 'leaves missing, invalid and inexact names unmatched' do
+      [nil, '', '  ', 123, 'Test Colledge'].each do |name|
+        expect(described_class.matching_school_or_alias(name)).to be_empty
+      end
+    end
+  end
+
   describe '#conference_for' do
     let(:team) { create(:team) }
     let(:conference) { create(:conference, name: 'Range Conference', slug: 'range-conference') }

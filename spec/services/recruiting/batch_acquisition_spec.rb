@@ -36,6 +36,16 @@ RSpec.describe Recruiting::BatchAcquisition do
     expect(HTTParty).to have_received(:get).twice
   end
 
+  it 'persists automatic mappings from existing aliases belonging to another source' do
+    team.update!(school: 'Canonical Arkansas')
+    create(:team_alias, team:, source: 'sports_reference', value: ' ARKANSAS ')
+
+    described_class.new(batch).call
+
+    expect(batch.entries.find_by!(source_label: 'Arkansas').team_id).to eq(team.id)
+    expect(Recruiting::BatchReview.new(batch).report.fetch('rows').first.fetch('team_id')).to eq(team.id)
+  end
+
   it 'retains failed HTTP evidence and prevents approval rather than creating an empty successful batch' do
     allow(HTTParty).to receive(:get).and_return(double(code: 403, body: 'Blocked source response'))
     described_class.new(batch).call

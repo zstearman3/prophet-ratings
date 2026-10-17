@@ -37,17 +37,43 @@ RSpec.describe Recruiting::Dataset do
     expect(preview.fetch('rows').first.fetch('team_id')).to eq(team.id)
   end
 
-  it 'reuses only exact provider-scoped aliases' do
-    document['rows'].first['team_label'] = 'Source Label'
-    create(:team_alias, team:, source: 'sports_reference', value: 'Source Label')
-    expect(preview.fetch('eligible_rows')).to eq(0)
-    create(:team_alias, team:, source: '247sports', value: 'Source Label')
-    expect(preview.fetch('eligible_rows')).to eq(1)
+  ['247sports', 'sports_reference', 'odds-api', nil].each do |source|
+    it "matches an existing alias from #{source.inspect}, ignoring case and surrounding whitespace" do
+      document['rows'].first['team_label'] = ' source label '
+      create(:team_alias, team:, source:, value: ' Source Label ')
+      expect(preview.fetch('eligible_rows')).to eq(1)
+      expect(preview.fetch('rows').first.fetch('team_id')).to eq(team.id)
+    end
+  end
+
+  it 'ignores case and surrounding whitespace in canonical schools without requiring an alias' do
+    document['rows'].first['team_label'] = ' test COLLEGE '
+    expect(preview.fetch('rows').first.fetch('team_id')).to eq(team.id)
+  end
+
+  it 'does not infer a fuzzy match for an unknown spelling' do
+    document['rows'].first['team_label'] = 'Test Colledge'
+    expect(preview.fetch('rows').first.fetch('team_id')).to be_nil
+  end
+
+  it 'combines aliases for the same school without making the match ambiguous' do
+    create(:team_alias, team:, source: 'sports_reference', value: team.school)
+    create(:team_alias, team:, source: '247sports', value: team.school)
+    expect(preview.fetch('rows').first).to include('candidate_team_ids' => [team.id], 'team_id' => team.id, 'exclusions' => [])
+  end
+
+  it 'leaves conflicting aliases across sources unresolved' do
+    document['rows'].first['team_label'] = 'Shared label'
+    other = create(:team)
+    create(:team_alias, team:, source: 'sports_reference', value: 'Shared label')
+    create(:team_alias, team: other, source: '247sports', value: 'SHARED LABEL')
+    expect(preview.fetch('rows').first).to include('candidate_team_ids' => [team.id, other.id].sort, 'team_id' => nil)
+    expect(preview.fetch('rows').first.fetch('exclusions')).to include(/Ambiguous/)
   end
 
   it 'reports canonical versus alias ambiguity without selecting a team' do
     other = create(:team)
-    create(:team_alias, team: other, source: '247sports', value: team.school)
+    create(:team_alias, team: other, source: 'sports_reference', value: " #{team.school.upcase} ")
     row = preview.fetch('rows').first
     expect(row['team_id']).to be_nil
     expect(row['candidate_team_ids']).to eq([team.id, other.id].sort)

@@ -158,13 +158,18 @@ bin/compose exec web bin/rails recruiting:preview \
 ```
 
 Preview verifies bundle integrity and emits deterministic JSON for unchanged files
-and database identities. Exact canonical `Team.school` and exact `TeamAlias.value`
-with source `247sports` are combined; only one distinct stored team resolves.
+and database identities. Canonical `Team.school` and `TeamAlias.value` from all
+sources (including aliases without a source) are combined, ignoring case and
+surrounding whitespace; only one distinct stored team resolves.
 No nickname, fuzzy matching, first-match choice or automatic creation occurs.
 Unmatched/ambiguous rows list candidate IDs and review actions. Explicitly reviewed
 source aliases can be added in the normal admin/console workflow and then reused;
 this task never modifies them. A canonical/alias conflict requires deliberate
 identity correction before rerunning.
+
+The database review UI uses this same matching when fetching a new batch. Existing
+batches retain their saved mappings and exclusions; fetch a new batch to use newly
+added aliases or updated matching without overwriting previous review choices.
 
 All rows sharing a label, provider identity or canonical team ID are excluded,
 even if their points agree. Resolve the extract/aliases deliberately rather than

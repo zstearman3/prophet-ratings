@@ -28,6 +28,11 @@ Open **RailsAdmin → Seasons → target season → Review recruiting**.
    and **Approve and publish recruiting inputs** to save the choices and publish together.
    No JSON files, paths, hashes, reviewer text or version names are required.
 
+Automatic matching checks canonical school names and stored aliases from every
+source, ignoring case and surrounding whitespace. Only one distinct team resolves;
+conflicting identities require review. Matching runs when the batch is fetched.
+Fetch a new batch after adding aliases; saved mappings in existing batches stay intact.
+
 Approval prepares missing target-season rows for mapped schools and stores an
 immutable `OffseasonInputRevision`, linking offseason profiles to that revision.
 It does not calculate ratings, publish preseason priors or activate the season.

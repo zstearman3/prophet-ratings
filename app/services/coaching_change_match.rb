@@ -46,8 +46,6 @@ class CoachingChangeMatch
   attr_reader :row, :rows
 
   def resolve_school(label)
-    Team.left_joins(:team_aliases)
-        .where('LOWER(TRIM(teams.school)) = :name OR LOWER(TRIM(team_aliases.value)) = :name', name: self.class.normalize(label))
-        .distinct.to_a
+    Team.matching_school_or_alias(self.class.normalize(label)).to_a
   end
 end
