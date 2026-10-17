@@ -46,7 +46,10 @@ class RatingsConfigVersion < ApplicationRecord
   end
 
   def self.publish!(payload = authored_config)
+    payload = payload.to_h.deep_symbolize_keys
+    ProphetRatings::ConfigurationSchema.validate_keys(payload, ProphetRatings::ConfigurationSchema::ROOT, 'config')
     ProphetRatings::ModelConfiguration.settings(new(name: payload[:bundle_name] || payload['bundle_name'], config: payload))
+    ProphetRatings::ConfigurationSchema.validate(payload)
     find_or_create_by_config(payload)
   end
 

@@ -47,6 +47,7 @@ module ProphetRatings
 
       validate_ratings_formula(payload)
       FactorForecast.validate(payload)
+      LearningSettings.validate(payload)
     end
 
     def self.validate_number(payload, path)

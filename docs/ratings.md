@@ -1130,3 +1130,13 @@ mutable error columns. Existing historical forecasts are never filled with
 hindsight values. A factor's usefulness alone does not establish incremental
 value for game predictions: that requires future baseline-versus-style forecasts
 on a common, untouched chronological evaluation sample.
+
+## Configuration authoring and learning controls
+
+See [Model tuning reference](model-tuning.md) for configuration paths, defaults,
+units, bounds, effects, optional components, and a publication example. The
+`v1.11-explicit-learning` bundle adds separate volatility and home-court learning
+rules while preserving current arithmetic. Newly published bundles reject unknown
+keys and inconsistent confidence/home-court settings; historical saved bundles
+retain compatibility. Changing settings does not activate a model or regenerate
+its ratings or forecasts.

@@ -169,15 +169,15 @@ module ProphetRatings
       blend_volatility(pace_errors, baseline)
     end
 
-    public_class_method def self.volatility_weight(count)
-      [(count / 16.0), 0.50].min.round(4)
+    def learning_weight(count, kind)
+      rule = LearningSettings.for(@ratings_config_version.settings, kind)
+      LearningSettings.weight(count, rule)
     end
 
     def blend_volatility(errors, baseline)
-      count = errors.size
-      return baseline if count < 4
+      weight = learning_weight(errors.size, :volatility)
+      return baseline if weight.zero?
 
-      weight = self.class.volatility_weight(count)
       (weight * StatisticsUtils.stddev(errors)) + ((1.0 - weight) * baseline)
     end
 
@@ -222,8 +222,8 @@ module ProphetRatings
 
       avg_off = StatisticsUtils.average(off_deltas)
       avg_def = StatisticsUtils.average(def_deltas)
-      off_weight = [(off_deltas.size / 16.0), 0.50].min.round(4)
-      def_weight = [(def_deltas.size / 16.0), 0.50].min.round(4)
+      off_weight = learning_weight(off_deltas.size, :home_court)
+      def_weight = learning_weight(def_deltas.size, :home_court)
 
       blended_off = baseline - (off_weight * avg_off)
       blended_def = -baseline + ((@ratings_config_version.settings[:ratings_formula] == 'corrected_v1' ? -1 : 1) * def_weight * avg_def)
