@@ -1,0 +1,65 @@
+<section class="space-y-5 pb-10">
+  <%= link_to 'All recruiting batches', admin_recruiting_batches_path(season_id: @batch.season_id), class: 'text-blue-700 underline' %>
+  <h1 class="text-3xl font-bold">Review recruiting · <%= @batch.season.year %> season</h1>
+  <% if notice %><p role="status" class="bg-green-100 p-3 rounded"><%= notice %></p><% end %>
+  <% if @review_error %><p role="alert" class="bg-red-100 p-3 rounded"><%= @review_error %></p><% end %>
+  <p>Batch <%= @batch.id %> · <strong><%= @batch.status.humanize %></strong> · Source year <%= @batch.source_year %> · <%= @batch.page_count %> captured pages</p>
+  <p><%= link_to '247 Recruit Composite source', @batch.source_url, target: '_blank', rel: 'noopener', class: 'text-blue-700 underline' %></p>
+  <% if @batch.status.in?(%w[queued fetching]) %>
+    <p>The background worker is fetching this batch. <%= link_to 'Refresh status', admin_recruiting_batch_path(@batch), class: 'text-blue-700 underline' %>.</p>
+  <% end %>
+  <% if @batch.failure_message.present? %>
+    <p role="alert" class="bg-red-100 p-3 rounded">Fetch failed: <%= @batch.source_status %>. <%= @batch.failure_message %>. This batch cannot be approved. Start a new fetch from the batch list.</p>
+  <% end %>
+  <% if @batch.coverage_note.present? %><p class="bg-amber-100 p-3 rounded"><%= @batch.coverage_note %></p><% end %>
+  <% if @batch.status == 'published' %>
+    <p class="bg-green-100 p-3 rounded">Approved by <%= @batch.reviewed_by %> at <%= @batch.reviewed_at %>. Recruiting input revision #<%= @batch.revision_id %> is retained. Fetch a new batch for corrections.</p>
+  <% end %>
+  <% if @report %>
+    <p><%= @report.fetch('extracted_rows') %> source rows · <%= @report.fetch('eligible_rows') %> eligible mappings · <%= @report.fetch('omitted_stored_team_ids').size %> stored schools without eligible source coverage.</p>
+    <p>Blank points mean unknown; 0 means a verified source zero. Omitted or excluded schools remain unknown. Class points are provider values, not the legacy recruiting score.</p>
+    <%= form_tag admin_recruiting_batch_path(@batch), method: :patch, id: 'recruiting-review-form', data: { turbo: false } do %>
+      <% ordered_rows = @report.fetch('rows').sort_by { |row| [row.fetch('exclusions').empty? ? 1 : 0, row.fetch('row_number')] } %>
+      <% page_number = [[params[:page].to_i, 1].max, [(ordered_rows.size / 50.0).ceil, 1].max].min %>
+      <% page_rows = ordered_rows.slice((page_number - 1) * 50, 50) || [] %>
+      <%= hidden_field_tag :page, page_number %>
+      <p>Page <%= page_number %> of <%= [(ordered_rows.size / 50.0).ceil, 1].max %> · unresolved rows appear first.</p>
+      <%= hidden_field_tag 'review[review_key]', Recruiting::BatchReview.new(@batch).review_key %>
+      <fieldset <%= 'disabled' if @batch.status == 'published' %>>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm border-collapse">
+            <thead><tr><th class="p-2">Rank</th><th>Source school</th><th>Map to team</th><th>Class points</th><th>Avg. rating</th><th>Commits</th><th>Review status</th></tr></thead>
+            <tbody>
+              <% options = Team.order(:school).pluck(:school, :id) %>
+              <% entries = @batch.entries.index_by(&:row_number) %>
+              <% page_rows.each do |row| %>
+                <% entry = entries.fetch(row.fetch('row_number')) %>
+                <% choice = params.dig(:review, :rows, entry.id.to_s, :team_id) || (entry.excluded? ? 'excluded' : entry.team_id) %>
+                <tr class="border-t align-top">
+                  <td class="p-2"><%= entry.source_rank&.to_i %></td><td class="p-2"><%= entry.source_label || 'Invalid source row' %></td>
+                  <td class="p-2"><%= select_tag "review[rows][#{entry.id}][team_id]", options_for_select([['Choose team', ''], ['Exclude this source row', 'excluded']] + options, choice), aria: { label: "Map #{entry.source_label}" }, class: 'border rounded p-2' %></td>
+                  <td class="p-2"><%= entry.class_points&.to_s('F') || 'Unknown' %></td>
+                  <td class="p-2"><%= entry.average_rating&.to_s('F') || 'Unknown' %></td>
+                  <td class="p-2"><%= entry.commit_count&.to_i || 'Unknown' %></td>
+                  <td class="p-2"><%= row.fetch('exclusions').presence&.join('; ') || 'Ready' %></td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+        <p class="my-4"><%= check_box_tag 'review[confirm]', '1', false %>
+          <%= label_tag 'review_confirm', 'I reviewed the mappings, exclusions and partial source coverage. Approve these recruiting inputs.' %></p>
+        <p>Save mappings before changing pages. Approval reviews the whole batch, including other pages.</p>
+        <p>Approval also prepares any missing season rows for mapped schools. It does not change ratings, forecasts or the active season.</p>
+        <div class="flex gap-3 my-4">
+          <%= button_tag 'Save mappings', name: nil, class: 'border rounded px-4 py-2' %>
+          <%= button_tag 'Approve and publish recruiting inputs', name: nil, formaction: publish_admin_recruiting_batch_path(@batch), class: 'bg-blue-700 text-white rounded px-4 py-2' %>
+        </div>
+      </fieldset>
+      <nav class="flex gap-4">
+        <% if page_number > 1 %><%= link_to 'Previous page', admin_recruiting_batch_path(@batch, page: page_number - 1), class: 'text-blue-700 underline' %><% end %>
+        <% if page_number * 50 < ordered_rows.size %><%= link_to 'Next page', admin_recruiting_batch_path(@batch, page: page_number + 1), class: 'text-blue-700 underline' %><% end %>
+      </nav>
+    <% end %>
+  <% end %>
+</section>

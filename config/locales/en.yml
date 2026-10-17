@@ -29,7 +29,16 @@
 
 en:
   admin:
+    recruiting_batches:
+      queued: "Recruiting fetch queued. Refresh status to see progress."
+      saved: "Recruiting mappings saved. Review and approve when ready."
+      published: "Recruiting inputs approved and published. Ratings were not recalculated."
     actions:
+      review_recruiting:
+        title: "Review recruiting"
+        menu: "Review recruiting"
+        breadcrumb: "Review recruiting"
+        link: "Review recruiting"
       review_memberships:
         school_saved: "School and season setup saved. Proposals refreshed; review memberships before approving."
         mapped: "Conference mappings saved. Proposals rebuilt from the saved scrape; review before approving."

@@ -3,10 +3,10 @@
 module Recruiting
   # Exact provider-scoped matching is read-only and excludes all duplicate occurrences.
   class Preview
-    def initialize(dataset, season)
+    def initialize(dataset, season, **options)
       @dataset = dataset
       @season = season
-      @matches = dataset.manifest.fetch('rows').map { |row| self.class.match(row) }
+      @matches = options.fetch(:rows) { dataset.manifest.fetch('rows').map { |row| self.class.match(row) } }
     end
 
     def call

@@ -15,24 +15,31 @@ identities and approvals. Unsupported source layouts need an adapter, not invent
 
 ## 1. Acquire and approve recruiting
 
-```bash
-bin/compose exec web bin/rails recruiting:acquire SOURCE_YEAR=2026 YEAR=2027 CATEGORY=recruit_composite OUTPUT_DIR=/rails/tmp/offseason-2027/recruiting MAX_PAGES=20
-bin/compose exec web bin/rails recruiting:preview YEAR=2027 DATASET_DIR=/rails/tmp/offseason-2027/recruiting/<dataset-revision>
-```
+Open **RailsAdmin → Seasons → target season → Review recruiting**.
 
-Review category, year, pages, points, exclusions and ambiguous identities. Correct
-verified source aliases against existing Teams and preview again. Create an
-[approval file](recruiting.md#pin-an-operator-review) pinning `dataset_revision`,
-`mapping_revision`, actual `approved_by` and ISO-8601 `approved_at`, then run:
+1. Click **Fetch recruiting data**. The background worker fetches the prior recruiting
+   year's 247 Recruit Composite pages into a database batch and normalized row records.
+   Keep the worker running (`bin/dev` starts it); use **Refresh status** while fetching.
+2. Review source school, team mapping, class points, average rating, commits and row
+   issues (50 rows per page, unresolved rows first). Save changes before switching
+   pages. Choose an existing team or explicitly exclude unmatched rows. Source
+   numeric values are read-only. Blank points remain unknown; zero stays verified zero.
+3. Click **Save mappings** to pause/resume review, or check the review confirmation
+   and **Approve and publish recruiting inputs** to save the choices and publish together.
+   No JSON files, paths, hashes, reviewer text or version names are required.
 
-```bash
-bin/compose exec web bin/rails recruiting:preview YEAR=2027 DATASET_DIR=/rails/tmp/offseason-2027/recruiting/<dataset-revision> REVIEW_PATH=/rails/tmp/offseason-2027/approval.json MAPPING_DIR=/rails/tmp/offseason-2027/mappings
-```
+Approval prepares missing target-season rows for mapped schools and stores an
+immutable `OffseasonInputRevision`, linking offseason profiles to that revision.
+It does not calculate ratings, publish preseason priors or activate the season.
+Source pages and exact decimal values are retained in the database. Failed captures
+are visible and cannot be approved; new fetches create separate batches. Duplicate
+identities, invalid source values and stale reviews block publication. Partial
+coverage stays explicit and omitted/excluded teams remain unknown.
 
-Retain `mappings/<mapping_revision>.json`. **This approved mapping report is the
-import's REVIEW_PATH**, rather than the small approval request. For access failures,
-use the [saved-HTML fallback](recruiting.md#saved-html-fallback) and preserve failures
-and original bytes. No manual points transcription is needed.
+Published batches are closed to further edits. Fetch and review a new batch for a
+correction; publication retains the previous revision automatically. Existing
+[file-based recruiting acquisition and approval](recruiting.md) remains available
+for advanced use and saved-HTML recovery.
 
 ## 2. Acquire and review drafted-player departures
 
@@ -66,7 +73,10 @@ Retain the report even on nonzero exit. Null loss means incomplete evidence, not
 verified zero. Unknown participation/global identity blocks complete accounting;
 failed sources and evidence conflicts must be resolved before input publication.
 
-## 3. Import reviewed evidence
+## 3. Import reviewed file evidence (advanced recruiting / departures)
+
+The recruiting admin workflow above already publishes its reviewed evidence; skip
+this step for UI-approved recruiting batches. Departures still use the file workflow.
 
 `offseason_inputs:import` requires existing Season/TeamSeasons. It validates saved
 files without network requests and publishes input revisions/profile pointers only.

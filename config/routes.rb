@@ -1,6 +1,12 @@
 # frozen_string_literal: true
 
 Rails.application.routes.draw do
+  namespace :admin do
+    resources :recruiting_batches, only: %i[index create show update] do
+      patch :publish, on: :member
+    end
+  end
+
   mount RailsAdmin::Engine => '/admin', as: 'rails_admin'
   devise_for :users, only: [:sessions]
   get 'matchups/new'
