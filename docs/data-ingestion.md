@@ -774,10 +774,16 @@ perform no database writes, data imports, scoring or scheduled scraping.
 ## Saved recruiting evidence
 
 `recruiting:prepare` retains immutable saved 247 Recruit Composite evidence;
-`recruiting:preview` reports conservative source-scoped team matching and coverage,
+`recruiting:preview` reports conservative canonical/alias team matching and coverage,
 with optional separately pinned operator mapping approval. Neither writes domain
 records or invokes ratings. See [Saved recruiting evidence](recruiting.md) for the
 annual JSON contract, year mapping, prepare/preview commands and review workflow.
+
+Recruiting and coaching share `Team.matching_school_or_alias(name)`. It returns a
+chainable relation of distinct candidates from canonical school names and aliases
+across all sources, ignoring case and surrounding whitespace. Callers must require
+a unique candidate before auto-mapping; the query never chooses the first match
+or uses fuzzy matching.
 
 ## Annual evidence to preseason handoff
 

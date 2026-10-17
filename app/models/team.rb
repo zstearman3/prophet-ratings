@@ -41,6 +41,15 @@ class Team < ApplicationRecord
   has_many :conferences, through: :team_conferences
   has_many :team_aliases, dependent: :destroy
 
+  # Return every exact identity candidate; callers must resolve ambiguity before choosing a team.
+  def self.matching_school_or_alias(name)
+    return none unless name.is_a?(String) && name.present?
+
+    left_joins(:team_aliases)
+      .where('LOWER(TRIM(teams.school)) = :name OR LOWER(TRIM(team_aliases.value)) = :name', name: name.strip.downcase)
+      .distinct.order(:id)
+  end
+
   def self.search(name)
     joins(:team_aliases)
       .where('teams.school = :name OR teams.nickname = :name OR team_aliases.value = :name', name:)
