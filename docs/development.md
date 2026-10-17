@@ -46,8 +46,8 @@ The Makefile remains as a compatibility layer: `make up` means
 `bin/dev --detach`, `make down` means `bin/stop`, and `make test` means
 `bin/test`. Use `make help` for the remaining aliases.
 
-The recruiting review screen queues fetches through GoodJob. Run the worker along
-with the web server (`bin/dev` starts both); a queued batch will not fetch while
+The recruiting and coaching review screens queue fetches through GoodJob. Run the worker along
+with the web server (`bin/dev` starts both); queued work will not fetch while
 the worker is stopped. After updating RailsAdmin action registrations, restart
 `web` (and restart `worker` for changed background job code).
 

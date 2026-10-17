@@ -2,6 +2,7 @@
 
 # Readiness is an explicit operator decision, independent of Season preparation.
 class CoachingReview < ApplicationRecord
+  validates :discovery_status, inclusion: { in: %w[idle queued fetching complete failed] }
   validates :year, numericality: { only_integer: true, in: 1..9999 }, uniqueness: true
   validate :resolved_candidates
   validate :immutable_year, on: :update
@@ -12,6 +13,13 @@ class CoachingReview < ApplicationRecord
       connection.execute(sanitize_sql_array(['SELECT pg_advisory_xact_lock(73127, ?)', Integer(year)]))
     end
     yield
+  end
+
+  def queue_discovery
+    return if discovery_status.in?(%w[queued fetching])
+
+    update!(discovery_status: 'queued', discovery_error: nil)
+    DiscoverCoachingChangesJob.perform_later(id)
   end
 
   private

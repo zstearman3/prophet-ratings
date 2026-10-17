@@ -29,11 +29,25 @@
 
 en:
   admin:
+    coaching_reviews:
+      queued: "Coaching discovery queued. Refresh status to see progress."
+      saved: "Coaching review saved. Ratings were not recalculated."
+      added: "Manual candidate added. Fill in its facts and choose a decision."
     recruiting_batches:
       queued: "Recruiting fetch queued. Refresh status to see progress."
       saved: "Recruiting mappings saved. Review and approve when ready."
       published: "Recruiting inputs approved and published. Ratings were not recalculated."
     actions:
+      review_coaching:
+        title: "Review coaching"
+        menu: "Review coaching"
+        breadcrumb: "Review coaching"
+        link: "Review coaching"
+      coaching_review_queue:
+        title: "Review coaching"
+        menu: "Review coaching"
+        breadcrumb: "Review coaching"
+        link: "Review coaching"
       review_recruiting:
         title: "Review recruiting"
         menu: "Review recruiting"

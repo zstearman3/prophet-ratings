@@ -111,31 +111,38 @@ Keep original bundles for replay and resolve missing legacy profile provenance d
 
 ## 4. Review coaching when the model enables it
 
-Coaching discovery can run before Season preparation:
+Open **RailsAdmin → Seasons → target season → Review coaching**, or use
+**Coaching changes → Review coaching** to choose an ending year before Season
+preparation. The review screen is `/admin/coaching_reviews`.
 
-```bash
-bin/rails coaching:discover YEAR=2027
-```
+1. Click **Fetch coaching changes**. The background worker fetches the prior year's
+   HoopDirt D1 tracker and stores pending candidates. Use **Refresh status** while
+   it runs. Fetch failures show on the page and preserve existing decisions/readiness.
+2. Review source incoming/former coach labels and proposed previous teams alongside
+   the editable facts. Resolve destination/previous teams with the dropdowns and
+   correct coach names as needed. Source conflicts and absences remain visible.
+   Use **Add a manual coaching candidate** for a missing move.
+3. Verify previous Team/year/role manually. Assert **Verified full season as head
+   coach** and **Verified previous-season Division I participation** only with
+   evidence; a TeamSeason or membership does not establish either. Assistants,
+   first-time hires and partial histories can be confirmed facts while remaining
+   ineligible for a pace contribution.
+4. Choose **Pending**, **Confirmed** or **Rejected** for each row. Check the review
+   confirmation and click **Save review** to resume later. The confirmation also
+   explicitly reconfirms edits to confirmed facts. There are 25 rows per page;
+   save before switching pages. Stale forms and invalid history fail atomically.
+5. When all candidates on every page are confirmed/rejected, check the confirmation
+   and click **Save and mark year ready**. An intentionally empty year may be ready;
+   a missing review means unready. Pending candidates, running discovery and failed
+   discovery block new readiness. New/changed candidates and source absences clear
+   readiness; unchanged discovery retries preserve it.
 
-Retain its JSON report and review candidates at `/admin/coaching_change`:
-
-1. Resolve destinations with existing Teams and verified `hoopdirt` aliases, then
-   rerun. Inspect all ambiguous IDs; cross-row coach-name matches are proposals.
-2. Verify previous Team/year/role manually. Assert `full_season_head_coach` and
-   `previous_season_d1` only with evidence; a TeamSeason or membership does not
-   establish D1 status. Assistants, first-time hires and partial histories can be
-   confirmed facts while remaining ineligible for a pace contribution.
-3. Confirm/reject every pending candidate. To correct confirmed facts, explicitly
-   reconfirm on save or return to pending for review. Inspect conflicts, equivalent
-   candidates and source absences; discovery never overwrites reviewed decisions.
-4. Mark the year ready at `/admin/coaching_review` only after review. An intentionally
-   empty year may be ready; missing review means unready. New/changed candidates
-   and source absence/reappearance invalidate readiness; unchanged retries preserve it.
-
-Source failures preserve the import; retry after recovery rather than marking an
-unusable source ready. See [discovery details](data-ingestion.md#coaching-change-discovery).
-The D1-source migration clears readiness and initializes `previous_season_d1` false;
-review/reconfirm facts before marking the year ready again.
+No JSON reports or file imports are required. Source fetches never overwrite
+confirmed/rejected decisions. Review on this screen changes stored coaching facts
+and readiness only; it does not recalculate ratings or alter published captures.
+See [discovery details](data-ingestion.md#coaching-change-discovery) for matching,
+conflict handling and recovery. The existing RailsAdmin record forms remain
+available for individual maintenance.
 
 To publish the experimental coaching configuration in Rails console:
 

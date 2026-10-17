@@ -3,6 +3,7 @@
 require Rails.root.join('lib/rails_admin/config/actions/new_team_conference')
 require Rails.root.join('lib/rails_admin/config/actions/review_memberships')
 require Rails.root.join('lib/rails_admin/config/actions/review_recruiting')
+require Rails.root.join('lib/rails_admin/config/actions/review_coaching')
 
 # rubocop:disable Metrics/BlockLength
 RailsAdmin.config do |config|
@@ -204,6 +205,8 @@ RailsAdmin.config do |config|
     new_team_conference
     review_memberships
     review_recruiting
+    review_coaching
+    coaching_review_queue
     export
     bulk_delete do
       except ['TeamConference']

@@ -1,0 +1,67 @@
+<% state = @page.fetch(:state) %>
+<section class="space-y-5 pb-10">
+  <%= link_to 'All coaching years', admin_coaching_reviews_path, class: 'text-blue-700 underline' %>
+  <h1 class="text-3xl font-bold">Review <%= @workflow.year %> coaching changes</h1>
+  <% if notice %><p role="status" class="bg-green-100 p-3 rounded"><%= notice %></p><% end %>
+  <% if @review_error %><p role="alert" class="bg-red-100 p-3 rounded"><%= @review_error %></p><% end %>
+  <p>Year readiness: <strong><%= state.ready? ? 'Ready' : 'Needs review' %></strong>. Fetch status: <%= state.discovery_status.humanize %>.<% if state.discovered_at %> Last successful fetch: <%= state.discovered_at %>.<% end %></p>
+  <p><%= link_to "HoopDirt #{@workflow.year - 1} source tracker", @page.fetch(:source_url), target: '_blank', rel: 'noopener', class: 'text-blue-700 underline' %></p>
+  <% if state.discovery_error.present? %><p role="alert" class="bg-red-100 p-3 rounded">Fetch failed: <%= state.discovery_error %>. Existing candidates and decisions were preserved. Retry after source recovery.</p><% end %>
+  <% fetching = state.discovery_status.in?(%w[queued fetching]) %>
+  <%= button_to 'Fetch coaching changes', discover_admin_coaching_review_path(@workflow.year), disabled: fetching, class: 'rounded bg-blue-700 px-4 py-2 text-white', form: { data: { turbo: false } } %>
+  <% if fetching %><p>The background worker is fetching this year. <%= link_to 'Refresh status', admin_coaching_review_path(@workflow.year), class: 'text-blue-700 underline' %>.</p><% end %>
+  <p><%= @page.fetch(:candidates).size %> stored candidates · <%= @page.fetch(:candidates).count { |candidate| candidate.status == 'pending' } %> pending. Confirm facts only after checking them. A confirmed move can still be ineligible for a pace adjustment.</p>
+  <p>Previous year, role, full-season responsibility and Division I participation require manual verification. Prior-team proposals are suggestions. Save before switching pages. Ratings are calculated separately during preseason publication.</p>
+  <%= form_tag admin_coaching_review_path(@workflow.year), method: :patch, id: 'coaching-review-form', data: { turbo: false } do %>
+    <%= hidden_field_tag 'review[review_key]', @workflow.review_key %>
+    <%= hidden_field_tag :page, @page.fetch(:page_number) %>
+    <p>Page <%= @page.fetch(:page_number) %> of <%= @page.fetch(:page_count) %> · pending candidates first.</p>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-sm border-collapse">
+        <thead><tr><th class="p-2">School and source</th><th>Reviewed coach and destination</th><th>Reviewed previous history</th><th>Decision</th></tr></thead>
+        <tbody>
+          <% @page.fetch(:page_rows).each do |candidate| %>
+            <% values = candidate.attributes %>
+            <% submitted = params.dig(:review, :rows, candidate.id.to_s) %>
+            <% values.merge!(submitted.permit(*Coaching::YearReview::EDITABLE_FIELDS).to_h) if submitted %>
+            <% prefix = "review[rows][#{candidate.id}]" %>
+            <tr class="border-t align-top">
+              <td class="p-2">
+                <strong><%= candidate.destination_school.presence || candidate.team&.school || 'Unresolved school' %></strong> · #<%= candidate.id %>
+                <% if candidate.discovery_school.present? %>
+                  <p>Source incoming: <%= candidate.discovery_coach_name.presence || 'Unknown' %></p>
+                  <p>Source former: <%= candidate.discovery_former_coach.presence || 'Unknown' %></p>
+                  <p>Proposed previous team: <%= @page.fetch(:team_names)[candidate.discovery_previous_team_id] || 'Unresolved' %></p>
+                <% end %>
+                <% related = @page.fetch(:candidates).select { |other| candidate.team_id && other.team_id == candidate.team_id && other.id != candidate.id } %>
+                <% if related.any? %><p class="text-amber-800">Other candidates for this destination: <%= related.map { |other| "#{other.coach_name.presence || 'Unknown coach'} (##{other.id})" }.join(', ') %></p><% end %>
+                <% Coaching::YearReview.source_warnings(candidate).each do |warning| %><p class="text-amber-800"><%= warning %></p><% end %>
+              </td>
+              <td class="p-2 space-y-2">
+                <div><%= label_tag "#{prefix}[team_id]", 'Destination team' %><%= select_tag "#{prefix}[team_id]", options_for_select(@page.fetch(:teams), values['team_id']), include_blank: 'Choose a team' %></div>
+                <div><%= label_tag "#{prefix}[coach_name]", 'Incoming coach' %><%= text_field_tag "#{prefix}[coach_name]", values['coach_name'] %></div>
+              </td>
+              <td class="p-2 space-y-2">
+                <% if candidate.previous_school.present? %><p>Stored previous school label: <%= candidate.previous_school %></p><% end %>
+                <div><%= label_tag "#{prefix}[previous_team_id]", 'Previous team' %><%= select_tag "#{prefix}[previous_team_id]", options_for_select(@page.fetch(:teams), values['previous_team_id']), include_blank: 'Unknown / not applicable' %></div>
+                <div><%= label_tag "#{prefix}[previous_year]", 'Previous season ending year' %><%= number_field_tag "#{prefix}[previous_year]", values['previous_year'], min: 1, max: @workflow.year - 1 %></div>
+                <div><%= label_tag "#{prefix}[previous_role]", 'Previous role' %><%= select_tag "#{prefix}[previous_role]", options_for_select(CoachingChange::PREVIOUS_ROLES.map { |role| [role.humanize, role] }, values['previous_role']), include_blank: 'Unknown' %></div>
+                <div><%= hidden_field_tag "#{prefix}[full_season_head_coach]", '0' %><%= check_box_tag "#{prefix}[full_season_head_coach]", '1', values['full_season_head_coach'].in?([true, '1']) %><%= label_tag "#{prefix}[full_season_head_coach]", 'Verified full season as head coach' %></div>
+                <div><%= hidden_field_tag "#{prefix}[previous_season_d1]", '0' %><%= check_box_tag "#{prefix}[previous_season_d1]", '1', values['previous_season_d1'].in?([true, '1']) %><%= label_tag "#{prefix}[previous_season_d1]", 'Verified previous-season Division I participation' %></div>
+              </td>
+              <td class="p-2"><%= label_tag "#{prefix}[status]", 'Decision' %><%= select_tag "#{prefix}[status]", options_for_select(CoachingChange::STATUSES.map { |status| [status.humanize, status] }, values['status']) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+    <p><%= check_box_tag 'review[confirm]', '1', false %><%= label_tag 'review[confirm]', 'I reviewed these coaching facts and decisions, including any edits to confirmed records.' %></p>
+    <%= button_tag 'Save review', name: :intent, value: 'save', class: 'rounded bg-blue-700 px-4 py-2 text-white' %>
+    <%= button_tag 'Save and mark year ready', name: :intent, value: 'ready', class: 'rounded bg-green-700 px-4 py-2 text-white' %>
+    <p>Mark ready only after every candidate on every page is confirmed or rejected. An intentionally empty year may be marked ready.</p>
+  <% end %>
+  <nav aria-label="Coaching review pages">
+    <% (1..@page.fetch(:page_count)).each do |page| %><%= link_to page, admin_coaching_review_path(@workflow.year, page:), class: 'text-blue-700 underline px-2' %><% end %>
+  </nav>
+  <%= button_to 'Add a manual coaching candidate', candidate_admin_coaching_review_path(@workflow.year), class: 'rounded bg-gray-200 px-4 py-2', form: { data: { turbo: false } } %>
+</section>
