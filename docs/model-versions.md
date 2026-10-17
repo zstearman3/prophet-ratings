@@ -130,7 +130,7 @@ publication/lookup/activation separation, and legacy evaluation.
 
 ## Prediction arithmetic versions
 
-The authored bundle is now `v1.7-shared-pace`. Its stored
+The authored bundle is now `v1.9-ratings-corrections`. It retains the v1.7 stored
 `prediction.uncertainty_model: shared_pace_v1` selects the exact shared-pace
 moments and efficiency-difference win probability described in
 [Ratings](ratings.md#shared-pace-uncertainty-baseline). Contract version 1 rows
@@ -140,6 +140,12 @@ rows and predictions are preserved, and no publication/activation happens on
 code deployment. Confidence labels are uncalibrated across both paths.
 
 Publish and explicitly select/activate the new bundle using the commands above
-with `MODEL_VERSION=v1.7-shared-pace`. New snapshots must belong to that version;
+with `MODEL_VERSION=v1.9-ratings-corrections`. New snapshots must belong to that version;
 review the existing live-input/reset safeguards before any authorized rollout.
 No automatic historical rewrite or calibration claim accompanies this change.
+
+The v1.9 bundle also selects `ratings_formula: corrected_v1` for the in-season
+pace, home-defense and three-point corrections described in
+[Ratings](ratings.md#corrected-in-season-ratings-v19-ratings-corrections).
+Blowout weighting remains off by default. Persisted bundles without this selector
+retain legacy ratings arithmetic.

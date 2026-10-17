@@ -14,9 +14,7 @@ module ProphetRatings
         (fgm + (0.5 * three_pm)) / fga.to_f
       },
       three_pt_proficiency: lambda { |fga:, three_pm:, three_pa:|
-        return nil if fga.zero?
-
-        ((2 * (three_pm.to_f / three_pa)) + (three_pa.to_f / fga)) / 3.0
+        BasketballCalculations::StatFormulae.three_point_proficiency(three_pm, three_pa, fga)
       }
     }.freeze
 
@@ -102,6 +100,10 @@ module ProphetRatings
         .group_by(&:team_season_id)
     end
 
+    public_class_method def self.sum_stat(team_games, stat)
+      team_games.sum { |team_game| team_game.public_send(stat).to_i }
+    end
+
     def calculate_average_stats(team_games)
       aggregates = {}
 
@@ -111,13 +113,13 @@ module ProphetRatings
         aggregates[stat] = avg
       end
 
-      possession_vals = team_games.filter_map { |g| g.game&.possessions }
+      possession_vals = team_games.filter_map { |g| pace_for(g.game) }
       aggregates[:pace] = possession_vals.any? ? possession_vals.sum / possession_vals.size.to_f : nil
 
-      fgm = team_games.sum { |tg| tg.field_goals_made.to_i }
-      fga = team_games.sum { |tg| tg.field_goals_attempted.to_i }
-      three_pm = team_games.sum { |tg| tg.three_pt_made.to_i }
-      three_pa = team_games.sum { |tg| tg.three_pt_attempted.to_i }
+      fgm = self.class.sum_stat(team_games, :field_goals_made)
+      fga = self.class.sum_stat(team_games, :field_goals_attempted)
+      three_pm = self.class.sum_stat(team_games, :three_pt_made)
+      three_pa = self.class.sum_stat(team_games, :three_pt_attempted)
 
       aggregates[:effective_fg_percentage] = DERIVED_STATS[:effective_fg_percentage].call(fgm:, fga:, three_pm:)
       aggregates[:three_pt_proficiency] = DERIVED_STATS[:three_pt_proficiency].call(fga:, three_pm:, three_pa:)
@@ -135,12 +137,13 @@ module ProphetRatings
       }
     end
 
-    def baseline_volatility(stat)
-      @ratings_config_version.settings.fetch(:baseline_volatility).fetch(stat).to_f
+    def pace_for(game)
+      stat = @ratings_config_version.settings[:ratings_formula] == 'corrected_v1' ? :pace : :possessions
+      game&.public_send(stat)
     end
 
     def offensive_efficiency_volatility(home_predictions, away_predictions)
-      baseline = baseline_volatility(:efficiency_volatility)
+      baseline = @ratings_config_version.settings.fetch(:baseline_volatility).fetch(:efficiency_volatility).to_f
       offensive_errors = (
         home_predictions.map(&:home_offensive_efficiency_error) +
         away_predictions.map(&:away_offensive_efficiency_error)
@@ -150,7 +153,7 @@ module ProphetRatings
     end
 
     def defensive_efficiency_volatility(home_predictions, away_predictions)
-      baseline = baseline_volatility(:efficiency_volatility)
+      baseline = @ratings_config_version.settings.fetch(:baseline_volatility).fetch(:efficiency_volatility).to_f
       defensive_errors = (
         home_predictions.map(&:home_defensive_efficiency_error) +
         away_predictions.map(&:away_defensive_efficiency_error)
@@ -160,21 +163,21 @@ module ProphetRatings
     end
 
     def pace_volatility(home_predictions, away_predictions)
-      baseline = baseline_volatility(:pace_volatility)
+      baseline = @ratings_config_version.settings.fetch(:baseline_volatility).fetch(:pace_volatility).to_f
       pace_errors = (home_predictions.map(&:pace_error) + away_predictions.map(&:pace_error)).compact
 
       blend_volatility(pace_errors, baseline)
     end
 
-    public_class_method def self.volatility_weight(count)
-      [(count / 16.0), 0.50].min.round(4)
+    def learning_weight(count, kind)
+      rule = LearningSettings.for(@ratings_config_version.settings, kind)
+      LearningSettings.weight(count, rule)
     end
 
     def blend_volatility(errors, baseline)
-      count = errors.size
-      return baseline if count < 4
+      weight = learning_weight(errors.size, :volatility)
+      return baseline if weight.zero?
 
-      weight = self.class.volatility_weight(count)
       (weight * StatisticsUtils.stddev(errors)) + ((1.0 - weight) * baseline)
     end
 
@@ -219,11 +222,11 @@ module ProphetRatings
 
       avg_off = StatisticsUtils.average(off_deltas)
       avg_def = StatisticsUtils.average(def_deltas)
-      off_weight = [(off_deltas.size / 16.0), 0.50].min.round(4)
-      def_weight = [(def_deltas.size / 16.0), 0.50].min.round(4)
+      off_weight = learning_weight(off_deltas.size, :home_court)
+      def_weight = learning_weight(def_deltas.size, :home_court)
 
       blended_off = baseline - (off_weight * avg_off)
-      blended_def = -baseline + (def_weight * avg_def)
+      blended_def = -baseline + ((@ratings_config_version.settings[:ratings_formula] == 'corrected_v1' ? -1 : 1) * def_weight * avg_def)
 
       {
         home_offense_boost: [blended_off, 0.0].max.round(3),

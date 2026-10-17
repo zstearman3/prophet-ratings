@@ -4,16 +4,22 @@ module BasketballCalculations
   module StatFormulae
     ##
     # Calculates the two-point field goal percentage, rounded to five decimal places.
-    # @return [Float] The ratio of two-point shots made to attempted, or NaN if no attempts.
+    # @return [Float, nil] The ratio of two-point shots made to attempted; nil if no attempts.
     def calculated_two_pt_percentage
+      return nil if two_pt_attempted.to_i.zero?
+
       (two_pt_made.to_f / two_pt_attempted).round(5)
     end
 
     def calculated_three_pt_percentage
+      return nil if three_pt_attempted.to_i.zero?
+
       (three_pt_made.to_f / three_pt_attempted).round(5)
     end
 
     def calculated_free_throws_percentage
+      return nil if free_throws_attempted.to_i.zero?
+
       (free_throws_made.to_f / free_throws_attempted).round(5)
     end
 
@@ -42,7 +48,21 @@ module BasketballCalculations
     end
 
     def calculated_three_pt_proficiency
-      (3.0 * calculated_three_pt_attempt_rate * calculated_three_pt_percentage).round(5)
+      StatFormulae.three_point_proficiency(three_pt_made, three_pt_attempted, field_goals_attempted)&.round(5)
+    end
+
+    def legacy_three_pt_proficiency
+      percentage = calculated_three_pt_percentage
+      return 0.0 unless percentage
+
+      (3.0 * calculated_three_pt_attempt_rate * percentage).round(5)
+    end
+
+    def self.three_point_proficiency(made, attempted, total_attempted)
+      return nil if total_attempted.to_i.zero?
+      return 0.0 if attempted.to_i.zero?
+
+      ((2 * made.to_f / attempted) + (attempted.to_f / total_attempted)) / 3.0
     end
 
     def calculated_offensive_rebound_rate
