@@ -30,7 +30,7 @@ RSpec.describe 'Admin coaching review workflow', type: :request do
   end
 
   it 'queues discovery and makes background status visible without running the scraper in the request' do
-    allow(DiscoverCoachingChangesJob).to receive(:perform_later)
+    allow(DiscoverCoachingChangesJob).to receive(:perform_later).and_return(true)
     post "#{path}/discover"
     record = CoachingReview.find_by!(year: 2027)
     expect(record.discovery_status).to eq('queued')
@@ -50,6 +50,30 @@ RSpec.describe 'Admin coaching review workflow', type: :request do
     expect(record.reload).to have_attributes(team_id: team.id, coach_name: 'Reviewed Coach', status: 'confirmed')
     expect(CoachingReview.find_by!(year: 2027)).to be_ready
     expect([TeamSeason.count, TeamOffseasonProfile.count, TeamRatingSnapshot.count, PreseasonPrior.count]).to eq([0, 0, 0, 0])
+  end
+
+  it 'redirects to the new candidate in pending-first order when page one is full' do
+    25.times { CoachingChange.create!(effective_year: 2027) }
+    26.times { CoachingChange.create!(effective_year: 2027, status: 'rejected') }
+    post "#{path}/candidate"
+    added = CoachingChange.order(:id).last
+    expect(response).to redirect_to("#{path}?page=2")
+    follow_redirect!
+    expect(response.body).to include('Manual candidate added', 'Page 2 of 3')
+    expect(response.parsed_body.at_css("input[name='review[rows][#{added.id}][coach_name]']")).to be_present
+  end
+
+  it 'shows an enqueue failure and allows another fetch attempt' do
+    record = CoachingReview.create!(year: 2027, ready: true)
+    allow(DiscoverCoachingChangesJob).to receive(:perform_later).and_return(false)
+    post "#{path}/discover"
+    expect(response).to have_http_status(:unprocessable_content)
+    expect(response.body).to include('Coaching discovery could not be queued')
+    expect(record.reload).to have_attributes(discovery_status: 'idle', ready: true)
+    allow(DiscoverCoachingChangesJob).to receive(:perform_later).and_return(true)
+    post "#{path}/discover"
+    expect(response).to redirect_to(path)
+    expect(record.reload.discovery_status).to eq('queued')
   end
 
   it 'preserves submitted choices and shows actionable history errors without saving partial changes' do

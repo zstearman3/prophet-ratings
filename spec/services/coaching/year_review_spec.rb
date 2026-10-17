@@ -91,7 +91,7 @@ RSpec.describe Coaching::YearReview do
   end
 
   it 'queues discovery once while a year is already queued' do
-    allow(DiscoverCoachingChangesJob).to receive(:perform_later)
+    allow(DiscoverCoachingChangesJob).to receive(:perform_later).and_return(true)
     2.times { workflow.queue_discovery }
     expect(DiscoverCoachingChangesJob).to have_received(:perform_later).with(workflow.review.id).once
     expect(workflow.review.discovery_status).to eq('queued')

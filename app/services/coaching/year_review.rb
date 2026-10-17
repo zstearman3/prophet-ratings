@@ -3,6 +3,7 @@
 module Coaching
   # Year-scoped, preview-bound edits reuse the existing fact and readiness validations.
   class YearReview
+    PAGE_SIZE = 25
     EDITABLE_FIELDS = %w[team_id coach_name previous_team_id previous_year previous_role
                          full_season_head_coach previous_season_d1 status].freeze
 
@@ -49,9 +50,16 @@ module Coaching
     end
 
     def self.pagination(rows, number)
-      count = [(rows.size / 25.0).ceil, 1].max
+      count = [(rows.size.to_f / PAGE_SIZE).ceil, 1].max
       current = number.to_i.clamp(1, count)
-      { page_count: count, page_number: current, page_rows: rows.slice((current - 1) * 25, 25) || [] }
+      { page_count: count, page_number: current, page_rows: rows.slice((current - 1) * PAGE_SIZE, PAGE_SIZE) || [] }
+    end
+
+    def page_for(candidate)
+      position = candidates.index(candidate)
+      raise ActiveRecord::RecordNotFound, 'Coaching candidate no longer exists; reload the review.' unless position
+
+      (position / PAGE_SIZE) + 1
     end
 
     def add_candidate

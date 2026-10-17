@@ -18,11 +18,21 @@ class CoachingReview < ApplicationRecord
   def queue_discovery
     return if discovery_status.in?(%w[queued fetching])
 
-    update!(discovery_status: 'queued', discovery_error: nil)
-    DiscoverCoachingChangesJob.perform_later(id)
+    transaction do
+      update!(discovery_status: 'queued', discovery_error: nil)
+      enqueue_discovery
+    end
   end
 
   private
+
+  def enqueue_discovery
+    return if DiscoverCoachingChangesJob.perform_later(id)
+
+    raise ActiveJob::EnqueueError, 'The job was not enqueued.'
+  rescue StandardError => error
+    raise ArgumentError, "Coaching discovery could not be queued: #{error.message}"
+  end
 
   def resolved_candidates
     return unless ready? && CoachingChange.exists?(effective_year: year, status: 'pending')

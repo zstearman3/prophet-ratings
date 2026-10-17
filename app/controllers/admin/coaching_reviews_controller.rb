@@ -30,8 +30,9 @@ module Admin
     end
 
     def candidate
-      workflow.add_candidate
-      redirect_to admin_coaching_review_path(workflow.year), notice: I18n.t('admin.coaching_reviews.added')
+      candidate = workflow.add_candidate
+      redirect_to admin_coaching_review_path(workflow.year, page: workflow.page_for(candidate)),
+                  notice: I18n.t('admin.coaching_reviews.added')
     end
 
     private
