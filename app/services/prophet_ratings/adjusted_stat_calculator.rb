@@ -12,7 +12,7 @@ module ProphetRatings
       @as_of = options.fetch(:as_of, Time.current)
     end
 
-    # rubocop:disable-next Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+    # rubocop:disable-next Metrics/AbcSize, Metrics/MethodLength
     def call
       Rails.logger.info("Starting adjustment: #{raw_stat} → #{adj_stat} / #{adj_stat_allowed}")
       season_avg = average_stat_for_season
@@ -50,12 +50,6 @@ module ProphetRatings
       Rails.logger.info("  → Columns (teams x 2): #{2 * num_teams}")
       Rails.logger.info("  → b mean: #{b_mean.round(4)}")
       Rails.logger.info("  → b stddev: #{b_stddev.round(4)}")
-
-      # Check for NaNs or Infs safely
-      has_nan_or_inf = rows.flatten.map(&:to_f).any? { |v| v.nan? || v.infinite? } ||
-                       b.map(&:to_f).any? { |v| v.nan? || v.infinite? }
-
-      Rails.logger.error("⚠️ Matrix contains NaN or Inf values! Stat=#{raw_stat}") if has_nan_or_inf
 
       extreme_b_indices = b.each_index.select { |i| b[i].abs > 15 }
 
@@ -117,20 +111,27 @@ module ProphetRatings
         return game.pace
       end
 
+      return three_point_observation(team_game) if raw_stat == :three_pt_proficiency
+
       team_game.send(raw_stat)
     end
 
     def blowout_dampening(team_game)
-      return 1.0 unless %i[offensive_rating defensive_rating].include?(raw_stat)
+      settings = config.fetch(:blowout)
+      return 1.0 unless settings[:enabled] && raw_stat == :offensive_efficiency
 
-      margin_cap = config[:blowout][:max_margin]
-      multiplier = config.dig(:blowout, :cap_multiplier).to_f
-      margin = if team_game.opponent_team_game&.points && team_game.points
-                 (team_game.points - team_game.opponent_team_game.points).abs
-               else
-                 0
-               end
-      Math.tanh(multiplier * margin / margin_cap)
+      game = team_game.game
+      margin = (game.home_team_score - game.away_team_score).abs
+      threshold = settings.fetch(:max_margin).to_f
+      return 1.0 if margin <= threshold
+
+      (threshold / margin)**settings.fetch(:cap_multiplier)
+    end
+
+    def three_point_observation(team_game)
+      # Recompute from stored counts: imports may have used either formula.
+      method = config[:ratings_formula] == 'corrected_v1' ? :calculated_three_pt_proficiency : :legacy_three_pt_proficiency
+      team_game.public_send(method)
     end
 
     def blend_with_preseason(preseason_value, observed_value)
@@ -202,8 +203,6 @@ module ProphetRatings
           observed = stat_value_for_game(off_tg)
           next if observed.blank?
 
-          observed *= blowout_dampening(off_tg)
-
           home_court = if apply_home_court
                          tg1 == off_tg ? home_adv : -home_adv
                        else
@@ -218,7 +217,8 @@ module ProphetRatings
 
           rows << row
           b << adjusted_observed.to_f
-          weights << GameWeightingService.new(game: off_tg, season:, as_of:, ratings_config_version: @ratings_config_version).call
+          weights << (GameWeightingService.new(game: off_tg, season:, as_of:, ratings_config_version: @ratings_config_version).call *
+                     blowout_dampening(off_tg))
 
           # ➕ Add metadata
           row_metadata << {

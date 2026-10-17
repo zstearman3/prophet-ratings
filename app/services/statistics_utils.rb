@@ -65,43 +65,23 @@ module StatisticsUtils
       ridge_alpha:
     }
 
-    output = ''
-    stderr_output = ''
+    input_data[:diagnostics] = options.fetch(:diagnostics, false)
+    output = nil
     time = Benchmark.realtime do
-      Open3.popen3('python3 lib/python/adjusted_stat_solver.py') do |stdin, stdout, stderr, _wait_thr|
-        # Start stderr capture in a thread immediately
-        stderr_output = ''
-        stderr_thread = Thread.new { stderr_output = stderr.read }
+      output, error, status = Open3.capture3('python3', 'lib/python/adjusted_stat_solver.py', stdin_data: input_data.to_json)
+      raise "Python solver failed (#{status.exitstatus || status.termsig}): #{error.strip}" unless status.success?
 
-        begin
-          stdin.write(input_data.to_json)
-          stdin.close
-        rescue Errno::EPIPE
-          Rails.logger.error('Broken pipe writing to Python solver.')
-          stderr_thread.join
-          Rails.logger.error("Python STDERR: #{stderr_output}")
-          raise
-        end
-
-        output = stdout.read
-        stderr_thread.join
-
-        Rails.logger.debug { "Solver STDOUT: #{output}" }
-        Rails.logger.debug { "Solver STDERR: #{stderr_output}" } unless stderr_output.empty?
-      end
+      Rails.logger.debug { "Solver STDERR: #{error}" } unless error.empty?
     end
-
     Rails.logger.info("Python solver completed in #{time.round(2)}s")
-    Rails.logger.debug { "Solver STDOUT: #{output}" }
-    Rails.logger.debug { "Solver STDERR: #{stderr_output}" } unless stderr_output.empty?
+    validate_solver_output(JSON.parse(output), a_rows.first.size)
+  end
 
-    begin
-      JSON.parse(output)
-    rescue JSON::ParserError => e
-      Rails.logger.error('Failed to parse JSON output from solver.')
-      Rails.logger.error("STDOUT: #{output.inspect}")
-      Rails.logger.error("STDERR: #{stderr_output.inspect}")
-      raise "JSON::ParserError in Python solver: #{e.message}"
+  def validate_solver_output(values, columns)
+    unless values.is_a?(Array) && values.size == columns && values.all? { |value| value.is_a?(Numeric) && value.finite? }
+      raise ArgumentError, "Solver must return #{columns} finite coefficients"
     end
+
+    values
   end
 end

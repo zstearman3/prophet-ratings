@@ -67,7 +67,8 @@ It calculates direct averages from `TeamGame` values for:
 - `offensive_efficiency`
 - `defensive_efficiency`
 
-It calculates `pace` from game possessions.
+It calculates `pace` from regulation-normalized game pace for corrected bundles
+(legacy bundles retain total possessions).
 
 It also derives:
 
@@ -554,7 +555,8 @@ When changing ratings code:
 - The adjusted-stat solver only includes teams with at least two finalized games as of the cutoff.
 - The top-level adjusted pace snapshot field is stored as `adj_pace`; `adj_pace_allowed` is part of the adjusted stat mapping but is not a visible `TeamSeason` schema field in the current annotation.
 - `TeamRatingSnapshot::STORED_STATS` includes `home_total_boost`, while `OverallRatingsCalculator` writes `total_home_boost` on `TeamSeason`. Check naming carefully before relying on that snapshot JSON key.
-- `AdjustedStatCalculator#blowout_dampening` currently checks for `offensive_rating` and `defensive_rating`, while the configured adjusted efficiency raw stat is `offensive_efficiency`. Do not assume blowout dampening is active for efficiency without verifying this behavior.
+- Blowout weighting is opt-in for corrected bundles; see the versioned in-season
+  corrections below. Legacy bundles leave it disabled.
 - `GameWeightingService` is initialized with a `TeamGame` object in the adjustment loop, despite the parameter name `game:`. Its recency calculation uses `@game.game.start_time`.
 
 ## Preseason publication contract
@@ -761,11 +763,11 @@ snapshots/forecasts are preserved. See the deliberate revision operation in
 ### Experimental reviewed coaching pace
 
 The opt-in `coaching_experiment` section of `config/ratings.yml` authors
-`v1.8-experimental-coaching-pace`, with `preseason.coaching.formula:
+`v1.9-experimental-coaching-pace`, with `preseason.coaching.formula:
 relative_pace_v2`, weight **0.50** and no adjustment cap. The coach signal and
 existing team prior receive equal weight. This initial assumption was selected
 before evaluation; it is not a fitted coefficient or a proven accuracy gain.
-The normal authored/default v1.7 bundle remains available without coaching settings.
+The normal authored/default v1.9 bundle remains available without coaching settings.
 
 A manually confirmed destination Team/year move qualifies only with confirmed
 full-season head-coach responsibility, explicit `previous_season_d1`, the immediately
@@ -960,3 +962,72 @@ through final ranks, snapshots and frozen forecasts, plus config-only tuning and
 atomic rollback. These checks establish arithmetic and reproducibility, not
 calibration or predictive improvement; a real annual preview needs reviewed files
 and stored history separately.
+
+## Corrected in-season ratings (`v1.9-ratings-corrections`)
+
+New authored bundles select `ratings_formula: corrected_v1`. Existing persisted
+bundles without this selector retain their legacy overtime baseline, home-defense
+learning sign, and game-level three-point observation formula. Existing snapshots
+and predictions are not rewritten. The experimental coaching bundle has a new
+name as well, so its inherited settings cannot change under an old identity.
+Publishing/deploying code does not activate a model or migrate existing live/prior
+provenance. Use the existing explicit model publication, preseason initialization,
+and reset/rebuild workflows before selecting the new bundle for an existing season.
+Do not silently relabel old live ratings. Historical corrections require a separate,
+deliberate rebuild; this change runs no backfill.
+
+Corrected behavior:
+
+- Raw team-season pace averages `Game#pace` (possessions per 40 minutes), matching
+  solver observations, rather than counting overtime possessions as extra pace.
+- Home-defense learning subtracts the blended predicted-minus-actual residual.
+  With eight residuals of +4 and a used boost equal to the -2.2 baseline, the new
+  boost is -4.2. Better observed defense therefore lowers predicted opponent scoring.
+- Three-point proficiency uses `((2 * 3P%) + 3PA/FGA) / 3` for both games and season
+  totals. Zero three-point attempts contribute zero; zero total attempts give nil.
+  Standalone two-point, three-point and free-throw percentages are nil when their
+  respective attempt count is zero. New imports store the corrected composite;
+  ratings recompute the selected game formula from stored shot counts, so existing
+  imports need no destructive rewrite and legacy model calculations remain identifiable.
+
+Optional blowout weighting applies only to offensive-efficiency observations
+(which jointly estimate offense and defense). `blowout.enabled` defaults to false;
+legacy bundles cannot enable it. With it enabled, the weight is 1 for absolute
+final score margins up to `blowout.max_margin`. Above that threshold:
+
+```text
+blowout_weight = (max_margin / absolute_final_margin) ** cap_multiplier
+observation_weight = recency_weight * blowout_weight
+```
+
+Both sides of a game receive the same factor. Scores, observed efficiencies,
+home-court corrections, the anchor, pace and Five Factors are unchanged. For a
+threshold of 15 and multiplier of 1, a 30-point margin has weight 0.5; a zero
+multiplier disables attenuation. This is a tunable heuristic, not an empirically
+validated accuracy improvement. Publish a distinct bundle before tuning it.
+The dormant `tanh` implementation has been removed.
+
+The solver still minimizes `sum(w * (A*x - b)^2) + alpha * sum(x^2)`, including
+the existing soft anchor row. It computes weighted normal equations by row scaling,
+without allocating a dense diagonal weight matrix. This optimization applies to
+all bundles; floating-point operation order may change insignificant trailing digits.
+No coefficients, weights or ridge strength change as part of the optimization.
+Inputs must have consistent nonempty shapes, finite values, nonnegative weights
+and nonnegative finite ridge alpha. Singular systems (possible with zero ridge)
+fail explicitly; there is no silent pseudoinverse fallback. Ruby checks subprocess
+success and the returned coefficient count/finiteness before callers persist results.
+Condition-number SVD diagnostics are off by default; pass `diagnostics: true` to
+`StatisticsUtils.solve_least_squares_with_python` when investigating a solve.
+
+Run the real solver and Ruby boundary checks with synthetic inputs, without a
+running application or database:
+
+```bash
+docker run --rm --network none -v "$PWD:/rails:ro" -w /rails \
+  --entrypoint python3 prophet-ratings-dev:latest test/python/test_adjusted_stat_solver.py
+```
+
+Build the development image with `bin/compose build web` first if needed. The
+normal RSpec suite covers formula/version behavior and solver-output validation;
+the separate Docker check exercises actual NumPy, dense-reference equivalence,
+invalid inputs, singular failures and the actual Ruby subprocess boundary.

@@ -242,7 +242,7 @@ RSpec.describe ProphetRatings::PreseasonRatingsCalculator do
     experiment = Rails.application.config_for(:ratings, env: :coaching_experiment).to_h.deep_symbolize_keys
     selected = RatingsConfigVersion.publish!(RatingsConfigVersion.authored_config.merge(experiment))
     expect(selected.settings.dig(:preseason, :coaching)).to eq(formula: 'relative_pace_v2', weight: 0.5)
-    expect(selected.name).to eq('v1.8-experimental-coaching-pace')
+    expect(selected.name).to eq('v1.9-experimental-coaching-pace')
     expect(RatingsConfigVersion.current).to be_nil
   end
 

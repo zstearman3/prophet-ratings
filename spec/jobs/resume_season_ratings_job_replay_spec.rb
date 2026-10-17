@@ -111,7 +111,8 @@ RSpec.describe ResumeSeasonRatingsJob do
     replay(date)
     # Latest mean errors are +10/-10; one sample has weight 1/16, regardless of saved errors.
     expect(teams.first.reload.home_offense_boost).to eq(1.575)
-    expect(teams.first.home_defense_boost).to eq(-2.825)
+    # A -10 defensive error weakens the negative boost: -2.2 - (-10 / 16).
+    expect(teams.first.home_defense_boost).to eq(-1.575)
     expect(teams.first.offensive_efficiency_volatility).to eq(11.5)
     replay(date - 1)
     expect(teams.first.reload.home_offense_boost).to eq(2.2)
