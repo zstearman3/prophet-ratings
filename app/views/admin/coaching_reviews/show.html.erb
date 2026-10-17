@@ -31,7 +31,15 @@
                 <% if candidate.discovery_school.present? %>
                   <p>Source incoming: <%= candidate.discovery_coach_name.presence || 'Unknown' %></p>
                   <p>Source former: <%= candidate.discovery_former_coach.presence || 'Unknown' %></p>
-                  <p>Proposed previous team: <%= @page.fetch(:team_names)[candidate.discovery_previous_team_id] || 'Unresolved' %></p>
+                  <p>Proposed previous team:
+                    <% if (school = @page.fetch(:team_names)[candidate.discovery_previous_team_id]) %>
+                      <%= school %>
+                    <% elsif candidate.previous_school.present? %>
+                      <%= candidate.previous_school %> (not automatically matched)
+                    <% else %>
+                      Not identified from source
+                    <% end %>
+                  </p>
                 <% end %>
                 <% related = @page.fetch(:candidates).select { |other| candidate.team_id && other.team_id == candidate.team_id && other.id != candidate.id } %>
                 <% if related.any? %><p class="text-amber-800">Other candidates for this destination: <%= related.map { |other| "#{other.coach_name.presence || 'Unknown coach'} (##{other.id})" }.join(', ') %></p><% end %>
@@ -39,7 +47,7 @@
               </td>
               <td class="p-2 space-y-2">
                 <div><%= label_tag "#{prefix}[team_id]", 'Destination team' %><%= select_tag "#{prefix}[team_id]", options_for_select(@page.fetch(:teams), values['team_id']), include_blank: 'Choose a team' %></div>
-                <div><%= label_tag "#{prefix}[coach_name]", 'Incoming coach' %><%= text_field_tag "#{prefix}[coach_name]", values['coach_name'] %></div>
+                <div><%= label_tag "#{prefix}[coach_name]", 'Incoming coach' %> <%= text_field_tag "#{prefix}[coach_name]", values['coach_name'] %></div>
               </td>
               <td class="p-2 space-y-2">
                 <% if candidate.previous_school.present? %><p>Stored previous school label: <%= candidate.previous_school %></p><% end %>

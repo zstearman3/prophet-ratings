@@ -120,7 +120,8 @@ preparation. The review screen is `/admin/coaching_reviews`.
    it runs. Fetch failures show on the page and preserve existing decisions/readiness.
 2. Review source incoming/former coach labels and proposed previous teams alongside
    the editable facts. Resolve destination/previous teams with the dropdowns and
-   correct coach names as needed. Source conflicts and absences remain visible.
+   correct coach names as needed. Unmatched previous-school names remain visible
+   beside their proposals. Source conflicts and absences remain visible.
    Use **Add a manual coaching candidate** for a missing move.
 3. Verify previous Team/year/role manually. Assert **Verified full season as head
    coach** and **Verified previous-season Division I participation** only with
