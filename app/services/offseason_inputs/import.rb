@@ -4,7 +4,6 @@ module OffseasonInputs
   # Explicit, preview-bound publication of evidence only. No ratings or forecasts are touched.
   class Import
     POINTERS = { 'recruiting' => 'recruiting_revision_id', 'departures' => 'departure_revision_id' }.freeze
-    LOADERS = { 'recruiting' => RecruitingBundle, 'departures' => DepartureBundle }.freeze
 
     def initialize(season:, kind:, paths:, publication:)
       @season = season
@@ -57,11 +56,11 @@ module OffseasonInputs
     end
 
     def load_payload
-      if @kind == 'recruiting' && @paths.key?(:recruiting_batch_id)
-        return Recruiting::DatabaseBundle.new(RecruitingBatch.find(@paths.fetch(:recruiting_batch_id)), @season).call
-      end
+      return Recruiting::DatabaseBundle.new(RecruitingBatch.find(@paths.fetch(:recruiting_batch_id)), @season).call if @kind == 'recruiting'
 
-      LOADERS.fetch(@kind).new(@paths, @season).call
+      raise ArgumentError, 'Unsupported offseason input kind' unless @kind == 'departures'
+
+      DepartureBundle.new(@paths, @season).call
     end
 
     def validate_publication(input_hash)
@@ -78,7 +77,7 @@ module OffseasonInputs
     def validate_fields(input_hash)
       Departures::Contract.text!(@publication.fetch('version'), 'VERSION')
       Departures::Contract.text!(@publication.fetch('reason'), 'REASON')
-      raise ArgumentError, "INPUT_HASH must pin reviewed files: #{input_hash}" unless @publication.fetch('input_hash') == input_hash
+      raise ArgumentError, "INPUT_HASH must pin reviewed evidence: #{input_hash}" unless @publication.fetch('input_hash') == input_hash
     end
 
     def validate_repeat(existing)

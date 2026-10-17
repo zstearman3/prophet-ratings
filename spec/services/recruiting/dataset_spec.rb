@@ -19,16 +19,13 @@ RSpec.describe Recruiting::Dataset do
     Recruiting::Preview.new(dataset, season).call
   end
 
-  it 'retains exact evidence and decimal points without rounding, and repeats deterministically' do
-    Dir.mktmpdir do |root|
-      path = dataset.save(root)
-      expect(dataset.save(root)).to eq(path)
-      expect(File.binread(File.join(path, 'original.json'))).to eq(bytes)
-      expect(File.binread(File.join(path, 'snapshot'))).to eq('saved source evidence')
-      expect(described_class.load(path).manifest.dig('rows', 0, 'values', 'class_points')).to eq('70.123456789123456789')
-      first_preview = preview
-      expect(preview).to eq(first_preview)
-    end
+  it 'normalizes exact decimal points and fingerprints captures deterministically without files' do
+    expect(dataset.manifest.dig('rows', 0, 'values', 'class_points')).to eq('70.123456789123456789')
+    expect(dataset.manifest).to eq(described_class.new(bytes, 'saved source evidence').manifest)
+    changed = described_class.new(bytes, 'changed evidence')
+    expect(dataset.manifest.fetch('dataset_revision')).not_to eq(changed.manifest.fetch('dataset_revision'))
+    original = preview
+    expect(preview).to eq(original)
   end
 
   it 'matches canonical schools even without aliases and writes no domain records' do
@@ -164,32 +161,5 @@ RSpec.describe Recruiting::Dataset do
     document['source_as_of_reason'] = 'Not displayed'
     document['captured_at'] = '2026-10-10'
     expect { dataset }.to raise_error(ArgumentError, /timezone/)
-  end
-
-  it 'rejects modified saved evidence and refuses to overwrite the bundle' do
-    Dir.mktmpdir do |root|
-      path = dataset.save(root)
-      File.write(File.join(path, 'snapshot'), 'changed')
-      expect { described_class.load(path) }.to raise_error(ArgumentError, /integrity/)
-      expect { dataset.save(root) }.to raise_error(ArgumentError, /integrity/)
-    end
-  end
-
-  it 'saves approval separately and rejects stale alias mappings' do
-    report = preview
-    approval = report.slice('dataset_revision', 'mapping_revision').merge('approved_by' => 'Test reviewer',
-                                                                          'approved_at' => '2026-10-10T20:00:00Z')
-    Dir.mktmpdir do |root|
-      review = Recruiting::MappingReview.new(report)
-      path = review.save(root, approval)
-      expect(review.save(root, approval)).to eq(path)
-      expect(JSON.parse(File.read(path))).to include('review_status' => 'reviewed',
-                                                     'approval' => approval.slice(
-                                                       'approved_by', 'approved_at'
-                                                     ))
-      other = create(:team)
-      create(:team_alias, team: other, source: '247sports', value: team.school)
-      expect { Recruiting::MappingReview.new(preview).approve(approval) }.to raise_error(ArgumentError, /pin/)
-    end
   end
 end

@@ -42,9 +42,8 @@ identities, invalid source values and stale reviews block publication. Partial
 coverage stays explicit and omitted/excluded teams remain unknown.
 
 Published batches are closed to further edits. Fetch and review a new batch for a
-correction; publication retains the previous revision automatically. Existing
-[file-based recruiting acquisition and approval](recruiting.md) remains available
-for advanced use and saved-HTML recovery.
+correction; publication retains the previous revision automatically. See
+[recruiting internals and recovery](recruiting.md) for source validation and failure handling.
 
 ## 2. Acquire and review drafted-player departures
 
@@ -78,30 +77,23 @@ Retain the report even on nonzero exit. Null loss means incomplete evidence, not
 verified zero. Unknown participation/global identity blocks complete accounting;
 failed sources and evidence conflicts must be resolved before input publication.
 
-## 3. Import reviewed file evidence (advanced recruiting / departures)
+## 3. Import reviewed departure evidence
 
-The recruiting admin workflow above already publishes its reviewed evidence; skip
-this step for UI-approved recruiting batches. Departures still use the file workflow.
+Recruiting is published directly from the admin review screen. The file import
+command supports departures only and requires existing Season/TeamSeasons. It
+validates saved files without network requests and publishes input revisions/profile
+pointers only. It does not publish ratings, prepare teams or activate anything.
 
-`offseason_inputs:import` requires existing Season/TeamSeasons. It validates saved
-files without network requests and publishes input revisions/profile pointers only.
-It does not publish ratings, prepare teams or activate anything.
-
-| KIND | Required source paths |
-| --- | --- |
-| `recruiting` | `DATASET_DIR`, approved mapping **report** as `REVIEW_PATH` |
-| `departures` | Original `CAPTURE_DIR`, `DATASET_PATH`, approved decisions as `REVIEW_PATH` |
-
-Example using explicit paths in the intended Rails environment:
+Use the original `CAPTURE_DIR`, `DATASET_PATH`, and approved decisions as `REVIEW_PATH`:
 
 ```bash
-bin/rails offseason_inputs:import YEAR=2027 KIND=recruiting DATASET_DIR=/path/to/dataset REVIEW_PATH=/path/to/mapping.json VERSION=review-2027-1 REASON='Initial evidence review' INPUT_HASH=inspect
+bin/rails offseason_inputs:import YEAR=2027 KIND=departures CAPTURE_DIR=/path/to/capture DATASET_PATH=/path/to/dataset.json REVIEW_PATH=/path/to/review.json VERSION=review-2027-1 REASON='Initial evidence review' INPUT_HASH=inspect
 ```
 
 The first validation reports the expected hash. Replace `INPUT_HASH=inspect` with
 that exact hash and rerun to obtain coverage and `preview_key`. Inspect source
 scope/dates, approval, excluded rows and each team's raw inputs. Apply the identical
-command with `APPLY=true PREVIEW_KEY=<reviewed-key>`. Repeat separately for departures.
+command with `APPLY=true PREVIEW_KEY=<reviewed-key>`.
 Input and model publication have distinct keys and transactions.
 
 Approved partial coverage remains explicit: missing recruiting points and incomplete

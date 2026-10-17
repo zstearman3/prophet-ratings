@@ -771,13 +771,13 @@ ledger and normalized totals are retained. Identity review is a separate immutab
 mapping revision; incomplete evidence never becomes a verified zero. These commands
 perform no database writes, data imports, scoring or scheduled scraping.
 
-## Saved recruiting evidence
+## Recruiting review
 
-`recruiting:prepare` retains immutable saved 247 Recruit Composite evidence;
-`recruiting:preview` reports conservative canonical/alias team matching and coverage,
-with optional separately pinned operator mapping approval. Neither writes domain
-records or invokes ratings. See [Saved recruiting evidence](recruiting.md) for the
-annual JSON contract, year mapping, prepare/preview commands and review workflow.
+The season admin's **Review recruiting** action fetches the prior year's 247 Recruit
+Composite rankings into database batches and normalized entries. Review mappings
+and approve there; no recruiting file import commands are provided. Failed captures
+remain inspectable and new fetches create separate batches. See
+[recruiting review](recruiting.md) for acquisition, validation and recovery details.
 
 Recruiting and coaching share `Team.matching_school_or_alias(name)`. It returns a
 chainable relation of distinct candidates from canonical school names and aliases
@@ -790,12 +790,13 @@ or uses fuzzy matching.
 Follow the [2026-to-2027 bundle checklist](offseason-inputs.md)
 for the complete acquire → identity/participation review → input import → model
 preview sequence. Acquisition/parsing and loss arithmetic are automated; approval,
-source scope and ambiguous identities require operator evidence review. Retain raw
-captures, immutable mapping/decision files and coverage reports. Missing recruiting
+source scope and ambiguous identities require operator evidence review. Recruiting
+captures and decisions are retained in database batches/revisions; retain departure
+capture files, approved decisions and coverage reports. Missing recruiting
 points or incomplete draft accounting remain unknown, including in approved partial
-inputs; never infer zero from source absence. Recruiting import uses the approved
-mapping **report**, while departure import uses the decisions file and original
-replayable capture. Each import has its own hash and guarded preview key.
+inputs; never infer zero from source absence. Approve recruiting in the admin UI;
+departure import uses the decisions file and original replayable capture. Each
+publication validates its own reviewed evidence and guarded preview key.
 
 Input imports only write reviewed revisions and profile pointers. They do not
 publish/activate a season. Revised sources/reviews need immutable successors and

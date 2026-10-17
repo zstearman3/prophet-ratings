@@ -20,9 +20,7 @@ module Recruiting
     def call
       proposal = report
       validate_review(proposal)
-      reviewed = MappingReview.new(proposal).approve(proposal.slice('dataset_revision', 'mapping_revision').merge(
-                                                       'approved_by' => batch.reviewed_by, 'approved_at' => batch.reviewed_at&.iso8601
-                                                     ))
+      reviewed = approved_report(proposal)
       { 'kind' => 'recruiting', 'dataset_hash' => batch.dataset_revision,
         'review_hash' => Departures::Contract.digest(reviewed), 'dataset' => batch.dataset.manifest.as_json,
         'review' => reviewed, 'report' => reviewed, 'evidence' => evidence, 'team_inputs' => team_inputs(proposal) }
@@ -42,6 +40,28 @@ module Recruiting
       proposal.fetch('rows').select do |row|
         row['team_id'].blank? && row.fetch('exclusions').exclude?('Excluded by manual review')
       end
+    end
+
+    def self.validate_rows(report)
+      fatal = report.fetch('rows').flat_map { |row| row.fetch('errors') + row.fetch('exclusions').grep(/Duplicate|Ambiguous/) }
+      raise ArgumentError, "Resolve recruiting conflicts: #{fatal.uniq.join('; ')}" if fatal.any?
+    end
+
+    def self.eligible_rows(report)
+      report.fetch('rows').select { |row| row.fetch('exclusions').empty? }.index_by { |row| row.fetch('team_id') }
+    end
+
+    def self.input(row)
+      points = row&.dig('values', 'class_points')
+      { 'status' => point_status(points), 'class_points' => points,
+        'units' => { 'class_points' => '247_recruit_composite_class_points' },
+        'row' => row, 'reason' => row ? 'reviewed_source_row' : 'omitted_or_unresolved_team' }
+    end
+
+    def self.point_status(points)
+      return 'unknown' unless points
+
+      BigDecimal(points).zero? ? 'verified_zero' : 'verified_points'
     end
 
     private
@@ -64,10 +84,20 @@ module Recruiting
 
     def validate_review(proposal)
       validate_batch
-      OffseasonInputs::RecruitingBundle.validate_rows(proposal)
-      return unless self.class.unresolved_rows(proposal).any?
+      validator = self.class
+      validator.validate_rows(proposal)
+      return unless validator.unresolved_rows(proposal).any?
 
       raise ArgumentError, 'Map or explicitly exclude every unresolved source row.'
+    end
+
+    def approved_report(proposal)
+      reviewer = batch.reviewed_by
+      raise ArgumentError, 'Recruiting approval requires a reviewer.' unless Extract.text?(reviewer)
+
+      approved_at = batch.reviewed_at&.iso8601
+      Extract.timestamp(approved_at)
+      proposal.merge('review_status' => 'reviewed', 'approval' => { 'approved_by' => reviewer, 'approved_at' => approved_at })
     end
 
     def evidence
@@ -76,9 +106,10 @@ module Recruiting
     end
 
     def team_inputs(proposal)
-      rows = OffseasonInputs::RecruitingBundle.eligible_rows(proposal)
+      converter = self.class
+      rows = converter.eligible_rows(proposal)
       season.team_seasons.order(:team_id).pluck(:team_id).to_h do |id|
-        [id.to_s, OffseasonInputs::RecruitingBundle.input(rows[id])]
+        [id.to_s, converter.input(rows[id])]
       end
     end
   end

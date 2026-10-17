@@ -2,11 +2,9 @@
 
 require 'rails_helper'
 require 'rake'
-require 'tmpdir'
 
 RSpec.describe OffseasonInputs::Import do
   let(:season) { create(:season, year: 2027) }
-  let(:directory) { Dir.mktmpdir('offseason-task') }
 
   around do |example|
     original_rake = Rake.application
@@ -19,7 +17,6 @@ RSpec.describe OffseasonInputs::Import do
   ensure
     Rake.application = original_rake
     ENV.replace(original_env)
-    FileUtils.remove_entry(directory)
   end
 
   def invoke
@@ -28,38 +25,41 @@ RSpec.describe OffseasonInputs::Import do
   end
 
   def prepare
-    create(:team_season, season:, team: create(:team, school: 'Test College'))
-    dataset = Recruiting::Dataset.new(Rails.root.join('spec/fixtures/recruiting/partial.json').binread, 'source')
-    path = dataset.save(directory)
-    report = Recruiting::Preview.new(dataset, season).call
-    review = report.slice('dataset_revision', 'mapping_revision').merge('approved_by' => 'Task reviewer',
-                                                                        'approved_at' => '2026-10-13T12:00:00Z')
-    review_path = Recruiting::MappingReview.new(report).save(directory, review)
-    paths = { dataset_dir: path, review_path: }
-    hash = Departures::Contract.digest(OffseasonInputs::RecruitingBundle.new(paths, season).call)
-    ENV.update('YEAR' => '2027', 'KIND' => 'recruiting', 'DATASET_DIR' => path, 'REVIEW_PATH' => review_path,
-               'VERSION' => 'review-task-1', 'REASON' => 'Reviewed annual evidence', 'INPUT_HASH' => hash)
-    described_class.new(season:, kind: 'recruiting', paths:,
-                        publication: { version: 'review-task-1', reason: 'Reviewed annual evidence',
-                                       input_hash: hash, predecessor_id: nil })
+    ENV.update('YEAR' => '2027', 'KIND' => 'departures', 'CAPTURE_DIR' => '/capture', 'DATASET_PATH' => '/capture/dataset.json',
+               'REVIEW_PATH' => '/capture/review.json', 'VERSION' => 'review-task-1',
+               'REASON' => 'Reviewed annual evidence', 'INPUT_HASH' => 'reviewed-hash')
+    report = { 'preview_key' => 'reviewed-key', 'payload' => { 'report' => {}, 'team_inputs' => {} } }
+    importer = instance_double(described_class, preview: report, call: report)
+    allow(described_class).to receive(:new).with(
+      season:, kind: 'departures',
+      paths: { capture_dir: '/capture', dataset_path: '/capture/dataset.json', review_path: '/capture/review.json' },
+      publication: { version: 'review-task-1', reason: 'Reviewed annual evidence', input_hash: 'reviewed-hash', predecessor_id: nil }
+    ).and_return(importer)
+    importer
   end
 
   it 'requires explicit existing year and fails without publication' do
+    ENV['KIND'] = 'departures'
     expect { invoke }.to raise_error(SystemExit)
-    ENV['YEAR'] = '2027'
+    ENV['YEAR'] = '2028'
     expect { invoke }.to raise_error(SystemExit)
     expect(OffseasonInputRevision.count).to eq(0)
   end
 
-  it 'prints coverage and a key without writes then applies only with that key' do
+  it 'passes departure file paths and the explicit preview key to the importer' do
     importer = prepare
-    key = importer.preview.fetch('preview_key')
     expect { invoke }.to output(/preview_key.*coverage.*team_inputs/m).to_stdout
     expect(OffseasonInputRevision.count).to eq(0)
     ENV['APPLY'] = 'true'
-    ENV['PREVIEW_KEY'] = key
+    ENV['PREVIEW_KEY'] = 'reviewed-key'
     expect { invoke }.to output(/preview_key/).to_stdout
-    expect(OffseasonInputRevision.count).to eq(1)
+    expect(importer).to have_received(:call).with(preview_key: 'reviewed-key')
     expect([PreseasonPrior.count, Prediction.count, TeamRatingSnapshot.count]).to eq([0, 0, 0])
+  end
+
+  it 'rejects recruiting file imports before requesting file paths or publication parameters' do
+    ENV.update('YEAR' => '2027', 'KIND' => 'recruiting')
+    expect { invoke }.to raise_error(SystemExit) { |error| expect(error.status).to eq(1) }
+    expect(OffseasonInputRevision.count).to eq(0)
   end
 end
