@@ -46,6 +46,7 @@ module ProphetRatings
       raise ArgumentError, "Unsupported prediction uncertainty model: #{model}" unless [nil, 'shared_pace_v1'].include?(model)
 
       validate_ratings_formula(payload)
+      FactorForecast.validate(payload)
     end
 
     def self.validate_number(payload, path)

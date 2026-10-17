@@ -22,6 +22,7 @@ module ProphetRatings
         'season' => season_inputs(season, config),
         'venue' => game.attributes.slice('venue_type', 'venue_confidence', 'venue_source', 'venue_name', 'neutral'),
         'snapshots' => snapshots.map { |snapshot| snapshot_inputs(snapshot) },
+        'factor_forecasts' => FactorForecast.capture(snapshots, config),
         'upset_modifier' => 1.0
       }
     end

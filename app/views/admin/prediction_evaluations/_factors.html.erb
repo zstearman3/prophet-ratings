@@ -1,0 +1,16 @@
+<h2 class="text-xl font-semibold">Five Factor forecasts</h2>
+<p>Each observation is one team's game. Errors use rate units (0.01 is one percentage point). The league-average forecast uses the same frozen anchors and exactly the same observations. Missing historical forecasts are excluded, never reconstructed here. These factors do not yet affect score or win-probability predictions.</p>
+<table class="w-full text-left"><thead><tr><th>Factor</th><th>Observations</th><th>MAE</th><th>RMSE</th><th>Bias</th><th>League-average MAE</th><th>League-average RMSE</th></tr></thead><tbody>
+  <% report.factor_metrics.each do |name, metrics| %>
+    <tr><th><%= name.to_s.humanize %></th><td><%= metrics[:model][:observations] %></td>
+      <% %i[mae rmse bias].each do |key| %><td><%= metrics[:model][key]&.round(4) || 'N/A' %></td><% end %>
+      <% %i[mae rmse].each do |key| %><td><%= metrics[:baseline][key]&.round(4) || 'N/A' %></td><% end %>
+    </tr>
+  <% end %>
+</tbody></table>
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+  <% report.factor_observations.each do |name, observations| %>
+    <% next if observations.empty? %>
+    <div><h3><%= name.to_s.humanize %>: error vs forecast</h3><%= scatter_chart observations.map { |row| [row[:predicted], row[:error]] }, xtitle: 'Predicted rate', ytitle: 'Predicted − actual', height: '280px' %></div>
+  <% end %>
+</div>

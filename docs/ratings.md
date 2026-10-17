@@ -1031,3 +1031,102 @@ Build the development image with `bin/compose build web` first if needed. The
 normal RSpec suite covers formula/version behavior and solver-output validation;
 the separate Docker check exercises actual NumPy, dense-reference equivalence,
 invalid inputs, singular failures and the actual Ruby subprocess boundary.
+
+## Admin prediction evaluation
+
+Open **Admin → Seasons → a season → Evaluate predictions**, or
+`/admin/prediction_evaluation`. Both the HTML report and team CSV require an
+administrator login. Select a season, model, and optional inclusive Eastern
+start/end game dates. Blank dates use the selected season's boundaries. This is
+a read-only request over stored forecasts/results: it never runs the solver,
+generates forecasts, changes the active model, or starts a backfill.
+
+The default **Verified pregame** mode selects one eligible issuance per game/model.
+**Legacy exploration** and **Postgame reconstructions** must be selected explicitly;
+they never mix with verified forecasts. Exploratory modes select the latest saved
+revision per game/model and are not evidence of live predictive performance. The
+report lists available records by provenance, selected forecasts, usable games,
+and invalid exclusions. Old databases containing only `legacy_unverified`
+forecasts will correctly show no eligible results in the default mode.
+
+Residuals are consistently **predicted minus actual**. Actual pace uses
+`Game#pace` (possessions per 40 minutes), including overtime normalization. Score,
+margin and total errors use final scores, including overtime. Residuals are
+recomputed from saved predictions and current finalized results rather than
+trusting cached error columns. Later box-score corrections can change a report;
+this page does not archive an immutable evaluation dataset.
+
+The scorecard reuses the preseason comparison metrics: margin/total MAE, Brier
+score, log loss, and calibration. It adds per-outcome MAE, RMSE, bias, sample SD,
+and observation counts. Invalid/missing scores or probabilities and tied outcomes
+exclude a game from the scorecard. Missing pace/efficiency values exclude only
+those measurements; their individual counts remain visible. Empty metrics are
+unknown, not zero; sample SD requires two observations. A probability of zero
+assigned to the actual winner yields `Infinity` log loss, not a clipped score.
+
+Charts include predicted/actual pace, pace error versus predicted pace, error
+histograms, standardized margin errors, and calibration against the ideal line's
+reference points. Calibration uses each bin's actual mean forecast probability,
+retains sparse bins, and lists counts. Standardized errors require frozen forecast
+context and valid positive predicted SD; legacy uncertainty is omitted. Team pace
+errors use the same sign for both participants, grouped by real team IDs. This
+is descriptive attribution, not an estimate of which team caused the pace error.
+
+An optional comparison model is evaluated on the intersection of valid games in
+both models. The comparison displays both scorecards on that common sample;
+it does not compare disjoint schedules or claim statistical significance. This
+supports future baseline-versus-style comparisons once both variants have stored
+forecasts. It does not add style to predictions, tune coefficients, or replace an
+untouched chronological evaluation period. Charts below the comparison remain
+explicitly the baseline's full selected sample.
+
+The admin page uses the existing Chartkick/Chart.js assets, with no Gruff or
+ImageMagick requirement. Offline `PredictionEvaluator#generate_pace_diagnostics`
+and `#generate_efficiency_diagnostics` remain available with the optional charts
+bundle. Both use the shared report calculations and accept `directory:` to avoid
+overwriting another run's files. Empty chart series produce no PNG; choose a fresh
+directory to avoid confusing earlier exports with an empty run.
+
+### Versioned Five Factor forecasts
+
+The authored `v1.10-factor-diagnostics` bundle adds `factors` settings for each
+of the five existing factor definitions. Each entry specifies `ridge_alpha`
+and `anchor_weight` for that factor's least-squares fit, plus `offense_weight`
+and `defense_weight` (0..1) for forecast dampening. Defaults preserve the current
+fit (0.001 ridge, 0.05 anchor) and use undampened forecasts (both weights 1).
+A zero forecast weight removes that side's deviation from the league mean.
+Legacy bundles without `factors` retain their global ridge/anchor behavior and
+produce no factor forecasts. Publishing a new bundle does not activate it;
+normal model publication/activation and snapshot generation are still required.
+
+Snapshot JSON now captures each factor's season anchor, using the same average
+of participating team-season raw values as the solver. Forecasts require finite
+ratings and anchors for both teams; missing factors are omitted independently.
+For different snapshot dates, each team's rating is centered on its own stored
+anchor and the forecast uses the mean of those two anchors:
+
+```
+expected = mean(home_anchor, away_anchor)
+         + offense_weight * (offense_rating - offense_anchor)
+         + defense_weight * (opponent_allowed_rating - opponent_anchor)
+```
+
+Defensive rebound rate is complemented to opponent offensive rebound rate before
+this calculation. Predictions are not clipped: eFG and free-throw rate need not
+be bounded by 1. The existing three-point proficiency formula stays unchanged.
+Equal game observation weighting and the existing shared recency schedule remain
+in effect; opportunity-weighted fits, separate offensive/defensive ridge
+penalties, alternative solvers, and alternate composite definitions are future
+experiments, not options in this increment.
+
+Issued factor forecasts, numerical inputs and league-average forecasts are stored
+in the immutable prediction `calculation_context.factor_forecasts`; the model
+configuration already freezes their weights. No schema migration is required.
+Scores and win probabilities still use efficiency/pace only. The admin factor
+scorecard shows counts, MAE, RMSE, bias and error-versus-forecast plots, alongside
+a league-average forecast scored on identical observations. Errors are computed
+on demand from persisted forecasts and current final results, not cached in new
+mutable error columns. Existing historical forecasts are never filled with
+hindsight values. A factor's usefulness alone does not establish incremental
+value for game predictions: that requires future baseline-versus-style forecasts
+on a common, untouched chronological evaluation sample.

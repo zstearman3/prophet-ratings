@@ -6,7 +6,7 @@ RSpec.describe ProphetRatings::AdjustedStatCalculator do
   let(:season) { create(:season, :current) }
   let(:version) { RatingsConfigVersion.publish! }
   let(:legacy) do
-    payload = RatingsConfigVersion.authored_config.except(:ratings_formula)
+    payload = RatingsConfigVersion.authored_config.except(:ratings_formula, :factors)
     payload[:bundle_name] = 'legacy-ratings-test'
     RatingsConfigVersion.publish!(payload)
   end

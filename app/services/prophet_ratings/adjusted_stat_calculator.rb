@@ -61,7 +61,8 @@ module ProphetRatings
         )
       end
 
-      x_values = StatisticsUtils.solve_least_squares_with_python(rows, b, weights:, ridge_alpha: config.dig(:ridge, :alpha))
+      ridge_alpha = factor_setting(:ridge_alpha, config.dig(:ridge, :alpha))
+      x_values = StatisticsUtils.solve_least_squares_with_python(rows, b, weights:, ridge_alpha:)
 
       team_season_map = TeamSeason.where(season:, team_id: team_ids).index_by(&:team_id)
       team_ids.each_with_index do |team_id, idx|
@@ -89,6 +90,10 @@ module ProphetRatings
 
     def config
       @ratings_config_version.settings
+    end
+
+    def factor_setting(name, fallback)
+      config.dig(:factors, raw_stat, name) || fallback
     end
 
     def average_stat_for_season
@@ -233,7 +238,7 @@ module ProphetRatings
         end
       end
 
-      anchor_weight = config.dig(:anchor, :weight).to_f
+      anchor_weight = factor_setting(:anchor_weight, config.dig(:anchor, :weight)).to_f
       anchor_row = Array.new(2 * num_teams, 0.0)
       (0...num_teams).each { |i| anchor_row[i] = 1.0 }
       rows << anchor_row
