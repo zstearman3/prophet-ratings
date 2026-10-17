@@ -124,6 +124,28 @@ RSpec.describe 'Admin coaching review workflow', type: :request do
                                      'Absent from latest successful source fetch', 'Source incoming coach differs')
   end
 
+  it 'shows an unmatched previous-school label without assigning a team' do
+    candidate.update!(discovery_school: 'review university', previous_school: "St Mary's")
+    get path
+    proposal = response.parsed_body.css('p').find { |paragraph| paragraph.text.include?('Proposed previous team:') }
+    expect(proposal.text.squish).to eq("Proposed previous team: St Mary's (not automatically matched)")
+    expect(candidate.reload.previous_team_id).to be_nil
+  end
+
+  it 'shows the matched previous team when a canonical identity is available' do
+    candidate.update!(discovery_school: 'review university', previous_school: 'Source alias', discovery_previous_team_id: team.id)
+    get path
+    proposal = response.parsed_body.css('p').find { |paragraph| paragraph.text.include?('Proposed previous team:') }
+    expect(proposal.text.squish).to eq('Proposed previous team: Review University')
+  end
+
+  it 'distinguishes absent previous-school evidence from an unmatched label' do
+    candidate.update!(discovery_school: 'review university')
+    get path
+    proposal = response.parsed_body.css('p').find { |paragraph| paragraph.text.include?('Proposed previous team:') }
+    expect(proposal.text.squish).to eq('Proposed previous team: Not identified from source')
+  end
+
   it 'requires admin login for every screen and mutation' do
     sign_out :user
     requests = [[:get, '/admin/coaching_reviews'], [:get, path], [:patch, path], [:post, "#{path}/discover"], [:post, "#{path}/candidate"]]
