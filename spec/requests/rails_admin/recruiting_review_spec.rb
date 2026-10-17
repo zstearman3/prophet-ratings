@@ -60,6 +60,19 @@ RSpec.describe 'Admin recruiting dataset review', type: :request do
     expect(response.body).to include('background worker', 'Refresh status')
   end
 
+  it 'renders a failed report once without retrying it inside the error handler' do
+    batch
+    review = instance_double(Recruiting::BatchReview)
+    allow(Recruiting::BatchReview).to receive(:new).and_return(review)
+    allow(review).to receive(:report).and_raise(ActiveRecord::StatementInvalid, 'Report unavailable')
+
+    get batch_path
+
+    expect(response).to have_http_status(:unprocessable_content)
+    expect(response.body).to include('Report unavailable')
+    expect(review).to have_received(:report).once
+  end
+
   it 'saves a mapping override without publishing, then approves from the rendered form button' do
     alternative = create(:team)
     values = review_values

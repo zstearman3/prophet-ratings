@@ -57,7 +57,7 @@ module Admin
       @review_error = message
       return render plain: message, status: :unprocessable_content unless batch
 
-      show
+      show unless action_name == 'show'
       render :show, status: :unprocessable_content
     end
   end

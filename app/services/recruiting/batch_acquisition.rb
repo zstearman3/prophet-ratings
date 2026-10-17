@@ -12,13 +12,20 @@ module Recruiting
 
       acquire
     rescue StandardError => error
-      batch.update!(status: 'failed', failure_message: error.message)
-      raise
+      record_failure(error)
     end
 
     private
 
     attr_reader :batch
+
+    def record_failure(error)
+      message = error.message
+      batch.update!(status: 'failed', failure_message: message)
+      Rails.logger.error("Recruiting batch #{batch.id} failed: #{error.class}: #{message}")
+    rescue StandardError
+      raise error
+    end
 
     def acquire
       batch.update!(status: 'fetching')

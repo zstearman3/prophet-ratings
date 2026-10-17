@@ -53,4 +53,28 @@ RSpec.describe Recruiting::BatchAcquisition do
     AcquireRecruitingBatchJob.perform_now(batch.id)
     expect(HTTParty).to have_received(:get).twice
   end
+
+  it 'records and logs an unexpected acquisition failure without scheduling a futile job retry' do
+    allow(Recruiting::Acquisition).to receive(:new).and_raise(IOError, 'Source unavailable')
+    allow(Rails.logger).to receive(:error)
+    job = AcquireRecruitingBatchJob.new(batch.id)
+    allow(job).to receive(:retry_job)
+
+    job.perform_now
+
+    expect(batch.reload).to have_attributes(status: 'failed', failure_message: 'Source unavailable')
+    expect(Rails.logger).to have_received(:error).with("Recruiting batch #{batch.id} failed: IOError: Source unavailable")
+    expect(job).not_to have_received(:retry_job)
+  end
+
+  it 'preserves the original acquisition exception when recording the failure also fails' do
+    error = IOError.new('Source unavailable')
+    allow(Recruiting::Acquisition).to receive(:new).and_raise(error)
+    allow(batch).to receive(:update!).and_call_original
+    allow(batch).to receive(:update!).with(status: 'failed', failure_message: error.message)
+                                     .and_raise(ActiveRecord::StatementInvalid, 'Database unavailable')
+
+    expect { described_class.new(batch).call }.to(raise_error { |raised| expect(raised).to equal(error) })
+    expect(batch.reload.status).to eq('fetching')
+  end
 end
