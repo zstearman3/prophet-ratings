@@ -70,3 +70,10 @@ Re-fetch before updates. Prefer targeted content edits or one appended handoff s
 After any write, fetch the page and verify the parent, intended properties, and content. On a timeout or ambiguous result, inspect the existing page or search for the creation before retrying; do not blindly duplicate tickets or notes. If the result remains uncertain, stop writes and report it. If a tool is unavailable, use other available read tools where sufficient and report the missing capability; do not repeatedly call a tool reported as not found.
 
 If Notion is unavailable, keep the draft or implementation handoff in the conversation and state that it has not been saved. Do not claim a ticket was created, synchronized, or moved to another status without verification.
+
+## Release notes
+
+Include the Work Item page URL in its PR description. [`bin/release`](releases.md)
+uses those explicit links to enrich merged PRs with task titles and current Status.
+It includes unlinked changes, reads Notion only, and never marks work Done. Terminal
+API access requires its own `NOTION_TOKEN`; the Codex connector is separate.

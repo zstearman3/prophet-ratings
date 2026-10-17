@@ -121,6 +121,12 @@ the normal tracked `db/schema.rb`, so automatic migrations no longer hide schema
 updates.
 Review the diff before committing; Rails upgrades can reorder the dump as well.
 
+## Releases
+
+Use [`bin/release`](releases.md) to preview release notes and prepare a dated tag
+and draft GitHub release from `development`. Promotion to `main` remains separate
+and triggers deployment.
+
 ## Working on migrations
 
 `development` is this project's integration branch; branch features from it.

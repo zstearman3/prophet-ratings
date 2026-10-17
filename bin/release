@@ -1,0 +1,25 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require 'optparse'
+require_relative '../lib/release_tool/draft'
+
+options = { dry_run: false, update: false, date: Date.today }
+parser = OptionParser.new do |flags|
+  flags.banner = 'Usage: bin/release [--dry-run] [--update [vYYYY.MM.DD[.NN]]]'
+  flags.on('--dry-run', 'Print release notes without changing tags or GitHub releases') { options[:dry_run] = true }
+  flags.on('--update [TAG]', 'Refresh only a draft release and its tag (latest today if TAG omitted)') do |tag|
+    options.merge!(update: true, tag:)
+  end
+  flags.on('-h', '--help', 'Show usage') { puts flags; exit }
+end
+
+begin
+  parser.parse!(ARGV)
+  raise OptionParser::InvalidArgument, ARGV.join(' ') unless ARGV.empty?
+
+  Dir.chdir(File.expand_path('..', __dir__)) { ReleaseTool::Draft.new(options).call }
+rescue ReleaseTool::Error, OptionParser::ParseError, KeyError => error
+  warn "Release preparation failed: #{error.message}"
+  exit 1
+end
