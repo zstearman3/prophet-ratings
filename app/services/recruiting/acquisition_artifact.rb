@@ -26,6 +26,21 @@ module Recruiting
       JSON.pretty_generate('pages' => @source.pages)
     end
 
+    def database_attributes
+      document = extract
+      original = "#{JSON.pretty_generate(document)}\n"
+      captured = snapshot
+      database_metadata(document).merge(extract_bytes: original, snapshot_bytes: captured,
+                                        dataset_revision: database_revision(original, captured))
+    end
+
+    def database_metadata(document)
+      status = @source.status
+      { status: status == 'ok' ? 'ready' : 'failed', source_status: status,
+        failure_message: @source.failure&.to_json, coverage_note: document.fetch('coverage_note'),
+        page_count: @source.pages.size, next_url: @source.next_url }
+    end
+
     def save(root)
       bytes = "#{JSON.pretty_generate(extract)}\n"
       return Dataset.new(bytes, snapshot).save(root) if @source.status == 'ok'
@@ -34,6 +49,10 @@ module Recruiting
     end
 
     private
+
+    def database_revision(original, captured)
+      Dataset.new(original, captured).manifest.fetch('dataset_revision') if @source.status == 'ok'
+    end
 
     def save_failure(root, bytes)
       directory = File.join(root, "failed-#{Digest::SHA256.hexdigest("#{bytes}:#{snapshot}")}")

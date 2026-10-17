@@ -46,6 +46,11 @@ The Makefile remains as a compatibility layer: `make up` means
 `bin/dev --detach`, `make down` means `bin/stop`, and `make test` means
 `bin/test`. Use `make help` for the remaining aliases.
 
+The recruiting review screen queues fetches through GoodJob. Run the worker along
+with the web server (`bin/dev` starts both); a queued batch will not fetch while
+the worker is stopped. After updating RailsAdmin action registrations, restart
+`web` (and restart `worker` for changed background job code).
+
 Detached development keeps logs in Docker. Run `bin/compose logs --tail=100 web`
 for recent server requests/errors, or add `-f` to follow them live. Ctrl-C exits
 the log viewer without stopping services. `bin/compose ps -a` also shows exited

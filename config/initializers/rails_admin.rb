@@ -2,10 +2,12 @@
 
 require Rails.root.join('lib/rails_admin/config/actions/new_team_conference')
 require Rails.root.join('lib/rails_admin/config/actions/review_memberships')
+require Rails.root.join('lib/rails_admin/config/actions/review_recruiting')
 
 # rubocop:disable Metrics/BlockLength
 RailsAdmin.config do |config|
   config.asset_source = :sprockets
+  config.excluded_models += %w[RecruitingBatch RecruitingEntry]
 
   ### Popular gems integration
 
@@ -201,6 +203,7 @@ RailsAdmin.config do |config|
     end
     new_team_conference
     review_memberships
+    review_recruiting
     export
     bulk_delete do
       except ['TeamConference']

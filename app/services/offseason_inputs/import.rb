@@ -27,6 +27,10 @@ module OffseasonInputs
       end
     end
 
+    def apply_preview
+      call(preview_key: preview.fetch('preview_key'))
+    end
+
     def self.validate_preview(report, key)
       Departures::Contract.check!(report.fetch('preview_key') == key, 'Inputs or profiles changed; review a fresh preview')
     end
@@ -44,12 +48,20 @@ module OffseasonInputs
     private
 
     def build_preview
-      payload = LOADERS.fetch(@kind).new(@paths, @season).call
+      payload = load_payload
       input_hash = Departures::Contract.digest(payload)
       validate_publication(input_hash)
       report = { 'season_id' => @season.id, 'target_year' => @season.year, 'kind' => @kind, 'publication' => @publication,
                  'input_hash' => input_hash, 'payload' => payload, 'profiles_before' => profiles_before }
       report.merge('preview_key' => Departures::Contract.digest(report))
+    end
+
+    def load_payload
+      if @kind == 'recruiting' && @paths.key?(:recruiting_batch_id)
+        return Recruiting::DatabaseBundle.new(RecruitingBatch.find(@paths.fetch(:recruiting_batch_id)), @season).call
+      end
+
+      LOADERS.fetch(@kind).new(@paths, @season).call
     end
 
     def validate_publication(input_hash)

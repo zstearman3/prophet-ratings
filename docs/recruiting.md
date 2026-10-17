@@ -1,10 +1,18 @@
 # Saved recruiting evidence
 
+For the normal human workflow, open **RailsAdmin → Seasons → target season → Review
+recruiting**. Fetching stores `RecruitingBatch`/`RecruitingEntry` records directly;
+review team mappings and approve from the table. See [annual input review](offseason-inputs.md#1-acquire-and-approve-recruiting).
+The UI retains exact source bytes internally and publishes the same immutable input
+revision contract without operator-authored JSON. The file workflow below remains
+available for advanced import/replay and saved-HTML recovery.
+
+
 This adapter accepts reviewed saved UTF-8 JSON for **247 men's basketball Recruit
 Composite, all conferences**. Transfer/Overall are unsupported. The explicit acquisition task can fetch public source pages. Preparation and
 preview never fetch network data, create teams/aliases, write offseason profiles,
 or run ratings.
-Profile persistence and scoring are separate work. Rank is audit evidence, never
+The database review UI publishes profile revision pointers; scoring remains separate. Rank is audit evidence, never
 an invented score. Raw class points survive future scoring-curve changes.
 
 Recruit year Y targets the stored ending-year Season.year Y+1 (2026 recruits

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_16_230000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_17_000000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -329,6 +329,48 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_16_230000) do
     t.index ["name"], name: "index_ratings_config_versions_on_name", unique: true
   end
 
+  create_table "recruiting_batches", force: :cascade do |t|
+    t.text "coverage_note"
+    t.datetime "created_at", null: false
+    t.string "dataset_revision"
+    t.text "extract_bytes"
+    t.text "failure_message"
+    t.text "next_url"
+    t.integer "page_count", default: 0, null: false
+    t.datetime "reviewed_at"
+    t.string "reviewed_by"
+    t.bigint "revision_id"
+    t.bigint "season_id", null: false
+    t.text "snapshot_bytes"
+    t.string "source_status"
+    t.integer "source_year", null: false
+    t.string "status", default: "queued", null: false
+    t.datetime "updated_at", null: false
+    t.index ["revision_id"], name: "index_recruiting_batches_on_revision_id"
+    t.index ["season_id"], name: "index_recruiting_batches_on_season_id"
+  end
+
+  create_table "recruiting_entries", force: :cascade do |t|
+    t.decimal "average_rating"
+    t.decimal "class_points"
+    t.decimal "commit_count"
+    t.datetime "created_at", null: false
+    t.boolean "excluded", default: false, null: false
+    t.string "provider_team_id"
+    t.bigint "recruiting_batch_id", null: false
+    t.integer "row_number", null: false
+    t.jsonb "source_errors", default: [], null: false
+    t.string "source_label"
+    t.decimal "source_rank"
+    t.jsonb "source_row"
+    t.text "source_url"
+    t.bigint "team_id"
+    t.datetime "updated_at", null: false
+    t.index ["recruiting_batch_id", "row_number"], name: "index_recruiting_entries_on_recruiting_batch_id_and_row_number", unique: true
+    t.index ["recruiting_batch_id"], name: "index_recruiting_entries_on_recruiting_batch_id"
+    t.index ["team_id"], name: "index_recruiting_entries_on_team_id"
+  end
+
   create_table "seasons", force: :cascade do |t|
     t.decimal "average_efficiency", precision: 6, scale: 3
     t.decimal "average_pace", precision: 6, scale: 3
@@ -610,6 +652,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_16_230000) do
   add_foreign_key "predictions", "team_rating_snapshots", column: "home_team_snapshot_id"
   add_foreign_key "preseason_priors", "ratings_config_versions"
   add_foreign_key "preseason_priors", "team_seasons"
+  add_foreign_key "recruiting_batches", "offseason_input_revisions", column: "revision_id"
+  add_foreign_key "recruiting_batches", "seasons"
+  add_foreign_key "recruiting_entries", "recruiting_batches"
+  add_foreign_key "recruiting_entries", "teams"
   add_foreign_key "seasons", "ratings_config_versions", column: "preseason_revision_id"
   add_foreign_key "team_aliases", "teams"
   add_foreign_key "team_conferences", "conferences"
