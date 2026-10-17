@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module Recruiting
-  # Successful acquisition uses immutable datasets; failed responses remain auditable.
+  # Converts source captures into retained database attributes, including failed responses.
   class AcquisitionArtifact
     def initialize(source)
       @source = source
@@ -14,7 +14,7 @@ module Recruiting
         'provider' => Extract::SOURCE, 'conference_scope' => 'all', 'source_status' => @source.status,
         'source_url' => HtmlPage.source_url(@source.year), 'source_as_of' => nil,
         'source_as_of_reason' => 'Displayed source update text retained per page; timezone not independently verified',
-        'snapshot_kind' => 'raw_html_bundle', 'snapshot_location' => 'snapshot (JSON with base64 exact page bytes)',
+        'snapshot_kind' => 'raw_html_bundle', 'snapshot_location' => 'RecruitingBatch.snapshot_bytes (base64 exact page bytes)',
         'extraction_version' => Extract::VERSION, 'html_parser_version' => 1,
         'coverage_note' => "#{pages.size} pages captured, #{rows.size} rows; next page: #{@source.next_url || 'none advertised'}; " \
                            'annual completeness not independently verified',
@@ -41,25 +41,10 @@ module Recruiting
         page_count: @source.pages.size, next_url: @source.next_url }
     end
 
-    def save(root)
-      bytes = "#{JSON.pretty_generate(extract)}\n"
-      return Dataset.new(bytes, snapshot).save(root) if @source.status == 'ok'
-
-      save_failure(root, bytes)
-    end
-
     private
 
     def database_revision(original, captured)
       Dataset.new(original, captured).manifest.fetch('dataset_revision') if @source.status == 'ok'
-    end
-
-    def save_failure(root, bytes)
-      directory = File.join(root, "failed-#{Digest::SHA256.hexdigest("#{bytes}:#{snapshot}")}")
-      FileUtils.mkdir_p(directory)
-      MappingReview.write_exclusive(File.join(directory, 'original.json'), bytes)
-      MappingReview.write_exclusive(File.join(directory, 'snapshot'), snapshot)
-      directory
     end
   end
 end

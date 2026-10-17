@@ -1,31 +1,32 @@
 # frozen_string_literal: true
 
 require 'rails_helper'
-require 'tmpdir'
 
 RSpec.describe OffseasonInputs::Import do
   let(:season) { create(:season, year: 2027) }
   let!(:membership) { create(:team_season, season:, team: create(:team, school: 'Test College')) }
   let!(:other) { create(:team_season, season:) }
   let(:document) { JSON.parse(Rails.root.join('spec/fixtures/recruiting/partial.json').read) }
-  let(:directory) { Dir.mktmpdir('offseason-inputs') }
-  let(:paths) { { dataset_dir: dataset_dir, review_path: File.join(directory, 'review.json') } }
-  let(:dataset_dir) { Recruiting::Dataset.new(JSON.generate(document), 'exact saved bytes').save(directory) }
-  let(:payload) { OffseasonInputs::RecruitingBundle.new(paths, season).call }
+  let(:batch) { capture }
+  let(:paths) { { recruiting_batch_id: batch.id } }
+  let(:payload) { Recruiting::DatabaseBundle.new(RecruitingBatch.find(paths.fetch(:recruiting_batch_id)), season).call }
   let(:publication) do
     { version: 'reviewed-1', reason: 'Initial evidence review', predecessor_id: nil,
       input_hash: Departures::Contract.digest(payload) }
   end
   let(:importer) { described_class.new(season:, kind: 'recruiting', paths:, publication:) }
 
-  before { approve }
-  after { FileUtils.remove_entry(directory) }
-
-  def approve
-    report = Recruiting::Preview.new(Recruiting::Dataset.load(dataset_dir), season).call
-    document = report.slice('dataset_revision', 'mapping_revision').merge('approved_by' => 'Reviewer',
-                                                                          'approved_at' => '2026-10-13T12:00:00Z')
-    File.write(paths.fetch(:review_path), JSON.generate(Recruiting::MappingReview.new(report).approve(document)))
+  def capture
+    bytes = JSON.generate(document)
+    dataset = Recruiting::Dataset.new(bytes, 'exact saved bytes')
+    RecruitingBatch.create!(season:, source_year: 2026, status: 'ready', source_status: 'ok',
+                            extract_bytes: bytes, snapshot_bytes: 'exact saved bytes',
+                            dataset_revision: dataset.manifest.fetch('dataset_revision'),
+                            reviewed_by: 'Reviewer', reviewed_at: '2026-10-13T12:00:00Z').tap do |record|
+      Recruiting::Preview.new(dataset, season).call.fetch('rows').each do |row|
+        record.entries.create!(RecruitingEntry.source_attributes(row))
+      end
+    end
   end
 
   def apply
@@ -45,33 +46,28 @@ RSpec.describe OffseasonInputs::Import do
 
   it 'distinguishes reviewed explicit zero from unknown missing points' do
     document['rows'].first['class_points'] = 0
-    fresh = Recruiting::Dataset.new(JSON.generate(document), 'exact saved bytes').save(directory)
-    paths[:dataset_dir] = fresh
-    allow(self).to receive(:dataset_dir).and_return(fresh)
-    approve
     expect(payload.dig('team_inputs', membership.team_id.to_s, 'status')).to eq('verified_zero')
     document['rows'].first.delete('class_points')
-    fresh = Recruiting::Dataset.new(JSON.generate(document), 'exact saved bytes').save(directory)
-    paths[:dataset_dir] = fresh
-    allow(self).to receive(:dataset_dir).and_return(fresh)
-    approve
-    expect(OffseasonInputs::RecruitingBundle.new(paths, season).call.dig('team_inputs', membership.team_id.to_s, 'status')).to eq('unknown')
+    paths[:recruiting_batch_id] = capture.id
+    expect(Recruiting::DatabaseBundle.new(RecruitingBatch.find(paths.fetch(:recruiting_batch_id)), season).call
+                                   .dig('team_inputs', membership.team_id.to_s, 'status')).to eq('unknown')
   end
 
-  it 'accepts JSON decimal numbers as well as displayed decimal strings after mapping-file serialization' do
+  it 'accepts numeric source values as well as displayed decimal strings' do
     document['rows'].first['class_points'] = 65.25
-    fresh = Recruiting::Dataset.new(JSON.generate(document), 'exact saved bytes').save(directory)
-    paths[:dataset_dir] = fresh
-    allow(self).to receive(:dataset_dir).and_return(fresh)
-    approve
     apply
     expect(OffseasonInputRevision.last.team_input(membership.team_id).fetch('class_points')).to eq('65.25')
   end
 
-  it 'rejects source bytes changed between validation and retention' do
-    bundle = OffseasonInputs::RecruitingBundle.new(paths, season)
-    File.write(File.join(dataset_dir, 'snapshot'), 'changed after validation')
-    expect { bundle.call }.to raise_error(ArgumentError, /evidence changed/)
+  it 'rejects changed database evidence before publication' do
+    batch.update!(snapshot_bytes: 'changed after capture')
+    expect { importer.preview }.to raise_error(ArgumentError, /evidence changed/)
+    expect(OffseasonInputRevision.count).to eq(0)
+  end
+
+  it 'requires a database batch rather than recruiting file paths' do
+    file_import = described_class.new(season:, kind: 'recruiting', paths: {}, publication:)
+    expect { file_import.preview }.to raise_error(KeyError, /recruiting_batch_id/)
     expect(OffseasonInputRevision.count).to eq(0)
   end
 
@@ -91,34 +87,20 @@ RSpec.describe OffseasonInputs::Import do
     expect(OffseasonInputRevision.count).to eq(0)
   end
 
-  it 'rejects absent, stale or tampered approval and conflicting mappings' do
-    review = JSON.parse(File.read(paths.fetch(:review_path)))
-    review['approval']['approved_by'] = ''
-    File.write(paths.fetch(:review_path), JSON.generate(review))
-    expect { importer.preview }.to raise_error(ArgumentError, /approved_by/)
-    approve
-    review = JSON.parse(File.read(paths.fetch(:review_path)))
-    review['rows'].first['team_id'] = other.team_id
-    File.write(paths.fetch(:review_path), JSON.generate(review))
-    expect { importer.preview }.to raise_error(ArgumentError, /report changed/)
-    approve
-    create(:team_alias, team: other.team, source: '247sports', value: 'Test College')
-    expect { importer.preview }.to raise_error(ArgumentError, /Ambiguous/)
+  it 'requires stored reviewer and approval time' do
+    batch.update!(reviewed_by: '')
+    expect { importer.preview }.to raise_error(ArgumentError, /reviewer/)
+    batch.update!(reviewed_by: 'Reviewer', reviewed_at: nil)
+    expect { importer.preview }.to raise_error(ArgumentError, /timestamp/)
+    expect(OffseasonInputRevision.count).to eq(0)
   end
 
   it 'rejects malformed numeric and duplicate rows before any writes' do
     document['rows'] << document['rows'].first
-    fresh = Recruiting::Dataset.new(JSON.generate(document), 'exact saved bytes').save(directory)
-    paths[:dataset_dir] = fresh
-    allow(self).to receive(:dataset_dir).and_return(fresh)
-    approve
     expect { importer.preview }.to raise_error(ArgumentError, /Duplicate/)
     document['rows'].pop
     document['rows'].first['class_points'] = '-1'
-    fresh = Recruiting::Dataset.new(JSON.generate(document), 'exact saved bytes').save(directory)
-    paths[:dataset_dir] = fresh
-    allow(self).to receive(:dataset_dir).and_return(fresh)
-    approve
+    paths[:recruiting_batch_id] = capture.id
     expect { importer.preview }.to raise_error(ArgumentError, /finite nonnegative/)
     expect(OffseasonInputRevision.count).to eq(0)
   end
@@ -127,10 +109,8 @@ RSpec.describe OffseasonInputs::Import do
     apply
     original = OffseasonInputRevision.last
     old_importer = importer
-    review = JSON.parse(File.read(paths.fetch(:review_path)))
-    review['approval']['approved_at'] = '2026-10-14T12:00:00Z'
-    File.write(paths.fetch(:review_path), JSON.generate(review))
-    changed = OffseasonInputs::RecruitingBundle.new(paths, season).call
+    batch.update!(reviewed_at: '2026-10-14T12:00:00Z')
+    changed = Recruiting::DatabaseBundle.new(batch, season).call
     successor = publication.merge(version: 'reviewed-2', input_hash: Departures::Contract.digest(changed),
                                   predecessor_id: original.id, reason: 'Second evidence approval')
     described_class.new(season:, kind: 'recruiting', paths:, publication: successor)
@@ -139,8 +119,7 @@ RSpec.describe OffseasonInputs::Import do
     new_importer = described_class.new(season:, kind: 'recruiting', paths:, publication: successor)
     new_importer.call(preview_key: new_importer.preview.fetch('preview_key'))
     current = membership.reload.team_offseason_profile.recruiting_revision_id
-    review['approval']['approved_at'] = '2026-10-13T12:00:00Z'
-    File.write(paths.fetch(:review_path), JSON.generate(review))
+    batch.update!(reviewed_at: '2026-10-13T12:00:00Z')
     old_importer.call(preview_key: old_importer.preview.fetch('preview_key'))
     expect(membership.reload.team_offseason_profile.recruiting_revision_id).to eq(current)
     expect(original.reload.payload).to eq(payload)

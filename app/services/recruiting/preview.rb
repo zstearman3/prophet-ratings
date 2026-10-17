@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module Recruiting
-  # Exact provider-scoped matching is read-only and excludes all duplicate occurrences.
+  # Exact canonical/alias matching is read-only and excludes all duplicate occurrences.
   class Preview
     def initialize(dataset, season, **options)
       @dataset = dataset
@@ -28,7 +28,7 @@ module Recruiting
     end
 
     def self.match_errors(candidates)
-      return ['Unmatched team: review canonical school/source-scoped alias'] if candidates.empty?
+      return ['Unmatched team: review canonical school or stored alias'] if candidates.empty?
       return ['Ambiguous team: review canonical/alias conflict'] if candidates.many?
 
       []
@@ -37,9 +37,7 @@ module Recruiting
     def self.candidate_ids(label)
       return [] unless Extract.text?(label)
 
-      canonical = Team.where(school: label).ids
-      aliases = TeamAlias.where(source: Extract::SOURCE, value: label).pluck(:team_id)
-      (canonical | aliases).sort
+      Team.matching_school_or_alias(label).ids
     end
 
     def self.identity(row, key)

@@ -16,30 +16,24 @@ RSpec.describe Recruiting::Acquisition do
 
   before { allow(described_class).to receive(:sleep) }
 
-  def saved_page(content, page_url)
-    Tempfile.create(['recruiting-page', '.html']) do |file|
-      file.write(content)
-      file.flush
-      source.saved([{ 'path' => file.path, 'url' => page_url }])
-    end
+  def fetch_page(content)
+    allow(HTTParty).to receive(:get).and_return(double(code: 200, body: content))
+    source.fetch(1)
   end
 
   it 'extracts observed markup and preserves exact text, decimal values and raw HTML bytes' do
-    saved_page(html, url)
+    fetch_page(html)
     expect(source.rows.first).to include('team_label' => 'Arkansas', 'raw_team_label' => 'Arkansas ',
                                          'class_points' => '70.43', 'rank' => '1', 'commit_count' => '8', 'average_rating' => '97.92')
     expect(Base64.strict_decode64(source.pages.first.fetch('html_base64'))).to eq(html)
     expect(source.pages.first.fetch('sha256')).to eq(Digest::SHA256.hexdigest(html))
     expect(source.next_url).to eq(second_url)
-    Dir.mktmpdir do |root|
-      path = artifact.save(root)
-      expect(Recruiting::Dataset.load(path).manifest.dig('metadata', 'snapshot_kind')).to eq('raw_html_bundle')
-    end
+    expect(JSON.parse(artifact.database_attributes.fetch(:extract_bytes)).fetch('snapshot_kind')).to eq('raw_html_bundle')
   end
 
-  it 'parses ordered saved pagination fragments deterministically' do
-    saved_page(html, url)
-    saved_page(second_html, second_url)
+  it 'parses successive pagination fragments deterministically' do
+    fetch_page(html)
+    fetch_page(second_html)
     expect(source.rows.pluck('rank')).to eq(%w[1 51])
     expect(source.pages.size).to eq(2)
     expect(artifact.extract.fetch('coverage_note')).to include('2 pages captured, 2 rows')
@@ -60,12 +54,11 @@ RSpec.describe Recruiting::Acquisition do
     source.fetch(3)
     expect(source.status).to eq('access_failure')
     expect(source.rows.size).to eq(1)
-    Dir.mktmpdir do |root|
-      path = artifact.save(root)
-      expect(JSON.parse(File.read(File.join(path, 'original.json')))).to include('source_status' => 'access_failure')
-      expect { Recruiting::Dataset.new(File.read(File.join(path, 'original.json')), artifact.snapshot) }
-        .to raise_error(ArgumentError, /Source failure/)
-    end
+    attributes = artifact.database_attributes
+    expect(attributes).to include(status: 'failed', source_status: 'access_failure', dataset_revision: nil)
+    expect(attributes.fetch(:snapshot_bytes)).to include(Base64.strict_encode64('Access denied'))
+    expect { Recruiting::Dataset.new(attributes.fetch(:extract_bytes), attributes.fetch(:snapshot_bytes)) }
+      .to raise_error(ArgumentError, /Source failure/)
   end
 
   it 'distinguishes network failure from empty coverage' do
@@ -76,7 +69,7 @@ RSpec.describe Recruiting::Acquisition do
   end
 
   it 'rejects challenge/unrecognized HTML even with HTTP 200' do
-    saved_page('<html>Access denied</html>', url)
+    fetch_page('<html>Access denied</html>')
     expect(source.status).to eq('parse_failure')
     expect(source.rows).to be_empty
     expect(source.pages.size).to eq(1)
@@ -87,7 +80,7 @@ RSpec.describe Recruiting::Acquisition do
     empty.css('.rankings-page__list-item').remove
     empty.css('a[data-js="showmore"]').remove
     empty.at_css('body').add_child('<ul class="rankings-page__list"></ul>')
-    saved_page(empty.to_html, url)
+    fetch_page(empty.to_html)
     expect(source.status).to eq('ok')
     expect(source.rows).to be_empty
   end
@@ -100,19 +93,17 @@ RSpec.describe Recruiting::Acquisition do
     expect { Recruiting::HtmlPage.new(changed, url, 2026).next_url }.to raise_error(ArgumentError)
   end
 
-  it 'rejects pagination loops and unordered saved pages' do
-    saved_page(html, second_url)
-    expect(source.status).to eq('parse_failure')
-    fresh = described_class.new(metadata)
+  it 'rejects pagination loops while retaining captured pages' do
     allow(HTTParty).to receive(:get).and_return(double(code: 200, body: html))
-    fresh.fetch(3)
-    expect(fresh.status).to eq('parse_failure')
-    expect(fresh.failure).to include('cycle')
+    source.fetch(3)
+    expect(source.status).to eq('parse_failure')
+    expect(source.failure).to include('cycle')
+    expect(source.pages.size).to eq(2)
   end
 
   it 'leaves missing fields unknown and lets preview exclude malformed supplied points' do
     changed = html.sub('70.43', 'NaN').sub('97.92', '')
-    saved_page(changed, url)
+    fetch_page(changed)
     row = Recruiting::Row.new(source.rows.first, 1).to_h
     expect(row.dig('values', 'average_rating')).to be_nil
     expect(row.fetch('errors')).to include(/class_points/)
@@ -121,36 +112,23 @@ RSpec.describe Recruiting::Acquisition do
   it 'retains an observed generic team URL as missing provider identity rather than inventing a slug' do
     changed = html.gsub('https://247sports.com/college/arkansas/season/2026-basketball/commits/',
                         'https://247sports.com/season/2026-basketball/commits/')
-    saved_page(changed, url)
+    fetch_page(changed)
     expect(source.status).to eq('ok')
     expect(source.rows.first.fetch('provider_team_id')).to be_nil
     expect(Recruiting::Row.new(source.rows.first, 1).to_h.fetch('errors')).to include(/provider_team_id/)
   end
 
-  it 'reports malformed saved entries and timestamp overrides as explicit failures' do
-    source.saved(['not an entry'])
-    expect(source.status).to eq('parse_failure')
-    fresh = described_class.new(metadata)
-    fresh.saved([{ 'path' => Rails.root.join('spec/fixtures/recruiting/page1.html').to_s,
-                   'url' => url, 'captured_at' => 'not a timestamp' }])
-    expect(fresh.status).to eq('parse_failure')
-  end
-
-  it 'retains failed artifacts for malformed canonical and pagination URLs in saved and live HTML' do
+  it 'retains failed captures for malformed canonical and pagination URLs' do
     malformed = html.sub(url, 'https://[broken')
-    saved_page(malformed, url)
+    fetch_page(malformed)
     expect(source.status).to eq('parse_failure')
-    Dir.mktmpdir do |root|
-      expect(File.read(File.join(artifact.save(root), 'snapshot'))).to include(Base64.strict_encode64(malformed))
-    end
+    expect(artifact.database_attributes.fetch(:snapshot_bytes)).to include(Base64.strict_encode64(malformed))
     fresh = described_class.new(metadata)
     pagination = html.sub(second_url.gsub('&', '&amp;'), 'https://[broken')
     allow(HTTParty).to receive(:get).and_return(double(code: 200, body: pagination))
     fresh.fetch(2)
     expect(fresh.status).to eq('parse_failure')
-    Dir.mktmpdir do |root|
-      saved = Recruiting::AcquisitionArtifact.new(fresh).save(root)
-      expect(File.read(File.join(saved, 'snapshot'))).to include(Base64.strict_encode64(pagination))
-    end
+    expect(Recruiting::AcquisitionArtifact.new(fresh).database_attributes.fetch(:snapshot_bytes))
+      .to include(Base64.strict_encode64(pagination))
   end
 end

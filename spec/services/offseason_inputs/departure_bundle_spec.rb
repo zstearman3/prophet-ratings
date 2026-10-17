@@ -148,7 +148,7 @@ RSpec.describe OffseasonInputs::DepartureBundle do
     expect(OffseasonInputRevision.count).to eq(0)
   end
 
-  context 'when publishing the complete saved-file workflow' do
+  context 'when publishing database recruiting and reviewed departure evidence' do
     include ActiveSupport::Testing::TimeHelpers
 
     let(:version) do
@@ -172,27 +172,26 @@ RSpec.describe OffseasonInputs::DepartureBundle do
       import_bundle
     end
 
-    def recruiting_dataset
+    def import_recruiting
+      batch = RecruitingBatch.find_by(season:) || capture_recruiting
+      review = Recruiting::BatchReview.new(batch)
+      review.publish({ 'review_key' => review.review_key, 'confirm' => '1' }, reviewer: 'Test reviewer')
+    end
+
+    def capture_recruiting
       extract = JSON.parse(Rails.root.join('spec/fixtures/recruiting/partial.json').read)
       extract.merge!('source_year' => 2025, 'target_season' => 2026,
                      'source_url' => 'https://247sports.com/Season/2025-Basketball/CompositeTeamRankings/')
       extract['rows'].first.merge!('team_label' => team.school, 'class_points' => '70')
-      Recruiting::Dataset.new(JSON.generate(extract), 'Synthetic recruiting extract').save(directory)
-    end
-
-    def import_recruiting
-      dataset_dir = recruiting_dataset
-      mapping = Recruiting::Preview.new(Recruiting::Dataset.load(dataset_dir), season).call
-      approval = mapping.slice('dataset_revision', 'mapping_revision').merge('approved_by' => 'Test reviewer',
-                                                                             'approved_at' => '2026-10-13T12:00:00Z')
-      review_path = File.join(directory, 'recruiting-review.json')
-      File.write(review_path, JSON.generate(Recruiting::MappingReview.new(mapping).approve(approval)))
-      recruiting_paths = { dataset_dir:, review_path: }
-      payload = OffseasonInputs::RecruitingBundle.new(recruiting_paths, season).call
-      publication = { version: 'recruiting-review-1', reason: 'Synthetic integration review', predecessor_id: nil,
-                      input_hash: Departures::Contract.digest(payload) }
-      importer = OffseasonInputs::Import.new(season:, kind: 'recruiting', paths: recruiting_paths, publication:)
-      importer.call(preview_key: importer.preview.fetch('preview_key'))
+      bytes = JSON.generate(extract)
+      dataset = Recruiting::Dataset.new(bytes, 'Synthetic recruiting extract')
+      RecruitingBatch.create!(season:, source_year: 2025, status: 'ready', source_status: 'ok',
+                              extract_bytes: bytes, snapshot_bytes: 'Synthetic recruiting extract',
+                              dataset_revision: dataset.manifest.fetch('dataset_revision')).tap do |batch|
+        Recruiting::Preview.new(dataset, season).call.fetch('rows').each do |row|
+          batch.entries.create!(RecruitingEntry.source_attributes(row))
+        end
+      end
     end
 
     def publish_reviewed
@@ -206,7 +205,7 @@ RSpec.describe OffseasonInputs::DepartureBundle do
       ProphetRatings::GamePredictionBuilder.new(game, ratings_config_version: version).call
     end
 
-    it 'previews the hand-calculated combined adjustment from both reviewed file imports without publishing' do
+    it 'previews the hand-calculated combined adjustment from both reviewed evidence imports without publishing' do
       report = operation.preview
       row = report[:teams].find { |entry| entry[:team_id] == team.id }
       # P=70, N0=0: R=5; two eligible players total 500/2000: D=-.5; A=4.5.
@@ -226,7 +225,7 @@ RSpec.describe OffseasonInputs::DepartureBundle do
       expect(snapshot.stats.dig('preseason_prior', 'inputs')).to eq(prior.inputs)
     end
 
-    it 'preserves all-selection evidence, captures, snapshots and frozen forecasts on unchanged file and initializer reruns' do
+    it 'preserves all-selection evidence, captures, snapshots and frozen forecasts on unchanged input and initializer reruns' do
       publish_reviewed
       expect(home.reload.preseason_prior.inputs.dig('reviewed_departures', 'selections').size).to eq(60)
       prediction = scheduled_prediction

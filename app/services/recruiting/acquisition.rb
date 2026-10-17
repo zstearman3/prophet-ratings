@@ -3,7 +3,7 @@
 require 'base64'
 
 module Recruiting
-  # Bounded source acquisition; failed evidence stays inspectable and cannot be prepared.
+  # Bounded source acquisition; failed evidence stays inspectable in its database batch.
   class Acquisition
     attr_reader :pages, :rows, :metadata
 
@@ -37,14 +37,6 @@ module Recruiting
                                                                                       @metadata['category'] == Extract::CATEGORY
     end
 
-    def saved(entries)
-      raise ArgumentError, 'Supply at least one saved page entry' unless entries.is_a?(Array) && entries.any?
-
-      entries.each { |entry| consume_saved(entry) }
-    rescue ArgumentError, KeyError, SystemCallError => error
-      fail_source('parse_failure', error)
-    end
-
     def fetch(limit)
       raise ArgumentError, 'MAX_PAGES must be between 1 and 100' unless limit.between?(1, 100)
 
@@ -69,17 +61,6 @@ module Recruiting
 
     private
 
-    def consume_saved(entry)
-      raise ArgumentError, 'Each saved page entry must be an object with path and URL' unless entry.is_a?(Hash)
-
-      raise ArgumentError, 'Saved page list extends beyond advertised pagination' unless next_url
-
-      url = entry.fetch('url')
-      raise ArgumentError, 'Saved pages must follow the advertised pagination URLs in order' unless url == next_url
-
-      capture(File.binread(entry.fetch('path')), entry)
-    end
-
     def capture(html, details)
       entry = archive_page(html, details)
       parser = HtmlPage.new(html, details.fetch('url'), year)
@@ -89,7 +70,7 @@ module Recruiting
     end
 
     def archive_page(html, details)
-      entry = @metadata.slice('observed_at', 'retrieved_at', 'captured_at').merge(details.except('path'))
+      entry = @metadata.slice('observed_at', 'retrieved_at', 'captured_at').merge(details)
       entry['sha256'] = Digest::SHA256.hexdigest(html)
       entry['html_base64'] = Base64.strict_encode64(html)
       pages << self.class.validated_entry(entry)
@@ -116,7 +97,7 @@ module Recruiting
       return capture(html, details) if code == 200
 
       archive_page(html, details)
-      fail_source('access_failure', "HTTP #{code} at #{next_url}; use saved HTML fallback")
+      fail_source('access_failure', "HTTP #{code} at #{next_url}; start a new fetch after source access recovers")
     end
 
     def fail_source(kind, error)
