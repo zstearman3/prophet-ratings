@@ -22,6 +22,14 @@ RSpec.describe ProphetRatings::TeamRatingSnapshotService do
     expect(team_season.reload.preseason_adj_pace).to eq(69.5)
   end
 
+  it 'captures the solver anchors alongside factor ratings' do
+    season = create(:season, :current)
+    version = RatingsConfigVersion.default_version
+    create(:team_season, season:, ratings_config_version: version, offensive_rebound_rate: 0.25)
+    described_class.new(season:, ratings_config_version: version).call
+    expect(TeamRatingSnapshot.last.stats.dig('factor_anchors', 'offensive_rebound_rate')).to eq(0.25)
+  end
+
   it 'rejects a snapshot when model switching leaves values from a different capture applied' do
     season = create(:season, :current)
     team_season = create(:team_season, season:)

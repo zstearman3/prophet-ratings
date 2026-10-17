@@ -7,6 +7,7 @@ module ProphetRatings
       @ratings_config_version.settings
       @season = season
       @as_of = as_of
+      @factor_anchors = nil
     end
 
     def call
@@ -14,7 +15,7 @@ module ProphetRatings
       @season.with_lock(requires_new: true) do
         review = SeasonParticipationReview.new(@season)
         review.validate_publication(@ratings_config_version, @as_of)
-        participation_key = review.publication_key
+        participation_key = publication_key(review)
         ratings_config_version = @ratings_config_version
 
         @season.rating_team_seasons.find_each do |team_season|
@@ -48,7 +49,14 @@ module ProphetRatings
     end
 
     def capture_participation(snapshot, participation_key)
-      snapshot.stats['participation_key'] = participation_key if participation_key
+      stats = snapshot.stats
+      stats['participation_key'] = participation_key if participation_key
+      stats['factor_anchors'] = @factor_anchors if @ratings_config_version.settings[:factors]
+    end
+
+    def publication_key(review)
+      @factor_anchors = FactorForecast.anchors(@season) if @ratings_config_version.settings[:factors]
+      review.publication_key
     end
 
     def validate_live_inputs(team_season)

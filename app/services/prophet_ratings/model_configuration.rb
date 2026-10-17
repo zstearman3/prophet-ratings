@@ -32,9 +32,22 @@ module ProphetRatings
       validate_bounds(payload)
     end
 
-    def self.validate_uncertainty_model(payload)
+    def self.validate_ratings_formula(payload)
+      formula = payload[:ratings_formula]
+      raise ArgumentError, 'Unsupported ratings formula' unless [nil, 'corrected_v1'].include?(formula)
+
+      enabled = payload.fetch(:blowout).fetch(:enabled, false)
+      raise ArgumentError, 'Blowout enabled must be boolean' unless [true, false].include?(enabled)
+      raise ArgumentError, 'Blowout weighting requires corrected_v1' if enabled && formula != 'corrected_v1'
+    end
+
+    def self.validate_model_formulae(payload)
       model = payload.dig(:prediction, :uncertainty_model)
       raise ArgumentError, "Unsupported prediction uncertainty model: #{model}" unless [nil, 'shared_pace_v1'].include?(model)
+
+      validate_ratings_formula(payload)
+      FactorForecast.validate(payload)
+      LearningSettings.validate(payload)
     end
 
     def self.validate_number(payload, path)
@@ -45,7 +58,7 @@ module ProphetRatings
     end
 
     def self.validate_bounds(payload)
-      validate_uncertainty_model(payload)
+      validate_model_formulae(payload)
       %w[weighting.recency_decay_days weighting.preseason_decay_days blowout.max_margin
          preseason.fallback_efficiency preseason.fallback_pace defaults.season_defaults.average_pace
          defaults.season_defaults.average_efficiency baseline_volatility.efficiency_volatility

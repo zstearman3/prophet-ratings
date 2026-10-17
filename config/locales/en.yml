@@ -38,6 +38,11 @@ en:
       saved: "Recruiting mappings saved. Review and approve when ready."
       published: "Recruiting inputs approved and published. Ratings were not recalculated."
     actions:
+      evaluate_predictions:
+        title: "Evaluate predictions"
+        menu: "Evaluate predictions"
+        breadcrumb: "Evaluate predictions"
+        link: "Evaluate predictions"
       review_coaching:
         title: "Review coaching"
         menu: "Review coaching"

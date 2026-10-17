@@ -24,6 +24,22 @@ RSpec.describe ProphetRatings::GamePredictionBuilder do
     described_class.new(game, ratings_config_version: version).call
   end
 
+  it 'freezes factor forecasts without changing scores and never rereads mutable factor ratings' do
+    snapshots.each do |snapshot|
+      snapshot.update!(stats: snapshot.stats.merge('adj_turnover_rate' => 0.2, 'adj_turnover_rate_forced' => 0.15,
+                                                   'factor_anchors' => { 'turnover_rate' => 0.18 }))
+    end
+    prediction = build_forecast
+    captured = prediction.calculation_context.fetch('factor_forecasts')
+    expect(captured.dig('turnover_rate', 'home')).to be_within(1e-10).of(0.17)
+    score = prediction.replay
+    snapshots.first.update!(adj_turnover_rate: 0.8)
+    expect(prediction.reload.calculation_context.fetch('factor_forecasts')).to eq(captured)
+    expect(prediction.replay).to eq(score)
+    prediction.calculation_context['factor_forecasts'] = {}
+    expect(prediction).not_to be_valid
+  end
+
   it 'uses the Eastern game date and never reads result statistics' do
     game.update!(start_time: Time.utc(2026, 10, 12, 1)) # October 11 Eastern, October 12 UTC
     snapshots.each do |snapshot|

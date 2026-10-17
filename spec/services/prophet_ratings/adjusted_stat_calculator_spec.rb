@@ -91,6 +91,20 @@ RSpec.describe ProphetRatings::AdjustedStatCalculator, type: :service do
       [ts1, ts2, ts3].each(&:reload)
     end
 
+    it 'passes factor-specific regularization and anchor weight to the solver' do
+      payload = RatingsConfigVersion.authored_config
+      payload[:bundle_name] = 'factor-fit'
+      payload[:factors][:effective_fg_percentage].merge!(ridge_alpha: 2.0, anchor_weight: 0.25)
+      version = RatingsConfigVersion.publish!(payload)
+      team_seasons.each { |team_season| team_season.update!(ratings_config_version: version) }
+      selected = described_class.new(season:, raw_stat: :effective_fg_percentage, adj_stat: :adj_effective_fg_percentage,
+                                     adj_stat_allowed: :adj_effective_fg_percentage_allowed, as_of:, ratings_config_version: version)
+      selected.call
+      expect(StatisticsUtils).to have_received(:solve_least_squares_with_python).with(
+        anything, anything, weights: satisfy { |weights| (weights.last - 0.25).abs < 1e-10 }, ridge_alpha: 2.0
+      )
+    end
+
     it 'assigns higher adj eFG% to stronger offensive teams' do
       expect(ts1.adj_effective_fg_percentage).to be > 0.50
       expect(ts2.adj_effective_fg_percentage).to be < 0.50

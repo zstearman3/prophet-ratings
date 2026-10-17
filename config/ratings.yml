@@ -1,5 +1,41 @@
 default: &default
-  bundle_name: "v1.7-shared-pace"
+  bundle_name: "v1.11-explicit-learning"
+  ratings_formula: corrected_v1
+  learning:
+    volatility:
+      minimum_observations: 4
+      sample_scale: 16.0
+      maximum_weight: 0.5
+    home_court:
+      minimum_observations: 1
+      sample_scale: 16.0
+      maximum_weight: 0.5
+  factors:
+    effective_fg_percentage:
+      ridge_alpha: 0.001
+      anchor_weight: 0.05
+      offense_weight: 1.0
+      defense_weight: 1.0
+    turnover_rate:
+      ridge_alpha: 0.001
+      anchor_weight: 0.05
+      offense_weight: 1.0
+      defense_weight: 1.0
+    offensive_rebound_rate:
+      ridge_alpha: 0.001
+      anchor_weight: 0.05
+      offense_weight: 1.0
+      defense_weight: 1.0
+    free_throw_rate:
+      ridge_alpha: 0.001
+      anchor_weight: 0.05
+      offense_weight: 1.0
+      defense_weight: 1.0
+    three_pt_proficiency:
+      ridge_alpha: 0.001
+      anchor_weight: 0.05
+      offense_weight: 1.0
+      defense_weight: 1.0
   preseason:
     previous_season_weight: 0.85
     fallback_efficiency: 105.5
@@ -15,6 +51,7 @@ default: &default
     preseason_decay_days: 40
     min_preseason_weight: 0.1
   blowout:
+    enabled: false
     max_margin: 15
     cap_multiplier: 1.25
   baseline_volatility:
@@ -40,7 +77,7 @@ production:
 # Opt-in authored settings; publish/select deliberately, never activate automatically.
 coaching_experiment:
   <<: *default
-  bundle_name: "v1.8-experimental-coaching-pace"
+  bundle_name: "v1.11-experimental-coaching-pace"
   preseason:
     previous_season_weight: 0.85
     fallback_efficiency: 105.5

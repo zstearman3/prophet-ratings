@@ -2,6 +2,7 @@
 
 Rails.application.routes.draw do
   namespace :admin do
+    resource :prediction_evaluation, only: :show
     resources :coaching_reviews, only: %i[index show update] do
       member do
         post :discover
