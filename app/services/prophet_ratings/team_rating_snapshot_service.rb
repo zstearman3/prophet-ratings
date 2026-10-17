@@ -49,9 +49,12 @@ module ProphetRatings
     end
 
     def capture_participation(snapshot, participation_key)
-      stats = snapshot.stats
-      stats['participation_key'] = participation_key if participation_key
-      stats['factor_anchors'] = @factor_anchors if @ratings_config_version.settings[:factors]
+      config = @ratings_config_version.settings
+      snapshot.stats.merge!({
+        'participation_key' => participation_key,
+        'factor_anchors' => (@factor_anchors if config[:factors]),
+        'rating_anchors' => (snapshot.team_season.rating_anchors if EarlySeasonPolicy.enabled?(config))
+      }.compact)
     end
 
     def publication_key(review)
@@ -61,6 +64,9 @@ module ProphetRatings
 
     def validate_live_inputs(team_season)
       team_season.validate_model_inputs(@ratings_config_version)
+      if EarlySeasonPolicy.enabled?(@ratings_config_version.settings)
+        PredictionAnchors.validate_live(team_season, @ratings_config_version, @as_of)
+      end
       return if team_season.ratings_config_version_id == @ratings_config_version.id
 
       raise ArgumentError, 'Live ratings lack selected model provenance; calculate ratings before snapshot publication'

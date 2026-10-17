@@ -1,0 +1,3 @@
+# Merge into a complete authored payload, then publish/select explicitly.
+bundle_name: v1.12-coherent-early-season
+early_season_policy: coherent_v1

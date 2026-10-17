@@ -31,16 +31,26 @@ module ProphetRatings
 
     def calculate(as_of:)
       validate_live_versions!(as_of)
+      aggregate_stats(as_of)
+      run_least_squares_adjustments(as_of:) if enough_finalized_data_for_adjustments?(as_of:)
+      publish_ratings(as_of:)
+    end
+
+    def aggregate_stats(as_of)
+      PredictionAnchors.reset(@season, @ratings_config_version, as_of) if EarlySeasonPolicy.enabled?(@config)
       TeamSeasonStatsAggregator.new(season: @season, as_of:, ratings_config_version: @ratings_config_version,
                                     verified_only: @options.fetch(:replay, false)).run
       @season.update_average_ratings(as_of:)
-      run_least_squares_adjustments(as_of:) if adjustment_period?(as_of) && enough_finalized_data_for_adjustments?(as_of:)
-      publish_ratings(as_of:)
     end
 
     def publish(as_of:)
       @options = {}
-      @season.with_lock(requires_new: true) { publish_ratings(as_of:) }
+      @season.with_lock(requires_new: true) do
+        if EarlySeasonPolicy.enabled?(@config) && as_of.to_date < @season.start_date
+          PredictionAnchors.reset(@season, @ratings_config_version, as_of)
+        end
+        publish_ratings(as_of:)
+      end
     end
 
     def publish_ratings(as_of:)
@@ -52,7 +62,7 @@ module ProphetRatings
       )
     end
 
-    private :calculate, :publish_ratings
+    private :calculate, :aggregate_stats, :publish_ratings
 
     def self.missing_ratings(team_season, config)
       attributes = team_season.attributes
@@ -77,10 +87,6 @@ module ProphetRatings
     end
 
     private
-
-    def adjustment_period?(as_of)
-      (as_of.to_date - @season.start_date) > @config.dig(:preseason, :adjustment_start_after_days)
-    end
 
     def update_live_ratings
       self.class.clear_excluded_ranks(@season)
@@ -235,6 +241,8 @@ module ProphetRatings
     end
 
     def enough_finalized_data_for_adjustments?(as_of:)
+      return false unless EarlySeasonPolicy.adjustment_period?(@season, as_of, @config)
+
       TeamGame
         .joins(:game, :team_season)
         .where(team_season_id: @season.rating_team_seasons.select(:id))

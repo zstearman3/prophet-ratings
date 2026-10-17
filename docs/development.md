@@ -269,8 +269,12 @@ Sass uses `sassc-embedded`, preserving Sprockets' API without compiling retired
 LibSass. An old native `build.sassc` override can be removed with
 `bundle config unset --local build.sassc`.
 
-Python/NumPy are present in Docker. Current specs stub the numerical solver, so
-a passing suite alone does not verify a full ratings calculation.
+Python/NumPy are present in Docker. Current specs normally stub the numerical
+solver, so a passing suite alone does not verify a full ratings calculation.
+`compose.test.yml` forwards `REAL_SOLVER` (false by default). The focused synthetic
+rehearsals in [ratings.md](ratings.md#opt-in-coherent-early-season-publication)
+opt into actual Python calls with `REAL_SOLVER=true bin/test <supported spec>`;
+this flag does not remove stubs from unrelated specs.
 
 ## Memory, disk space and cleanup
 

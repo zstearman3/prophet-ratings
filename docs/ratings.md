@@ -1140,3 +1140,66 @@ rules while preserving current arithmetic. Newly published bundles reject unknow
 keys and inconsistent confidence/home-court settings; historical saved bundles
 retain compatibility. Changing settings does not activate a model or regenerate
 its ratings or forecasts.
+
+## Opt-in coherent early-season publication
+
+Merge `config/examples/early_season_v1.yml` into a complete new authored payload
+and publish/select it deliberately. `early_season_policy: coherent_v1` bypasses
+the old `preseason.adjustment_start_after_days` gate for that model only. Bundles
+without the selector retain their old gate and anchor behavior. This change does
+not publish or activate a model, rewrite old outputs, or run a backfill.
+
+The first slice retains two finalized games per team, at the requested cutoff.
+Only observations between qualified participants enter each fit. Unplayed and
+one-game teams retain their captured preseason efficiencies and pace; all included
+participants must have matching captured priors. A missing per-stat observation,
+a zero-weight observation, or the soft anchor alone is not observed evidence.
+Columns without observation support retain their prior (or missing factor).
+Disconnected schedules are allowed: the corrected_v1 ratings formula and strictly positive global and per-factor ridge
+are required, with solver failures rolling back the entire publication. This
+establishes numerical support, not statistical calibration or improved accuracy.
+
+The existing calendar blend remains: `w = max(1 - days / preseason_decay_days,
+min_preseason_weight)`, rounded to four decimals, with negative days clamped to
+zero. Day zero can run supported fits, but efficiency/pace retain weight one on
+the prior. Factors keep their existing unblended convention. First-game updates
+and game-count decay fitting remain separate extensions.
+
+A single mutable season mean cannot describe a mixture of updated and unplayed
+teams. For each core rating, persist its center in `TeamSeason#rating_anchors`,
+with the selected model ID and calculation date. The common prior efficiency
+center is mean captured preseason offense across included participants, preserving
+the existing preseason convention; pace uses mean captured prior pace. An updated
+rating and its center use the same weight: `rating = w * prior + (1-w) * fitted`
+and `center = w * prior_center + (1-w) * raw_season_center`. Unsupported columns
+keep both prior and prior center. Individual strength is never used as the league
+center, so unequal priors retain their offensive/defensive deviations.
+
+Snapshots copy these centers into `stats.rating_anchors` and reject mismatched
+live model/date anchors. For either scoring direction (and analogously pace):
+
+```text
+expected_efficiency = offense_rating + opponent_defense_rating
+                    - mean(offense_center, opponent_defense_center)
+```
+
+This centers each input on its own baseline, then adds their mean reference.
+It supports mixed updated/prior teams and snapshots from different dates.
+Predictions and simulations use snapshot centers; forecast context copies them
+for replay. Missing centers fail explicitly for this policy, with no fallback to
+mutable season averages. Existing models retain their original arithmetic.
+Season-level averages remain aggregate diagnostics/legacy inputs; they are not
+prediction centers for the new policy. No general model-comparison runner or
+season-wide anchor history is introduced.
+
+Run the full synthetic Rails/Python rehearsal (including disconnected and
+unplayed teams) in Docker with:
+
+```bash
+REAL_SOLVER=true bin/test spec/services/prophet_ratings/overall_ratings_calculator_early_season_spec.rb
+```
+
+No domain imports or ratings backfills are needed. Apply the additive anchor
+migration before using the new policy, then use the existing explicit preseason
+initialization/rebuild and model-selection safeguards. Existing outputs must not
+be relabeled to acquire missing anchors.

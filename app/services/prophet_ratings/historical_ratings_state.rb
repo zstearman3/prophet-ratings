@@ -36,7 +36,7 @@ module ProphetRatings
       TeamRatingSnapshot.new(team: team_season.team, team_season:, season: team_season.season,
                              ratings_config_version: team_season.ratings_config_version,
                              snapshot_date: date, **attributes.slice('rating', *ForecastContext::RATING_FIELDS).symbolize_keys,
-                             stats: attributes.slice(*TeamRatingSnapshot::STORED_STATS).merge(
+                             stats: attributes.slice(*TeamRatingSnapshot::STORED_STATS, 'rating_anchors').merge(
                                'reconstruction' => { 'preseason_prior_id' => team_season.preseason_prior_id,
                                                      'result_cutoff' => date.iso8601 }
                              ))
