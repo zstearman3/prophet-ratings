@@ -2,6 +2,12 @@
 
 Rails.application.routes.draw do
   namespace :admin do
+    resources :coaching_reviews, only: %i[index show update] do
+      member do
+        post :discover
+        post :candidate
+      end
+    end
     resources :recruiting_batches, only: %i[index create show update] do
       patch :publish, on: :member
     end

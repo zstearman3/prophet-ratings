@@ -1,0 +1,14 @@
+<section class="space-y-5 pb-10">
+  <h1 class="text-3xl font-bold">Review coaching changes</h1>
+  <p>Choose the season ending year. For example, 2027 uses the 2026 coaching tracker for the 2026–27 season. Season preparation is not required.</p>
+  <%= form_tag admin_coaching_reviews_path, method: :get, data: { turbo: false } do %>
+    <%= label_tag :year, 'Season ending year' %>
+    <%= number_field_tag :year, params[:year] || @years.first || Date.current.year, min: 2, max: 9999, required: true %>
+    <%= submit_tag 'Open review', class: 'rounded bg-blue-700 px-4 py-2 text-white' %>
+  <% end %>
+  <ul>
+    <% @years.each do |year| %>
+      <li><%= link_to "Review #{year} coaching changes", admin_coaching_review_path(year), class: 'text-blue-700 underline' %></li>
+    <% end %>
+  </ul>
+</section>
