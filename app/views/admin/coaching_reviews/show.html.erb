@@ -39,7 +39,7 @@
               </td>
               <td class="p-2 space-y-2">
                 <div><%= label_tag "#{prefix}[team_id]", 'Destination team' %><%= select_tag "#{prefix}[team_id]", options_for_select(@page.fetch(:teams), values['team_id']), include_blank: 'Choose a team' %></div>
-                <div><%= label_tag "#{prefix}[coach_name]", 'Incoming coach' %><%= text_field_tag "#{prefix}[coach_name]", values['coach_name'] %></div>
+                <div><%= label_tag "#{prefix}[coach_name]", 'Incoming coach' %> <%= text_field_tag "#{prefix}[coach_name]", values['coach_name'] %></div>
               </td>
               <td class="p-2 space-y-2">
                 <% if candidate.previous_school.present? %><p>Stored previous school label: <%= candidate.previous_school %></p><% end %>
