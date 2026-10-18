@@ -36,6 +36,14 @@
 #
 FactoryBot.define do
   factory :team_rating_snapshot do
+    trait :with_forecast_inputs do
+      after(:build) do |snapshot|
+        snapshot.stats['season_forecast_inputs'] = ProphetRatings::SeasonForecastInputs.capture(
+          snapshot.season, snapshot.ratings_config_version, snapshot.snapshot_date
+        )
+      end
+    end
+
     team_season
     team { team_season&.team || association(:team) }
     season { team_season&.season || association(:season) }

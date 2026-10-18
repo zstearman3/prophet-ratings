@@ -184,7 +184,10 @@ RSpec.describe ProphetRatings::OverallRatingsCalculator do
     date = season.start_date + 1
     calculator.call(as_of: date)
     pair = snapshots(date).first(2)
-    game = create(:game, season:, venue_type: 'neutral', venue_confidence: 'confirmed')
+    game = create(:game, season:, start_time: (date + 1).in_time_zone + 12.hours, venue_type: 'neutral', venue_confidence: 'confirmed')
+    pair.each_with_index do |snapshot, index|
+      create(:team_game, game:, team: snapshot.team, team_season: snapshot.team_season, home: index.zero?)
+    end
     context = ProphetRatings::ForecastContext.capture(game, pair, version)
     expected = predict(pair)
     season.update!(average_efficiency: 150, average_pace: 100)

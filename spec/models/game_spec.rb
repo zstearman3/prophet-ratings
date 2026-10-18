@@ -33,7 +33,7 @@ RSpec.describe Game do
   let(:away_team_season) { create(:team_season, season:) }
   let(:ratings_config_version) { RatingsConfigVersion.ensure_current! }
   let!(:home_snapshot) do
-    create(:team_rating_snapshot,
+    create(:team_rating_snapshot, :with_forecast_inputs,
            team_season: home_team_season,
            snapshot_date: game.schedule_date - 1,
            ratings_config_version:,
@@ -42,7 +42,7 @@ RSpec.describe Game do
            adj_pace: 72.0)
   end
   let!(:away_snapshot) do
-    create(:team_rating_snapshot,
+    create(:team_rating_snapshot, :with_forecast_inputs,
            team_season: away_team_season,
            snapshot_date: game.schedule_date - 1,
            ratings_config_version:,

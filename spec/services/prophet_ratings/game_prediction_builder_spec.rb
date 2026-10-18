@@ -14,14 +14,40 @@ RSpec.describe ProphetRatings::GamePredictionBuilder do
     [true, false].map do |home|
       team = create(:team_season, season:)
       create(:team_game, game:, team: team.team, team_season: team, home:)
-      create(:team_rating_snapshot, team_season: team, ratings_config_version: version,
-                                    snapshot_date: game.schedule_date - 1, adj_pace: 70,
-                                    offensive_efficiency_volatility: 0, defensive_efficiency_volatility: 0, pace_volatility: 0)
+      create(:team_rating_snapshot, :with_forecast_inputs, team_season: team, ratings_config_version: version,
+                                                           snapshot_date: game.schedule_date - 1, adj_pace: 70,
+                                                           offensive_efficiency_volatility: 0, defensive_efficiency_volatility: 0,
+                                                           pace_volatility: 0)
     end
+  end
+
+  def refresh_publication(snapshot)
+    snapshot.stats['season_forecast_inputs'] =
+      ProphetRatings::SeasonForecastInputs.capture(season, snapshot.ratings_config_version, snapshot.snapshot_date)
+    snapshot.save!
   end
 
   def build_forecast
     described_class.new(game, ratings_config_version: version).call
+  end
+
+  it 'logs rejected legacy publication metadata and saves no partial issuance' do
+    snapshots.first.update!(stats: snapshots.first.stats.except('season_forecast_inputs'))
+    allow(Rails.logger).to receive(:warn)
+    expect(build_forecast).to be_nil
+    expect(game.predictions).to be_empty
+    expect(Rails.logger).to have_received(:warn).with(/republish ratings for the selected model.date/)
+  end
+
+  it 'rejects latest mismatched publication dates without silently falling back to an older pair' do
+    snapshots.each do |snapshot|
+      create(:team_rating_snapshot, :with_forecast_inputs, team_season: snapshot.team_season,
+                                                           ratings_config_version: version, snapshot_date: snapshot.snapshot_date - 1)
+    end
+    snapshots.last.update!(snapshot_date: snapshots.last.snapshot_date - 2)
+    refresh_publication(snapshots.last)
+    expect(build_forecast).to be_nil
+    expect(game.predictions).to be_empty
   end
 
   it 'freezes factor forecasts without changing scores and never rereads mutable factor ratings' do
@@ -44,8 +70,9 @@ RSpec.describe ProphetRatings::GamePredictionBuilder do
     game.update!(start_time: Time.utc(2026, 10, 12, 1)) # October 11 Eastern, October 12 UTC
     snapshots.each do |snapshot|
       snapshot.update!(snapshot_date: Date.new(2026, 10, 10))
-      create(:team_rating_snapshot, team_season: snapshot.team_season, ratings_config_version: version,
-                                    snapshot_date: Date.new(2026, 10, 11), adj_offensive_efficiency: 200)
+      refresh_publication(snapshot)
+      create(:team_rating_snapshot, :with_forecast_inputs, team_season: snapshot.team_season, ratings_config_version: version,
+                                                           snapshot_date: Date.new(2026, 10, 11), adj_offensive_efficiency: 200)
     end
     allow(game).to receive(:pace).and_raise('target result access')
     allow(game.home_team_game).to receive(:offensive_efficiency).and_raise('target result access')
@@ -150,7 +177,10 @@ RSpec.describe ProphetRatings::GamePredictionBuilder do
   it 'labels late-created backdated sources as reconstruction after tipoff' do
     snapshots
     game.update!(start_time: 1.hour.ago, status: :final)
-    snapshots.each { |snapshot| snapshot.update!(snapshot_date: game.schedule_date - 1) }
+    snapshots.each do |snapshot|
+      snapshot.update!(snapshot_date: game.schedule_date - 1)
+      refresh_publication(snapshot)
+    end
     prediction = build_forecast
     expect(prediction.forecast_kind).to eq('reconstruction')
     expect(prediction.generated_at).to be >= snapshots.first.created_at
@@ -230,7 +260,10 @@ RSpec.describe ProphetRatings::GamePredictionBuilder do
   it 'checks rescheduled cutoff eligibility in Eastern time rather than the UTC date' do
     travel_to(Time.utc(2026, 10, 11, 16))
     game.update!(start_time: Time.utc(2026, 10, 13, 1))
-    snapshots.each { |snapshot| snapshot.update!(snapshot_date: Date.new(2026, 10, 11)) }
+    snapshots.each do |snapshot|
+      snapshot.update!(snapshot_date: Date.new(2026, 10, 11))
+      refresh_publication(snapshot)
+    end
     prediction = build_forecast
     game.update!(start_time: Time.utc(2026, 10, 12, 1)) # Still October 11 in Eastern time
     expect(prediction.input_cutoff).to eq(game.schedule_date)
@@ -317,7 +350,10 @@ RSpec.describe ProphetRatings::GamePredictionBuilder do
     payload['bundle_name'] = 'legacy-builder'
     payload['prediction'].delete('uncertainty_model')
     legacy = RatingsConfigVersion.publish!(payload)
-    snapshots.each { |snapshot| snapshot.update!(ratings_config_version: legacy, pace_volatility: nil) }
+    snapshots.each do |snapshot|
+      snapshot.update!(ratings_config_version: legacy, pace_volatility: nil)
+      refresh_publication(snapshot)
+    end
     prediction = described_class.new(game, ratings_config_version: legacy).call
     original = [prediction.replay, prediction.margin_std_deviation, prediction.total_std_deviation]
     season.update!(efficiency_std_deviation: 40, pace_std_deviation: 30, average_efficiency: 130)
