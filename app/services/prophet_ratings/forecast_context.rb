@@ -11,28 +11,18 @@ module ProphetRatings
 
     def self.capture(game, snapshots, version)
       config = version.settings
-      season = game.season
+      season = SeasonForecastInputs.for_snapshots(game, snapshots, version)
       {
         'contract_version' => 1,
         'model_version_id' => version.id,
         'model_config' => version.config,
         'season_id' => game.season_id,
-        'season_source' => season.attributes.slice('id', 'updated_at', 'average_efficiency', 'average_pace',
-                                                   'efficiency_std_deviation', 'pace_std_deviation'),
-        'season' => season_inputs(season, config),
+        'season_source' => season.except('values'),
+        'season' => season.fetch('values'),
         'venue' => game.attributes.slice('venue_type', 'venue_confidence', 'venue_source', 'venue_name', 'neutral'),
         'snapshots' => snapshots.map { |snapshot| snapshot_inputs(snapshot) },
         'factor_forecasts' => FactorForecast.capture(snapshots, config),
         'upset_modifier' => 1.0
-      }
-    end
-
-    def self.season_inputs(season, config)
-      {
-        'average_efficiency' => (season.average_efficiency || config.dig(:defaults, :season_defaults, :average_efficiency)).to_f,
-        'average_pace' => (season.average_pace || config.dig(:defaults, :season_defaults, :average_pace)).to_f,
-        'efficiency_std_deviation' => (season.efficiency_std_deviation || config.dig(:baseline_volatility, :efficiency_volatility)).to_f,
-        'pace_std_deviation' => (season.pace_std_deviation || config.dig(:baseline_volatility, :pace_volatility)).to_f
       }
     end
 

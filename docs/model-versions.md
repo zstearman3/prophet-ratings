@@ -46,9 +46,14 @@ snapshot if none is explicitly supplied, then require both snapshots to match
 it. The matchup screen selects its default once. Core ratings, weighting,
 preseason blending/profile coefficients, home court, volatility/confidence
 fallbacks, and ridge/anchor parameters come from the selected stored payload.
-Season baselines and available snapshot values remain data inputs; configured
-fallbacks apply only where those inputs are missing. Confidence thresholds and
-all numerical configuration fields must be present; decay denominators and
+Available snapshot values remain data inputs. New saved forecasts obtain season
+anchors and fallback deviations from the selected model/date publication's
+`stats.season_forecast_inputs`, rather than mutable live season fields. The writer
+captures all four effective values and explicit season/config fallback evidence
+atomically with the snapshots; both participants must share compatible model,
+season, publication date and cutoff. See the
+[publication input contract](ratings.md#frozen-forecast-context-and-revisions).
+Confidence thresholds and all numerical configuration fields must be present; decay denominators and
 baseline values must be positive and mixture weights must be in 0..1.
 
 Residual aggregation rejects stored predictions whose snapshot versions differ
@@ -67,6 +72,14 @@ original intended version matters; it cannot be reconstructed from the queue.
 ## Legacy and live-input compatibility
 
 Existing immutable versions, priors, snapshots, and predictions are preserved.
+Snapshots missing `season_forecast_inputs` are rejected for new saved issuance;
+republishing requires the normal authorized selected-model workflow. No automatic
+historical rewrite or provenance fabrication occurs. Already frozen contexts
+replay their saved values unchanged without requiring this metadata. Recalculated
+historical working inputs carry explicit `reconstruction` provenance, never a
+claim to an archived publication. No bundle/config hash change accompanies this
+input-provenance fix.
+
 Legacy ratings-only payloads lack stored prediction/default settings, so new
 calculations, replay, or activation reject them with an explicit error. Stored
 legacy predictions can still be listed and evaluated without filling their

@@ -42,7 +42,8 @@ RSpec.describe PinnedModelVersion do
     [true, false].each do |home|
       team = create(:team_season, season:, ratings_config_version: original)
       create(:team_game, game:, team_season: team, team: team.team, home:)
-      create(:team_rating_snapshot, team_season: team, ratings_config_version: original, snapshot_date: game.schedule_date - 1)
+      create(:team_rating_snapshot, :with_forecast_inputs, team_season: team, ratings_config_version: original,
+                                                           snapshot_date: game.schedule_date - 1)
     end
     job = GenerateNightlyPredictionsJob.perform_later(season.id, as_of: Time.current)
     replacement.activate

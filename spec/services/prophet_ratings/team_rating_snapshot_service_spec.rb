@@ -77,12 +77,20 @@ RSpec.describe ProphetRatings::TeamRatingSnapshotService do
       service.call
       described_class.new(season:, as_of: season.start_date - 2).call
       original = TeamRatingSnapshot.order(:id).map(&:attributes)
+      season.update!(average_pace: 80, efficiency_std_deviation: 20)
       first_team_season.update!(adj_offensive_efficiency: 120)
       later_team_season.update!(preseason_adj_offensive_efficiency: 999)
       TeamRatingSnapshot.transaction(requires_new: true) do
         expect { service.call }.to raise_error(ArgumentError, /selected preseason calculator/)
         expect(TeamRatingSnapshot.order(:id).map(&:attributes)).to eq(original)
       end
+      ProphetRatings::PreseasonRatingsCalculator.new(season).call
+      season.team_seasons.find_each { |team| team.update!(ratings_config_version: RatingsConfigVersion.default_version) }
+      service.call
+      expect(TeamRatingSnapshot.count).to eq(4)
+      expect(TeamRatingSnapshot.where(snapshot_date: season.start_date - 1).map do |snapshot|
+        snapshot.stats.dig('season_forecast_inputs', 'values', 'average_pace')
+      end).to eq([80, 80])
     end
   end
 end

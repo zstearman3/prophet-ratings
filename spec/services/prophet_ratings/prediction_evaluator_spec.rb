@@ -97,7 +97,8 @@ RSpec.describe ProphetRatings::PredictionEvaluator do
 
   it 'uses only eligible pregame revisions and derives z scores from their frozen uncertainty' do
     snapshots = teams.map do |team|
-      create(:team_rating_snapshot, team_season: team, ratings_config_version: version, snapshot_date: Date.new(2026, 1, 1))
+      create(:team_rating_snapshot, :with_forecast_inputs, team_season: team, ratings_config_version: version,
+                                                           snapshot_date: Date.new(2026, 1, 1))
     end
     context = ProphetRatings::ForecastContext.capture(game, snapshots, version)
     [game.start_time - 2.hours, game.start_time - 1.hour, game.start_time + 1.hour].each_with_index do |time, index|

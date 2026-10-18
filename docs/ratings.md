@@ -664,8 +664,34 @@ Snapshots must be dated strictly before the game's Eastern schedule date, no
 later than the actual generation date, and created/updated by generation time.
 There is no same-day intraday exception. Missing eligible or complete inputs skip
 with a warning directing the operator to publish complete prior-day snapshots.
-No later source is substituted. Anchors/fallbacks are the values available at
-actual issuance; they are frozen, not retrospectively reconstructed as-of values.
+No later source is substituted. New issuance takes all four effective season
+inputs from `stats.season_forecast_inputs` on the selected snapshots, never from
+mutable live season fields. Publication captures `average_efficiency`,
+`average_pace`, `efficiency_std_deviation` and `pace_std_deviation` once inside the
+snapshot transaction. Missing fields use the selected stored model's existing
+season defaults or baseline volatility; `value_sources` records which season
+field or configured fallback supplied each value. Means must be finite and
+positive; deviations must be finite and nonnegative (zero is valid).
+
+The saved object has contract version 1, selected model/season IDs, snapshot date,
+result cutoff, source `publication`, effective values and source evidence. Both
+participants must have matching objects from the same publication date/cutoff,
+and each object must match its actual snapshot's model, season and date. Snapshot
+team identities must match the game's prepared participants. Missing, malformed,
+mixed or legacy metadata fails clearly; the builder logs the reason and skips,
+without searching for an older compatible pair. Identical publication retries
+capture no fresh timestamps and reuse the same inputs and snapshot identities.
+A partial publication failure rolls back the full publication, including metadata.
+
+Existing frozen contexts retain their original season values and replay without
+this new metadata. Metadata-free legacy snapshots cannot issue new saved forecasts:
+republish through the authorized selected-model ratings workflow first. Code
+rollout does not backfill historical provenance or authorize a rebuild. Historical
+working snapshots instead capture recalculated values with source `reconstruction`,
+matching model/date/cutoff and null persisted snapshot IDs. They remain explicitly
+labeled reconstruction and cannot be mixed with persisted publication inputs,
+even when the numerical values agree. This adds provenance validation without
+changing coefficients, arithmetic or stored model hashes; no new bundle is needed.
 
 Each change from the latest issuance appends a revision, including an A → B → A
 input correction. Only consecutive identical inputs reuse the latest issuance.
@@ -1184,7 +1210,9 @@ expected_efficiency = offense_rating + opponent_defense_rating
 ```
 
 This centers each input on its own baseline, then adds their mean reference.
-It supports mixed updated/prior teams and snapshots from different dates.
+Its direct predictor/simulator arithmetic supports mixed updated/prior teams
+and snapshots from different dates. New saved forecast issuance requires the
+same publication date for both season-input objects as described above.
 Predictions and simulations use snapshot centers; forecast context copies them
 for replay. Missing centers fail explicitly for this policy, with no fallback to
 mutable season averages. Existing models retain their original arithmetic.
