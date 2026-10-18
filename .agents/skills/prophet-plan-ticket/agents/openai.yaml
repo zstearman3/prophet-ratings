@@ -1,4 +1,4 @@
 interface:
   display_name: "Prophet: Plan a Ticket"
-  short_description: "Refine an idea into a code-informed Notion ticket"
-  default_prompt: "Use $prophet-plan-ticket to refine my Prophet Ratings idea with code-informed questions, then create a Notion ticket once the questions are answered."
+  short_description: "Explore ideas and shape concise Prophet work tickets"
+  default_prompt: "Use $prophet-plan-ticket to explore my idea with code-informed approaches and tradeoffs, refine the scope and acceptance criteria with me, and create a concise ticket once we agree what to build."

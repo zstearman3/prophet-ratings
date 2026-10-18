@@ -2,6 +2,36 @@
 
 Prophet Ratings uses Notion for planning and this repository for implementation evidence. The repository skills are `prophet-plan-ticket` and `prophet-implement-ticket` in `.agents/skills/`. Both read this shared map so board conventions have one maintained source.
 
+`prophet-plan-ticket` is the collaborative product and technical discovery phase:
+inspect code, compare approaches and relative effort/maintenance costs, and refine
+behavior and scope with the user. The saved ticket preserves the problem/outcome,
+numbered observable acceptance criteria, agreed approach and consequential
+constraints, plus useful code starting points and actual dependencies. Conversation
+can be exploratory; the ticket summarizes its decisions concisely. Batch planning
+reuses shared investigation and decisions while keeping each ticket understandable.
+`prophet-implement-ticket` revalidates code observations and owns the detailed
+execution plan, risk scoring, tests/commands, independent reviews, and QA. Preserve
+agreed product/architecture decisions when adding implementation evidence.
+
+Ticket implementation requires installed, readable Superpowers `writing-plans` and
+`using-git-worktrees` skills and their resources for the selected workflow. Resolve
+them from the current skill catalog or installed package; online source alone does
+not satisfy preflight. If absent, install/repair Superpowers through the user's
+chosen skill/plugin setup before invoking implementation; ticket runs do not
+silently install or update dependencies. The upstream source is
+[obra/superpowers](https://github.com/obra/superpowers).
+
+The implementation skill always uses an isolated task worktree, fetches and pulls
+the latest `development` before starting a new ticket, and records the base SHA.
+Resumed work integrates freshly fetched development without discarding task edits;
+stacked work also includes the latest development plus its explicit dependency.
+Implementation plans and evidence stay in the ticket's Implementation record.
+Independent plan review, code review, and QA precede PR publication and `Testing`.
+The skill's supporting references define risk/escalation and a bounded process
+targeting one Plus five-hour usage allowance; this is a soft consumption target,
+not a guaranteed subscription cap. Missing prerequisites or incomplete gates leave
+the ticket out of `Testing`/`Done` with a resumable handoff.
+
 ## Locations
 
 Verified through the connected Notion workspace in September 2026:
@@ -49,11 +79,11 @@ These are observed schema values; live schema takes precedence for valid names a
 
 Work Items also has `Archived`; it has no observed Blocked status. Record blockers in the ticket body and retain its current non-complete status. Do not alter database schemas, views, templates, or initiative status as routine ticket work.
 
-The observed Task template contains Description. The Bug template adds Steps to Reproduce. Use these conventions with the planning skill's acceptance criteria and implementation notes; the templates themselves do not contain a full implementation specification.
+The observed Task template contains Description. The Bug template adds Steps to Reproduce. Use these conventions with the planning skill's acceptance criteria, agreed approach/constraints, and useful code starting points; the templates themselves do not contain a full implementation specification.
 
 ## Interaction and authority
 
-- Planning is iterative. Inspect code, ask material clarifying questions, and wait for answers before creating a ticket. Do not create an early Notion draft. Once questions are answered and creation is requested, create the agreed ticket without an extra approval round.
+- Planning is iterative. Inspect code, explore approaches, and refine the intended behavior with the user before creating a ticket. Keep working drafts in the conversation by default. Once material product/domain decisions are settled and creation is requested, create the agreed ticket without an extra approval round; detailed implementation choices can remain open. If explicitly asked to save an unfinished idea, preserve its open decisions and disclose that it is not ready for implementation, without inventing schema/status values. A requested batch may publish settled independent tickets while other ideas continue to evolve.
 - Implementation may update the selected ticket's status and body with decisions, blockers, and a handoff. Use `Testing` after successful required verification so the user can review; do not equate local checks with deployment or user acceptance.
 - Scope updates to the selected ticket and agreed relations. Do not create extra plan pages, initiatives, or batches of tickets without an agreed need. These skills do not authorize messages or comments to other people.
 
