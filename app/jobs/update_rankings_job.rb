@@ -23,7 +23,7 @@ class UpdateRankingsJob < ApplicationJob
 
   public_class_method def self.recalculate(season, version_id)
     version = RatingsConfigVersion.resolve(version_id)
-    ProphetRatings::OverallRatingsCalculator.new(season, ratings_config_version: version).call
+    ProphetRatings::OverallRatingsCalculator.new(season, ratings_config_version: version).call(as_of: Game.current_schedule_date - 1.day)
     version
   end
 

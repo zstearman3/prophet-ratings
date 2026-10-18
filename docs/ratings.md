@@ -6,9 +6,25 @@ This document explains how Prophet Ratings currently computes team ratings. It i
 
 The main orchestrator is `ProphetRatings::OverallRatingsCalculator` in `app/services/prophet_ratings/overall_ratings_calculator.rb`.
 
-It is invoked by `UpdateRankingsJob`, which defaults to `Season.current` and then optionally enqueues `GenerateNightlyPredictionsJob` after rating publication and the enclosing transaction commit.
+It is invoked by `UpdateRankingsJob`, which defaults to `Season.current` and
+explicitly calculates through `Game.current_schedule_date - 1.day`: the last
+completed Eastern schedule day, capped at the target season's end. This subtracts
+one calendar day, including across DST transitions. The morning publication
+includes finalized games through yesterday and excludes today's games even if
+already final. Its snapshot date, result cutoff, season forecast inputs and
+coherent-policy rating anchors all use that calculation date. On opening morning,
+the cutoff is the day before season start.
 
-Typical call:
+The job then optionally enqueues `GenerateNightlyPredictionsJob` after successful
+rating publication and the enclosing transaction commit. Today's forecasts can
+use those prior-day snapshots, while still requiring their actual `created_at`
+and `updated_at` timestamps to be no later than forecast issuance. Dating a new
+publication yesterday does not make it available to an earlier issuance. Missing
+inputs continue to skip a forecast with a warning. This scheduled-job alignment
+does not rewrite historical snapshots or forecasts and requires no model bundle
+or coefficient change.
+
+Direct calculator call (its default remains today, unlike the scheduled job):
 
 ```ruby
 ProphetRatings::OverallRatingsCalculator.new(season).call

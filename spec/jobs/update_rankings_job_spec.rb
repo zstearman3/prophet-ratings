@@ -106,6 +106,33 @@ RSpec.describe UpdateRankingsJob do
     expect(ProphetRatings::OverallRatingsCalculator).to have_received(:new).with(season, ratings_config_version: model_version)
   end
 
+  describe 'last completed Eastern schedule day' do
+    let(:season) do
+      create(:season, :current, year: 2025, start_date: Date.new(2025, 1, 1), end_date: Date.new(2026, 1, 1))
+    end
+
+    before { allow(ProphetRatings::OverallRatingsCalculator).to receive(:new).and_call_original }
+
+    [
+      ['2025-03-09T04:59:00Z', '2025-03-07'], # Before Eastern midnight; UTC is already March 9.
+      ['2025-03-09T05:00:00Z', '2025-03-08'],
+      ['2025-03-09T06:59:00Z', '2025-03-08'], # Before the spring clock jump.
+      ['2025-03-09T07:00:00Z', '2025-03-08'],
+      ['2025-03-10T04:00:00Z', '2025-03-09'], # Calendar yesterday after a 23-hour day.
+      ['2025-11-02T03:59:00Z', '2025-10-31'],
+      ['2025-11-02T04:00:00Z', '2025-11-01'],
+      ['2025-11-02T05:59:00Z', '2025-11-01'], # Before the repeated fall hour.
+      ['2025-11-02T06:00:00Z', '2025-11-01'],
+      ['2025-11-03T05:00:00Z', '2025-11-02'] # Calendar yesterday after a 25-hour day.
+    ].each do |timestamp, cutoff|
+      it "publishes through #{cutoff} when run at #{timestamp}" do
+        team_season = create(:team_season, season:)
+        travel_to(Time.iso8601(timestamp)) { described_class.perform_now(season.id, enqueue_nightly_predictions: false) }
+        expect(team_season.team_rating_snapshots.sole.snapshot_date).to eq(Date.iso8601(cutoff))
+      end
+    end
+  end
+
   it 'exits without recalculating when another rankings update holds the lock' do
     allow(GoodJob::Job).to receive(:advisory_lock_key).with(described_class::ADVISORY_LOCK_KEY).and_return(false)
 
