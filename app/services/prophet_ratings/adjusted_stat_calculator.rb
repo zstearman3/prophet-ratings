@@ -35,7 +35,7 @@ module ProphetRatings
 
       rows, b, weights, row_metadata = build_matrix_components(team_index, num_teams, season_avg)
 
-      if rows.empty?
+      if rows.empty? || !EarlySeasonPolicy.usable_fit?(season_avg, row_metadata, config)
         Rails.logger.warn("No valid rows generated for #{raw_stat}")
         return
       end
@@ -64,12 +64,20 @@ module ProphetRatings
       ridge_alpha = factor_setting(:ridge_alpha, config.dig(:ridge, :alpha))
       x_values = StatisticsUtils.solve_least_squares_with_python(rows, b, weights:, ridge_alpha:)
 
+      supported_columns = EarlySeasonPolicy.supported_columns(rows, config)
       team_season_map = TeamSeason.where(season:, team_id: team_ids).index_by(&:team_id)
       team_ids.each_with_index do |team_id, idx|
         ts = team_season_map[team_id]
         next unless ts
 
         stats_to_write = build_stats_to_write(ts, x_values, season_avg, idx, num_teams)
+        stats_to_write = PredictionAnchors.publication_stats(
+          ts, stats_to_write,
+          config:, supported_columns:, columns: { adj_stat => idx, adj_stat_allowed => num_teams + idx },
+          weight: PredictionAnchors.prior_weight(season, as_of, config), center: season_avg
+        )
+        next if stats_to_write.empty?
+
         ts.update!(stats_to_write.merge(ratings_config_version: @ratings_config_version))
       end
 
@@ -121,6 +129,13 @@ module ProphetRatings
       team_game.send(raw_stat)
     end
 
+    def observation_weight(team_game, observed)
+      return 0 if observed.blank?
+
+      GameWeightingService.new(game: team_game, season:, as_of:, ratings_config_version: @ratings_config_version).call *
+        blowout_dampening(team_game)
+    end
+
     def blowout_dampening(team_game)
       settings = config.fetch(:blowout)
       return 1.0 unless settings[:enabled] && raw_stat == :offensive_efficiency
@@ -142,20 +157,8 @@ module ProphetRatings
     def blend_with_preseason(preseason_value, observed_value)
       return observed_value if preseason_value.blank?
 
-      weight = preseason_weight
+      weight = PredictionAnchors.prior_weight(season, as_of, config)
       (weight * preseason_value) + ((1 - weight) * observed_value)
-    end
-
-    ##
-    # Calculates the current weight to apply to preseason values based on the number of days since the season started.
-    # The weight decays linearly over a configured number of days and is bounded by a minimum threshold.
-    # @return [Float] The preseason weight, between the configured minimum and 1.0.
-    def preseason_weight
-      start_date = season.start_date
-      days_since_start = [(as_of.to_date - start_date).to_i, 0].max
-      decay_days = config[:weighting][:preseason_decay_days] || 30
-      min_weight = config[:weighting][:min_preseason_weight] || 0.0
-      [1.0 - (days_since_start.to_f / decay_days), min_weight].max.round(4)
     end
 
     ##
@@ -206,7 +209,8 @@ module ProphetRatings
 
         [[tg1, tg2], [tg2, tg1]].each do |off_tg, def_tg|
           observed = stat_value_for_game(off_tg)
-          next if observed.blank?
+          weight = observation_weight(off_tg, observed)
+          next unless EarlySeasonPolicy.usable_observation?(observed, weight, config)
 
           home_court = if apply_home_court
                          tg1 == off_tg ? home_adv : -home_adv
@@ -222,8 +226,7 @@ module ProphetRatings
 
           rows << row
           b << adjusted_observed.to_f
-          weights << (GameWeightingService.new(game: off_tg, season:, as_of:, ratings_config_version: @ratings_config_version).call *
-                     blowout_dampening(off_tg))
+          weights << weight
 
           # ➕ Add metadata
           row_metadata << {

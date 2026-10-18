@@ -13,7 +13,7 @@ module ProphetRatings
       efficiency_adjustment: { formula: nil, lower_bound: nil, upper_bound: nil }
     }.freeze
     ROOT = {
-      contract_version: nil, bundle_name: nil, ratings_formula: nil, preseason: PRESEASON,
+      contract_version: nil, bundle_name: nil, ratings_formula: nil, early_season_policy: nil, preseason: PRESEASON,
       weighting: { recency_decay_days: nil, min_recency_weight: nil, preseason_decay_days: nil, min_preseason_weight: nil },
       blowout: { enabled: nil, max_margin: nil, cap_multiplier: nil },
       baseline_volatility: { efficiency_volatility: nil, pace_volatility: nil },

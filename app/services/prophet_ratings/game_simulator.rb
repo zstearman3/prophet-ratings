@@ -89,9 +89,9 @@ module ProphetRatings
     end
 
     def expected_pace
-      @expected_pace ||= (home_rating_snapshot.adj_pace - season_average_pace) +
-                         (away_rating_snapshot.adj_pace - season_average_pace) +
-                         season_average_pace
+      @expected_pace ||= PredictionAnchors.expected(
+        [home_rating_snapshot, away_rating_snapshot], %w[adj_pace adj_pace], config:, fallback: season_average_pace
+      )
     end
 
     ##
@@ -100,11 +100,10 @@ module ProphetRatings
     def home_expected_ortg
       return unless home_rating_snapshot && away_rating_snapshot
 
-      @home_expected_ortg ||=
-        home_rating_snapshot.adj_offensive_efficiency +
-        away_rating_snapshot.adj_defensive_efficiency -
-        season_average_efficiency +
-        home_offense_boost
+      @home_expected_ortg ||= PredictionAnchors.expected(
+        [home_rating_snapshot, away_rating_snapshot], %w[adj_offensive_efficiency adj_defensive_efficiency],
+        config:, fallback: season_average_efficiency
+      ) + home_offense_boost
     end
 
     ##
@@ -113,11 +112,10 @@ module ProphetRatings
     def away_expected_ortg
       return unless home_rating_snapshot && away_rating_snapshot
 
-      @away_expected_ortg ||=
-        away_rating_snapshot.adj_offensive_efficiency +
-        home_rating_snapshot.adj_defensive_efficiency -
-        season_average_efficiency +
-        home_defense_boost
+      @away_expected_ortg ||= PredictionAnchors.expected(
+        [away_rating_snapshot, home_rating_snapshot], %w[adj_offensive_efficiency adj_defensive_efficiency],
+        config:, fallback: season_average_efficiency
+      ) + home_defense_boost
     end
 
     def home_offense_boost

@@ -22,6 +22,7 @@ services:
     environment:
       RAILS_ENV: test
       CI: "true"
+      REAL_SOLVER: "${REAL_SOLVER:-false}"
       DATABASE_URL: postgresql://postgres:password@db:5432/prophet_ratings_test
       TEST_DATABASE_URL: postgresql://postgres:password@db:5432/prophet_ratings_test
     volumes:

@@ -45,6 +45,7 @@ module ProphetRatings
       model = payload.dig(:prediction, :uncertainty_model)
       raise ArgumentError, "Unsupported prediction uncertainty model: #{model}" unless [nil, 'shared_pace_v1'].include?(model)
 
+      EarlySeasonPolicy.validate(payload)
       validate_ratings_formula(payload)
       FactorForecast.validate(payload)
       LearningSettings.validate(payload)

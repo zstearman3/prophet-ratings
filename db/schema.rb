@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_17_010000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_17_220000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -590,6 +590,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_17_010000) do
     t.decimal "preseason_adj_pace", precision: 6, scale: 3
     t.bigint "preseason_prior_id"
     t.decimal "rating", precision: 6, scale: 3
+    t.jsonb "rating_anchors", default: {}, null: false
     t.bigint "ratings_config_version_id"
     t.bigint "season_id", null: false
     t.bigint "team_id", null: false

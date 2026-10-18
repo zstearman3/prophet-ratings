@@ -36,6 +36,24 @@ behavior. Publish/select models and generate snapshots through the existing
 provenance-aware workflow in [ratings.md](ratings.md). Do not relabel old live
 ratings as a new model. No new model is automatically activated by this change.
 
+## Optional early-season policy
+
+The default authored bundle remains unchanged. To author a separate candidate:
+
+```ruby
+payload = RatingsConfigVersion.authored_config.deep_dup
+payload.merge!(YAML.load_file(Rails.root.join('config/examples/early_season_v1.yml')).deep_symbolize_keys)
+candidate = RatingsConfigVersion.publish!(payload)
+# Deliberately initialize/rebuild and select only through the existing operational safeguards.
+```
+
+`early_season_policy: coherent_v1` selects the supported early-update and stored
+anchor contract. Absence preserves old behavior; unknown selectors fail.
+The `corrected_v1` ratings formula, positive global `ridge.alpha` and all configured factor `ridge_alpha` values are
+mandatory. Keep two-game eligibility and the existing calendar blend; day zero
+retains full core prior weight. This is a correctness policy, not evidence of
+predictive improvement. See [the full publication and anchor equations](ratings.md#opt-in-coherent-early-season-publication).
+
 ## Learning from prior forecast errors
 
 Both `learning.volatility` and `learning.home_court` have the following controls:
@@ -69,7 +87,7 @@ but must not be negative. Defaults below describe the authored default bundle.
 | `preseason.previous_season_weight` | 0.85 | Fraction [0, 1] | Retain more prior-season adjusted strength as it increases. |
 | `preseason.fallback_efficiency` | 105.5 | Positive points per 100 possessions | Prior initialization when previous-season efficiency is unavailable. |
 | `preseason.fallback_pace` | 69.5 | Positive possessions per 40 minutes | Prior initialization when previous-season pace is unavailable. |
-| `preseason.adjustment_start_after_days` | 14 | Nonnegative elapsed days | Solver starts strictly after this threshold, subject to minimum data. |
+| `preseason.adjustment_start_after_days` | 14 | Nonnegative elapsed days | Legacy solver starts strictly after this threshold, subject to minimum data. Ignored by `early_season_policy: coherent_v1`. |
 | `preseason.profile.recruiting_score_multiplier` | 0.1 | Nonnegative efficiency per profile score | Legacy profile recruiting effect. |
 | `preseason.profile.attrition_multiplier` | 5 | Nonnegative efficiency scale | Legacy profile attrition effect. |
 | `preseason.profile.max_efficiency_adjustment` | 5 | Nonnegative efficiency | Caps legacy profile adjustments. Reviewed components have their own bounds. |
