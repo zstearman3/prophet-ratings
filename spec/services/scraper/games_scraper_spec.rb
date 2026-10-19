@@ -81,6 +81,8 @@ RSpec.describe Scraper::GamesScraper do
       date: Game::SCHEDULE_TIME_ZONE.parse("#{date} 7:00pm").in_time_zone,
       away_team_stats: {},
       home_team_stats: {},
+      source_completed: false,
+      source_completion_evidence: nil,
       url: schedule_url
     }
 
@@ -209,5 +211,224 @@ RSpec.describe Scraper::GamesScraper do
     malformed_response = instance_double(HTTParty::Response, body: '<div class="scorebox"><div></div><div></div></div>', success?: true)
     allow(HTTParty).to receive(:get).with(scraper.send(:game_url, completed_url)).and_return(malformed_response)
     expect { scraper.to_json_in_batches(0, 1) }.to raise_error(described_class::SourceError, /Missing boxscore teams/)
+  end
+
+  context 'with saved source layouts' do
+    let(:date) { Date.new(2024, 11, 4) }
+    let(:completed_url) { '/cbb/boxscores/2024-11-04-20-kansas.html' }
+    let(:schedule_html) { fixture_html('unlinked_final') }
+
+    def fixture_html(name)
+      Rails.root.join("spec/fixtures/games_scraper/#{name}.html").read
+    end
+
+    def stub_boxscore(html)
+      boxscore_response = instance_double(HTTParty::Response, body: html, success?: true)
+      allow(HTTParty).to receive(:get).with(scraper.send(:game_url, completed_url)).and_return(boxscore_response)
+    end
+
+    it 'preserves unlinked names without poll ranks and emits score-only final evidence' do
+      expect(scraper.to_json).to contain_exactly(hash_including(
+                                                   away_team: 'Howard', home_team: 'Kansas', away_team_score: 57, home_team_score: 87,
+                                                   away_team_stats: {}, home_team_stats: {}, url: schedule_url,
+                                                   source_completed: true, source_completion_evidence: 'schedule_final'
+                                                 ))
+    end
+
+    it 'retains a known team alias matchup with an unmatched unlinked opponent' do
+      team = create(:team, school: 'Kansas Jayhawks')
+      create(:team_alias, team:, value: 'Kansas', source: 'sports_reference')
+
+      expect(scraper.to_json_for_team(team)).to contain_exactly(hash_including(away_team: 'Howard', home_team: 'Kansas'))
+    end
+
+    it 'uses consistent winner and loser markup when no final label or link remains' do
+      allow(response).to receive(:body).and_return(schedule_html.sub('F<span class="no_mobile">inal</span>', ''))
+
+      expect(scraper.to_json.first).to include(source_completed: true, source_completion_evidence: 'schedule_winner_loser')
+    end
+
+    it 'keeps unlinked scheduled names and unavailable scores distinct from finals' do
+      allow(response).to receive(:body).and_return(fixture_html('scheduled'))
+
+      expect(scraper.to_json.first).to include(
+        away_team: 'Howard', home_team: 'Kansas', away_team_score: nil, home_team_score: nil,
+        source_completed: false, source_completion_evidence: nil
+      )
+    end
+
+    it 'does not infer completion from scores on a past date alone' do
+      allow(response).to receive(:body).and_return(fixture_html('ambiguous_scores'))
+
+      expect(scraper.to_json.first).to include(source_completed: false, source_completion_evidence: nil)
+    end
+
+    %w[Canceled Cancelled Postponed Live Halftime Scheduled].each do |status|
+      it "rejects a linked #{status} schedule even when its boxscore has valid final scores" do
+        html = fixture_html('canceled_linked').sub('Canceled', status)
+        allow(response).to receive(:body).and_return(html)
+        stub_boxscore(fixture_html('detailed_final'))
+
+        expect { scraper.to_json }.to raise_error(described_class::SourceError, /Nonfinal/)
+      end
+    end
+
+    ['87', '', '-1', 'unknown'].each do |score|
+      it "rejects a final with invalid or tied away score #{score.inspect}" do
+        allow(response).to receive(:body).and_return(fixture_html('malformed_final').sub('>unknown<', ">#{score}<"))
+
+        expect { scraper.to_json }.to raise_error(described_class::SourceError, /final scores/)
+      end
+    end
+
+    it 'rejects winner markup that contradicts the final scores' do
+      allow(response).to receive(:body).and_return(schedule_html.sub('>57<', '>97<'))
+
+      expect { scraper.to_json }.to raise_error(described_class::SourceError, /winner/)
+    end
+
+    it 'preserves an explicit zero score without inventing missing statistics' do
+      allow(response).to receive(:body).and_return(schedule_html.sub('>57<', '>0<'))
+
+      expect(scraper.to_json.first).to include(away_team_score: 0, source_completed: true, away_team_stats: {})
+    end
+
+    it 'extracts ordinary linked finals with basic statistics assigned to their own teams' do
+      allow(response).to receive(:body).and_return(fixture_html('linked_final'))
+      stub_boxscore(fixture_html('detailed_final'))
+
+      game = scraper.to_json.first
+
+      expect(game).to include(away_team: 'Howard', home_team: 'Kansas', source_completed: true, source_completion_evidence: 'boxscore')
+      expect(game[:away_team_stats]).to include(points: '57')
+      expect(game[:home_team_stats]).to include(points: '87')
+    end
+
+    it 'recognizes a score-only boxscore with plain-text names' do
+      stub_boxscore(fixture_html('score_only'))
+
+      expect(scraper.send(:scrape_game, completed_url)).to include(
+        away_team: 'Howard', home_team: 'Kansas', away_team_score: 57, home_team_score: 87,
+        source_completed: true, source_completion_evidence: 'boxscore', away_team_stats: {}, home_team_stats: {}
+      )
+    end
+
+    it 'does not shift home statistics onto the away team when its basic table is absent' do
+      document = Nokogiri::HTML(fixture_html('detailed_final'))
+      document.at_css('#box-score-basic-howard').remove
+      stub_boxscore(document.to_html)
+
+      game = scraper.send(:scrape_game, completed_url)
+
+      expect(game[:away_team_stats]).to eq({})
+      expect(game[:home_team_stats]).to include(points: '87')
+    end
+
+    it 'leaves unidentifiable plain-text team statistics unavailable' do
+      document = Nokogiri::HTML(fixture_html('detailed_final'))
+      document.css('.scorebox strong a').each { |anchor| anchor.replace(anchor.children) }
+      stub_boxscore(document.to_html)
+
+      expect(scraper.send(:scrape_game, completed_url)).to include(away_team_stats: {}, home_team_stats: {})
+    end
+
+    it 'does not synthesize counts for missing statistic cells' do
+      document = Nokogiri::HTML(fixture_html('detailed_final'))
+      document.css('#box-score-basic-howard [data-stat="fg"]').remove
+      stub_boxscore(document.to_html)
+
+      expect(scraper.send(:scrape_game, completed_url)[:away_team_stats][:field_goals_made]).to be_blank
+    end
+
+    it 'rejects nonfinal boxscore status even when scores are valid' do
+      stub_boxscore(fixture_html('score_only').sub('November 4, 2024', 'November 4, 2024 Live'))
+
+      expect { scraper.send(:scrape_game, completed_url) }.to raise_error(described_class::SourceError, /Nonfinal/)
+    end
+
+    it 'rejects bare arbitrary scored containers without recognized boxscore context' do
+      stub_boxscore('<div class="scorebox"><div><strong>A</strong><div class="score">1</div></div>' \
+                    '<div><strong>B</strong><div class="score">2</div></div></div>')
+
+      expect { scraper.send(:scrape_game, completed_url) }.to raise_error(described_class::SourceError, /Unrecognized/)
+    end
+
+    %w[Howard Kansas].each do |unlinked_team|
+      it "retains #{unlinked_team} when only that schedule name is unlinked" do
+        document = Nokogiri::HTML(fixture_html('linked_final'))
+        document.css('td:first-child a').find { |anchor| anchor.text == unlinked_team }.then { |anchor| anchor.replace(anchor.children) }
+        document.css('td.gamelink a').each { |anchor| anchor.replace(anchor.children) }
+        allow(response).to receive(:body).and_return(document.to_html)
+
+        expect(scraper.to_json.first).to include(away_team: 'Howard', home_team: 'Kansas', source_completed: true)
+      end
+    end
+
+    it 'filters by the known school when its opponent is unlinked' do
+      team = create(:team, school: 'Kansas')
+
+      expect(scraper.to_json_for_team(team)).to contain_exactly(hash_including(away_team: 'Howard', home_team: 'Kansas'))
+    end
+
+    ['87', '', 'bad', '-1'].each do |score|
+      it "rejects a recognized boxscore with invalid or tied score #{score.inspect}" do
+        stub_boxscore(fixture_html('score_only').sub('>57<', ">#{score}<"))
+
+        expect { scraper.send(:scrape_game, completed_url) }.to raise_error(described_class::SourceError, /final scores/)
+      end
+    end
+
+    it 'rejects contradictory winner and loser classes on the same row' do
+      html = schedule_html.sub('class="loser"', 'class="winner loser"').sub('class="winner"', 'class="loser"')
+      allow(response).to receive(:body).and_return(html)
+
+      expect { scraper.to_json }.to raise_error(described_class::SourceError)
+    end
+
+    ['<div>November 4, 2024</div><div>Live</div>',
+     '<div><span>November 4, 2024</span><span>Live</span></div>',
+     '<div>November 4, 2024</div><div>In-progress</div>'].each do |metadata|
+      it "rejects nonfinal boxscore metadata with preserved node boundaries: #{metadata}" do
+        document = Nokogiri::HTML(fixture_html('score_only'))
+        document.at_css('.scorebox_meta').inner_html = metadata
+        stub_boxscore(document.to_html.gsub(/>\s+</, '><'))
+
+        expect { scraper.send(:scrape_game, completed_url) }.to raise_error(described_class::SourceError, /Nonfinal/)
+      end
+    end
+
+    %w[Live In-progress].each do |status|
+      it "rejects a minified linked Final and #{status} schedule before fetching its boxscore" do
+        document = Nokogiri::HTML(fixture_html('linked_final'))
+        document.css('table.teams td:nth-child(3)')[1].content = status
+        allow(response).to receive(:body).and_return(document.to_html.gsub(/>\s+</, '><'))
+        stub_boxscore(fixture_html('detailed_final'))
+
+        expect { scraper.to_json }.to raise_error(described_class::SourceError, /Nonfinal/)
+        expect(HTTParty).not_to have_received(:get).with(scraper.send(:game_url, completed_url))
+      end
+    end
+
+    ['tr.loser', 'tr.winner'].each do |selector|
+      it "rejects contradictory winner/loser outcome classes on #{selector}" do
+        document = Nokogiri::HTML(fixture_html('unlinked_final'))
+        document.at_css(selector)['class'] = 'winner loser'
+        allow(response).to receive(:body).and_return(document.to_html)
+
+        expect { scraper.to_json }.to raise_error(described_class::SourceError, /outcome/)
+      end
+    end
+
+    it 'rejects adjacent Final and Live spans inside a linked status cell before fetching the boxscore' do
+      document = Nokogiri::HTML(fixture_html('linked_final'))
+      status_cell = document.at_css('td.gamelink')
+      status_cell.at_css('a').inner_html = '<span>Final</span>'
+      status_cell.add_child('<span>Live</span>')
+      allow(response).to receive(:body).and_return(document.to_html.gsub(/>\s+</, '><'))
+      stub_boxscore(fixture_html('detailed_final'))
+
+      expect { scraper.to_json }.to raise_error(described_class::SourceError, /Nonfinal/)
+      expect(HTTParty).not_to have_received(:get).with(scraper.send(:game_url, completed_url))
+    end
   end
 end
