@@ -131,9 +131,11 @@ module Importer
       end
 
       def process_unmatched_game(game)
-        return if game.completed?
+        return if game.final?
 
         game.transaction(requires_new: true) do
+          # Permit confirmed raw updates through the shared incomplete-row path within this savepoint only.
+          game.scheduled! if game.final_unmatched?
           yield
           game.reload.update!(status: :final_unmatched, minutes: nil, possessions: nil, in_conference: false)
         end

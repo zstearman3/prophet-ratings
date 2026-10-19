@@ -653,6 +653,107 @@ RSpec.describe Importer::GamesImporter do
                                                      opponent_team_season_id: nil)
     end
 
+    it 'adds a newly resolved side and its overall record to the same unmatched result' do
+      home_team_season.destroy!
+      described_class.import([unmatched_row])
+      game = Game.last
+      expect(TeamGame.where(game:)).to be_empty
+      resolved_season = create(:team_season, team: home_team, season:)
+      version = create(:ratings_config_version)
+
+      expect { described_class.import([unmatched_row]) }.not_to change(Game, :count)
+      ProphetRatings::TeamSeasonStatsAggregator.new(season:, as_of: date, ratings_config_version: version).run
+
+      aggregate_failures 'persisted unmatched result and record' do
+        expect(game.reload).to have_attributes(status: 'final_unmatched', minutes: nil, possessions: nil)
+        expect(TeamGame.where(game:).count).to eq(1)
+        expect(game.home_team_game).to have_attributes(team_season: resolved_season, points: 100,
+                                                       offensive_rating: nil, turnover_rate: nil)
+        expect(resolved_season.reload).to have_attributes(wins: 1, losses: 0, conference_wins: 0,
+                                                          offensive_efficiency: nil, pace: nil)
+        expect(Game.final).not_to include(game)
+      end
+    end
+
+    describe 'confirmed refreshes' do
+      let(:game) do
+        described_class.import([unmatched_row])
+        Game.last
+      end
+      let(:prediction) do
+        version = create(:ratings_config_version)
+        snapshots = [home_team_season, away_team_season].map do |team_season|
+          create(:team_rating_snapshot, team_season:, ratings_config_version: version, snapshot_date: date - 1.day)
+        end
+        create(:prediction, game:, ratings_config_version: version,
+                            home_team_snapshot: snapshots.first, away_team_snapshot: snapshots.last,
+                            home_offensive_efficiency: 110, away_offensive_efficiency: 100,
+                            home_defensive_efficiency: 100, away_defensive_efficiency: 110, pace: 70)
+      end
+
+      it 'corrects confirmed scores and overall W-L without calculating statistics or residuals' do
+        original_prediction = prediction.attributes
+        version = prediction.ratings_config_version
+        aggregator = ProphetRatings::TeamSeasonStatsAggregator.new(season:, as_of: date, ratings_config_version: version)
+        aggregator.run
+        expect(home_team_season.reload).to have_attributes(wins: 1, losses: 0)
+        correction = unmatched_row.merge(home_team_score: 80, away_team_score: 90, home_team_stats: { points: 80 })
+
+        expect { described_class.import([correction]) }.not_to change(Game, :count)
+        aggregator.run
+
+        aggregate_failures 'corrected raw result and record' do
+          expect(game.reload).to have_attributes(status: 'final_unmatched', home_team_score: 80, away_team_score: 90,
+                                                 minutes: nil, possessions: nil, in_conference: false)
+          expect(game.home_team_game).to have_attributes(points: 80, assists: nil, offensive_rating: nil, turnover_rate: nil)
+          expect(home_team_season.reload).to have_attributes(wins: 0, losses: 1, conference_losses: 0,
+                                                             offensive_efficiency: nil, pace: nil)
+          expect(prediction.reload.attributes).to eq(original_prediction)
+          expect(Game.final).not_to include(game)
+        end
+      end
+
+      it 'preserves the game, raw side and prediction on an unconfirmed partial refresh' do
+        original_prediction = prediction.attributes
+        original_game = game.attributes
+        original_sides = TeamGame.where(game:).order(:id).map(&:attributes)
+        partial = unmatched_row.merge(source_completed: false, home_team_score: nil, away_team_score: nil,
+                                      home_team_stats: {}, away_team_stats: {})
+
+        described_class.import([partial])
+
+        expect(game.reload.attributes).to eq(original_game)
+        expect(TeamGame.where(game:).order(:id).map(&:attributes)).to eq(original_sides)
+        expect(prediction.reload.attributes).to eq(original_prediction)
+      end
+
+      it 'rolls back score and side writes after a raising persistence failure inside an outer transaction' do
+        original_prediction = prediction.attributes
+        original_game = game.attributes
+        original_sides = TeamGame.where(game:).order(:id).map(&:attributes)
+        correction = unmatched_row.merge(home_team: 'Still Unknown', away_team: away_team.school,
+                                         home_team_score: 80, away_team_score: 95)
+        allow(Game).to receive(:find_by).with(url: unmatched_row[:url]).and_return(game)
+        allow(game).to receive(:update!).and_wrap_original do |method, attributes|
+          if attributes[:status] == :final_unmatched
+            expect(Game.find(game.id)).to have_attributes(status: 'scheduled', home_team_score: 80, away_team_score: 95)
+            expect(TeamGame.where(game:).pluck(:team_season_id)).to eq([away_team_season.id])
+            game.readonly!
+          end
+          method.call(attributes)
+        end
+
+        Game.transaction do
+          expect { described_class.import([correction]) }.to raise_error(ActiveRecord::ReadOnlyRecord)
+          aggregate_failures 'restored persisted state' do
+            expect(game.reload.attributes).to eq(original_game)
+            expect(TeamGame.where(game:).order(:id).map(&:attributes)).to eq(original_sides)
+            expect(prediction.reload.attributes).to eq(original_prediction)
+          end
+        end
+      end
+    end
+
     describe 'promotion' do
       let(:game) do
         described_class.import([unmatched_row])

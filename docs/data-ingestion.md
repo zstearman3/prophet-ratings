@@ -335,10 +335,11 @@ have previous raw/derived statistics cleared before incoming raw counts are stor
 unresolved stale associations and game possessions/minutes/conference flags are
 cleared. Unknown sides have no TeamGame.
 
-Partial refreshes preserve completed unmatched results, and unresolved corrections
-preserve valid matched finals. A later fully matched, statistically complete row
-can promote the same game ID through ordinary finalization. Failed validation
-restores the entire previous unmatched result and boxes; any persistence failure,
+Unconfirmed partial refreshes preserve completed unmatched results. A valid
+source-confirmed unmatched refresh updates scores and resolved raw sides atomically;
+unresolved corrections preserve valid matched finals. A later fully matched,
+statistically complete row can promote the same game ID through ordinary
+finalization. Failed validation restores the entire previous unmatched result and boxes; any persistence failure,
 including prediction residual writes, rolls the promotion back and propagates.
 Fully matched malformed boxes cannot use unmatched status to bypass validation.
 Schedule reconciliation reports unchanged completed results as protected, and
