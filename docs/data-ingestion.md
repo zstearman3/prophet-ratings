@@ -335,24 +335,55 @@ game.finalize
 
 `Game#finalize` delegates to `ProphetRatings::GameFinalizer`.
 
-Finalization runs in a transaction and performs:
+Finalization uses its own transaction savepoint, including when called from an
+outer transaction. It performs:
 
-1. Derived game field updates:
-   - Possessions
-   - Minutes
-   - In-conference flag
-2. Finalization prerequisite validation.
-3. `calculate_game_stats` on each `TeamGame`.
-4. Prediction error updates for stored predictions, validating snapshot/version identity.
+1. Validation of both stored team boxes and scores before derived writes.
+2. Derived game field updates: possessions, minutes and in-conference flag.
+3. Validation that game possessions, minutes and 40-minute pace are finite and positive.
+4. `calculate_game_stats` on both `TeamGame` records, using raising saves.
+5. Prediction error updates for stored predictions, validating snapshot/version identity.
    A rating run supplies its pinned model and updates that model's predictions;
    ordinary ingestion finalization updates all stored model predictions without
    looking up the global active version.
    Invalid snapshot/model associations are logged and skipped during ordinary
    ingestion, leaving their prediction errors unchanged. A pinned rating run
    raises on the same mismatch and rolls back finalization for review.
-5. `game.final!` status transition.
+6. `game.final!` status transition, only after every required write succeeds.
 
-A game cannot finalize unless it has enough derived data to compute pace. If finalization fails due to missing derived stats, the importer logs a warning and leaves the game scheduled.
+Both home and away sides are mandatory. Required stored counts are field goals,
+two-point shots, three-point shots and free throws (made and attempted); offensive,
+defensive and total rebounds; assists, steals, blocks, turnovers, fouls and points.
+Counts and game scores must be finite and nonnegative. Each side's total player
+minutes must be finite, positive and equal to the other side's total; 225 player
+minutes per side still produce a 45-minute game. Each side's calculated possessions
+must be finite and positive before averaging. Validation also requires:
+
+- The game score equals that side's points.
+- Points equal `2 * two_pt_made + 3 * three_pt_made + free_throws_made`.
+- Made shots do not exceed attempts in each shot category, including total field goals.
+- Total field goals made and attempted equal the two-point plus three-point components.
+- Total rebounds equal offensive plus defensive rebounds.
+
+No cross-team rebound/missed-shot or steal/turnover accounting assumptions are
+added. Zero-event boxes remain valid when these relationships hold and possessions
+are positive. Rates with no opportunities persist as null; see
+[undefined rates](ratings.md#undefined-rates).
+
+Invalid boxes raise `GameFinalizer::MissingDerivedStatsError` with game, side and
+field/reason context. Validation or persistence failure rolls back derived game
+fields, both sides' statistics, prediction errors and final status together, even
+if a caller rescues inside its own transaction. Persistence errors propagate.
+
+The importer requires both incoming team seasons to resolve before finalizing a
+complete row, even when a matched game already has valid stored sides. It logs
+invalid-box or unresolved-side warnings and leaves new or scheduled malformed
+games scheduled with their available raw boxes for inspection. A complete correction to
+an existing final game includes its raw game and box writes in the same savepoint
+as finalization: an invalid correction logs a warning and preserves the previous
+consistent final record, both boxes and prediction errors. Other save failures
+roll back the complete row and propagate. No historical data is repaired or
+rewritten by this validation change.
 
 Finalized games are the authoritative inputs for ratings aggregation.
 

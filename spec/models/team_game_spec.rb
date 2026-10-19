@@ -103,6 +103,12 @@ RSpec.describe TeamGame do
 
     before { team_game.calculate_game_stats }
 
+    it 'raises when derived statistics cannot be saved' do
+      team_game.team = nil
+
+      expect { team_game.calculate_game_stats }.to raise_error(ActiveRecord::RecordInvalid)
+    end
+
     it 'calculates effective field goal percentage' do
       fgm = team_game.field_goals_made
       three_pm = team_game.three_pt_made

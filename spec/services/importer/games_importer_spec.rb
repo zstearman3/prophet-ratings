@@ -415,6 +415,110 @@ RSpec.describe Importer::GamesImporter do
     expect(game.pace).to be_nil
   end
 
+  it 'keeps new malformed complete boxes scheduled and logs the field reason' do
+    malformed = completed_row.deep_dup
+    malformed[:home_team_stats][:points] = 1
+    allow(Rails.logger).to receive(:warn)
+
+    described_class.import([malformed])
+
+    expect(Game.last).to have_attributes(status: 'scheduled', minutes: nil, possessions: nil)
+    expect(Game.last.home_team_game.offensive_rating).to be_nil
+    expect(Rails.logger).to have_received(:warn).with(/Skipping finalization.*home.*score/)
+  end
+
+  it 'preserves a final game and both boxes after an invalid complete correction inside an outer transaction' do
+    described_class.import([completed_row])
+    game = Game.last
+    original_game = game.attributes
+    original_sides = TeamGame.where(game:).order(:id).map(&:attributes)
+    malformed = completed_row.deep_dup
+    malformed[:home_team_score] = 1
+    malformed[:home_team_stats][:points] = 1
+    malformed[:away_team_stats][:assists] = 99
+
+    Game.transaction { described_class.import([malformed]) }
+
+    expect(game.reload.attributes).to eq(original_game)
+    expect(TeamGame.where(game:).order(:id).map(&:attributes)).to eq(original_sides)
+  end
+
+  describe 'complete corrections with unresolved incoming sides' do
+    let(:game) do
+      described_class.import([completed_row])
+      Game.last
+    end
+    let(:prediction) do
+      version = create(:ratings_config_version)
+      snapshots = [home_team_season, away_team_season].map do |team_season|
+        create(:team_rating_snapshot, team_season:, ratings_config_version: version, snapshot_date: date - 1.day)
+      end
+      create(:prediction, game:, ratings_config_version: version,
+                          home_team_snapshot: snapshots.first, away_team_snapshot: snapshots.last,
+                          home_offensive_efficiency: 110, away_offensive_efficiency: 100,
+                          home_defensive_efficiency: 100, away_defensive_efficiency: 110, pace: 70)
+    end
+
+    before do
+      prediction
+      game.finalize
+    end
+
+    %i[unknown_team missing_team_season].each do |resolution_failure|
+      it "preserves the final game, boxes and prediction errors for #{resolution_failure}" do
+        incoming_name = 'Unresolved Away'
+        if resolution_failure == :missing_team_season
+          incoming_team = create(:team, school: incoming_name, slug: 'unresolved-away')
+          create(:team_alias, team: incoming_team, value: incoming_name, source: 'sports_reference')
+        end
+        original_game = game.attributes
+        original_sides = TeamGame.where(game:).order(:id).map(&:attributes)
+        original_prediction = prediction.reload.attributes
+        correction = completed_row.deep_dup
+        correction[:home_team_score] = correction[:home_team_stats][:points] = 101
+        correction[:home_team_stats][:free_throws_made] = 20
+        correction[:away_team] = incoming_name
+        correction[:away_team_stats][:rebounds] = 35
+
+        Game.transaction { described_class.import([correction]) }
+
+        expect(game.reload.attributes).to eq(original_game)
+        expect(TeamGame.where(game:).order(:id).map(&:attributes)).to eq(original_sides)
+        expect(prediction.reload.attributes).to eq(original_prediction)
+      end
+    end
+  end
+
+  it 'applies valid complete corrections when both incoming team seasons resolve' do
+    described_class.import([completed_row])
+    game = Game.last
+    correction = completed_row.deep_dup
+    correction[:home_team_score] = correction[:home_team_stats][:points] = 101
+    correction[:home_team_stats][:free_throws_made] = 20
+
+    described_class.import([correction])
+
+    expect(game.reload).to have_attributes(status: 'final', home_team_score: 101)
+    expect(game.home_team_game).to have_attributes(points: 101, free_throws_made: 20)
+  end
+
+  it 'leaves a complete row with an unmatched side scheduled instead of averaging only one team' do
+    unknown = completed_row.merge(away_team: 'Unknown Team')
+    described_class.import([unknown])
+    expect(Game.last).to have_attributes(status: 'scheduled', minutes: nil, possessions: nil)
+    expect(Game.last.away_team_game).to be_nil
+  end
+
+  it 'does not resave rolled-back derived fields when normalized minutes are invalid' do
+    malformed = completed_row.deep_dup
+    malformed[:home_team_stats][:minutes] = 4
+    malformed[:away_team_stats][:minutes] = 4
+
+    described_class.import([malformed])
+
+    expect(Game.last).to have_attributes(status: 'scheduled', minutes: nil, possessions: nil)
+  end
+
   it 'does not downgrade an existing final game when an incomplete row is imported later' do
     described_class.import([completed_row])
     game = Game.last

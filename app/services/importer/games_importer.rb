@@ -107,11 +107,21 @@ module Importer
                Game.new(home_team_name: row[:home_team], away_team_name: row[:away_team], start_time:)
 
         if game_complete?(row)
-          process_complete_game(game, row, season, home_team_season, away_team_season)
+          process_complete_row(game) do
+            process_complete_game(game, row, season, home_team_season, away_team_season)
+          end
         else
           process_incomplete_game(game, row, season, home_team_season, away_team_season)
         end
         game
+      end
+
+      def process_complete_row(game, &)
+        # A correction to a final record must roll back raw boxes as well as derived writes.
+        game.transaction(requires_new: true, &)
+      rescue ProphetRatings::GameFinalizer::MissingDerivedStatsError => error
+        game.reload
+        Rails.logger.warn("Skipping finalization for game #{game.id}: #{error.message}")
       end
 
       def process_complete_game(game, row, season, home_team_season, away_team_season)
@@ -132,7 +142,7 @@ module Importer
         process_team_game(home_game, row[:home_team_stats], home_team_season, away_team_season) if home_game
         process_team_game(away_game, row[:away_team_stats], away_team_season, home_team_season) if away_game
 
-        finalize_game_if_possible(game)
+        finalize_game_if_possible(game, home: home_game, away: away_game)
       end
 
       def process_incomplete_game(game, row, season, home_team_season, away_team_season)
@@ -165,11 +175,27 @@ module Importer
         incoming_url.presence || stored_url
       end
 
-      def finalize_game_if_possible(game)
+      def finalize_game_if_possible(game, sides)
+        validate_incoming_sides(game, sides)
         game.finalize
-      rescue ProphetRatings::GameFinalizer::MissingDerivedStatsError => e
-        Rails.logger.warn("Skipping finalization for game #{game.id}: #{e.message}")
+      rescue ProphetRatings::GameFinalizer::MissingDerivedStatsError => error
+        handle_finalization_failure(game, error)
+      end
+
+      def handle_finalization_failure(game, error)
+        raise error if game.final?
+
+        Rails.logger.warn("Skipping finalization for game #{game.id}: #{error.message}")
         game.scheduled!
+      end
+
+      def validate_incoming_sides(game, sides)
+        sides.each do |label, side|
+          next if side
+
+          raise ProphetRatings::GameFinalizer::MissingDerivedStatsError,
+                "Cannot finalize game #{game.id}: #{label} incoming team season could not be resolved"
+        end
       end
 
       def game_complete?(row)
