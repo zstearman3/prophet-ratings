@@ -666,6 +666,42 @@ stored predictions and immutable payloads are not rewritten.
 
 ## Frozen forecast context and revisions
 
+### Participant corrections and outcome alignment
+
+Before displaying a current forecast, evaluating any forecast kind, attaching
+result errors, or learning volatility/home-court adjustments, compare the
+ordered home and away `team_id` **and** `team_season_id` against the game's
+current `TeamGame` sides. Nonempty frozen context is authoritative: use its
+captured snapshot source IDs, never mutable source snapshot associations.
+Recreating TeamGame rows for the same identities and sides is safe; reversing
+sides, replacing a participant, or losing either current/captured identity is
+excluded. Scores and box-score corrections for matching identities remain
+usable and evaluation recomputes their residuals.
+
+The stable exclusion reasons are `missing_current_participants`,
+`missing_captured_participants`, and `participant_side_mismatch`. Current
+forecast pages explain unavailability; saved betting recommendations with a
+rejected prediction are hidden without deleting records. Evaluation retains the
+selected/excluded denominator and reports `coverage.excluded_by_reason` (with
+`invalid_outcome` for otherwise invalid numeric outcomes). Learning exposes
+`excluded_prediction_counts` per aggregation run and logs exclusions. Previously
+saved residuals from rejected forecasts do not enter learning.
+
+Chronological candidate selection stays unchanged: rejecting a selected verified
+issuance never exposes a legacy forecast for the same game/model. Empty-context
+legacy forecasts use their snapshots' stored team/team-season IDs, fail closed
+when unavailable, and remain unverified because their original identities were
+not captured immutably. Reconstructions obey the same alignment check during
+exploratory evaluation and never become current or residual-learning fallback.
+
+These are outcome-alignment safeguards for all model versions, with no new
+coefficients, configuration hash, or bundle. They do not remap, reissue, delete,
+or rewrite issued predictions, contexts, provenance, or attached historical
+errors. Existing contexts remain replayable even when current results no longer
+describe their original participants. An intentional new forecast requires the
+normal explicit issuance workflow and eligibility checks.
+
+
 New saved predictions have calculation context contract 1: both snapshots' exact
 core ratings and optional volatility/home boosts, source IDs/dates/timestamps,
 season efficiency/pace anchors and resolved deviation fallbacks, venue evidence,

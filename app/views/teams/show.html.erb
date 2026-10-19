@@ -192,7 +192,7 @@
                     <span class="text-xs text-gray-500"><%= prediction.provenance_label %></span>
                     <%= link_to prediction.predicted_score_string, game_path(game), class: "hover:text-blue-600" %>
                   <% else %>
-                    —
+                    <%= game.current_prediction_unavailable_reason(ratings_config_version: @config)&.humanize || '—' %>
                   <% end %>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm uppercase">

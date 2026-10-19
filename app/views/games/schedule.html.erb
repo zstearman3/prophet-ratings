@@ -53,7 +53,7 @@
                 class: "block text-gray-800 hover:text-blue-600" %>
               <span class="text-xs text-gray-500">Home win: <%= number_to_percentage(prediction.home_win_probability * 100, precision: 1) %></span>
             <% else %>
-              <span class="text-xs text-gray-400">No prediction</span>
+              <span class="text-xs text-gray-400"><%= game.current_prediction_unavailable_reason&.humanize || 'No prediction' %></span>
             <% end %>
           </td>
         </tr>

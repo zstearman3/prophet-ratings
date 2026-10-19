@@ -9,6 +9,7 @@ module ProphetRatings
                    date_range: Season.current.start_date..Season.current.end_date, mode: 'pregame', season: nil)
       raise ArgumentError, 'Unknown forecast type' unless MODES.include?(mode)
 
+      @excluded_by_reason = Hash.new(0)
       @mode = mode
       @scope = Prediction.joins(:game).where(ratings_config_version:)
                          .merge(Game.final.through_schedule_date(date_range.end))
@@ -29,13 +30,19 @@ module ProphetRatings
       evaluated_count = observations.size
       {
         mode: @mode, available_by_kind: @scope.group(:forecast_kind).count,
-        selected: selected_count, evaluated: evaluated_count, excluded_invalid: selected_count - evaluated_count
+        selected: selected_count, evaluated: evaluated_count, excluded_invalid: selected_count - evaluated_count,
+        excluded_by_reason: @excluded_by_reason
       }
     end
 
     def observations
-      @observations ||= predictions.includes(game: { home_team_game: :team, away_team_game: :team })
-                                   .filter_map { |prediction| EvaluationObservation.new(prediction).call }
+      @observations ||= begin
+        @excluded_by_reason = Hash.new(0)
+        predictions.includes(:home_team_snapshot, :away_team_snapshot,
+                             game: { home_team_game: :team, away_team_game: :team }).filter_map do |prediction|
+          observation_for(prediction)
+        end
+      end
     end
 
     def compare(other)
@@ -59,6 +66,12 @@ module ProphetRatings
     end
 
     private
+
+    def observation_for(prediction)
+      result = EvaluationObservation.new(prediction).call
+      @excluded_by_reason[prediction.participant_exclusion_reason || 'invalid_outcome'] += 1 unless result
+      result
+    end
 
     def predictions
       return @scope.selected_pregame if @mode == 'pregame'

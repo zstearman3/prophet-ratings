@@ -128,7 +128,7 @@ RSpec.describe ResumeSeasonRatingsJob do
                                      forecast_kind: 'pregame', forecast_start_time: game.start_time,
                                      input_cutoff: season.start_date - 1, generated_at: game.start_time - 1.hour,
                                      revision_key: 'incomplete-game', home_offensive_efficiency_error: 999)
-    game.away_team_game.destroy!
+    game.away_team_game.update!(offensive_efficiency: nil)
     teams.first.update!(adj_offensive_efficiency: 125)
     expect { replay(date + 1) }.to raise_error(ArgumentError, /finalized.*team-game inputs/)
     expect(teams.first.reload.adj_offensive_efficiency).to eq(125)

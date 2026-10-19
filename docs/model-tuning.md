@@ -156,3 +156,9 @@ common games and keep an untouched chronological evaluation period. Factor MAE
 improvement alone does not establish improvement in score or win predictions.
 No defaults above are claimed to be empirically optimal. The admin evaluation
 page provides evidence; it does not automatically search or activate parameters.
+
+Participant corrections change sample eligibility, not model coefficients.
+Evaluation and learning exclude missing or mismatched ordered participant IDs;
+inspect reason counts before interpreting sample changes. Score-only corrections
+with matching identities remain eligible. See [the alignment policy](ratings.md#participant-corrections-and-outcome-alignment)
+for frozen, legacy, and reconstruction handling and preservation of issued history.

@@ -16,7 +16,10 @@
       <p class="rounded border border-amber-500 bg-amber-50 p-4 font-semibold">Exploratory results only. These forecasts are not verified pregame predictions and cannot establish live predictive performance.</p>
     <% end %>
     <p><strong><%= @page[:model].name %></strong> · <%= @page[:dates].first %> through <%= @page[:dates].last %> (Eastern game dates).</p>
-    <p><%= coverage[:selected] %> selected forecasts; <%= coverage[:evaluated] %> evaluated; <%= coverage[:excluded_invalid] %> excluded for missing/nonfinite scores or probabilities, invalid probabilities, or tied outcomes. One forecast per game/model.</p>
+    <p><%= coverage[:selected] %> selected forecasts; <%= coverage[:evaluated] %> evaluated; <%= coverage[:excluded_invalid] %> excluded for participant alignment or invalid outcomes. One forecast per game/model.</p>
+    <% coverage.fetch(:excluded_by_reason).each do |reason, count| %>
+      <p><%= reason.humanize %>: <%= count %> excluded.</p>
+    <% end %>
     <p>Available forecast records before selection: <%= coverage[:available_by_kind].map { |kind, count| "#{kind}: #{count}" }.join(', ').presence || 'none' %>.</p>
     <p class="text-sm">Actuals use current finalized box scores. Corrections can change this report. Historical reconstructions are evaluated separately; legacy uncertainty is omitted.</p>
     <% if @page[:comparison] %>

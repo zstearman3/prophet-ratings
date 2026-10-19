@@ -123,12 +123,22 @@ class Game < ApplicationRecord
   # Returns the prediction for the game associated with the current ratings configuration version, or nil if none exists.
   # @return [Prediction, nil] The current prediction or nil if not found.
   def current_prediction(ratings_config_version: RatingsConfigVersion.published_default)
-    current_config_id = ratings_config_version&.id
-    return nil unless current_config_id
-
-    scope = predictions.where(ratings_config_version_id: current_config_id)
-    scope.selected_pregame.first || scope.where(forecast_kind: 'legacy_unverified').order(id: :desc).first
+    candidate = current_prediction_candidate(ratings_config_version)
+    candidate unless candidate&.participant_exclusion_reason
   end
+
+  def current_prediction_unavailable_reason(ratings_config_version: RatingsConfigVersion.published_default)
+    current_prediction_candidate(ratings_config_version)&.participant_exclusion_reason
+  end
+
+  def current_prediction_candidate(ratings_config_version)
+    return unless ratings_config_version
+
+    predictions.selected_pregame.find_by(ratings_config_version:) ||
+      predictions.where(ratings_config_version:, forecast_kind: 'legacy_unverified').order(id: :desc).first
+  end
+
+  private :current_prediction_candidate
 
   ##
   # Returns the team with the higher score.

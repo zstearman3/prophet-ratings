@@ -6,7 +6,7 @@
           <div class="flex items-center">
             <h1 class="text-2xl font-bold text-prophet-black">
               <% if @away_team_game&.team %>
-                <span class="text-sm text-gray-600 mr-2">#<%= @away_team_game.team_season&.rank %></span>
+                <span class="text-sm text-gray-600 mr-2">#<%= @away_team_game&.team_season&.rank %></span>
                 <%= link_to @away_team_game.team.school, team_path(@away_team_game.team), class: "hover:text-blue-600" %>
               <% else %>
                 <%= @game.away_team_name %>
@@ -19,7 +19,7 @@
           <div class="flex items-center">
             <h1 class="text-2xl font-bold text-prophet-black">
               <% if @home_team_game&.team %>
-                <span class="text-sm text-gray-600 mr-2">#<%= @home_team_game.team_season&.rank %></span>
+                <span class="text-sm text-gray-600 mr-2">#<%= @home_team_game&.team_season&.rank %></span>
                 <%= link_to @home_team_game.team.school, team_path(@home_team_game.team), class: "hover:text-blue-600" %>
               <% else %>
                 <%= @game.home_team_name %>
@@ -68,9 +68,13 @@
               <tr>
                 <td class="px-3 py-2 whitespace-nowrap">
                   <div class="flex items-center">
-                    <span class="text-sm text-gray-600 mr-2">#<%= @away_team_game.team_season&.rank %></span>
+                    <span class="text-sm text-gray-600 mr-2">#<%= @away_team_game&.team_season&.rank %></span>
                     <span class="text-sm font-medium text-prophet-black">
-                      <%= link_to @away_team_game.team.school, team_path(@away_team_game.team), class: "hover:text-blue-600" %>
+                      <% if @away_team_game&.team %>
+                        <%= link_to @away_team_game.team.school, team_path(@away_team_game.team), class: "hover:text-blue-600" %>
+                      <% else %>
+                        <%= @game.away_team_name %>
+                      <% end %>
                     </span>
                   </div>
                 </td>
@@ -123,9 +127,13 @@
               <tr>
                 <td class="px-3 py-2 whitespace-nowrap">
                   <div class="flex items-center">
-                    <span class="text-sm text-gray-600 mr-2">#<%= @home_team_game.team_season&.rank %></span>
+                    <span class="text-sm text-gray-600 mr-2">#<%= @home_team_game&.team_season&.rank %></span>
                     <span class="text-sm font-medium text-prophet-black">
-                      <%= link_to @home_team_game.team.school, team_path(@home_team_game.team), class: "hover:text-blue-600" %>
+                      <% if @home_team_game&.team %>
+                        <%= link_to @home_team_game.team.school, team_path(@home_team_game.team), class: "hover:text-blue-600" %>
+                      <% else %>
+                        <%= @game.home_team_name %>
+                      <% end %>
                     </span>
                   </div>
                 </td>
@@ -260,7 +268,7 @@
         </div>
       <% else %>
         <div class="bg-white p-6 rounded-lg shadow">
-          <p class="text-gray-600">No prediction available for this game.</p>
+          <p class="text-gray-600"><%= @game.current_prediction_unavailable_reason&.humanize || 'No prediction available for this game.' %></p>
         </div>
       <% end %>
     </div>
