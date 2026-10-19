@@ -59,6 +59,9 @@ RSpec.describe 'Admin prediction evaluations', type: :request do
       snapshots = create_list(:team_season, 2, season:).map do |team|
         create(:team_rating_snapshot, team_season: team, ratings_config_version: version)
       end
+      snapshots.each_with_index do |snapshot, index|
+        create(:team_game, game:, team: snapshot.team, team_season: snapshot.team_season, home: index.zero?)
+      end
       create(:prediction, game:, ratings_config_version: version, home_team_snapshot: snapshots.first, away_team_snapshot: snapshots.last,
                           home_score: 84, away_score: 72, pace: 78, home_win_probability: 0.75)
       get path, params: filters.merge(mode: 'legacy_unverified', comparison_id: version.id)

@@ -18,10 +18,14 @@ module ProphetRatings
       }
     }.freeze
 
+    def excluded_prediction_counts
+      @options.fetch(:excluded_prediction_counts)
+    end
+
     def initialize(season: Season.current, as_of: Time.current, ratings_config_version: nil, **options)
       @ratings_config_version = RatingsConfigVersion.resolve(ratings_config_version)
       @season = season
-      @options = options.merge(as_of:)
+      @options = options.merge(as_of:, excluded_prediction_counts: Hash.new(0))
       @predictions_by_side = {}
     end
 
@@ -54,19 +58,23 @@ module ProphetRatings
 
     attr_reader :season
 
-    def as_of
-      @options.fetch(:as_of)
-    end
-
     def preload_predictions
       scope = @options[:verified_only] ? Prediction.selected_pregame : Prediction.selected_with_legacy
       predictions = scope
                     .where(ratings_config_version: @ratings_config_version)
                     .joins(:game)
                     .where(games: { season_id: season.id })
-                    .merge(Game.final.through_schedule_date(as_of))
+                    .merge(Game.final.through_schedule_date(@options.fetch(:as_of)))
                     .includes(:home_team_snapshot, :away_team_snapshot, game: %i[home_team_game away_team_game])
                     .to_a
+
+      excluded_prediction_counts.clear
+      predictions = predictions.reject do |prediction|
+        reason = prediction.participant_exclusion_reason
+        excluded_prediction_counts[reason] += 1 if reason
+        reason
+      end
+      Rails.logger.info("Excluded prediction participants: #{excluded_prediction_counts}") if excluded_prediction_counts.any?
 
       predictions.each do |prediction|
         if @options[:verified_only]
@@ -95,7 +103,7 @@ module ProphetRatings
       TeamGame
         .joins(:game)
         .where(team_season_id: team_season_ids)
-        .merge(Game.final.through_schedule_date(as_of))
+        .merge(Game.final.through_schedule_date(@options.fetch(:as_of)))
         .includes(:game)
         .group_by(&:team_season_id)
     end

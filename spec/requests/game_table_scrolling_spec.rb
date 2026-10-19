@@ -41,6 +41,9 @@ RSpec.describe 'Game table scrolling' do
                                                   team_season: create(:team_season, season: game.season))
     away_snapshot = create(:team_rating_snapshot, ratings_config_version: config,
                                                   team_season: create(:team_season, season: game.season))
+    [home_snapshot, away_snapshot].each_with_index do |snapshot, index|
+      create(:team_game, game:, team: snapshot.team, team_season: snapshot.team_season, home: index.zero?)
+    end
     prediction = create(:prediction, game:, ratings_config_version: config, home_team_snapshot: home_snapshot,
                                      away_team_snapshot: away_snapshot, home_score: 75, away_score: 70,
                                      home_win_probability: 0.6, pace: 68)

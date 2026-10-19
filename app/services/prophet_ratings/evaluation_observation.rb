@@ -9,7 +9,7 @@ module ProphetRatings
     end
 
     def call
-      return unless valid_outcome?
+      return if exclusion_reason
 
       {
         game_id: @game.id, prediction_id: @prediction.id, date: @game.schedule_date,
@@ -19,6 +19,10 @@ module ProphetRatings
         pace_errors: pace_pair ? [pace_pair.first - pace_pair.last] : [], pace_pair: pace_pair,
         margin_z: margin_z, teams: teams, factors: FactorEvaluation.observations(@prediction)
       }
+    end
+
+    def exclusion_reason
+      @prediction.participant_exclusion_reason || ('invalid_outcome' unless valid_outcome?)
     end
 
     def self.finite?(value)

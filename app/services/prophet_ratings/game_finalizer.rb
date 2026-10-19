@@ -70,6 +70,8 @@ module ProphetRatings
     end
 
     def finalize_stored_prediction(prediction)
+      reason = prediction.participant_exclusion_reason
+      return skip_invalid_prediction(prediction, reason) if reason
       return unless prediction_version_valid?(prediction)
 
       update_prediction_errors!(prediction)
@@ -85,7 +87,7 @@ module ProphetRatings
     end
 
     def skip_invalid_prediction(prediction, error)
-      Rails.logger.warn("Skipping prediction=#{prediction.id} for game=#{game.id}: #{error.message}")
+      Rails.logger.warn("Skipping prediction=#{prediction.id} for game=#{game.id}: #{error}")
       nil
     end
 
@@ -105,9 +107,10 @@ module ProphetRatings
 
     public_class_method def self.prediction_error_attributes(prediction)
       game = prediction.game
+      return if prediction.participant_exclusion_reason || !complete_error_inputs?(prediction, game)
+
       home_game = game.home_team_game
       away_game = game.away_team_game
-      return unless home_game && away_game
 
       {
         home_offensive_efficiency_error: prediction.home_offensive_efficiency - home_game.offensive_efficiency,
@@ -117,6 +120,16 @@ module ProphetRatings
         pace_error: prediction.pace - game.pace
       }
     end
+
+    def self.complete_error_inputs?(prediction, game)
+      predicted = prediction.attributes.values_at('home_offensive_efficiency', 'away_offensive_efficiency',
+                                                  'home_defensive_efficiency', 'away_defensive_efficiency', 'pace')
+      actual = [game.home_team_game, game.away_team_game].flat_map do |side|
+        [side.offensive_efficiency, side.defensive_efficiency]
+      end
+      (predicted + actual + [game.pace]).all? { |value| EvaluationObservation.finite?(value) }
+    end
+    private_class_method :complete_error_inputs?
 
     ##
     # Calculates the average possessions from the home and away team games.

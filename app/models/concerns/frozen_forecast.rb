@@ -53,6 +53,19 @@ module FrozenForecast
     ProphetRatings::ForecastContext.new(calculation_context)
   end
 
+  # Ordered identity must still describe the outcome; issuance itself is never rewritten.
+  def participant_exclusion_reason
+    current = current_participant_identities
+    return 'missing_current_participants' if current.flatten.any?(&:nil?)
+
+    captured = captured_participant_identities
+    if captured.flatten.any?(&:nil?)
+      'missing_captured_participants'
+    elsif captured != current
+      'participant_side_mismatch'
+    end
+  end
+
   def forecast_team_season_id(index)
     return calculation_context.dig('snapshots', index, 'source', 'team_season_id') if calculation_context.present?
 
@@ -75,6 +88,24 @@ module FrozenForecast
   end
 
   private
+
+  def captured_participant_identities
+    [0, 1].map { |index| forecast_participant_identity(index) }
+  end
+
+  def current_participant_identities
+    [game.home_team_game, game.away_team_game].map { |side| [side&.team_id, side&.team_season_id] }
+  end
+
+  def forecast_participant_identity(index)
+    if calculation_context.present?
+      source = calculation_context.dig('snapshots', index, 'source') || {}
+      source.values_at('team_id', 'team_season_id')
+    else
+      snapshot = [home_team_snapshot, away_team_snapshot].fetch(index)
+      [snapshot&.team_id, snapshot&.team_season_id]
+    end
+  end
 
   def forecast_provenance_is_complete
     return if forecast_kind == 'legacy_unverified' && calculation_context.empty?

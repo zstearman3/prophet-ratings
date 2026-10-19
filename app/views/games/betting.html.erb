@@ -37,7 +37,8 @@
     </thead>
     <tbody>
       <% @games.each do |game| %>
-        <% recommendations = game.current_bet_recommendations.index_by(&:bet_type) %>
+        <% usable_recommendations, excluded_recommendations = game.current_bet_recommendations.partition { |recommendation| !recommendation.prediction.participant_exclusion_reason } %>
+        <% recommendations = usable_recommendations.index_by(&:bet_type) %>
 
         <tr class="border-t tr-hoverable cursor-pointer" data-controller="betting-expand" data-action="click->betting-expand#toggle" data-betting-sort-target="row"
           data-ev-for-spread="<%= recommendations["spread"]&.ev || -999 %>"
@@ -46,6 +47,9 @@
           <td class="px-4 py-2 font-semibold">
             <%= link_to "#{game.away_team_name} @ #{game.home_team_name}", game_path(game),
               class: "text-gray-800 hover:text-blue-600" %>
+            <% excluded_recommendations.map { |recommendation| recommendation.prediction.participant_exclusion_reason }.uniq.each do |reason| %>
+              <div class="text-xs text-gray-500">Forecast unavailable: <%= reason.humanize %></div>
+            <% end %>
           </td>
           <td class="px-4 py-2">
             <% if recommendations["spread"] %>
@@ -98,6 +102,8 @@
             <% if game.current_prediction %>
               <div class="text-xs text-gray-500"><%= game.current_prediction.provenance_label %></div>
               <div><span class="font-semibold">Predicted Score:</span> <%= game.current_prediction.predicted_score_with_teams %></div>
+            <% else %>
+              <%= game.current_prediction_unavailable_reason&.humanize %>
             <% end %>
           </td>
           <td class="px-4 py-3 align-top">

@@ -252,6 +252,9 @@ RSpec.describe ProphetRatings::ModelConfiguration do
     home, away = snapshots(first)
     [home, away].each { |snapshot| snapshot.team_season.update!(ratings_config_version: selected) }
     game = create(:game, season:, start_time: Game.schedule_time_for(season.start_date))
+    [home, away].each_with_index do |snapshot, index|
+      create(:team_game, game:, team: snapshot.team, team_season: snapshot.team_season, home: index.zero?)
+    end
     prediction = create(:prediction, game:, home_team_snapshot: home, away_team_snapshot: away, ratings_config_version: first)
     # Emulate an inconsistent historical row written before the output-version validation existed.
     prediction.update_columns(ratings_config_version_id: selected.id) # rubocop:disable Rails/SkipsModelValidations
