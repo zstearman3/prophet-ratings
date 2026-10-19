@@ -151,19 +151,32 @@ module Scraper
     end
 
     def schedule_completion_evidence(game_div, rows)
-      evidence = winner_loser_evidence(game_div)
-      evidence = 'schedule_final' if game_div.css('td.gamelink').text.squish.match?(/\AFinal(?:\s|\z)/i)
+      evidence = winner_loser_evidence(rows)
+      evidence = final_schedule_evidence(game_div, rows) || evidence
       validate_final_scores!(*rows.map { |row| score_from_row(row) }) if evidence
       evidence
     end
 
-    def winner_loser_evidence(game_div)
-      winner = game_div.at_css('table.teams tr.winner')
-      loser = game_div.at_css('table.teams tr.loser')
-      return unless winner && loser
+    def final_schedule_evidence(game_div, rows)
+      return unless game_div.css('td.gamelink').text.squish.match?(/\AFinal(?:\s|\z)/i)
 
-      validate_winner!(score_from_row(winner), score_from_row(loser))
+      validate_winner_loser!(rows) if rows.any? { |row| row.matches?('.winner, .loser') }
+      'schedule_final'
+    end
+
+    def winner_loser_evidence(rows)
+      return unless rows.any? { |row| row.matches?('.winner') }
+
+      validate_winner_loser!(rows)
       'schedule_winner_loser'
+    end
+
+    def validate_winner_loser!(rows)
+      winners, other_rows = rows.partition { |row| row.matches?('.winner') }
+      loser = other_rows.first
+      raise SourceError, "Contradictory schedule outcome for #{@date}" unless winners.one? && other_rows.one? && loser.matches?('.loser')
+
+      validate_winner!(score_from_row(winners.first), score_from_row(loser))
     end
 
     def validate_winner!(winner_score, loser_score)

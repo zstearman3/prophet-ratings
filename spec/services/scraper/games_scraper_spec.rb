@@ -287,6 +287,50 @@ RSpec.describe Scraper::GamesScraper do
       expect { scraper.to_json }.to raise_error(described_class::SourceError, /winner/)
     end
 
+    %w[unlinked_final linked_final].each do |layout|
+      it "rejects two winner rows in a #{layout} schedule before fetching a boxscore" do
+        document = Nokogiri::HTML(fixture_html(layout))
+        document.at_css('tr.loser')['class'] = 'winner'
+        allow(response).to receive(:body).and_return(document.to_html)
+        stub_boxscore(fixture_html('detailed_final'))
+
+        expect { scraper.to_json }.to raise_error(described_class::SourceError, /outcome/)
+        expect(HTTParty).not_to have_received(:get).with(scraper.send(:game_url, completed_url))
+      end
+    end
+
+    it 'rejects two loser rows when a Final label declares completion' do
+      document = Nokogiri::HTML(schedule_html)
+      document.at_css('tr.winner')['class'] = 'loser'
+      allow(response).to receive(:body).and_return(document.to_html)
+
+      expect { scraper.to_json }.to raise_error(described_class::SourceError, /outcome/)
+    end
+
+    it 'accepts a Final label without outcome classes on either team row' do
+      document = Nokogiri::HTML(schedule_html)
+      document.css('tr.winner, tr.loser').each { |row| row.remove_attribute('class') }
+      allow(response).to receive(:body).and_return(document.to_html)
+
+      expect(scraper.to_json.first).to include(
+        away_team: 'Howard', home_team: 'Kansas', away_team_score: 57, home_team_score: 87,
+        source_completed: true, source_completion_evidence: 'schedule_final'
+      )
+    end
+
+    it 'ignores outcome classes on descriptor rows before the two teams' do
+      document = Nokogiri::HTML(schedule_html)
+      descriptor = document.at_css('td.desc').parent
+      descriptor['class'] = 'winner loser'
+      document.at_css('tbody').prepend_child(descriptor)
+      allow(response).to receive(:body).and_return(document.to_html)
+
+      expect(scraper.to_json.first).to include(
+        away_team: 'Howard', home_team: 'Kansas', away_team_score: 57, home_team_score: 87,
+        source_completed: true, source_completion_evidence: 'schedule_final'
+      )
+    end
+
     it 'preserves an explicit zero score without inventing missing statistics' do
       allow(response).to receive(:body).and_return(schedule_html.sub('>57<', '>0<'))
 

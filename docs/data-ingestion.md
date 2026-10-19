@@ -237,7 +237,10 @@ A past date or bare scores do not confirm completion. Explicit canceled,
 postponed, suspended, abandoned, live, in-progress, halftime or scheduled status
 raises `Scraper::GamesScraper::SourceError`, including before following a
 schedule's boxscore link. Malformed final scores, tied finals and contradictory
-winner/loser scores also raise. Without supported evidence, schedule rows remain
+winner/loser scores also raise. An explicit `Final` accepts either no outcome
+classes or one winner and one loser on the two team rows; contradictory outcome
+classes raise before following a boxscore link. Descriptor rows do not supply
+team outcome evidence. Without supported evidence, schedule rows remain
 unconfirmed even if scores are present. A recognized empty `game_summaries`
 container is an empty date; failed HTTP requests, unavailable/unrecognized pages,
 and malformed team pairs are source errors rather than empty dates.
