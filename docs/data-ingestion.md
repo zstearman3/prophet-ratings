@@ -200,31 +200,65 @@ Schedule URL format:
 https://www.sports-reference.com/cbb/boxscores/index.cgi?month=<m>&day=<d>&year=<yyyy>
 ```
 
-The scraper handles two kinds of entries:
+The scraper returns symbol-keyed row hashes for linked boxscores, completed
+score-only schedule results, and scheduled games. Team names may be links or
+plain text; poll-rank annotations are excluded. The first source team remains
+`away_team`, the second `home_team`. Missing links do not imply division,
+database membership or ratings eligibility. Team filtering needs only the known
+school or one of its aliases, so an untracked opponent is retained.
 
-- Completed games with a box-score link.
-- Scheduled games on the schedule page without a final box-score link.
+Every row includes:
 
-Completed game rows include:
+- `home_team`, `away_team`: source names in source order.
+- `home_team_score`, `away_team_score`: nonnegative integers when available;
+  otherwise `nil`. Explicit zero is preserved.
+- `date`: parsed start time, or the existing fallback on the requested Eastern
+  schedule date. Completed boxscores use scorebox metadata; schedule rows use
+  their tip time if available. Conversion preserves Eastern schedule-date identity.
+- `home_team_stats`, `away_team_stats`: available basic totals, or `{}` when
+  unavailable. Missing cells remain blank strings; no zero counts are fabricated.
+- `url`: relative boxscore path when fetched, otherwise the full daily schedule
+  URL. Score-only schedule results retain this date-level identity, not an
+  invented game identifier.
+- `source_completed`: boolean source confirmation, independent of database team
+  matching and statistical completeness.
+- `source_completion_evidence`: one of the values below when confirmed,
+  otherwise `nil`.
 
-- Home team name
-- Away team name
-- Home score
-- Away score
-- Start date/time
-- Location
-- Home team stats
-- Away team stats
-- Box-score URL
+Completion requires two valid, unequal integer scores plus supported evidence:
 
-Scheduled game rows include:
+| Evidence | Supported source context |
+| --- | --- |
+| `schedule_final` | Explicit `Final` text in the schedule's gamelink cell, with or without an anchor. |
+| `schedule_winner_loser` | A winner/loser row pair whose scores agree with the declared winner. |
+| `boxscore` | A dated `/cbb/boxscores/YYYY-MM-DD-*.html` path, two named scorebox team containers, scorebox metadata and valid scores. Detailed tables are optional. |
 
-- Home team name
-- Away team name
-- Scheduled start time if parseable
-- Optional scores if present on the schedule page
-- Empty team stats
-- Schedule-page URL
+A past date or bare scores do not confirm completion. Explicit canceled,
+postponed, suspended, abandoned, live, in-progress, halftime or scheduled status
+raises `Scraper::GamesScraper::SourceError`, including before following a
+schedule's boxscore link. Malformed final scores, tied finals and contradictory
+winner/loser scores also raise. An explicit `Final` accepts either no outcome
+classes or one winner and one loser on the two team rows; contradictory outcome
+classes raise before following a boxscore link. Descriptor rows do not supply
+team outcome evidence. Without supported evidence, schedule rows remain
+unconfirmed even if scores are present. A recognized empty `game_summaries`
+container is an empty date; failed HTTP requests, unavailable/unrecognized pages,
+and malformed team pairs are source errors rather than empty dates.
+
+Boxscores additionally provide `box_score_location`. Basic stats are selected
+using the corresponding team's school-link identifier and table ID, so a missing
+away table cannot shift home statistics into the away payload. If an unlinked
+scorebox name cannot be safely associated with a table, its stats remain `{}`.
+
+`Ingestion::GameRowEnricher` preserves the completion keys, names, scores and
+source URL while adding existing venue/date enrichment. The importer currently
+ignores the additive completion fields and still applies its existing team
+matching and complete-stat finalization rules. Backend classification such as
+`final_unmatched`, persistence policy, calculations and UI are follow-on work.
+Source confirmation alone does not finalize a database game.
+
+Source-derived fixtures and their explicitly labeled synthetic transformations
+are documented in [the fixture provenance](../spec/fixtures/games_scraper/README.md).
 
 Team stats parsed from completed box scores include:
 

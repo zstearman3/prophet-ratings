@@ -82,7 +82,7 @@ module Scraper
       urls = document.css('div.game_summaries div.gender-m').filter_map do |game_div|
         team_names = game_rows(game_div).filter_map { |row| team_name_from_row(row) }
 
-        # Only keep games where both teams are matched in the database
+        # A known team is enough; its opponent need not be tracked.
         next unless team_names.any? { |name| all_names.include?(name) }
 
         parse_game_entry(game_div)
@@ -92,15 +92,19 @@ module Scraper
     end
 
     def parse_game_entry(game_div)
+      schedule_entry = parse_scheduled_game(game_div)
       gamelink = game_div.at_css('td.gamelink a')&.attribute('href')&.value
       return gamelink if gamelink.present?
 
-      parse_scheduled_game(game_div)
+      schedule_entry
     end
 
     def parse_scheduled_game(game_div)
+      reject_nonfinal_status!(game_div.css('table.teams td:nth-child(3)'))
       rows = game_rows(game_div)
-      raise SourceError, "Malformed scheduled game for #{@date}" unless rows.size >= 2
+      raise SourceError, "Contradictory schedule outcome for #{@date}" if rows.any? { |row| row.matches?('.winner.loser') }
+
+      source_completion_evidence = schedule_completion_evidence(game_div, rows)
 
       away_row = rows[0]
       home_row = rows[1]
@@ -116,18 +120,74 @@ module Scraper
         date: scheduled_start_time(time_from_rows(rows)),
         away_team_stats: {},
         home_team_stats: {},
+        source_completed: source_completion_evidence.present?,
+        source_completion_evidence:,
         url: schedule_url(@date)
       }
     end
 
     def game_rows(game_div)
-      game_div.css('table.teams tr').select { |row| row.at_css('td:first-child a').present? }
+      rows = game_div.css('table.teams tr').select { |row| row.css('td').size == 3 && !row.at_css('td[colspan]') }
+      raise SourceError, "Malformed scheduled game for #{@date}" unless rows.size == 2
+
+      rows
     end
 
     def team_name_from_row(row)
-      return nil unless row
+      node = row&.at_css('td:first-child, strong')
+      return '' unless node
 
-      row.at_css('td:first-child a')&.text.to_s.strip
+      copy = node.dup
+      copy.css('.pollrank').remove
+      copy.text.squish
+    end
+
+    def reject_nonfinal_status!(status_nodes)
+      status = status_nodes.xpath('.//text()').map(&:text).join(' ')
+      nonfinal = /\b(cancell?ed|postponed|suspended|abandoned|live|in[[:space:]-]+progress|halftime|scheduled|[12](?:st|nd) half)\b/i
+      return unless status.match?(nonfinal)
+
+      raise SourceError, "Nonfinal source status for #{@date}: #{status.squish}"
+    end
+
+    def schedule_completion_evidence(game_div, rows)
+      evidence = winner_loser_evidence(rows)
+      evidence = final_schedule_evidence(game_div, rows) || evidence
+      validate_final_scores!(*rows.map { |row| score_from_row(row) }) if evidence
+      evidence
+    end
+
+    def final_schedule_evidence(game_div, rows)
+      return unless game_div.css('td.gamelink').text.squish.match?(/\AFinal(?:\s|\z)/i)
+
+      validate_winner_loser!(rows) if rows.any? { |row| row.matches?('.winner, .loser') }
+      'schedule_final'
+    end
+
+    def winner_loser_evidence(rows)
+      return unless rows.any? { |row| row.matches?('.winner') }
+
+      validate_winner_loser!(rows)
+      'schedule_winner_loser'
+    end
+
+    def validate_winner_loser!(rows)
+      winners, other_rows = rows.partition { |row| row.matches?('.winner') }
+      loser = other_rows.first
+      raise SourceError, "Contradictory schedule outcome for #{@date}" unless winners.one? && other_rows.one? && loser.matches?('.loser')
+
+      validate_winner!(score_from_row(winners.first), score_from_row(loser))
+    end
+
+    def validate_winner!(winner_score, loser_score)
+      validate_final_scores!(winner_score, loser_score)
+      raise SourceError, "Inconsistent schedule winner for #{@date}" if winner_score <= loser_score
+    end
+
+    def validate_final_scores!(away_score, home_score)
+      return if away_score.is_a?(Integer) && home_score.is_a?(Integer) && away_score != home_score
+
+      raise SourceError, "Invalid final scores for #{@date}"
     end
 
     def score_from_row(row)
@@ -209,19 +269,25 @@ module Scraper
       raise SourceError, "Boxscore request failed: HTTP #{response.code}" unless response.success?
 
       document = Nokogiri::HTML(response.body)
-      raise SourceError, "Unrecognized boxscore page: #{url}" unless document.at_css('div.scorebox')
+      unless url.match?(%r{\A/cbb/boxscores/\d{4}-\d{2}-\d{2}-[^/]+\.html\z}) && document.at_css('div.scorebox')
+        raise SourceError, "Unrecognized boxscore page: #{url}"
+      end
 
-      team_boxes = document.css('div.scorebox')&.xpath('./div')
-      home_team = team_boxes[1]&.css('strong a')&.text
-      away_team = team_boxes[0]&.css('strong a')&.text
+      team_boxes = document.css('div.scorebox > div').select { |box| box.at_css('strong') }
+      home_team = team_name_from_row(team_boxes[1])
+      away_team = team_name_from_row(team_boxes[0])
       raise SourceError, "Missing boxscore teams: #{url}" if home_team.blank? || away_team.blank?
 
+      raise SourceError, "Unrecognized boxscore context: #{url}" unless document.at_css('div.scorebox_meta') && team_boxes.size == 2
+
+      reject_nonfinal_status!(document.css('.scorebox_meta, .scorebox .status'))
       home_team_score = parsed_score(team_boxes[1]&.css('div.score')&.text)
       away_team_score = parsed_score(team_boxes[0]&.css('div.score')&.text)
+      validate_final_scores!(away_team_score, home_team_score)
       date = completed_start_time(document.css('div.scorebox_meta div')[0]&.text)
       box_score_location = document.css('div.scorebox_meta div')[1]&.text.to_s.strip
-      away_team_line = document.css('table.stats_table tfoot tr')[0]
-      home_team_line = document.css('table.stats_table tfoot tr')[2]
+      away_team_stats = team_stats(document, team_boxes[0])
+      home_team_stats = team_stats(document, team_boxes[1])
 
       {
         home_team:,
@@ -230,10 +296,20 @@ module Scraper
         away_team_score:,
         date:,
         box_score_location:,
-        away_team_stats: parse_team_stats(away_team_line),
-        home_team_stats: parse_team_stats(home_team_line),
+        away_team_stats:,
+        home_team_stats:,
+        source_completed: true,
+        source_completion_evidence: 'boxscore',
         url:
       }
+    end
+
+    def team_stats(document, team_box)
+      team_url = team_box.at_css('strong a')&.[]('href').to_s
+      slug = team_url[%r{\A/cbb/schools/([a-z0-9-]+)/}, 1]
+      return {} unless slug
+
+      parse_team_stats(document.at_xpath("//table[@id='box-score-basic-#{slug}']/tfoot/tr"))
     end
 
     def scrape_day

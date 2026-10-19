@@ -182,4 +182,26 @@ RSpec.describe Ingestion::GameRowEnricher do
     expect(enriched_row).to eq(row)
     expect(Rails.logger).not_to have_received(:warn)
   end
+
+  it 'preserves source completion and identity through enrichment with an unmatched opponent at Eastern midnight' do
+    eastern_start_time = Game::SCHEDULE_TIME_ZONE.parse('2025-11-11 11:30pm').in_time_zone
+    row = game_row('Michigan', 'Untracked Opponent', eastern_start_time, '/cbb/boxscores/index.cgi?day=11')
+          .merge(away_team_score: 50, home_team_score: 80, away_team_stats: {}, home_team_stats: {},
+                 source_completed: true, source_completion_evidence: 'schedule_winner_loser')
+    michigan_schedule_rows.replace([schedule_row('Untracked Opponent', '', 'Crisler Arena', eastern_start_time, nil)
+                                    .merge(date: Date.new(2025, 11, 11))])
+
+    enriched_row = described_class.new([row]).call.first
+
+    expect(enriched_row).to include(row)
+    expect(enriched_row[:venue_type]).to eq('home')
+    expect(Game.schedule_date_for(enriched_row[:date])).to eq(Date.new(2025, 11, 11))
+  end
+
+  it 'preserves source completion when no enrichment matches an unmatched opponent' do
+    row = game_row('Michigan', 'Untracked Opponent', Time.zone.local(2025, 11, 11), 'schedule-url')
+          .merge(source_completed: true, source_completion_evidence: 'schedule_final', away_team_score: 50, home_team_score: 80)
+
+    expect(described_class.new([row]).call).to eq([row])
+  end
 end
