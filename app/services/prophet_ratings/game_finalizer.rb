@@ -15,11 +15,13 @@ module ProphetRatings
     ##
     # Finalizes the game by updating its status, derived fields, team game statistics, and prediction errors.
     def call
-      game.transaction do
+      game.transaction(requires_new: true) do
+        GameBoxScoreValidator.new(game, :home).call
+        GameBoxScoreValidator.new(game, :away).call
         update_derived_fields
         validate_finalization_prerequisites!
-        game.home_team_game&.calculate_game_stats
-        game.away_team_game&.calculate_game_stats
+        game.home_team_game.calculate_game_stats
+        game.away_team_game.calculate_game_stats
         finalize_prediction!
         game.final!
       end
@@ -30,20 +32,18 @@ module ProphetRatings
     attr_reader :game
 
     def validate_finalization_prerequisites!
-      return if game.pace.present?
+      %i[minutes possessions pace].each do |field|
+        value = game.public_send(field)
+        next if BasketballCalculations::StatFormulae.finite?(value) && value.positive?
 
-      missing = []
-      missing << 'minutes' if game.minutes.to_i <= 0
-      missing << 'possessions' if game.possessions.blank?
-
-      raise MissingDerivedStatsError,
-            "Cannot finalize game #{game.id}: missing valid #{missing.join(' and ')} required to compute pace"
+        raise MissingDerivedStatsError, "Cannot finalize game #{game.id}: #{field} must be finite and positive"
+      end
     end
 
     ##
     # Updates the game record with derived fields including possessions, average minutes played, and in-conference status.
     def update_derived_fields
-      game.update(
+      game.update!(
         possessions: calculated_possessions,
         minutes: calculated_minutes,
         in_conference: in_conference_game?

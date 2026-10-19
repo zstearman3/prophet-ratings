@@ -84,7 +84,7 @@ class TeamGame < ApplicationRecord
   alias_attribute :defensive_efficiency, :defensive_rating
 
   def calculate_game_stats
-    update(
+    update!(
       two_pt_percentage: calculated_two_pt_percentage,
       three_pt_percentage: calculated_three_pt_percentage,
       field_goals_percentage: calculated_field_goals_percentage,

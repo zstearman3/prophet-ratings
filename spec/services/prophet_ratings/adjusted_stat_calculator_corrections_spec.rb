@@ -40,6 +40,41 @@ RSpec.describe ProphetRatings::AdjustedStatCalculator do
     expect(aggregator.send(:calculate_average_stats, [side])[:three_pt_proficiency]).to eq(0)
   end
 
+  it 'omits undefined rebound rates from averages while retaining observed zero' do
+    unavailable = build(:team_game, offensive_rebounds: 0)
+    opponent = build(:team_game, defensive_rebounds: 0)
+    allow(unavailable).to receive(:opponent_game).and_return(opponent)
+    unavailable.offensive_rebound_rate = unavailable.calculated_offensive_rebound_rate
+    observed_zero = build(:team_game, offensive_rebound_rate: 0)
+    observed_half = build(:team_game, offensive_rebound_rate: 0.5)
+
+    stats = aggregator.send(:calculate_average_stats, [unavailable, observed_zero, observed_half])
+
+    expect(unavailable.offensive_rebound_rate).to be_nil
+    expect(stats[:offensive_rebound_rate]).to eq(0.25)
+  end
+
+  %i[corrected legacy].each do |formula|
+    it "omits undefined shot observations from #{formula} matrix rows and retains zero-opportunity composites" do
+      model = formula == :corrected ? version : legacy
+      teams = create_list(:team_season, 2, season:)
+      game = create(:game, season:, status: :final, start_time: season.start_date + 20.days)
+      create(:team_game, game:, team_season: teams.first, team: teams.first.team, home: true,
+                         field_goals_attempted: 0, three_pt_made: 0, three_pt_attempted: 0)
+      zero = create(:team_game, game:, team_season: teams.last, team: teams.last.team, home: false,
+                                field_goals_attempted: 10, three_pt_made: 0, three_pt_attempted: 0)
+      service = described_class.new(season:, raw_stat: :three_pt_proficiency, adj_stat: :unused,
+                                    adj_stat_allowed: :unused, as_of: game.schedule_date, ratings_config_version: model)
+      index = teams.map(&:team_id).each_with_index.to_h
+
+      rows, targets, _weights, metadata = service.send(:build_matrix_components, index, 2, 0.2)
+
+      expect(rows).to eq([[0, 1, 1, 0], [1, 1, 0, 0]])
+      expect(targets).to eq([-0.2, 0])
+      expect(metadata.map { |row| row.slice(:team_id, :observed) }).to eq([{ team_id: zero.team_id, observed: 0 }])
+    end
+  end
+
   it 'uses regulation-normalized pace while retaining the old bundle baseline' do
     side = build(:team_game, game: build(:game, possessions: 90, minutes: 45))
     expect(aggregator.send(:calculate_average_stats, [side])[:pace]).to eq(80)

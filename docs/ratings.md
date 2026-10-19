@@ -100,6 +100,30 @@ The aggregator also updates:
 
 Volatility and home-court values use previous prediction errors when available. If sample size is too small, the code falls back toward configured baselines from `config/ratings.yml`.
 
+### Undefined rates
+
+Game stat formulas return null when their required inputs are missing/nonfinite
+or their opportunity denominator is zero. This includes shot percentages, true
+shooting and effective field-goal percentages, shot attempt/free-throw rates,
+assist rate with no made field goals, rebound rates with no rebound opportunities,
+and possession-based rates with no possessions. Opponent-dependent rates require
+an opponent box. A zero numerator with a positive denominator remains an observed
+zero, not a missing value.
+
+The three-point proficiency composite keeps its established exception: zero 3PA
+with positive FGA and present shot counts is `0`, although standalone 3P% is null.
+For example, 2 makes in 5 three-point attempts and 10 total FGA produce `0.43333`
+under the corrected composite. Zero total FGA or missing required shot counts
+produce null under both corrected and legacy composites. Finite legacy composite
+arithmetic retains its existing rounded percentage calculation.
+
+Direct season averages omit null observations and retain observed zero rates.
+Adjusted-stat matrix construction similarly omits unavailable observations under
+both legacy and corrected bundles, including recomputed three-point composites.
+These guards preserve finite formula definitions, coefficients, config hashes and
+40-minute pace normalization. They require no new model bundle and do not rewrite
+historical snapshots or imported statistics.
+
 ## Season averages
 
 After raw aggregation, `Season#update_average_ratings` stores season-level baselines:
