@@ -76,7 +76,7 @@ class Season < ApplicationRecord
 
   def rating_outputs?
     initialized = team_seasons.where('adj_offensive_efficiency IS NOT NULL OR adj_defensive_efficiency IS NOT NULL OR adj_pace IS NOT NULL')
-    team_rating_snapshots.exists? || predictions.exists? || games.final.exists? || initialized.exists?
+    team_rating_snapshots.exists? || predictions.exists? || games.completed.exists? || initialized.exists?
   end
 
   def update_average_ratings(as_of: nil)

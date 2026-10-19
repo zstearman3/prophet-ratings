@@ -112,4 +112,31 @@ RSpec.describe ProphetRatings::PredictionEvaluator do
     expect(verified.call[:margin_mae]).to eq(1)
     expect(verified.report.rows.first[:margin_z]).to be_positive
   end
+
+  it 'excludes unmatched completed games from evaluation and direct observations despite stale valid inputs' do
+    prediction = forecast(home_defensive_efficiency: 90, away_defensive_efficiency: 100)
+    game.update!(status: :final_unmatched)
+    observation = ProphetRatings::EvaluationObservation.new(prediction)
+    expect(observation.exclusion_reason).to eq('unmatched_result')
+    expect(observation.call).to be_nil
+    expect(evaluator.call[:games]).to eq(0)
+    expect(ProphetRatings::GameFinalizer.prediction_error_attributes(prediction)).to be_nil
+    game.home_team_game.destroy!
+    game.away_team_game.destroy!
+    expect(ProphetRatings::GameFinalizer.prediction_error_attributes(prediction.reload)).to be_nil
+  end
+
+  it 'ignores unmatched stored prediction errors when learning volatility and home advantage' do
+    prediction = forecast(home_offensive_efficiency_error: 999, home_defensive_efficiency_error: -999,
+                          away_offensive_efficiency_error: -999, away_defensive_efficiency_error: 999)
+    game.update!(status: :final_unmatched, venue_type: 'home', venue_confidence: 'confirmed')
+    aggregator = ProphetRatings::TeamSeasonStatsAggregator.new(season:, as_of: season.end_date, ratings_config_version: version)
+    aggregator.run
+    baseline = teams.map { |team| team.reload.attributes }
+    prediction.update!(pace_error: -999, home_offensive_efficiency_error: -999)
+    aggregator.run
+    expect(teams.map { |team| team.reload.attributes }).to eq(baseline)
+    expect(teams.first).to have_attributes(offensive_efficiency_volatility: 11.5, home_offense_boost: 2.2,
+                                           home_defense_boost: -2.2)
+  end
 end

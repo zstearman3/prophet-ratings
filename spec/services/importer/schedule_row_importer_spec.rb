@@ -85,4 +85,11 @@ RSpec.describe Importer::ScheduleRowImporter do
     expect(game.reload.schedule_date).to eq(date + 1.day)
     expect(Game.count).to eq(1)
   end
+
+  it 'reports an unmatched completed result as protected on a partial schedule refresh' do
+    incoming = row.merge(source_completed: true, home_team_score: 70, away_team_score: 60)
+    first = import_row(incoming)
+    expect(import_row(row)).to include(game_id: first[:game_id], outcome: 'protected', changes: {})
+    expect(Game.find(first[:game_id])).to be_final_unmatched
+  end
 end

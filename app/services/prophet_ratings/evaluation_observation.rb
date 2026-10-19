@@ -22,6 +22,8 @@ module ProphetRatings
     end
 
     def exclusion_reason
+      return 'unmatched_result' if @game.final_unmatched?
+
       @prediction.participant_exclusion_reason || ('invalid_outcome' unless valid_outcome?)
     end
 

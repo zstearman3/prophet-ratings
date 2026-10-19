@@ -37,17 +37,20 @@ module ProphetRatings
       preload_predictions
 
       team_seasons = @season.rating_team_seasons.to_a
-      team_games_by_season_id = finalized_team_games_by_season_id(team_seasons.map(&:id))
+      ids = team_seasons.map(&:id)
+      model_games = team_games_by_season_id(ids, results: Game.final)
+      record_games = team_games_by_season_id(ids, results: Game.completed)
 
       team_seasons.each do |team_season|
         team_season.validate_model_inputs(@ratings_config_version)
-        team_games = team_games_by_season_id[team_season.id] || []
+        id = team_season.id
+        team_games = model_games[id] || []
 
         aggregates = calculate_average_stats(team_games)
         aggregates.merge!(calculate_efficiency_stddevs(team_games))
         aggregates.merge!(calculate_volatility(team_season))
         aggregates.merge!(calculate_home_advantages(team_season))
-        aggregates.merge!(calculate_wins_and_losses(team_games))
+        aggregates.merge!(calculate_wins_and_losses(record_games[id] || []))
 
         # rubocop:disable-next Rails/SkipsModelValidations
         team_season.update_columns(aggregates) if aggregates.any?
@@ -97,13 +100,13 @@ module ProphetRatings
                                     .group_by { |p| p.forecast_team_season_id(1) }
     end
 
-    def finalized_team_games_by_season_id(team_season_ids)
+    def team_games_by_season_id(team_season_ids, results:)
       return {} if team_season_ids.empty?
 
       TeamGame
         .joins(:game)
         .where(team_season_id: team_season_ids)
-        .merge(Game.final.through_schedule_date(@options.fetch(:as_of)))
+        .merge(results.through_schedule_date(@options.fetch(:as_of)))
         .includes(:game)
         .group_by(&:team_season_id)
     end
@@ -243,7 +246,7 @@ module ProphetRatings
     end
 
     def calculate_wins_and_losses(team_games)
-      conference_games = team_games.select { |tg| tg.game.in_conference? }
+      conference_games = team_games.select { |tg| tg.game.final? && tg.game.in_conference? }
 
       wins, losses = team_games.partition do |tg|
         game = tg.game

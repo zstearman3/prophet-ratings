@@ -251,11 +251,12 @@ away table cannot shift home statistics into the away payload. If an unlinked
 scorebox name cannot be safely associated with a table, its stats remain `{}`.
 
 `Ingestion::GameRowEnricher` preserves the completion keys, names, scores and
-source URL while adding existing venue/date enrichment. The importer currently
-ignores the additive completion fields and still applies its existing team
-matching and complete-stat finalization rules. Backend classification such as
-`final_unmatched`, persistence policy, calculations and UI are follow-on work.
-Source confirmation alone does not finalize a database game.
+source URL while adding existing venue/date enrichment. The importer uses literal
+`source_completed: true` with valid result names/scores and an unresolved incoming
+Team or TeamSeason to classify a raw-only `final_unmatched` result. Fully matched
+games still require ordinary complete-stat and numerical validation before
+finalization; source confirmation alone does not bypass those checks. UI support
+remains follow-on work.
 
 Source-derived fixtures and their explicitly labeled synthetic transformations
 are documented in [the fixture provenance](../spec/fixtures/games_scraper/README.md).
@@ -301,8 +302,8 @@ For each row, the importer:
 5. Builds a new `Game` if no matching game exists.
 6. Creates or finds home/away `TeamGame` records when team seasons can be resolved.
 7. Writes team-game stat attributes.
-8. Finalizes the game if the row is complete.
-9. Otherwise leaves or marks the game as scheduled.
+8. Finalizes a statistically complete, fully matched game through strict box validation.
+9. Stores a source-confirmed completed unmatched result as described below; otherwise leaves the game scheduled.
 
 A scraped row is considered complete only when all are present:
 
@@ -314,6 +315,35 @@ A scraped row is considered complete only when all are present:
 Required team stat keys are defined by `TEAM_STAT_KEYS` in `GamesImporter`.
 
 Incomplete rows still preserve the scheduled game and team-game associations where possible. This allows future schedule-aware prediction workflows without requiring box-score stats.
+
+### Completed unmatched results
+
+The status integers remain scheduled=0, final=1 and canceled=2; final_unmatched=3
+is additive. `Game.completed` and `completed?` include both completed statuses.
+`Game.final` and `final?` remain the matched, numerically validated boundary.
+
+An unmatched result requires literal `source_completed: true`, present distinct
+team names, unequal nonnegative integer scores (integers or digit-only strings),
+and an incoming Team or TeamSeason that cannot be resolved. Scores, dates or full
+box keys alone do not confirm completion. This status describes database identity,
+not verified division membership.
+
+The importer stores scores/names and available known-side raw counts without
+creating placeholder schools or team seasons, inferring missing statistics,
+calculating matchup statistics or updating prediction residuals. Reused side rows
+have previous raw/derived statistics cleared before incoming raw counts are stored;
+unresolved stale associations and game possessions/minutes/conference flags are
+cleared. Unknown sides have no TeamGame.
+
+Partial refreshes preserve completed unmatched results, and unresolved corrections
+preserve valid matched finals. A later fully matched, statistically complete row
+can promote the same game ID through ordinary finalization. Failed validation
+restores the entire previous unmatched result and boxes; any persistence failure,
+including prediction residual writes, rolls the promotion back and propagates.
+Fully matched malformed boxes cannot use unmatched status to bypass validation.
+Schedule reconciliation reports unchanged completed results as protected, and
+played-season safeguards recognize both statuses. No historical rewrite, import
+or backfill is performed by this change.
 
 ## Venue classification
 
@@ -376,14 +406,16 @@ outer transaction. It performs:
 2. Derived game field updates: possessions, minutes and in-conference flag.
 3. Validation that game possessions, minutes and 40-minute pace are finite and positive.
 4. `calculate_game_stats` on both `TeamGame` records, using raising saves.
-5. Prediction error updates for stored predictions, validating snapshot/version identity.
+5. Transition to `final` inside the savepoint after box and derived-stat validation.
+6. Prediction error updates for stored predictions, validating snapshot/version identity.
    A rating run supplies its pinned model and updates that model's predictions;
    ordinary ingestion finalization updates all stored model predictions without
    looking up the global active version.
    Invalid snapshot/model associations are logged and skipped during ordinary
    ingestion, leaving their prediction errors unchanged. A pinned rating run
    raises on the same mismatch and rolls back finalization for review.
-6. `game.final!` status transition, only after every required write succeeds.
+
+The status transition and prediction updates commit only after every required write succeeds.
 
 Both home and away sides are mandatory. Required stored counts are field goals,
 two-point shots, three-point shots and free throws (made and attempted); offensive,
@@ -603,7 +635,7 @@ The task looks for duplicate groups using the same conservative identifiers used
 - ordered teams plus legacy raw stored date for old date-only rows
 - neutral-site unordered team pairs plus schedule date
 
-It chooses a survivor by preferring finalized games, complete `TeamGame` data, predictions/odds, manual or known venue data, unique URLs, and then lower ids as a tie breaker. In dry-run mode it only prints the groups and planned survivor.
+It hard-orders survivors as strict final, then final_unmatched, then other statuses. Within each status priority it prefers complete `TeamGame` data, predictions/odds, manual or known venue data, unique URLs, and then lower ids as a tie breaker. An unmatched survivor retains its result and known raw side; duplicate boxes and derived game values are not copied into it or used to upgrade its status. In dry-run mode it only prints the groups and planned survivor.
 
 To repair records, set `APPLY=true`:
 

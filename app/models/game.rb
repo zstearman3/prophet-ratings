@@ -95,7 +95,13 @@ class Game < ApplicationRecord
   # rubocop:disable-next Rails/HasManyOrHasOneDependent, Rails/InverseOf
   has_many :current_bet_recommendations, -> { where(current: true) }, class_name: 'BetRecommendation'
 
-  enum :status, { scheduled: 0, final: 1, canceled: 2 }
+  enum :status, { scheduled: 0, final: 1, canceled: 2, final_unmatched: 3 }
+  scope :completed, -> { where(status: %i[final final_unmatched]) }
+
+  def completed?
+    final? || final_unmatched?
+  end
+
   enum :venue_type, VENUE_TYPES, prefix: :venue
 
   def confirmed_home_venue?
