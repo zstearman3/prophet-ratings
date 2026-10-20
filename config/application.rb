@@ -27,6 +27,9 @@ module ProphetRatings
     # config.eager_load_paths << Rails.root.join("extras")
     config.action_controller.action_on_unpermitted_parameters = false
 
+    # The app does not use Active Storage image variants.
+    config.active_storage.variant_processor = :disabled
+
     config.active_job.queue_adapter = :good_job
     config.good_job.retry_on_unhandled_error = false
   end
