@@ -34,6 +34,32 @@ module ProphetRatings
       validate_home_stats(payload)
     end
 
+    def self.validate_authoring(payload)
+      normalized = normalize_authoring_payload(payload)
+      validate_authoring_contract(normalized)
+      normalized
+    end
+
+    def self.validate_authoring_contract(payload)
+      validate_keys(payload, ROOT, 'config')
+      validate_bundle_name(payload)
+      ModelConfiguration.settings(RatingsConfigVersion.new(name: payload[:bundle_name], config: payload))
+      validate(payload)
+    end
+
+    def self.normalize_authoring_payload(payload)
+      raise ArgumentError, 'config must be an object' unless payload.is_a?(Hash)
+
+      payload.deep_symbolize_keys
+    end
+
+    def self.validate_bundle_name(payload)
+      name = payload[:bundle_name]
+      return if name.is_a?(String) && name.present?
+
+      raise ArgumentError, 'Invalid or missing model setting: bundle_name'
+    end
+
     def self.validate_keys(values, schema, path)
       raise ArgumentError, "#{path} must be an object" unless values.is_a?(Hash)
 

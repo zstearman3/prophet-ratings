@@ -23,6 +23,7 @@ class RatingsConfigVersion < ApplicationRecord
   has_many :team_rating_snapshots, dependent: :nullify
 
   validate :preserve_model_identity
+  validate :validate_new_authoring_config, on: :create
   validates :config, presence: true
   validates :name, presence: true, uniqueness: true
 
@@ -46,10 +47,7 @@ class RatingsConfigVersion < ApplicationRecord
   end
 
   def self.publish!(payload = authored_config)
-    payload = payload.to_h.deep_symbolize_keys
-    ProphetRatings::ConfigurationSchema.validate_keys(payload, ProphetRatings::ConfigurationSchema::ROOT, 'config')
-    ProphetRatings::ModelConfiguration.settings(new(name: payload[:bundle_name] || payload['bundle_name'], config: payload))
-    ProphetRatings::ConfigurationSchema.validate(payload)
+    payload = ProphetRatings::ConfigurationSchema.validate_authoring(payload)
     find_or_create_by_config(payload)
   end
 
@@ -93,7 +91,9 @@ class RatingsConfigVersion < ApplicationRecord
   end
 
   def self.find_or_create_by_config(config_hash)
-    config_json = config_hash.to_h.deep_stringify_keys
+    raise ArgumentError, 'config must be an object' unless config_hash.is_a?(Hash)
+
+    config_json = config_hash.deep_stringify_keys
     existing = find_by(name: config_json.fetch('bundle_name'))
     if existing && existing.config != config_json
       raise ArgumentError, 'Ratings configuration changed under an existing bundle_name; use a new bundle_name'
@@ -103,6 +103,15 @@ class RatingsConfigVersion < ApplicationRecord
   end
 
   private
+
+  def validate_new_authoring_config
+    normalized = ProphetRatings::ConfigurationSchema.validate_authoring(config)
+    return if name == normalized.fetch(:bundle_name)
+
+    errors.add(:name, 'must match config.bundle_name')
+  rescue ArgumentError => error
+    errors.add(:config, error.message)
+  end
 
   def preserve_model_identity
     return unless persisted? && (will_save_change_to_config? || will_save_change_to_name?)

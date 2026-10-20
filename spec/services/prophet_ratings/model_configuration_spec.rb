@@ -57,7 +57,8 @@ RSpec.describe ProphetRatings::ModelConfiguration do
   end
 
   it 'keeps incomplete legacy versions readable but refuses to calculate or fill missing settings from YAML' do
-    legacy = create(:ratings_config_version, name: 'legacy', config: { bundle_name: 'legacy', home_court_advantage: 1 })
+    legacy = create(:ratings_config_version, name: 'legacy')
+    legacy.update_columns(config: { bundle_name: 'legacy', home_court_advantage: 1 }) # rubocop:disable Rails/SkipsModelValidations
     expect { legacy.settings }.to raise_error(ArgumentError, /complete configuration contract/)
     ProphetRatings::PredictionEvaluator.new(ratings_config_version: legacy, date_range: season.start_date..season.end_date).call
     expect(legacy.reload.config).to eq('bundle_name' => 'legacy', 'home_court_advantage' => 1)
