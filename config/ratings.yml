@@ -1,5 +1,5 @@
 default: &default
-  bundle_name: "v1.11-explicit-learning"
+  bundle_name: "v1.12-probability-precision"
   ratings_formula: corrected_v1
   learning:
     volatility:

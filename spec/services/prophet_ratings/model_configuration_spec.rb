@@ -11,6 +11,7 @@ RSpec.describe ProphetRatings::ModelConfiguration do
     payload = RatingsConfigVersion.authored_config
     payload[:bundle_name] = name
     payload[:prediction].delete(:uncertainty_model)
+    payload[:prediction].delete(:probability_precision)
     payload[:home_court_advantage] = home_boost
     payload[:defaults][:season_defaults] = { average_efficiency: efficiency, average_pace: pace }
     payload[:baseline_volatility] = { efficiency_volatility: volatility, pace_volatility: 4 }

@@ -42,13 +42,26 @@ module ProphetRatings
     end
 
     def self.validate_model_formulae(payload)
-      model = payload.dig(:prediction, :uncertainty_model)
-      raise ArgumentError, "Unsupported prediction uncertainty model: #{model}" unless [nil, 'shared_pace_v1'].include?(model)
-
+      validate_prediction_formulae(payload)
       EarlySeasonPolicy.validate(payload)
       validate_ratings_formula(payload)
       FactorForecast.validate(payload)
       LearningSettings.validate(payload)
+    end
+
+    def self.validate_prediction_formulae(payload)
+      model = payload.dig(:prediction, :uncertainty_model)
+      raise ArgumentError, "Unsupported prediction uncertainty model: #{model}" unless [nil, 'shared_pace_v1'].include?(model)
+
+      validate_probability_precision(payload)
+    end
+
+    def self.validate_probability_precision(payload)
+      precision = payload.dig(:prediction, :probability_precision)
+      raise ArgumentError, "Unsupported prediction probability precision: #{precision}" unless [nil, 'float64_v1'].include?(precision)
+      return unless precision == 'float64_v1' && payload.dig(:prediction, :uncertainty_model) != 'shared_pace_v1'
+
+      raise ArgumentError, 'Prediction probability precision float64_v1 requires shared_pace_v1'
     end
 
     def self.validate_number(payload, path)

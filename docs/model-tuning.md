@@ -31,8 +31,10 @@ not retroactively subjected to the new authoring key whitelist. Their existing
 contract/formula validation still applies. New learning blocks must be complete;
 absence preserves the historical rule, not a fallback to current YAML.
 
-The authored default is `v1.11-explicit-learning`; it preserves v1.10 numerical
-behavior. Publish/select models and generate snapshots through the existing
+The authored default is `v1.12-probability-precision`; it retains the v1.11
+learning settings and coefficients while preserving unrounded issued probabilities
+with `prediction.probability_precision: float64_v1`. Publish/select models and
+generate snapshots through the existing
 provenance-aware workflow in [ratings.md](ratings.md). Do not relabel old live
 ratings as a new model. No new model is automatically activated by this change.
 
@@ -143,7 +145,7 @@ in [ratings.md](ratings.md) describe their exact formulas and provenance rules.
 | `preseason.departures` | `formula`: points_share_v1; `weight`: [0,1]; `slope`, `max_net_efficiency` >=0 | Departure share response and maximum net-efficiency loss. |
 | `preseason.efficiency_adjustment` | `formula`: reviewed_net_v1; finite `lower_bound` <=0 and `upper_bound` >=0; requires recruiting and departures blocks | Opts into reviewed component integration and bounds the combined net-efficiency adjustment. |
 
-Formula selectors (`ratings_formula`, `prediction.uncertainty_model`, and optional
+Formula selectors (`ratings_formula`, `prediction.uncertainty_model`, `prediction.probability_precision`, and optional
 component formulas) select algorithms, rather than continuous tuning parameters.
 `contract_version` is a compatibility marker; do not tune it. Unit conversions
 (40 minutes, 100 possessions), minimum data needed to calculate sample SD, and
@@ -162,3 +164,12 @@ Evaluation and learning exclude missing or mismatched ordered participant IDs;
 inspect reason counts before interpreting sample changes. Score-only corrections
 with matching identities remain eligible. See [the alignment policy](ratings.md#participant-corrections-and-outcome-alignment)
 for frozen, legacy, and reconstruction handling and preservation of issued history.
+
+`prediction.probability_precision: float64_v1` in the authored
+`v1.12-probability-precision` bundle requires `shared_pace_v1` and preserves the
+existing binary64 CDF result across issuance, frozen replay, persistence and
+metrics. It changes output precision, not coefficients or calibration. Missing
+selectors retain historical four-decimal outputs; existing saved forecasts
+cannot regain discarded digits. Round only display values. See the
+[precision contract](ratings.md#issued-win-probability-precision) for finite
+bounds, deterministic and numerical endpoints, and migration/rollback rules.

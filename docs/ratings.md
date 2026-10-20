@@ -724,6 +724,44 @@ is not evidence of calibration. Legacy payloads without the uncertainty selector
 retain their prior probability and margin/total diagnostic arithmetic; their
 stored predictions and immutable payloads are not rewritten.
 
+## Issued win-probability precision
+
+The authored `v1.12-probability-precision` bundle selects
+`prediction.probability_precision: float64_v1`, which requires `shared_pace_v1`.
+The existing normal CDF result is returned as an unrounded Ruby Float, captured
+by frozen replay and stored in PostgreSQL double precision (binary64). Reload
+preserves that Float exactly. Evaluation consumes the saved probability without
+clipping or recomputing from current ratings; round only for display.
+
+For efficiency means 140/100 and four component SDs of 5 (modifier 1), the
+difference SD is 10. At z=4, the issued home probability is
+0.9999683287581669 and an away upset has finite log loss about 10.3601014865.
+The symmetric z=-4 case retains its small home probability. Equal means yield
+0.5. Genuine zero difference variance retains 0/1 for unequal means and 0.5
+for ties. New frozen forecasts require a finite probability in [0,1]. Binary64
+and the existing CDF still have finite numerical limits: sufficiently extreme
+nondegenerate tails can reach 0/1. Impossible observed outcomes retain infinite
+log loss; this change does not clip probabilities or change the distribution.
+
+Stored models without the precision selector retain four-decimal probability
+outputs, including shared-pace models; models without either selector also
+retain their legacy pace-dependent arithmetic. Frozen replay uses its captured
+payload, never current YAML. Existing predictions are not recomputed. Widening
+storage preserves their numerical values but cannot recover discarded digits.
+Apply the migration before the new code. Its down migration deliberately raises
+`ActiveRecord::IrreversibleMigration`: a code rollback must retain the wider
+column to avoid destroying newly issued precision. Deployment neither publishes
+nor activates the authored bundle.
+
+The `numeric(5,4)` to `double precision` conversion rewrites `predictions`
+and holds an `ACCESS EXCLUSIVE` lock until the migration transaction commits,
+blocking reads and writes; see [PostgreSQL ALTER TABLE](https://www.postgresql.org/docs/15/sql-altertable.html).
+Before rollout, inspect production table size and workload, rehearse migration
+duration on a representative copy, and schedule a planned maintenance window.
+Synthetic migration specs establish value preservation, not production lock
+duration. If an acceptable lock duration cannot be met, defer rollout for a
+separately reviewed staged migration.
+
 ## Frozen forecast context and revisions
 
 ### Participant corrections and outcome alignment

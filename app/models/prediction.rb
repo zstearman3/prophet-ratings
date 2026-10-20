@@ -15,7 +15,7 @@
 #  home_offensive_efficiency       :decimal(6, 3)
 #  home_offensive_efficiency_error :decimal(6, 3)
 #  home_score                      :decimal(6, 3)
-#  home_win_probability            :decimal(5, 4)
+#  home_win_probability            :float
 #  pace                            :decimal(6, 3)
 #  pace_error                      :decimal(6, 3)
 #  vegas_spread                    :decimal(6, 3)
@@ -55,6 +55,8 @@ class Prediction < ApplicationRecord
   has_many :bet_recommendations, dependent: :destroy
 
   validate :snapshots_must_have_same_ratings_version
+  validates :home_win_probability, numericality: { greater_than_or_equal_to: 0, less_than_or_equal_to: 1 },
+                                   on: :create, unless: -> { forecast_kind == 'legacy_unverified' }
 
   validates :game, uniqueness: { scope: %i[home_team_snapshot_id away_team_snapshot_id forecast_kind] },
                    if: -> { forecast_kind == 'legacy_unverified' }

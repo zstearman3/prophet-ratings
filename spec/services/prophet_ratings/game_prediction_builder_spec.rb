@@ -349,6 +349,7 @@ RSpec.describe ProphetRatings::GamePredictionBuilder do
     payload = version.config.deep_dup
     payload['bundle_name'] = 'legacy-builder'
     payload['prediction'].delete('uncertainty_model')
+    payload['prediction'].delete('probability_precision')
     legacy = RatingsConfigVersion.publish!(payload)
     snapshots.each do |snapshot|
       snapshot.update!(ratings_config_version: legacy, pace_volatility: nil)

@@ -32,7 +32,7 @@ RSpec.describe ProphetRatings::GamePredictor do
 
   it 'uses efficiency difference for win probability' do
     result = predictor
-    expect(result[:win_probability_home]).to eq((0.5 * (1 + Math.erf(-5 / Math.sqrt(488)))).round(4))
+    expect(result[:win_probability_home]).to be_within(1e-15).of(0.5 * (1 + Math.erf(-5 / Math.sqrt(488))))
   end
 
   it 'shares combined deviations and means with persisted diagnostics' do
@@ -61,7 +61,7 @@ RSpec.describe ProphetRatings::GamePredictor do
     result = predictor(upset_modifier: 2)
     expected = ProphetRatings::ScoreMoments.new(means: { home: 100, away: 105, pace: 70 }, deviations: { home: 20, away: 24, pace: 5 })
     expect(result[:meta][:margin_std_deviation]).to eq(Math.sqrt(expected.margin_variance))
-    expect(result[:win_probability_home]).to eq(expected.home_win_probability.round(4))
+    expect(result[:win_probability_home]).to eq(expected.home_win_probability)
   end
 
   it 'rejects missing core inputs explicitly' do
@@ -107,6 +107,7 @@ RSpec.describe ProphetRatings::GamePredictor do
     payload = version.config.deep_dup
     payload['bundle_name'] = 'legacy-uncertainty'
     payload['prediction'].delete('uncertainty_model')
+    payload['prediction'].delete('probability_precision')
     legacy = RatingsConfigVersion.publish!(payload)
     home.ratings_config_version = legacy
     away.ratings_config_version = legacy

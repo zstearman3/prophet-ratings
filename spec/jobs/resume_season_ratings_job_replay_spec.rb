@@ -96,7 +96,7 @@ RSpec.describe ResumeSeasonRatingsJob do
                    away_team_snapshot: snapshots.last, calculation_context: context, forecast_kind: 'pregame',
                    forecast_start_time: game.start_time, input_cutoff: season.start_date - 1,
                    home_offensive_efficiency_error: 999, home_defensive_efficiency_error: 999,
-                   away_offensive_efficiency: 100, away_defensive_efficiency: 100, pace: 70 }
+                   away_offensive_efficiency: 100, away_defensive_efficiency: 100, pace: 70, home_win_probability: 0.5 }
     create(:prediction, **attributes, generated_at: game.start_time - 2.hours, revision_key: 'first',
                                       home_offensive_efficiency: 120, home_defensive_efficiency: 80)
     create(:prediction, **attributes, generated_at: game.start_time - 1.hour, revision_key: 'latest',
@@ -127,7 +127,7 @@ RSpec.describe ResumeSeasonRatingsJob do
                                      calculation_context: ProphetRatings::ForecastContext.capture(game, snapshots, version),
                                      forecast_kind: 'pregame', forecast_start_time: game.start_time,
                                      input_cutoff: season.start_date - 1, generated_at: game.start_time - 1.hour,
-                                     revision_key: 'incomplete-game', home_offensive_efficiency_error: 999)
+                                     revision_key: 'incomplete-game', home_offensive_efficiency_error: 999, home_win_probability: 0.5)
     game.away_team_game.update!(offensive_efficiency: nil)
     teams.first.update!(adj_offensive_efficiency: 125)
     expect { replay(date + 1) }.to raise_error(ArgumentError, /finalized.*team-game inputs/)
