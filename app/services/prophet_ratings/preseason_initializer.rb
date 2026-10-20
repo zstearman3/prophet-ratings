@@ -67,11 +67,22 @@ module ProphetRatings
     def validate_publication
       publication_date = @season.start_date - 1.day
       SeasonParticipationReview.new(@season).validate_publication(@ratings_config_version, publication_date)
-      return unless @season.current? || @season.games.completed.exists? ||
-                    @season.team_rating_snapshots.where.not(snapshot_date: publication_date).exists? ||
-                    @season.rating_team_seasons.any? { |team_season| self.class.changed_ratings?(team_season) }
+      return unless @season.current? || finalized_games? || snapshots_outside_publication_date?(publication_date) ||
+                    changed_live_core_ratings?
 
       raise ArgumentError, 'Existing in-season outputs must be preserved; use an explicitly scoped season:rebuild_ratings.'
+    end
+
+    def finalized_games?
+      @season.games.completed.exists?
+    end
+
+    def snapshots_outside_publication_date?(publication_date)
+      @season.team_rating_snapshots.where.not(snapshot_date: publication_date).exists?
+    end
+
+    def changed_live_core_ratings?
+      @season.rating_team_seasons.any? { |team_season| self.class.changed_ratings?(team_season) }
     end
 
     def publish
