@@ -47,6 +47,7 @@
           <td class="px-4 py-2 font-semibold">
             <%= link_to "#{game.away_team_name} @ #{game.home_team_name}", game_path(game),
               class: "text-gray-800 hover:text-blue-600" %>
+            <button type="button" data-betting-expand-target="toggle" aria-expanded="false" aria-controls="<%= dom_id(game, :betting_details) %>" aria-label="Betting details for <%= game.away_team_name %> @ <%= game.home_team_name %>" class="ml-2 rounded px-1 text-xs font-normal text-gray-500 underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">Details</button>
             <% excluded_recommendations.map { |recommendation| recommendation.prediction.participant_exclusion_reason }.uniq.each do |reason| %>
               <div class="text-xs text-gray-500">Forecast unavailable: <%= reason.humanize %></div>
             <% end %>
@@ -97,10 +98,20 @@
             <% end %>
           </td>
         </tr>
-        <tr class="expandable-row hidden bg-gray-50 text-sm border-t">
+        <tr id="<%= dom_id(game, :betting_details) %>" class="expandable-row hidden bg-gray-50 text-sm border-t">
           <td class="px-4 py-3 align-top">
-            <% if game.current_prediction %>
-              <div><span class="font-semibold">Predicted Score:</span> <span title="<%= game.current_prediction.provenance_label %>"><%= game.current_prediction.predicted_score_with_teams %></span></div>
+            <% prediction = game.current_prediction %>
+            <% if prediction %>
+              <% prediction_label = if game.final_unmatched?
+                   prediction.forecast_kind == 'pregame' ? 'Historical pregame forecast' : "Historical · #{prediction.provenance_label}"
+                 else
+                   prediction.provenance_label
+                 end %>
+              <div>
+                <span class="font-semibold">Predicted Score:</span>
+                <span title="<%= prediction_label %>"><%= prediction.home_score && prediction.away_score ? prediction.predicted_score_with_teams : 'Prediction unavailable' %></span>
+                <%= render 'shared/forecast_provenance', prediction:, label: prediction_label %>
+              </div>
             <% else %>
               <%= game.current_prediction_unavailable_reason&.humanize %>
             <% end %>

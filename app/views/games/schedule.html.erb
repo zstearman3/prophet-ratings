@@ -56,12 +56,13 @@
                  end %>
               <% if prediction.home_score && prediction.away_score %>
                 <%= link_to prediction.predicted_score_string, game_path(game),
-                  title: prediction_label, class: "block text-gray-800 hover:text-blue-600" %>
+                  title: prediction_label, class: "inline-block text-gray-800 hover:text-blue-600" %>
               <% else %>
-                <span title="<%= prediction_label %>" class="block text-xs text-gray-400">Prediction unavailable</span>
+                <span title="<%= prediction_label %>" class="inline-block text-xs text-gray-400">Prediction unavailable</span>
               <% end %>
+              <%= render 'shared/forecast_provenance', prediction:, label: prediction_label %>
               <% if prediction.home_win_probability %>
-                <span class="text-xs text-gray-500"><%= historical_prediction ? 'Captured home win probability' : 'Home win' %>: <%= number_to_percentage(prediction.home_win_probability * 100, precision: 1) %></span>
+                <span class="block text-xs text-gray-500"><%= historical_prediction ? 'Captured home win probability' : 'Home win' %>: <%= number_to_percentage(prediction.home_win_probability * 100, precision: 1) %></span>
               <% end %>
             <% else %>
               <span class="text-xs text-gray-400"><%= game.current_prediction_unavailable_reason&.humanize || 'No prediction' %></span>

@@ -71,6 +71,7 @@ RSpec.describe 'Games' do
       expect(score_cell.text.strip).to eq('-')
       expect(prediction_link).to be_present
       expect(prediction_link['title']).to eq(prediction.provenance_label)
+      document.css('table details > :not(summary)').remove
       expect(document.at_css('table').text).not_to include(prediction.provenance_label)
     end
 

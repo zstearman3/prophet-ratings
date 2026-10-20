@@ -215,6 +215,7 @@
                     <% else %>
                       <span title="<%= prediction_label %>">Prediction unavailable</span>
                     <% end %>
+                    <%= render 'shared/forecast_provenance', prediction:, label: prediction_label %>
                   <% elsif game.final_unmatched? %>
                     Prediction unavailable
                   <% else %>

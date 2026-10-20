@@ -28,6 +28,8 @@ RSpec.describe 'Unmatched game forecast history' do
     get '/games/schedule', params: { date: game.schedule_date.to_s }
     schedule_cell = response.parsed_body.at_css('tbody tr').css('td')[3]
     expect(schedule_cell.text).to include(latest.predicted_score_string)
+    expect(schedule_cell.at_css('details').text).to include('Historical · Unverified legacy forecast')
+    schedule_cell.css('details > :not(summary)').remove
     expect(schedule_cell.text).not_to include('Unverified legacy forecast')
     expect(schedule_cell.at_css('a')['title']).to eq('Historical · Unverified legacy forecast')
     expect(schedule_cell.text).not_to include('60 - 70')
@@ -39,6 +41,8 @@ RSpec.describe 'Unmatched game forecast history' do
     get "/teams/#{home_team.slug}", params: { year: season.year }
     row = response.parsed_body.at_css('.overflow-x-auto > table tbody tr')
     expect(row.css('td')[4].text).to include(latest.predicted_score_string)
+    expect(row.css('td')[4].at_css('details').text).to include('Historical · Unverified legacy forecast')
+    row.css('details > :not(summary)').remove
     expect(row.css('td')[4].text).not_to include('Unverified legacy forecast')
     expect(row.css('td')[4].at_css('a')['title']).to eq('Historical · Unverified legacy forecast')
     expect(row.css('td')[5].text.strip).to eq('-')

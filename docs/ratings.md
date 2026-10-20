@@ -825,8 +825,14 @@ Historical ratings workflows may create reconstructions; they are not a live
 forecast archive. Nightly prediction jobs now select only scheduled upcoming games.
 This contract adds no fitted coefficients or confidence/calibration claims.
 
-Schedule, team schedule and betting tables show forecast provenance as a hover
-tooltip on the predicted score. The game detail page displays the label explicitly.
+Schedule, team schedule and betting tables retain forecast provenance as a hover
+tooltip on the predicted score. An adjacent info disclosure also exposes the exact
+label to keyboard, touch and screen reader users; select it to open or close the
+label. Missing saved scores keep their unavailable text and the same disclosure.
+The betting table's Details button opens the existing expanded row with keyboard
+or touch, in addition to clicking the row. Unmatched results retain a historical
+label even if participant records have been repaired before finalization. The game
+detail page displays the label explicitly.
 
 ## Bounded historical ratings reconstruction
 
