@@ -23,6 +23,11 @@ export default class extends Controller {
     this.render()
   }
 
+  blurAlreadyFocusedControl(event) {
+    const control = event.target.closest?.("a, button")
+    if (control === document.activeElement) control.blur()
+  }
+
   close() {
     if (!this.stateValue || this.breakpoint.matches) return
 

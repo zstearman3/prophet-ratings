@@ -1,13 +1,13 @@
-<% nav_link_class = "flex min-h-[52px] items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-prophet-indigo focus:outline-none focus:ring-2 focus:ring-prophet-indigo md:min-h-0 md:px-2 md:py-2" %>
-<% active_link_class = "bg-purple-50 text-prophet-indigo" %>
+<% nav_link_class = "flex min-h-[52px] items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-prophet-indigo focus:outline-none focus-visible:ring-2 focus-visible:ring-prophet-indigo md:min-h-0 md:px-2 md:py-2" %>
+<% active_link_class = "bg-purple-50 md:bg-transparent text-prophet-indigo" %>
 <% nav_link_aria = ->(active) { active ? { current: "page" } : {} } %>
-<nav class="border-b border-gray-200 bg-white" aria-label="Main navigation" data-controller="navbar" data-navbar-state-value="false" data-action="keydown.esc->navbar#close">
+<nav class="border-b border-gray-200 bg-[#F1F5F9]" aria-label="Main navigation" data-controller="navbar" data-navbar-state-value="false" data-action="keydown.esc->navbar#close pointerdown->navbar#blurAlreadyFocusedControl:capture">
   <div class="max-w-screen-xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between">
-    <a href="<%= root_path %>" class="flex items-center rounded focus:outline-none focus:ring-2 focus:ring-prophet-indigo focus:ring-offset-2" aria-label="Prophet Ratings home">
+    <a href="<%= root_path %>" class="flex items-center rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-prophet-indigo focus-visible:ring-offset-2" aria-label="Prophet Ratings home">
       <%= image_tag('Retro Prophet Logo.png', alt: 'Retro Prophet Logo', class: 'h-10 w-auto') %>
     </a>
 
-    <button data-navbar-target="button" data-action="click->navbar#toggle" type="button" class="inline-flex items-center justify-center w-11 h-11 rounded-lg text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-prophet-indigo md:hidden" aria-controls="navbar-menu" aria-expanded="false" aria-label="Expand menu">
+    <button data-navbar-target="button" data-action="click->navbar#toggle" type="button" class="inline-flex items-center justify-center w-11 h-11 rounded-lg text-gray-700 hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-prophet-indigo md:hidden" aria-controls="navbar-menu" aria-expanded="false" aria-label="Expand menu">
       <svg data-navbar-target="bars" class="w-6 h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
         <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
       </svg>
@@ -21,28 +21,28 @@
         <li>
           <% ratings_current = request.path == root_path %>
           <%= link_to root_path, data: { nav_item: true }, aria: nav_link_aria.call(ratings_current), class: [nav_link_class, (active_link_class if ratings_current)].compact.join(' ') do %>
-            <svg class="h-5 w-5 shrink-0 text-current" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M4 19V5m0 14h16M8 15l3-4 3 2 5-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+            <svg class="h-5 w-5 shrink-0 text-current md:hidden" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M4 19V5m0 14h16M8 15l3-4 3 2 5-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
             <span>Ratings</span>
           <% end %>
         </li>
         <li>
           <% matchup_current = ['/matchup', '/matchup/submit'].include?(request.path) %>
           <%= link_to matchup_path, data: { nav_item: true }, aria: nav_link_aria.call(matchup_current), class: [nav_link_class, (active_link_class if matchup_current)].compact.join(' ') do %>
-            <svg class="h-5 w-5 shrink-0 text-current" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M7 7h10M7 12h10M7 17h6M4 4h16v16H4z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+            <svg class="h-5 w-5 shrink-0 text-current md:hidden" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M7 7h10M7 12h10M7 17h6M4 4h16v16H4z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
             <span>Matchup Analysis</span>
           <% end %>
         </li>
         <li>
           <% schedule_current = request.path == schedule_games_path %>
           <%= link_to schedule_games_path(date: Date.current), data: { nav_item: true }, aria: nav_link_aria.call(schedule_current), class: [nav_link_class, (active_link_class if schedule_current)].compact.join(' ') do %>
-            <svg class="h-5 w-5 shrink-0 text-current" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M7 3v3m10-3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v13H4V6a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+            <svg class="h-5 w-5 shrink-0 text-current md:hidden" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M7 3v3m10-3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v13H4V6a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
             <span>Schedule</span>
           <% end %>
         </li>
         <li>
           <% betting_current = request.path == betting_games_path %>
           <%= link_to betting_games_path, data: { nav_item: true }, aria: nav_link_aria.call(betting_current), class: [nav_link_class, (active_link_class if betting_current)].compact.join(' ') do %>
-            <svg class="h-5 w-5 shrink-0 text-current" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M3 7h18v12H3zM7 7V5h10v2m-9 5h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+            <svg class="h-5 w-5 shrink-0 text-current md:hidden" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M3 7h18v12H3zM7 7V5h10v2m-9 5h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
             <span>Betting</span>
           <% end %>
         </li>

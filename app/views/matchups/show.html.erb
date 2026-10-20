@@ -47,7 +47,7 @@
         </div>
       </div>
 
-    <div class="flex justify-between pt-4">
+    <div class="flex flex-col gap-2 pt-4 sm:flex-row sm:justify-between">
 
       <%= icon_button(form,
             text: "Predict Outcome",
@@ -55,7 +55,7 @@
             name: "action_type",
             value: "predict",
             title: "Prediction shows the most likely outcome based on current ratings.",
-            class: "bg-prophet-indigo hover:bg-prophet-indigo/80 text-white font-bold py-2 px-4 rounded inline-flex items-center space-x-2") %>
+            class: "bg-prophet-indigo hover:bg-prophet-indigo/80 text-white font-bold py-2 px-4 rounded inline-flex min-h-11 w-full items-center justify-center gap-2 sm:w-auto") %>
 
       <%= icon_button(form,
             text: "Simulate Outcome",
@@ -63,7 +63,7 @@
             name: "action_type",
             value: "simulate",
             title: "Simulation shows one plausible result using randomness and volatility.",
-            class: "bg-prophet-indigo hover:bg-prophet-indigo/80 text-white font-bold py-2 px-4 rounded inline-flex items-center space-x-2") %>
+            class: "bg-prophet-indigo hover:bg-prophet-indigo/80 text-white font-bold py-2 px-4 rounded inline-flex min-h-11 w-full items-center justify-center gap-2 sm:w-auto") %>
     </div>
     <% end %>
 

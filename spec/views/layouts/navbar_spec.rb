@@ -21,6 +21,16 @@ RSpec.describe 'layouts/_navbar' do
                                       ])
   end
 
+  it 'uses the requested background and hides link icons at the desktop breakpoint' do
+    render partial: 'layouts/navbar'
+
+    document = Nokogiri::HTML(rendered)
+    expect(document.at_css('nav')['class'].split).to include('bg-[#F1F5F9]')
+    icons = document.css('nav a[data-nav-item] svg')
+    expect(icons.length).to eq(4)
+    expect(icons.all? { |icon| icon['class'].split.include?('md:hidden') }).to be(true)
+  end
+
   {
     '/' => 'Ratings',
     '/matchup' => 'Matchup Analysis',
@@ -34,7 +44,7 @@ RSpec.describe 'layouts/_navbar' do
 
       current_links = Nokogiri::HTML(rendered).css('nav a[aria-current="page"]')
       expect(current_links.map { |link| link.text.strip }).to eq([label])
-      expect(current_links.first['class']).to include('bg-purple-50', 'text-prophet-indigo')
+      expect(current_links.first['class']).to include('bg-purple-50', 'md:bg-transparent', 'text-prophet-indigo')
     end
   end
 
@@ -53,5 +63,18 @@ RSpec.describe 'layouts/_navbar' do
     expect(toggle['aria-expanded']).to eq('false')
     expect(toggle['aria-label']).to eq('Expand menu')
     expect(document.at_css('#navbar-menu.hidden')).not_to be_nil
+    expect(document.at_css('nav')['data-action'].split).to include('pointerdown->navbar#blurAlreadyFocusedControl:capture')
+  end
+
+  it 'shows navbar focus rings only for keyboard-visible focus' do
+    render partial: 'layouts/navbar'
+    document = Nokogiri::HTML(rendered)
+    home_link = document.at_css('nav > div > a')
+    toggle = document.at_css('button[aria-controls="navbar-menu"]')
+    links = document.css('nav a[data-nav-item]')
+
+    expect(home_link['class'].split).to include('focus-visible:ring-2', 'focus-visible:ring-prophet-indigo', 'focus-visible:ring-offset-2')
+    expect(toggle['class'].split).to include('focus-visible:ring-2', 'focus-visible:ring-prophet-indigo')
+    expect(links.all? { |link| link['class'].split.include?('focus-visible:ring-2') }).to be(true)
   end
 end
