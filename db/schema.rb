@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_20_000000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_21_001000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -105,6 +105,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_20_000000) do
     t.string "sports_reference_slugs", default: [], null: false, array: true
     t.index ["name"], name: "index_conferences_on_name"
     t.index ["slug"], name: "index_conferences_on_slug"
+  end
+
+  create_table "game_external_identities", force: :cascade do |t|
+    t.bigint "game_id", null: false
+    t.string "provider", null: false
+    t.string "external_id", null: false
+    t.datetime "superseded_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["game_id"], name: "index_game_external_identities_on_game_id"
+    t.index ["provider", "external_id"], name: "index_game_external_identities_on_provider_and_external_id", unique: true
+    t.index ["provider", "game_id"], name: "index_game_external_identities_on_active_provider_game", unique: true, where: "(superseded_at IS NULL)"
   end
 
   create_table "game_odds", force: :cascade do |t|
@@ -441,6 +453,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_20_000000) do
     t.index ["team_id"], name: "index_team_conferences_on_team_id"
   end
 
+  create_table "team_external_identities", force: :cascade do |t|
+    t.bigint "team_id", null: false
+    t.string "provider", null: false
+    t.string "external_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["provider", "external_id"], name: "index_team_external_identities_on_provider_and_external_id", unique: true
+    t.index ["team_id"], name: "index_team_external_identities_on_team_id"
+  end
+
   create_table "team_games", force: :cascade do |t|
     t.bigint "team_id", null: false
     t.bigint "game_id", null: false
@@ -647,6 +669,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_20_000000) do
   add_foreign_key "coaching_changes", "teams", column: "discovery_previous_team_id"
   add_foreign_key "coaching_changes", "teams", column: "discovery_team_id"
   add_foreign_key "coaching_changes", "teams", column: "previous_team_id"
+  add_foreign_key "game_external_identities", "games"
   add_foreign_key "game_odds", "games"
   add_foreign_key "game_sync_dates", "seasons"
   add_foreign_key "offseason_input_revisions", "offseason_input_revisions", column: "predecessor_id"
@@ -666,6 +689,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_20_000000) do
   add_foreign_key "team_conferences", "seasons", column: "end_season_id"
   add_foreign_key "team_conferences", "seasons", column: "start_season_id"
   add_foreign_key "team_conferences", "teams"
+  add_foreign_key "team_external_identities", "teams"
   add_foreign_key "team_games", "team_seasons", column: "opponent_team_season_id"
   add_foreign_key "team_offseason_profiles", "offseason_input_revisions", column: "departure_revision_id"
   add_foreign_key "team_offseason_profiles", "offseason_input_revisions", column: "recruiting_revision_id"
