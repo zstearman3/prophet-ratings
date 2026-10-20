@@ -23,12 +23,12 @@ RSpec.describe 'Forecast provenance disclosures' do
     end
   end
 
-  def create_forecast(kind, home_score: 76)
+  def create_forecast(kind, home_score: 76, revision_key: kind, generated_at: game.start_time - 1.hour)
     attributes = { game:, ratings_config_version: config, home_team_snapshot: snapshots.first,
                    away_team_snapshot: snapshots.last, home_score:, away_score: 64, home_win_probability: 0.7, pace: 70 }
     unless kind == 'legacy_unverified'
       attributes.merge!(forecast_kind: kind, calculation_context: ProphetRatings::ForecastContext.capture(game, snapshots, config),
-                        revision_key: kind, generated_at: game.start_time - 1.hour, forecast_start_time: game.start_time,
+                        revision_key:, generated_at:, forecast_start_time: game.start_time,
                         input_cutoff: game.schedule_date - 1, home_offensive_efficiency: 110, away_offensive_efficiency: 100,
                         home_defensive_efficiency: 100, away_defensive_efficiency: 110)
     end
@@ -129,6 +129,7 @@ RSpec.describe 'Forecast provenance disclosures' do
   %w[pregame legacy_unverified].each do |kind|
     it "marks a #{kind} betting forecast historical after matching participants are restored to an unmatched result" do
       prediction = create_forecast(kind)
+      create_forecast(kind, home_score: 88, revision_key: 'older', generated_at: game.start_time - 2.hours) if kind == 'pregame'
       create(:team_alias, team: participants.first.team, value: game.home_team_name, source: 'sports_reference')
       Importer::GamesImporter.import_game(
         { date: game.start_time, url: game.url, home_team: game.home_team_name, away_team: 'Unresolved Opponent',
@@ -150,7 +151,9 @@ RSpec.describe 'Forecast provenance disclosures' do
 
       table = request_table('betting')
       label = kind == 'pregame' ? 'Historical pregame forecast' : 'Historical · Unverified legacy forecast'
-      expect(table.at_css("[title='#{label}']")).to be_present
+      score = table.at_css("[title='#{label}']")
+      expect(score).to be_present
+      expect(score.text).to include(prediction.predicted_score_with_teams)
       expect_disclosure(table, label)
     end
   end
