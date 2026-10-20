@@ -160,12 +160,6 @@ RSpec.describe 'Conferences' do
     expect(response.parsed_body.text).to include('No team ratings are available')
   end
 
-  it 'does not expose a conference directory route' do
-    get '/conferences'
-
-    expect(response).to have_http_status(:not_found)
-  end
-
   it 'shows missing rating and rank as unavailable and retains long school names' do
     team = create(:team, school: 'University of the Very Long School Name That Must Wrap Across a Narrow Table Layout')
     create(:team_conference, team:, conference:, start_season: season_start, end_season: current_season)
@@ -199,5 +193,48 @@ RSpec.describe 'Conferences' do
     expect(values[headers.index('Rating')]).to eq('—')
     expect(values[headers.index('Adj ORtg')]).to eq('—')
     expect(values[headers.index('Adj DRtg')]).to eq('0.0')
+  end
+
+  describe 'GET /conferences' do
+    it 'defaults to the current season and preserves it in conference links' do
+      get '/conferences'
+
+      document = response.parsed_body
+      expect(response).to have_http_status(:success)
+      expect(document.css('a').find { |link| link.text == conference.name }['href'])
+        .to eq(conference_path(conference, season: current_season.year))
+      expect(document.at_css('select[name="season"] option[selected]')['value']).to eq(current_season.year.to_s)
+      expect(document.css('nav a').map(&:text)).not_to include('Conferences')
+    end
+
+    it 'preserves the selected historical season in conference links and selector' do
+      get '/conferences', params: { season: season_start.year }
+
+      document = response.parsed_body
+      expect(response).to have_http_status(:success)
+      expect(document.css('a').find { |link| link.text == conference.name }['href'])
+        .to eq(conference_path(conference, season: season_start.year))
+      expect(document.at_css('select[name="season"] option[selected]')['value']).to eq(season_start.year.to_s)
+    end
+
+    it 'shows empty states for missing current season and an empty directory' do
+      current_season.update!(current: false)
+      get '/conferences'
+      expect(response.parsed_body.text).to include('No current season is available')
+
+      current_season.update!(current: true)
+      TeamConference.delete_all
+      Conference.delete_all
+      get '/conferences', params: { season: current_season.year }
+      expect(response.parsed_body.text).to include('No conferences are available')
+    end
+
+    it 'returns not found for an invalid or unknown season' do
+      get '/conferences', params: { season: 'not-a-year' }
+      expect(response).to have_http_status(:not_found)
+
+      get '/conferences', params: { season: 1900 }
+      expect(response).to have_http_status(:not_found)
+    end
   end
 end

@@ -40,5 +40,5 @@ Rails.application.routes.draw do
     post :submit, on: :collection
   end
   resources :teams, param: :slug, only: [:index, :show]
-  resources :conferences, only: :show
+  resources :conferences, only: %i[index show]
 end

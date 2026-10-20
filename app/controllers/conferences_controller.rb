@@ -4,6 +4,10 @@
 class ConferencesController < ApplicationController
   include RatingsTableSorting
 
+  def index
+    render locals: { conferences: Conference.order(:name), seasons: Season.order(year: :desc), season: selected_season }
+  end
+
   def show
     conference = Conference.find(params.expect(:id))
     season = selected_season
