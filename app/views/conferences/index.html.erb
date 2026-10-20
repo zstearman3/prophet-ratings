@@ -1,0 +1,16 @@
+<main class="mx-auto max-w-screen-xl p-4">
+  <h1 class="mb-4 text-2xl font-semibold">Conferences</h1>
+  <%= render 'season_selector', seasons:, season:, action: conferences_path %>
+
+  <% if season.nil? %>
+    <p class="mt-4">No current season is available. Choose a season to view its conference pages.</p>
+  <% elsif conferences.empty? %>
+    <p class="mt-4">No conferences are available.</p>
+  <% else %>
+    <ul class="mt-4 space-y-2">
+      <% conferences.each do |conference| %>
+        <li><%= link_to conference.name, conference_path(conference, season: season.year), class: 'text-prophet-indigo hover:underline' %></li>
+      <% end %>
+    </ul>
+  <% end %>
+</main>

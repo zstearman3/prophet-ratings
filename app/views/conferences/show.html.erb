@@ -1,0 +1,31 @@
+<main class="mx-auto max-w-screen-xl p-4">
+  <p class="mb-3"><%= link_to '← Conferences', conferences_path(season: season&.year), class: 'hover:underline' %></p>
+  <h1 class="mb-1 text-2xl font-semibold"><%= conference.name %></h1>
+  <% if season %>
+    <p class="mb-4 text-gray-600"><%= season.name.presence || "#{season.year - 1}-#{season.year.to_s.last(2)}" %> season</p>
+    <%= render 'season_selector', seasons:, season:, action: conference_path(conference) %>
+
+    <% if has_team_seasons %>
+      <p class="my-3 text-sm text-gray-600"><%= expanded ? 'Scroll horizontally to see all stats.' : 'Showing national rank, school and rating.' %></p>
+      <p class="mb-3 text-sm">
+        <% if expanded %>
+          <%= link_to 'Show fewer stats', conference_path(conference, request.query_parameters.except('stats').merge(season: season.year)), class: 'hover:underline' %>
+        <% else %>
+          <%= link_to 'Show more stats', conference_path(conference, request.query_parameters.merge(season: season.year, stats: 'more')), class: 'hover:underline' %>
+        <% end %>
+      </p>
+      <% if expanded %>
+        <div tabindex="0" aria-label="Scroll horizontally to view all team statistics" class="overflow-auto focus:outline focus:outline-2 focus:outline-indigo-600">
+          <%= render 'team_seasons/ratings_table', team_seasons:, compact: false, national_rank: true, selected_season: season, scrollable: true %>
+        </div>
+      <% else %>
+        <%= render 'team_seasons/ratings_table', team_seasons:, compact: true, national_rank: true, selected_season: season %>
+      <% end %>
+    <% else %>
+      <p class="mt-4">No team ratings are available for this conference and season.</p>
+    <% end %>
+  <% else %>
+    <p class="mb-4 text-gray-600">No current season is available. Choose a season to view conference ratings.</p>
+    <%= render 'season_selector', seasons:, season: nil, action: conference_path(conference) %>
+  <% end %>
+</main>

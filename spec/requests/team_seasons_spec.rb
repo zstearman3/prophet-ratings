@@ -7,7 +7,7 @@ RSpec.describe 'TeamSeasons' do
     let!(:season) { create(:season, :current) }
     let!(:higher_rated) do
       create(:team_season, season:, team: create(:team, school: 'Alpha University'),
-                           rating: 25.125, adj_offensive_efficiency: 115.25)
+                           rating: 25.125, adj_offensive_efficiency: 115.25, offensive_efficiency: 0.0)
     end
     let!(:lower_rated) do
       create(:team_season, season:, team: create(:team, school: 'Beta University'),
@@ -32,6 +32,24 @@ RSpec.describe 'TeamSeasons' do
         expect(cells[1].at_css('a')['href']).to eq(team_path(team_season.team))
         expect(cells[1].at_css('a')['data-turbo']).to eq('false')
       end
+    end
+
+    it 'preserves the complete home ratings column order and displayed values' do
+      get root_path
+
+      headers = response.parsed_body.css('turbo-frame#team_stats thead th').map { |cell| cell.text.strip.sub(/[▲▼]\z/, '') }
+      expect(headers).to eq([
+                              'Rank', 'School', 'Rating', 'Adj ORtg', 'Adj DRtg', 'Adj Pace', 'Adj TO%', 'Adj TO% Forced',
+                              'Adj ORB%', 'Adj DRB%', 'Adj FT Rate', 'Adj 3PT Prof', 'Adj 3PT Prof Allowed', 'Adj eFG%',
+                              'Adj eFG% Allowed', 'Raw ORtg', 'Raw DRtg', 'Raw Pace', 'Raw eFG%', 'Raw FT Rate',
+                              'Raw 3PA Rate', 'Raw ORB%', 'Raw TO%', 'Home Off Boost', 'Home Def Boost', 'Total Home Boost',
+                              'Off Volatility', 'Def Volatility', 'Pace Volatility', 'ORtg Std Dev', 'DRtg Std Dev'
+                            ])
+      expect(response.parsed_body.css('tbody tr').first.css('td').map { |cell| cell.text.strip }.first(4))
+        .to eq(['1', 'Alpha University', '25.125', '115.25'])
+      root_cells = response.parsed_body.css('turbo-frame#team_stats tbody tr').first.css('td')
+      expect(root_cells[15].text.strip).to eq('0.0')
+      expect(root_cells[16].text.strip).to be_empty
     end
 
     it 'gives each body cell one consistent separator while preserving the sticky header and overflow' do
