@@ -204,16 +204,18 @@
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-prophet-black">
                   <% prediction = @predictions_by_game[game.id] %>
                   <% if prediction %>
-                    <span class="text-xs text-gray-500"><%= if game.final_unmatched?
-                                                               prediction.forecast_kind == 'pregame' ? 'Historical pregame forecast' : "Historical · #{prediction.provenance_label}"
-                                                             else
-                                                               prediction.provenance_label
-                                                             end %></span>
+                    <% prediction_label = if game.final_unmatched?
+                         prediction.forecast_kind == 'pregame' ? 'Historical pregame forecast' : "Historical · #{prediction.provenance_label}"
+                       else
+                         prediction.provenance_label
+                       end %>
                     <% if prediction.home_score && prediction.away_score %>
-                      <%= link_to prediction.predicted_score_string, game_path(game), class: "hover:text-blue-600" %>
+                      <%= link_to prediction.predicted_score_string, game_path(game),
+                        title: prediction_label, class: "hover:text-blue-600" %>
                     <% else %>
-                      Prediction unavailable
+                      <span title="<%= prediction_label %>">Prediction unavailable</span>
                     <% end %>
+                    <%= render 'shared/forecast_provenance', prediction:, label: prediction_label %>
                   <% elsif game.final_unmatched? %>
                     Prediction unavailable
                   <% else %>
