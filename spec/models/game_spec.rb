@@ -115,6 +115,16 @@ RSpec.describe Game do
     end
   end
 
+  describe '#status_string for completed games' do
+    it 'shows a public Final label for unmatched results and only shows overtime from stored minutes' do
+      game.update!(status: :final_unmatched, minutes: nil)
+      expect(game.status_string).to eq('Final')
+
+      game.update!(minutes: 45)
+      expect(game.status_string).to eq('Final OT')
+    end
+  end
+
   describe 'venue classification' do
     it 'defaults new games to an unknown venue' do
       game = described_class.new
