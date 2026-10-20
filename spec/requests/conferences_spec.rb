@@ -45,6 +45,7 @@ RSpec.describe 'Conferences' do
       expect(document.css('thead th').pluck('class')).to all(include('px-1'))
       expect(document.css('tbody td').pluck('class')).to all(include('px-1'))
       expect(document.text).to include('2025-26 season')
+      expect(document.at_css('select[name="season"] option[selected]')['value']).to eq(current_season.year.to_s)
     end
 
     it 'filters members and links by the requested historical season' do
@@ -59,6 +60,7 @@ RSpec.describe 'Conferences' do
       expect(response).to have_http_status(:success)
       schools = response.parsed_body.css('tbody tr td:nth-child(2)').map { |cell| cell.text.strip }
       expect(schools).not_to include('Delta University', 'Outside University')
+      expect(response.parsed_body.at_css('select[name="season"] option[selected]')['value']).to eq(season_start.year.to_s)
 
       get conference_path(conference, season: current_season.year)
       expect(response.parsed_body.css('tbody tr td:nth-child(2)').map { |cell| cell.text.strip })
@@ -144,6 +146,9 @@ RSpec.describe 'Conferences' do
       get conference_path(conference, season: 'not-a-year')
       expect(response).to have_http_status(:not_found)
 
+      get conference_path(conference, season: '')
+      expect(response).to have_http_status(:not_found)
+
       get conference_path(conference, season: 1900)
       expect(response).to have_http_status(:not_found)
     end
@@ -153,6 +158,12 @@ RSpec.describe 'Conferences' do
     current_season.update!(current: false)
     get conference_path(conference)
     expect(response.parsed_body.text).to include('No current season is available')
+    selector = response.parsed_body.at_css('select[name="season"]')
+    expect(selector.key?('required')).to be(true)
+    expect(selector.css('option[selected]')).to be_empty
+    expect(selector.css('option').first['value']).to eq('')
+    expect(selector.css('option').first.text).to eq('Select a season')
+    expect(selector.css('option').pluck('value')).to include(season_start.year.to_s)
 
     current_season.update!(current: true)
     empty_conference = create(:conference, name: 'Empty Conference')
@@ -221,6 +232,12 @@ RSpec.describe 'Conferences' do
       current_season.update!(current: false)
       get '/conferences'
       expect(response.parsed_body.text).to include('No current season is available')
+      selector = response.parsed_body.at_css('select[name="season"]')
+      expect(selector.key?('required')).to be(true)
+      expect(selector.css('option[selected]')).to be_empty
+      expect(selector.css('option').first['value']).to eq('')
+      expect(selector.css('option').first.text).to eq('Select a season')
+      expect(selector.css('option').pluck('value')).to include(season_start.year.to_s)
 
       current_season.update!(current: true)
       TeamConference.delete_all
@@ -231,6 +248,9 @@ RSpec.describe 'Conferences' do
 
     it 'returns not found for an invalid or unknown season' do
       get '/conferences', params: { season: 'not-a-year' }
+      expect(response).to have_http_status(:not_found)
+
+      get '/conferences', params: { season: '' }
       expect(response).to have_http_status(:not_found)
 
       get '/conferences', params: { season: 1900 }
