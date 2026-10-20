@@ -6,7 +6,6 @@ module ProphetRatings
       @ratings_config_version = RatingsConfigVersion.resolve(ratings_config_version)
       @config = @ratings_config_version.settings
       @season = season
-      @previous_season = nil
     end
 
     def call
@@ -35,32 +34,35 @@ module ProphetRatings
     end
 
     def base_inputs(team_season)
-      return legacy_inputs(team_season) unless coaching_enabled?
+      return legacy_inputs(team_season, previous_season) unless coaching_enabled?
 
       coaching = CoachingPaceInputs.new(@season)
-      coaching.with_review { coaching_inputs(team_season, coaching) }
+      coaching.with_review do
+        previous = previous_season
+        coaching_inputs(team_season, coaching, previous)
+      end
     end
 
-    def coaching_inputs(team_season, coaching)
-      inputs = legacy_inputs(team_season)
+    def coaching_inputs(team_season, coaching, previous)
+      inputs = legacy_inputs(team_season, previous)
       inputs.merge(contract: 'preseason-v2-coaching',
-                   coaching: coaching.capture(team_season.team_id, average_for_stat('adj_pace')))
+                   coaching: coaching.capture(team_season.team_id, average_for_stat('adj_pace', previous)))
     end
 
     def coaching_enabled?
       @config.dig(:preseason, :coaching)
     end
 
-    def legacy_inputs(team_season)
+    def legacy_inputs(team_season, previous_season)
       previous = previous_season&.team_seasons&.find_by(team_id: team_season.team_id)
       profile = team_season.team_offseason_profile
       serializer = self.class
       {
         contract: 'preseason-v1', configuration: @config,
-        previous_season: serializer.source_identity(@previous_season), previous_team_season: serializer.source_identity(previous),
+        previous_season: serializer.source_identity(previous_season), previous_team_season: serializer.source_identity(previous),
         profile: serializer.source_identity(profile),
         previous_values: serializer.previous_values(previous),
-        baselines: PreseasonPriorFormula::STATS.index_with { |stat| average_for_stat(stat) },
+        baselines: PreseasonPriorFormula::STATS.index_with { |stat| average_for_stat(stat, previous_season) },
         profile_values: serializer.normalized_profile(profile)
       }
     end
@@ -100,23 +102,23 @@ module ProphetRatings
     end
 
     def previous_season
-      @previous_season = Season.find_by(year: @season.year - 1)
+      Season.find_by(year: @season.year - 1)
     end
 
     def fallback_efficiency
       @config.fetch(:preseason).fetch(:fallback_efficiency)
     end
 
-    def average_for_stat(stat)
+    def average_for_stat(stat, previous_season)
       case stat
       when 'adj_offensive_efficiency'
-        @previous_season&.avg_adj_offensive_efficiency || @previous_season&.average_efficiency ||
+        previous_season&.avg_adj_offensive_efficiency || previous_season&.average_efficiency ||
           fallback_efficiency
       when 'adj_defensive_efficiency'
-        @previous_season&.avg_adj_defensive_efficiency || @previous_season&.average_efficiency ||
+        previous_season&.avg_adj_defensive_efficiency || previous_season&.average_efficiency ||
           fallback_efficiency
       when 'adj_pace'
-        @previous_season&.average_pace || @config.dig(:preseason, :fallback_pace)
+        previous_season&.average_pace || @config.dig(:preseason, :fallback_pace)
       end
     end
     private :base_inputs, :legacy_inputs, :coaching_inputs, :coaching_enabled?, :previous_season, :captured_prior,
