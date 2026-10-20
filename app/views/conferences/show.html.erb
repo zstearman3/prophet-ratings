@@ -1,5 +1,4 @@
 <main class="mx-auto max-w-screen-xl p-4">
-  <p class="mb-3"><%= link_to '← Conferences', conferences_path(season: season&.year), class: 'hover:underline' %></p>
   <h1 class="mb-1 text-2xl font-semibold"><%= conference.name %></h1>
   <% if season %>
     <p class="mb-4 text-gray-600"><%= season.name.presence || "#{season.year - 1}-#{season.year.to_s.last(2)}" %> season</p>

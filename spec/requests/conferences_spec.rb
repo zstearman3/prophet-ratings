@@ -29,6 +29,7 @@ RSpec.describe 'Conferences' do
 
       expect(response).to have_http_status(:success)
       document = response.parsed_body
+      expect(document.css('a').map(&:text)).not_to include('← Conferences')
       expect(document.css('thead th').map { |cell| cell.text.strip }).to eq(['National rank', 'School', 'Rating'])
       expected_rows = [
         ['4', 'Alpha University', '25.125'],
@@ -150,9 +151,6 @@ RSpec.describe 'Conferences' do
 
   it 'shows empty states when no current season or no conference members exist' do
     current_season.update!(current: false)
-    get conferences_path
-    expect(response.parsed_body.text).to include('No current season is available')
-
     get conference_path(conference)
     expect(response.parsed_body.text).to include('No current season is available')
 
@@ -162,13 +160,10 @@ RSpec.describe 'Conferences' do
     expect(response.parsed_body.text).to include('No team ratings are available')
   end
 
-  it 'shows an explicit empty state when no conferences exist' do
-    TeamConference.delete_all
-    Conference.delete_all
+  it 'does not expose a conference directory route' do
+    get '/conferences'
 
-    get conferences_path(season: current_season.year)
-
-    expect(response.parsed_body.text).to include('No conferences are available')
+    expect(response).to have_http_status(:not_found)
   end
 
   it 'shows missing rating and rank as unavailable and retains long school names' do
@@ -204,16 +199,5 @@ RSpec.describe 'Conferences' do
     expect(values[headers.index('Rating')]).to eq('—')
     expect(values[headers.index('Adj ORtg')]).to eq('—')
     expect(values[headers.index('Adj DRtg')]).to eq('0.0')
-  end
-
-  describe 'GET /conferences' do
-    it 'lists conferences for the selected season' do
-      get conferences_path(season: season_start.year)
-
-      expect(response).to have_http_status(:success)
-      expect(response.parsed_body.css('a').map { |anchor| anchor.text.strip }).to include('Big Test Conference')
-      expect(response.parsed_body.css('a').find { |anchor| anchor.text.include?('Big Test Conference') }['href'])
-        .to include("season=#{season_start.year}")
-    end
   end
 end

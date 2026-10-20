@@ -1,12 +1,8 @@
 # frozen_string_literal: true
 
-# Serves season-aware conference listings and their team ratings tables.
+# Serves season-aware conference team ratings tables.
 class ConferencesController < ApplicationController
   include RatingsTableSorting
-
-  def index
-    render locals: { conferences: Conference.order(:name), seasons: Season.order(year: :desc), season: selected_season }
-  end
 
   def show
     conference = Conference.find(params.expect(:id))

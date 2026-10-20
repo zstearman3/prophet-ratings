@@ -2,7 +2,9 @@
 
 ## Conference ratings pages
 
-`/conferences` lists conference pages for the selected season. `/conferences/:id`
+Conference pages are reached from the conference label in a team's record
+header. The label uses that team's membership for the displayed season, so
+historical team pages link to the conference they belonged to then. `/conferences/:id`
 shows a conference's members using the season's inclusive conference membership
 dates. The optional `season=YYYY` parameter selects a historical season; when it
 is omitted, the current season is used. The compact table displays each stored
