@@ -25,6 +25,15 @@ publishing or updating `current`. Activation explicitly changes the default
 for future runs. `ensure_current!` remains an explicit publish-and-activate
 compatibility API; calculation and evaluation paths no longer call it.
 `find_or_create_by_current_config` remains a publication compatibility API.
+All supported new-row paths enforce the same strict authoring contract:
+`publish!`, a factory lookup that must create a row, ordinary Active Record
+creation, and RailsAdmin creation reject unknown keys, malformed objects, and
+invalid values. A factory lookup first returns an identical row by its stored
+name/config, preserving compatibility with historical payloads. Existing rows
+remain readable and replayable under their existing runtime policy; incomplete
+legacy contracts still cannot be newly calculated. Updating descriptions or
+activation state remains supported, while name and config are immutable.
+Direct SQL and validation-bypass writes are unsupported authoring paths.
 
 Defaults select the active row, or the already-published authored bundle when no
 row is active. No published default is an error for calculations. Lookup of

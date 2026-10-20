@@ -184,7 +184,8 @@ RSpec.describe ProphetRatings::PreseasonRevision do
     report = revision.preview
     season.update!(start_date: season.start_date + 1.day)
     expect { revision.call(preview_key: report[:preview_key]) }.to raise_error(ArgumentError, /in-season outputs|rerun.*preview/)
-    incomplete = create(:ratings_config_version, config: { bundle_name: 'legacy' })
+    incomplete = create(:ratings_config_version, name: 'legacy')
+    incomplete.update_columns(config: { bundle_name: 'legacy' }) # rubocop:disable Rails/SkipsModelValidations
     expect { described_class.new(season, ratings_config_version: incomplete) }.to raise_error(ArgumentError, /legacy|contract/i)
   end
 

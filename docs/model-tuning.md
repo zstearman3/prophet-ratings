@@ -30,6 +30,13 @@ that would apply a points-per-100 adjustment to a rate. Existing saved bundles a
 not retroactively subjected to the new authoring key whitelist. Their existing
 contract/formula validation still applies. New learning blocks must be complete;
 absence preserves the historical rule, not a fallback to current YAML.
+The same strict guard applies when a supported ordinary model create or
+RailsAdmin create would persist a new row. A factory lookup for an identical
+stored name/config returns that historical row before applying new-payload
+validation; changed assumptions under an existing name still fail. Existing
+historical rows remain readable and replayable under their current contract,
+and edits to name/config remain forbidden. Direct validation-bypass writes are
+unsupported.
 
 The authored default is `v1.12-probability-precision`; it retains the v1.11
 learning settings and coefficients while preserving unrounded issued probabilities
