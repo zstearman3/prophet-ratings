@@ -49,16 +49,16 @@
             <% historical_prediction = game.historical_prediction(ratings_config_version: @ratings_config_version) %>
             <% prediction = historical_prediction || game.current_prediction(ratings_config_version: @ratings_config_version) %>
             <% if prediction.present? %>
-              <span class="text-xs text-gray-500"><%= if historical_prediction
-                                                         prediction.forecast_kind == 'pregame' ? 'Historical pregame forecast' : "Historical · #{prediction.provenance_label}"
-                                                       else
-                                                         prediction.provenance_label
-                                                       end %></span>
+              <% prediction_label = if historical_prediction
+                   prediction.forecast_kind == 'pregame' ? 'Historical pregame forecast' : "Historical · #{prediction.provenance_label}"
+                 else
+                   prediction.provenance_label
+                 end %>
               <% if prediction.home_score && prediction.away_score %>
                 <%= link_to prediction.predicted_score_string, game_path(game),
-                  class: "block text-gray-800 hover:text-blue-600" %>
+                  title: prediction_label, class: "block text-gray-800 hover:text-blue-600" %>
               <% else %>
-                <span class="block text-xs text-gray-400">Prediction unavailable</span>
+                <span title="<%= prediction_label %>" class="block text-xs text-gray-400">Prediction unavailable</span>
               <% end %>
               <% if prediction.home_win_probability %>
                 <span class="text-xs text-gray-500"><%= historical_prediction ? 'Captured home win probability' : 'Home win' %>: <%= number_to_percentage(prediction.home_win_probability * 100, precision: 1) %></span>

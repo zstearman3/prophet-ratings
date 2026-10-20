@@ -825,6 +825,9 @@ Historical ratings workflows may create reconstructions; they are not a live
 forecast archive. Nightly prediction jobs now select only scheduled upcoming games.
 This contract adds no fitted coefficients or confidence/calibration claims.
 
+Schedule, team schedule and betting tables show forecast provenance as a hover
+tooltip on the predicted score. The game detail page displays the label explicitly.
+
 ## Bounded historical ratings reconstruction
 
 Resume/rebuild restores each eligible team from the selected immutable `PreseasonPrior`

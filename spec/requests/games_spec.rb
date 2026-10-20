@@ -70,6 +70,8 @@ RSpec.describe 'Games' do
       expect(response).to have_http_status(:success)
       expect(score_cell.text.strip).to eq('-')
       expect(prediction_link).to be_present
+      expect(prediction_link['title']).to eq(prediction.provenance_label)
+      expect(document.at_css('table').text).not_to include(prediction.provenance_label)
     end
 
     it 'uses Eastern schedule dates when selecting games' do
