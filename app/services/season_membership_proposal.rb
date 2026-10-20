@@ -49,10 +49,7 @@ class SeasonMembershipProposal
   end
 
   def self.memberships_at(team, year)
-    team.team_conferences.select do |membership|
-      last_year = membership.end_season&.year
-      membership.start_season.year <= year && (!last_year || last_year >= year)
-    end
+    team.team_conferences.select { |membership| membership.covers_year?(year) }
   end
 
   def self.validate_target_year(proposal, submission)

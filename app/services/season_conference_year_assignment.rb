@@ -9,7 +9,7 @@ class SeasonConferenceYearAssignment
   end
 
   def call
-    memberships = SeasonMembershipProposal.memberships_at(team, season.year)
+    memberships = team.team_conferences.select { |membership| membership.covers_year?(season.year) }
     raise ArgumentError, "#{team.school}: resolve overlapping membership ranges first." if memberships.many?
 
     @membership = memberships.first

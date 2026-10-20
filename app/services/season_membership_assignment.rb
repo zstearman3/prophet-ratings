@@ -30,13 +30,11 @@ class SeasonMembershipAssignment
   def update_membership(team, existing, desired_id)
     return if existing&.conference_id == desired_id
 
-    if existing&.start_season_id == season.id
-      desired_id ? existing.update!(conference_id: desired_id) : existing.destroy!
-    elsif desired_id
-      assign_membership(team, desired_id)
-    elsif existing
-      existing.update!(end_season: Season.find_by!(year: season.year - 1))
-    end
+    return update_target_membership(existing, desired_id) if existing&.start_season_id == season.id
+    return assign_membership(team, desired_id) if desired_id
+    return unless existing
+
+    existing.update!(end_season: Season.find_by!(year: season.year - 1))
   end
 
   def assign_membership(team, conference_id)
@@ -45,6 +43,10 @@ class SeasonMembershipAssignment
   end
 
   def active_memberships(team)
-    SeasonMembershipProposal.memberships_at(team, season.year)
+    team.team_conferences.select { |membership| membership.covers_year?(season.year) }
+  end
+
+  def update_target_membership(existing, desired_id)
+    desired_id ? existing.update!(conference_id: desired_id) : existing.destroy!
   end
 end

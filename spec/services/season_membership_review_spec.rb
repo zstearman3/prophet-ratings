@@ -82,6 +82,61 @@ RSpec.describe SeasonMembershipReview do
     expect(season.rating_team_seasons.pluck(:team_id)).to eq([team.id])
   end
 
+  it 'assigns a first conference membership for a team without stored history' do
+    newcomer = create(:team, school: 'Newcomer U', url: '/cbb/schools/newcomer/men/')
+    create(:team_alias, team: newcomer, value: newcomer.school)
+    source << source.first.merge(team_slug: 'newcomer', team_name: newcomer.school)
+    SeasonPreparer.new(year: season.year).call
+    review.refresh
+    approve
+
+    membership = newcomer.team_conferences.sole
+    expect(membership).to have_attributes(conference_id: conference.id, start_season_id: season.id, end_season_id: nil)
+  end
+
+  it 'leaves teams with no prior membership unchanged when reviewed independent or excluded' do
+    independent = create(:team, school: 'Independent U')
+    excluded = create(:team, school: 'Excluded U')
+    create(:team_alias, team: independent, value: independent.school)
+    SeasonPreparer.new(year: season.year).call
+    review.refresh
+    attributes = approval
+    attributes['teams'][independent.id.to_s] = { 'choice' => 'independent', 'reason' => 'Official independent schedule' }
+    attributes['teams'][excluded.id.to_s] = { 'choice' => 'excluded', 'reason' => 'Verified D1 departure' }
+    approve(attributes)
+
+    expect(independent.team_conferences).to be_empty
+    expect(excluded.team_conferences).to be_empty
+    expect(season.participation_review.fetch('teams')).to include(
+      hash_including('team_id' => independent.id, 'status' => 'included'),
+      hash_including('team_id' => excluded.id, 'status' => 'excluded')
+    )
+  end
+
+  it 'closes an existing finite range at the prior season for an independent decision' do
+    future = create(:season, year: 2028)
+    membership.update!(end_season: future)
+    review.refresh
+    attributes = approval
+    attributes['teams'][team.id.to_s] = { 'choice' => 'independent', 'reason' => 'Verified conference departure' }
+    approve(attributes)
+
+    expect(membership.reload.end_season).to eq(previous)
+  end
+
+  it 'preserves the missing preceding-season error when closing a prior membership' do
+    earlier = create(:season, year: 2024)
+    membership.update!(start_season: earlier)
+    previous.destroy!
+    review.refresh
+    attributes = approval
+    attributes['teams'][team.id.to_s] = { 'choice' => 'independent', 'reason' => 'Verified conference departure' }
+
+    expect { approve(attributes) }.to raise_error(ActiveRecord::RecordNotFound, /Couldn't find Season/)
+    expect(membership.reload.end_season).to be_nil
+    expect(season.reload.participation_review).to eq({})
+  end
+
   it 'does not rewrite an unchanged membership or its timestamp' do
     membership.update!(conference:)
     review.refresh
