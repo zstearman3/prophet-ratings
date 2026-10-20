@@ -18,7 +18,7 @@ gem 'jsbundling-rails'
 gem 'json', '< 3'
 gem 'pg', '~> 1.6'
 gem 'puma', '>= 5.0'
-gem 'rails', '~> 8.1.3'
+gem 'rails', '~> 8.1.4'
 gem 'rails_admin'
 gem 'redis', '>= 4.0.1'
 # Preserve Sprockets' SassC API without compiling the retired LibSass C++ extension.
