@@ -79,6 +79,14 @@ RSpec.describe SeasonParticipationReview do
     expect { review.validate }.to raise_error(ArgumentError, %r{Review current start/end dates})
   end
 
+  it 'reports stale reviewed dates before the in-season publication guard' do
+    apply_review
+    season.update!(end_date: season.end_date + 1, current: true)
+
+    expect { ProphetRatings::PreseasonInitializer.new(season).preview }
+      .to raise_error(ArgumentError, %r{Review current start/end dates})
+  end
+
   it 'rejects malformed entries or duplicate IDs before changing the prior review' do
     apply_review
     original = season.reload.participation_review
