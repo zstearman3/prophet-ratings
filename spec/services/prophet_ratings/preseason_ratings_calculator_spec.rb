@@ -70,7 +70,17 @@ RSpec.describe ProphetRatings::PreseasonRatingsCalculator, type: :service do
 
     it 'captures source identities, values and configuration for independent replay' do
       prior = PreseasonPrior.find_by!(team_season:)
-      expect(prior.inputs.dig('previous_team_season', 'id')).to eq(previous_team_season.id)
+      expected_inputs = {
+        'previous_season' => { 'id' => previous_season.id, 'updated_at' => previous_season.updated_at.iso8601(6),
+                               'attributes' => previous_season.attributes.as_json },
+        'previous_team_season' => { 'id' => previous_team_season.id,
+                                    'updated_at' => previous_team_season.updated_at.iso8601(6),
+                                    'attributes' => previous_team_season.attributes.as_json },
+        'configuration' => prior.ratings_config_version.config,
+        'previous_values' => { 'adj_offensive_efficiency' => '112.0', 'adj_defensive_efficiency' => '99.0',
+                               'adj_pace' => '67.0' }
+      }
+      expect(prior.inputs.slice(*expected_inputs.keys)).to eq(expected_inputs)
       expect(prior.inputs.dig('profile_values', 'returning_minutes_pct')).to eq(0.8)
       expect(ProphetRatings::PreseasonPriorFormula.new(prior.inputs, prior.inputs.fetch('configuration')).call).to eq(prior.outputs)
       expect { prior.update!(outputs: prior.outputs.merge('preseason_adj_pace' => 80)) }.to raise_error(ActiveRecord::ReadOnlyRecord)
@@ -96,12 +106,15 @@ RSpec.describe ProphetRatings::PreseasonRatingsCalculator, type: :service do
     end
 
     it 'replays captured inputs after history and profiles change' do
+      prior = PreseasonPrior.find_by!(team_season:)
+      captured_identity = prior.attributes.slice('id', 'inputs', 'outputs')
       previous_team_season.update!(adj_offensive_efficiency: nil)
       offseason_profile.destroy!
       described_class.new(season).call
 
       expect(team_season.reload.preseason_adj_offensive_efficiency).to eq(115.25)
       expect(PreseasonPrior.count).to eq(1)
+      expect(prior.reload.attributes.slice('id', 'inputs', 'outputs')).to eq(captured_identity)
     end
   end
 
