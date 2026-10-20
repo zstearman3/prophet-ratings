@@ -16,11 +16,43 @@ RSpec.describe ProphetRatings::PreseasonRevision do
     revision.call(preview_key: revision.preview.fetch(:preview_key))
   end
 
+  def legacy_report_row(row, inputs, config)
+    prior = row.preseason_prior
+    {
+      team_id: row.team_id, team_season_id: row.id, added: prior.blank?,
+      profile_before: prior&.inputs&.fetch('profile', nil), profile_after: inputs['profile'],
+      outputs_before: prior&.outputs, outputs_after: ProphetRatings::PreseasonPriorFormula.new(inputs, config).call,
+      coaching: ProphetRatings::PreseasonPriorFormula.new(inputs, config).pace_report,
+      efficiency: ProphetRatings::PreseasonPriorFormula.new(inputs, config).efficiency_report, inputs: inputs
+    }
+  end
+
   def scheduled_forecast
     game = create(:game, season:, status: :scheduled, start_time: season.start_date.in_time_zone + 12.hours)
     create(:team_game, game:, team_season: home, team: home.team, home: true)
     create(:team_game, game:, team_season: away, team: away.team, home: false)
     ProphetRatings::GamePredictionBuilder.new(game, ratings_config_version: version).call
+  end
+
+  it 'preserves ordered preview rows and preview identity across reload-shaped JSON' do
+    report = revision.preview
+    calculator = ProphetRatings::PreseasonRatingsCalculator.new(season, ratings_config_version: revision_version)
+    expected = season.rating_team_seasons.order(:team_id).map do |row|
+      legacy_report_row(row, calculator.preview_inputs(row).as_json, revision_version.config)
+    end
+
+    expect(report[:teams]).to eq(expected)
+    expect(report[:teams].pluck(:team_id)).to eq([home.team_id, away.team_id].sort)
+    expected_priors = [home, away].sort_by(&:team_id).map { |row| row.reload.preseason_prior.outputs }
+    expect(report[:teams].pluck(:outputs_before)).to eq(expected_priors)
+    legacy_report = report.except(:teams, :preview_key).merge(teams: expected)
+    legacy_key = Digest::SHA256.hexdigest(described_class.canonical_json(legacy_report.as_json).to_json)
+    expect(report[:preview_key]).to eq(legacy_key)
+
+    reloaded_revision = described_class.new(
+      Season.find(season.id), ratings_config_version: RatingsConfigVersion.find(revision_version.id)
+    )
+    expect(reloaded_revision.preview[:preview_key]).to eq(report[:preview_key])
   end
 
   it 'previews corrections and added coverage without writing, then preserves old outputs and frozen forecasts' do

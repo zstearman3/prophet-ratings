@@ -59,6 +59,14 @@ RSpec.describe ProphetRatings::PreseasonRevision do
     profile
     report = operation.preview
     row = report[:teams].find { |team| team[:team_id] == home.team_id }
+    prior = home.reload.preseason_prior
+    formula = ProphetRatings::PreseasonPriorFormula.new(row[:inputs], version.config)
+    expect(row).to eq(
+      team_id: home.team_id, team_season_id: home.id, added: prior.blank?,
+      profile_before: prior&.inputs&.fetch('profile', nil), profile_after: row[:inputs]['profile'],
+      outputs_before: prior&.outputs, outputs_after: formula.call,
+      coaching: formula.pace_report, efficiency: formula.efficiency_report, inputs: row[:inputs]
+    )
     expect(row[:efficiency]).to include(adjustment: 5, offense_allocation: 2.5, defense_allocation: -2.5)
     expect(row[:efficiency][:departures]).to include(reason: 'missing_departure_evidence')
     expect(PreseasonPrior.count).to eq(0)

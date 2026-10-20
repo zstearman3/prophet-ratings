@@ -29,6 +29,21 @@ RSpec.describe ProphetRatings::PreseasonInitializer do
     expect(snapshot.stats.dig('preseason_prior', 'outputs', 'preseason_adj_pace')).to eq(69.5)
   end
 
+  it 'uses matching-version inputs while reporting the currently linked capture as before provenance' do
+    original_version = RatingsConfigVersion.publish!
+    described_class.new(season, ratings_config_version: original_version).call
+    linked_prior = home.reload.preseason_prior
+    selected_version = RatingsConfigVersion.publish!(RatingsConfigVersion.authored_config.merge(bundle_name: 'report-selection-test'))
+
+    report = described_class.new(season, ratings_config_version: selected_version).send(:captured_report)
+    team = report[:teams].find { |row| row[:team_id] == home.team_id }
+
+    expect(team[:inputs]['configuration']['bundle_name']).to eq('report-selection-test')
+    expect(team[:outputs_before]).to eq(linked_prior.outputs)
+    expect(team[:profile_before]).to eq(linked_prior.inputs['profile'])
+    expect(report[:teams].pluck(:team_id)).to eq([home, away].map(&:team_id).sort)
+  end
+
   it 'produces a neutral scheduled prediction with independently calculated scores and probability' do
     game = scheduled_game
     initializer.call

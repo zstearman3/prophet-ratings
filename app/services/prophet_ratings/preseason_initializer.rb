@@ -33,7 +33,7 @@ module ProphetRatings
     def reported_team(row, calculator)
       prior = PreseasonPrior.find_by(team_season: row, ratings_config_version: @ratings_config_version)
       inputs = prior ? prior.inputs : calculator.preview_inputs(row).as_json
-      PreseasonRevision.preview_row(row, inputs, @ratings_config_version.config)
+      PreseasonReportBuilder.new(row, inputs, @ratings_config_version.config, prior: row.preseason_prior).call
     end
 
     private :captured_report, :reported_team
