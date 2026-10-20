@@ -39,19 +39,30 @@
             <span class="text-xs px-2 py-0.5 rounded <%= badge_class %>"><%= badge_label %></span>
           </td>
           <td class="px-4 py-2">
-            <% if game.final? %>
-              <%= game.away_team_score %> - <%= game.home_team_score %>
+            <% if game.completed? %>
+              <%= game.away_team_score && game.home_team_score ? "#{game.away_team_score} - #{game.home_team_score}" : 'N/A' %>
             <% else %>
               -
             <% end %>
           </td>
           <td class="px-4 py-2">
-            <% prediction = game.current_prediction %>
+            <% historical_prediction = game.historical_prediction(ratings_config_version: @ratings_config_version) %>
+            <% prediction = historical_prediction || game.current_prediction(ratings_config_version: @ratings_config_version) %>
             <% if prediction.present? %>
-              <span class="text-xs text-gray-500"><%= prediction.provenance_label %></span>
-              <%= link_to prediction.predicted_score_string, game_path(game),
-                class: "block text-gray-800 hover:text-blue-600" %>
-              <span class="text-xs text-gray-500">Home win: <%= number_to_percentage(prediction.home_win_probability * 100, precision: 1) %></span>
+              <span class="text-xs text-gray-500"><%= if historical_prediction
+                                                         prediction.forecast_kind == 'pregame' ? 'Historical pregame forecast' : "Historical · #{prediction.provenance_label}"
+                                                       else
+                                                         prediction.provenance_label
+                                                       end %></span>
+              <% if prediction.home_score && prediction.away_score %>
+                <%= link_to prediction.predicted_score_string, game_path(game),
+                  class: "block text-gray-800 hover:text-blue-600" %>
+              <% else %>
+                <span class="block text-xs text-gray-400">Prediction unavailable</span>
+              <% end %>
+              <% if prediction.home_win_probability %>
+                <span class="text-xs text-gray-500"><%= historical_prediction ? 'Captured home win probability' : 'Home win' %>: <%= number_to_percentage(prediction.home_win_probability * 100, precision: 1) %></span>
+              <% end %>
             <% else %>
               <span class="text-xs text-gray-400"><%= game.current_prediction_unavailable_reason&.humanize || 'No prediction' %></span>
             <% end %>

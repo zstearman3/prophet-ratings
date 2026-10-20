@@ -7,11 +7,9 @@ class GamesController < ApplicationController
       away_team_game: %i[team team_season]
     ).find(params.expect(:id))
 
-    @home_team_game = @game.home_team_game
-    @away_team_game = @game.away_team_game
-
-    @prediction = @game.current_prediction
     @config = RatingsConfigVersion.current
+    @historical_prediction = @game.historical_prediction(ratings_config_version: @config)
+    @prediction = @game.current_prediction(ratings_config_version: @config) unless @historical_prediction
   end
 
   ##

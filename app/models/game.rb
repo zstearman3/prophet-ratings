@@ -133,6 +133,12 @@ class Game < ApplicationRecord
     candidate unless candidate&.participant_exclusion_reason
   end
 
+  def historical_prediction(ratings_config_version: RatingsConfigVersion.published_default)
+    return unless final_unmatched?
+
+    current_prediction_candidate(ratings_config_version)
+  end
+
   def current_prediction_unavailable_reason(ratings_config_version: RatingsConfigVersion.published_default)
     current_prediction_candidate(ratings_config_version)&.participant_exclusion_reason
   end
@@ -173,8 +179,10 @@ class Game < ApplicationRecord
   # Returns a formatted string representing the game's status, indicating overtime if applicable.
   # @return [String] The status string, such as "Final", "Final OT", "Final 2OT", or the uppercase status.
   def status_string
-    if final? && overtime?
+    if completed? && overtime?
       overtimes == 1 ? 'Final OT' : "Final #{overtimes}OT"
+    elsif completed?
+      'Final'
     else
       status.upcase
     end
