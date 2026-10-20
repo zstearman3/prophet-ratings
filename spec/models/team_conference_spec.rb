@@ -54,6 +54,26 @@ RSpec.describe TeamConference do
     expect(membership).to be_valid
   end
 
+  describe '#covers_year?' do
+    it 'includes both boundaries of a finite range' do
+      membership = build(:team_conference, team:, conference:, start_season: season2025, end_season: season2027)
+
+      expect([2024, 2025, 2026, 2027, 2028].map { |year| membership.covers_year?(year) }).to eq([false, true, true, true, false])
+    end
+
+    it 'covers the start year and later years for an open range' do
+      membership = build(:team_conference, team:, conference:, start_season: season2025)
+
+      expect([2024, 2025, 2099].map { |year| membership.covers_year?(year) }).to eq([false, true, true])
+    end
+
+    it 'covers only the year for a single-year range' do
+      membership = build(:team_conference, team:, conference:, start_season: season2026, end_season: season2026)
+
+      expect([2025, 2026, 2027].map { |year| membership.covers_year?(year) }).to eq([false, true, false])
+    end
+  end
+
   it 'allows a bounded range' do
     membership = build(
       :team_conference,

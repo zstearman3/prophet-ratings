@@ -43,6 +43,11 @@ class TeamConference < ApplicationRecord
     "#{team.school} — #{conference.name} (#{season_range_label})"
   end
 
+  def covers_year?(year)
+    last_year = end_season&.year
+    start_season.year <= year && (!last_year || last_year >= year)
+  end
+
   private
 
   def end_season_not_before_start
