@@ -108,6 +108,12 @@ Wins and losses compare stored side scores, including when the known team is
 away. Conference W–L requires a strict final and its stored conference flag; an
 unresolved opponent's conference or division is never inferred.
 
+Schedule, game detail and team-season pages display stored scores for completed
+unmatched games using the public `Final` label. Missing opponent links and model
+data remain visibly unavailable; saved forecasts with changed participants are
+labeled as historical and are not shown as evaluated results. This display
+behavior does not change model eligibility.
+
 All statistical averages, pace deviations, adjustment/solver observations,
 two-game eligibility counts, prediction residuals, evaluation samples, volatility
 and home-court learning continue to require strict `Game.final` inputs. Raw or

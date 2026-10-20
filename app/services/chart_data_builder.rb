@@ -42,8 +42,12 @@ class ChartDataBuilder
   end
 
   def chart_data
-    raw = @snapshots.map { |s| [s.snapshot_date, s.send(@stat) || 0.0] }
-    percentage? ? raw.map { |d| [d[0], (d[1] * 100.0).round(3)] } : raw
+    raw = @snapshots.map { |s| [s.snapshot_date, s.send(@stat)] }
+    return raw unless percentage?
+
+    raw.map do |date, value|
+      [date, value && (value * 100.0).round(3)]
+    end
   end
 
   def reference_lines
@@ -52,31 +56,44 @@ class ChartDataBuilder
     avg = season_average(avg_attr)
     stddev = season_std_dev(stddev_attr)
 
-    avg *= 100 if percentage?
-    stddev *= 100 if percentage?
+    avg *= 100 if percentage? && avg
+    stddev *= 100 if percentage? && stddev
 
-    dates = chart_data.map(&:first)
-    {
-      avg: dates.map { |d| [d, avg] },
-      upper: dates.map { |d| [d, avg + stddev] },
-      lower: dates.map { |d| [d, avg - stddev] },
-      upper2: dates.map { |d| [d, avg + (2.0 * stddev)] },
-      lower2: dates.map { |d| [d, avg - (2.0 * stddev)] }
-    }
+    bands = if avg && stddev
+              [avg, avg + stddev, avg - stddev, avg + (2.0 * stddev), avg - (2.0 * stddev)]
+            else
+              [avg, nil, nil, nil, nil]
+            end
+    %i[avg upper lower upper2 lower2].zip(bands.map { |value| reference_line(value) }).to_h
   end
 
   private
 
-  def season_average(avg_attr)
-    return (@season.avg_adj_offensive_efficiency || 0).to_f - (@season.avg_adj_defensive_efficiency || 0).to_f if avg_attr == 'rating'
+  def reference_line(value)
+    @snapshots.map { |snapshot| [snapshot.snapshot_date, value] }
+  end
 
-    @season.try(avg_attr) || 0
+  def season_average(avg_attr)
+    if avg_attr == 'rating'
+      offense = @season.avg_adj_offensive_efficiency
+      defense = @season.avg_adj_defensive_efficiency
+      return offense.to_f - defense.to_f if offense && defense
+
+      return nil
+    end
+
+    @season.try(avg_attr)
   end
 
   def season_std_dev(stddev_attr)
-    return StatisticsUtils.stddev(@season.team_seasons.pluck(:rating)).round(3) if stddev_attr == 'rating'
+    if stddev_attr == 'rating'
+      ratings = @season.team_seasons.where.not(rating: nil).pluck(:rating)
+      return nil if ratings.size < 2
 
-    @season.try(stddev_attr) || 0
+      return StatisticsUtils.stddev(ratings).round(3)
+    end
+
+    @season.try(stddev_attr)
   end
 
   def stat_to_avg_attr(stat)

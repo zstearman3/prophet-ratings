@@ -5,41 +5,41 @@
         <div class="flex flex-col items-center">
           <div class="flex items-center">
             <h1 class="text-2xl font-bold text-prophet-black">
-              <% if @away_team_game&.team %>
-                <span class="text-sm text-gray-600 mr-2">#<%= @away_team_game&.team_season&.rank %></span>
-                <%= link_to @away_team_game.team.school, team_path(@away_team_game.team), class: "hover:text-blue-600" %>
+              <% if @game.away_team_game&.team %>
+                <span class="text-sm text-gray-600 mr-2"><%= @game.away_team_game&.team_season&.rank ? "##{@game.away_team_game.team_season.rank}" : 'N/A' %></span>
+                <%= link_to @game.away_team_game.team.school, team_path(@game.away_team_game.team), class: "hover:text-blue-600" %>
               <% else %>
                 <%= @game.away_team_name %>
               <% end %>
             </h1>
           </div>
-          <span class="text-2xl font-bold text-prophet-black mt-2"><%= @game.final? ? @game.away_team_score : '-' %></span>
+          <span class="text-2xl font-bold text-prophet-black mt-2"><%= @game.completed? ? (@game.away_team_score || 'N/A') : '-' %></span>
         </div>
         <div class="flex flex-col items-center">
           <div class="flex items-center">
             <h1 class="text-2xl font-bold text-prophet-black">
-              <% if @home_team_game&.team %>
-                <span class="text-sm text-gray-600 mr-2">#<%= @home_team_game&.team_season&.rank %></span>
-                <%= link_to @home_team_game.team.school, team_path(@home_team_game.team), class: "hover:text-blue-600" %>
+              <% if @game.home_team_game&.team %>
+                <span class="text-sm text-gray-600 mr-2"><%= @game.home_team_game&.team_season&.rank ? "##{@game.home_team_game.team_season.rank}" : 'N/A' %></span>
+                <%= link_to @game.home_team_game.team.school, team_path(@game.home_team_game.team), class: "hover:text-blue-600" %>
               <% else %>
                 <%= @game.home_team_name %>
               <% end %>
             </h1>
           </div>
-          <span class="text-2xl font-bold text-prophet-black mt-2"><%= @game.final? ? @game.home_team_score : '-' %></span>
+          <span class="text-2xl font-bold text-prophet-black mt-2"><%= @game.completed? ? (@game.home_team_score || 'N/A') : '-' %></span>
         </div>
       </div>
     </div>
 
     <div class="mt-4">
-      <p class="text-gray-600 text-center">Date: <%= @game.start_time.strftime("%B %d, %Y") %></p>
+      <p class="text-gray-600 text-center">Date: <%= @game.start_time.strftime("%B %d, %Y") %> · <%= @game.completed? ? @game.status_string : @game.status.titleize %></p>
       <% if @game.venue_name.present? %>
         <p class="text-gray-600 text-center">Venue: <%= @game.venue_name %></p>
       <% end %>
     </div>
 
     <div class="mt-8">
-      <% if @game.final? %>
+      <% if @game.completed? %>
         <h2 class="text-xl font-semibold text-prophet-black mb-4">Box Score</h2>
         <div class="bg-white rounded-lg shadow overflow-hidden">
           <div class="overflow-x-auto">
@@ -68,10 +68,10 @@
               <tr>
                 <td class="px-3 py-2 whitespace-nowrap">
                   <div class="flex items-center">
-                    <span class="text-sm text-gray-600 mr-2">#<%= @away_team_game&.team_season&.rank %></span>
+                    <span class="text-sm text-gray-600 mr-2"><%= @game.away_team_game&.team_season&.rank ? "##{@game.away_team_game.team_season.rank}" : 'N/A' %></span>
                     <span class="text-sm font-medium text-prophet-black">
-                      <% if @away_team_game&.team %>
-                        <%= link_to @away_team_game.team.school, team_path(@away_team_game.team), class: "hover:text-blue-600" %>
+                      <% if @game.away_team_game&.team %>
+                        <%= link_to @game.away_team_game.team.school, team_path(@game.away_team_game.team), class: "hover:text-blue-600" %>
                       <% else %>
                         <%= @game.away_team_name %>
                       <% end %>
@@ -79,58 +79,58 @@
                   </div>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
-                  <%= @away_team_game&.field_goals_made&.then { |m| "#{m}/#{@away_team_game&.field_goals_attempted}" } || 'N/A' %>
+                  <%= @game.away_team_game&.field_goals_made && @game.away_team_game&.field_goals_attempted ? "#{@game.away_team_game.field_goals_made}/#{@game.away_team_game.field_goals_attempted}" : 'N/A' %>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
-                  <%= @away_team_game&.three_pt_made&.then { |m| "#{m}/#{@away_team_game&.three_pt_attempted}" } || 'N/A' %>
+                  <%= @game.away_team_game&.three_pt_made && @game.away_team_game&.three_pt_attempted ? "#{@game.away_team_game.three_pt_made}/#{@game.away_team_game.three_pt_attempted}" : 'N/A' %>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
-                  <%= @away_team_game&.free_throws_made&.then { |m| "#{m}/#{@away_team_game&.free_throws_attempted}" } || 'N/A' %>
+                  <%= @game.away_team_game&.free_throws_made && @game.away_team_game&.free_throws_attempted ? "#{@game.away_team_game.free_throws_made}/#{@game.away_team_game.free_throws_attempted}" : 'N/A' %>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
-                  <%= @away_team_game&.rebounds || 'N/A' %>
+                  <%= @game.away_team_game&.rebounds || 'N/A' %>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
-                  <%= @away_team_game&.assists || 'N/A' %>
+                  <%= @game.away_team_game&.assists || 'N/A' %>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
-                  <%= @away_team_game&.steals || 'N/A' %>
+                  <%= @game.away_team_game&.steals || 'N/A' %>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
-                  <%= @away_team_game&.blocks || 'N/A' %>
+                  <%= @game.away_team_game&.blocks || 'N/A' %>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
-                  <%= @away_team_game&.turnovers || 'N/A' %>
+                  <%= @game.away_team_game&.turnovers || 'N/A' %>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
-                  <%= @away_team_game&.field_goals_percentage&.then { |p| "#{number_with_precision(p * 100, precision: 1)}%" } || 'N/A' %>
+                  <%= @game.away_team_game&.field_goals_percentage&.then { |p| "#{number_with_precision(p * 100, precision: 1)}%" } || 'N/A' %>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
-                  <%= @away_team_game&.three_pt_percentage&.then { |p| "#{number_with_precision(p * 100, precision: 1)}%" } || 'N/A' %>
+                  <%= @game.away_team_game&.three_pt_percentage&.then { |p| "#{number_with_precision(p * 100, precision: 1)}%" } || 'N/A' %>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
-                  <%= @away_team_game&.free_throws_percentage&.then { |p| "#{number_with_precision(p * 100, precision: 1)}%" } || 'N/A' %>
+                  <%= @game.away_team_game&.free_throws_percentage&.then { |p| "#{number_with_precision(p * 100, precision: 1)}%" } || 'N/A' %>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
-                  <%= @away_team_game&.offensive_rebounds || 'N/A' %>
+                  <%= @game.away_team_game&.offensive_rebounds || 'N/A' %>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
-                  <%= @away_team_game&.defensive_rebounds || 'N/A' %>
+                  <%= @game.away_team_game&.defensive_rebounds || 'N/A' %>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
-                  <%= @away_team_game&.offensive_rating || 'N/A' %>
+                  <%= @game.away_team_game&.offensive_rating || 'N/A' %>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
-                  <%= @away_team_game&.defensive_rating || 'N/A' %>
+                  <%= @game.away_team_game&.defensive_rating || 'N/A' %>
                 </td>
               </tr>
               <tr>
                 <td class="px-3 py-2 whitespace-nowrap">
                   <div class="flex items-center">
-                    <span class="text-sm text-gray-600 mr-2">#<%= @home_team_game&.team_season&.rank %></span>
+                    <span class="text-sm text-gray-600 mr-2"><%= @game.home_team_game&.team_season&.rank ? "##{@game.home_team_game.team_season.rank}" : 'N/A' %></span>
                     <span class="text-sm font-medium text-prophet-black">
-                      <% if @home_team_game&.team %>
-                        <%= link_to @home_team_game.team.school, team_path(@home_team_game.team), class: "hover:text-blue-600" %>
+                      <% if @game.home_team_game&.team %>
+                        <%= link_to @game.home_team_game.team.school, team_path(@game.home_team_game.team), class: "hover:text-blue-600" %>
                       <% else %>
                         <%= @game.home_team_name %>
                       <% end %>
@@ -138,49 +138,49 @@
                   </div>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
-                  <%= @home_team_game&.field_goals_made&.then { |m| "#{m}/#{@home_team_game&.field_goals_attempted}" } || 'N/A' %>
+                  <%= @game.home_team_game&.field_goals_made && @game.home_team_game&.field_goals_attempted ? "#{@game.home_team_game.field_goals_made}/#{@game.home_team_game.field_goals_attempted}" : 'N/A' %>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
-                  <%= @home_team_game&.three_pt_made&.then { |m| "#{m}/#{@home_team_game&.three_pt_attempted}" } || 'N/A' %>
+                  <%= @game.home_team_game&.three_pt_made && @game.home_team_game&.three_pt_attempted ? "#{@game.home_team_game.three_pt_made}/#{@game.home_team_game.three_pt_attempted}" : 'N/A' %>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
-                  <%= @home_team_game&.free_throws_made&.then { |m| "#{m}/#{@home_team_game&.free_throws_attempted}" } || 'N/A' %>
+                  <%= @game.home_team_game&.free_throws_made && @game.home_team_game&.free_throws_attempted ? "#{@game.home_team_game.free_throws_made}/#{@game.home_team_game.free_throws_attempted}" : 'N/A' %>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
-                  <%= @home_team_game&.rebounds || 'N/A' %>
+                  <%= @game.home_team_game&.rebounds || 'N/A' %>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
-                  <%= @home_team_game&.assists || 'N/A' %>
+                  <%= @game.home_team_game&.assists || 'N/A' %>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
-                  <%= @home_team_game&.steals || 'N/A' %>
+                  <%= @game.home_team_game&.steals || 'N/A' %>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
-                  <%= @home_team_game&.blocks || 'N/A' %>
+                  <%= @game.home_team_game&.blocks || 'N/A' %>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
-                  <%= @home_team_game&.turnovers || 'N/A' %>
+                  <%= @game.home_team_game&.turnovers || 'N/A' %>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
-                  <%= @home_team_game&.field_goals_percentage&.then { |p| "#{number_with_precision(p * 100, precision: 1)}%" } || 'N/A' %>
+                  <%= @game.home_team_game&.field_goals_percentage&.then { |p| "#{number_with_precision(p * 100, precision: 1)}%" } || 'N/A' %>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
-                  <%= @home_team_game&.three_pt_percentage&.then { |p| "#{number_with_precision(p * 100, precision: 1)}%" } || 'N/A' %>
+                  <%= @game.home_team_game&.three_pt_percentage&.then { |p| "#{number_with_precision(p * 100, precision: 1)}%" } || 'N/A' %>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
-                  <%= @home_team_game&.free_throws_percentage&.then { |p| "#{number_with_precision(p * 100, precision: 1)}%" } || 'N/A' %>
+                  <%= @game.home_team_game&.free_throws_percentage&.then { |p| "#{number_with_precision(p * 100, precision: 1)}%" } || 'N/A' %>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
-                  <%= @home_team_game&.offensive_rebounds || 'N/A' %>
+                  <%= @game.home_team_game&.offensive_rebounds || 'N/A' %>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
-                  <%= @home_team_game&.defensive_rebounds || 'N/A' %>
+                  <%= @game.home_team_game&.defensive_rebounds || 'N/A' %>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
-                  <%= @home_team_game&.offensive_rating || 'N/A' %>
+                  <%= @game.home_team_game&.offensive_rating || 'N/A' %>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-sm text-prophet-black">
-                  <%= @home_team_game&.defensive_rating || 'N/A' %>
+                  <%= @game.home_team_game&.defensive_rating || 'N/A' %>
                 </td>
               </tr>
             </tbody>
@@ -202,25 +202,26 @@
         <div class="bg-white p-6 rounded-lg shadow">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <h3 class="text-lg font-semibold text-prophet-black mb-2">Predicted Outcome</h3>
+              <h3 class="text-lg font-semibold text-prophet-black mb-2"><%= @game.final_unmatched? ? 'Historical pregame forecast' : 'Predicted Outcome' %></h3>
               <div class="space-y-2">
                 <div class="flex justify-between">
                   <span class="text-gray-600">Favorite:</span>
                   <span class="font-medium">
-                    <%= link_to @prediction.favorite.school, team_path(@prediction.favorite), class: "hover:text-blue-600" %>
+                    <% favorite = @prediction.home_score && @prediction.away_score ? @prediction.favorite : nil %>
+                    <%= favorite ? link_to(favorite.school, team_path(favorite), class: "hover:text-blue-600") : 'N/A' %>
                   </span>
                 </div>
                 <div class="flex justify-between">
                   <span class="text-gray-600">Win Probability:</span>
-                  <span class="font-medium"><%= @prediction.favorite_win_probability.round(3) * 100.0 %>%</span>
+                  <span class="font-medium"><%= @prediction.home_score && @prediction.away_score && @prediction.home_win_probability ? "#{(@prediction.favorite_win_probability * 100).round(1)}%" : 'N/A' %></span>
                 </div>
                 <div class="flex justify-between">
                   <span class="text-gray-600">Predicted Score:</span>
-                  <span class="font-medium"><%= @prediction.predicted_score_string %></span>
+                  <span class="font-medium"><%= @prediction.home_score && @prediction.away_score ? @prediction.predicted_score_string : 'N/A' %></span>
                 </div>
                 <div class="flex justify-between">
                   <span class="text-gray-600">Predicted Total:</span>
-                  <span class="font-medium"><%= @prediction.total %></span>
+                  <span class="font-medium"><%= @prediction.home_score && @prediction.away_score ? @prediction.total : 'N/A' %></span>
                 </div>
               </div>
             </div>
@@ -232,7 +233,14 @@
                   <div class="flex justify-between">
                     <span class="text-gray-600">Winning Team:</span>
                     <span class="font-medium">
-                      <%= link_to @game.winning_team.school, team_path(@game.winning_team), class: "hover:text-blue-600" %>
+                      <% winner = @game.home_team_score && @game.away_team_score ? @game.winning_team : nil %>
+                      <% if winner %>
+                        <%= link_to winner.school, team_path(winner), class: "hover:text-blue-600" %>
+                      <% elsif @game.home_team_score && @game.away_team_score %>
+                        <%= @game.home_team_score > @game.away_team_score ? @game.home_team_name : @game.away_team_name %>
+                      <% else %>
+                        N/A
+                      <% end %>
                     </span>
                   </div>
                   <div class="flex justify-between">
@@ -241,11 +249,11 @@
                   </div>
                   <div class="flex justify-between">
                     <span class="text-gray-600">Final Score:</span>
-                    <span class="font-medium"><%= @game.away_team_score %> - <%= @game.home_team_score %></span>
+                  <span class="font-medium"><%= @game.away_team_score && @game.home_team_score ? "#{@game.away_team_score} - #{@game.home_team_score}" : 'N/A' %></span>
                   </div>
                   <div class="flex justify-between">
                     <span class="text-gray-600">Total Points:</span>
-                    <span class="font-medium"><%= @game.home_team_score + @game.away_team_score %></span>
+                  <span class="font-medium"><%= @game.home_team_score && @game.away_team_score ? @game.home_team_score + @game.away_team_score : 'N/A' %></span>
                   </div>
                 </div>
               </div>
@@ -259,16 +267,34 @@
                   </div>
                   <div class="flex justify-between">
                     <span class="text-gray-600">Score:</span>
-                    <span class="font-medium">-</span>
+                  <span class="font-medium"><%= if @game.completed?
+                                                    @game.away_team_score && @game.home_team_score ? "#{@game.away_team_score} - #{@game.home_team_score}" : 'N/A'
+                                                  else
+                                                    '-'
+                                                  end %></span>
                   </div>
                 </div>
               </div>
             <% end %>
           </div>
         </div>
+      <% elsif @historical_prediction %>
+        <% captured_teams = @historical_prediction.forecast_kind == 'pregame' ? @historical_prediction.calculation_context.fetch('snapshots', []).map { |snapshot| snapshot['school'] } : [] %>
+        <p class="text-sm text-gray-600"><%= @historical_prediction.forecast_kind == 'pregame' ? 'Historical pregame forecast' : "Historical · #{@historical_prediction.provenance_label}" %></p>
+        <div class="bg-white p-6 rounded-lg shadow">
+          <% if @historical_prediction.away_score && @historical_prediction.home_score %>
+            <p><%= captured_teams[1].presence || 'Away team' %> <%= @historical_prediction.away_score.round %> - <%= captured_teams[0].presence || 'Home team' %> <%= @historical_prediction.home_score.round %></p>
+          <% else %>
+            <p class="text-gray-600">Prediction unavailable.</p>
+          <% end %>
+          <% if @historical_prediction.home_win_probability %>
+            <p class="text-sm text-gray-600">Captured home win probability: <%= number_to_percentage(@historical_prediction.home_win_probability * 100, precision: 1) %></p>
+          <% end %>
+          <p class="mt-2 text-sm text-gray-600">This saved forecast is historical and has no evaluation result for the unmatched final.</p>
+        </div>
       <% else %>
         <div class="bg-white p-6 rounded-lg shadow">
-          <p class="text-gray-600"><%= @game.current_prediction_unavailable_reason&.humanize || 'No prediction available for this game.' %></p>
+          <p class="text-gray-600"><%= @game.final_unmatched? ? 'No prediction available for this game.' : (@game.current_prediction_unavailable_reason(ratings_config_version: @config)&.humanize || 'No prediction available for this game.') %></p>
         </div>
       <% end %>
     </div>
