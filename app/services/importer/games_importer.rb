@@ -106,7 +106,13 @@ module Importer
         game = find_existing_game(row, date) ||
                Game.new(home_team_name: row[:home_team], away_team_name: row[:away_team], start_time:)
 
-        if game_complete?(row)
+        unresolved = !home_team_season || !away_team_season
+        if unresolved && confirmed_result?(row)
+          process_unmatched_game(game) do
+            process_incomplete_game(game, row, season, home_team_season, away_team_season)
+            replace_unmatched_sides(game, row, [home_team_season, away_team_season])
+          end
+        elsif game_complete?(row)
           process_complete_row(game) do
             process_complete_game(game, row, season, home_team_season, away_team_season)
           end
@@ -114,6 +120,39 @@ module Importer
           process_incomplete_game(game, row, season, home_team_season, away_team_season)
         end
         game
+      end
+
+      def confirmed_result?(row)
+        names = row.values_at(:home_team, :away_team).map { |name| name.to_s.strip }
+        scores = row.values_at(:home_team_score, :away_team_score)
+        row[:source_completed] == true && names.all?(&:present?) && names.first != names.last &&
+          scores.all? { |score| (score.is_a?(Integer) && score >= 0) || (score.is_a?(String) && score.match?(/\A[0-9]+\z/)) } &&
+          scores.first.to_i != scores.last.to_i
+      end
+
+      def process_unmatched_game(game)
+        return if game.final?
+
+        game.transaction(requires_new: true) do
+          # Permit confirmed raw updates through the shared incomplete-row path within this savepoint only.
+          game.scheduled! if game.final_unmatched?
+          yield
+          game.reload.update!(status: :final_unmatched, minutes: nil, possessions: nil, in_conference: false)
+        end
+      end
+
+      def replace_unmatched_sides(game, row, team_seasons)
+        [[:home_team_stats, true], [:away_team_stats, false]].zip(team_seasons).each do |(key, home), team_season|
+          side = TeamGame.find_by(game:, home:)
+          team_season ? replace_unmatched_side(side, row[key].to_h) : side&.destroy!
+        end
+      end
+
+      def replace_unmatched_side(side, stats)
+        # Raw-only replacement must not carry another identity's counts or any derived values.
+        cleared = side.attributes.except('id', 'game_id', 'team_id', 'team_season_id', 'home', 'created_at', 'updated_at')
+                      .transform_values { nil }
+        side.update!(cleared.merge(stats.stringify_keys.slice(*TEAM_STAT_KEYS.map(&:to_s))))
       end
 
       def process_complete_row(game, &)
@@ -147,7 +186,7 @@ module Importer
 
       def process_incomplete_game(game, row, season, home_team_season, away_team_season)
         # Partial source rows cannot revise completed data or its identity/associations.
-        return if game.final? && finalized_game_data_present?(game)
+        return if game.final_unmatched? || (game.final? && finalized_game_data_present?(game))
 
         # Keep unplayed/incomplete games scheduled.
         attrs = {
@@ -183,7 +222,7 @@ module Importer
       end
 
       def handle_finalization_failure(game, error)
-        raise error if game.final?
+        raise error if game.completed?
 
         Rails.logger.warn("Skipping finalization for game #{game.id}: #{error.message}")
         game.scheduled!

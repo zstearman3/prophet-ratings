@@ -285,4 +285,20 @@ RSpec.describe ProphetRatings::OverallRatingsCalculator, type: :service do
       expect(teams.first.reload.adj_offensive_efficiency).to be_within(0.001).of(111.667)
     end
   end
+
+  it 'does not let unmatched results satisfy the two-final-games adjustment gate' do
+    season = create(:season)
+    teams = create_list(:team_season, 2, season:)
+    [0, 1].each do |day|
+      game = create(:game, season:, status: day.zero? ? :final : :final_unmatched,
+                           start_time: Game.schedule_time_for(season.start_date + day))
+      teams.each_with_index do |team, index|
+        create(:team_game, game:, team_season: team, team: team.team, home: index.zero?)
+      end
+    end
+    calculator = described_class.new(season)
+    expect(calculator.send(:enough_finalized_data_for_adjustments?, as_of: season.start_date + 30.days)).to be(false)
+    season.games.final_unmatched.each(&:final!)
+    expect(calculator.send(:enough_finalized_data_for_adjustments?, as_of: season.start_date + 30.days)).to be(true)
+  end
 end

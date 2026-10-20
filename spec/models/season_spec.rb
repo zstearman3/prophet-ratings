@@ -81,4 +81,12 @@ RSpec.describe Season do
       connection&.close
     end
   end
+
+  it 'treats unmatched completed results as played outputs while excluding their pace' do
+    season = create(:season)
+    create(:game, season:, status: :final_unmatched, possessions: 200, minutes: 40)
+    expect(season.rating_outputs?).to be(true)
+    season.update_average_ratings
+    expect(season.reload.pace_std_deviation).to be_nil
+  end
 end

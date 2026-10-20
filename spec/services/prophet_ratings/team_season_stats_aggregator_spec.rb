@@ -185,4 +185,34 @@ RSpec.describe ProphetRatings::TeamSeasonStatsAggregator, type: :service do
       )
     end
   end
+
+  describe 'completed unmatched records' do
+    it 'counts score-based home wins and away losses through the cutoff without changing model aggregates' do
+      season = create(:season)
+      version = RatingsConfigVersion.published_default
+      team_season = create(:team_season, season:)
+      cutoff = season.start_date + 10.days
+      aggregator = described_class.new(season:, as_of: cutoff, ratings_config_version: version)
+      final = create(:game, season:, home_team_score: 70, away_team_score: 60,
+                            possessions: 70, minutes: 40, start_time: Game.schedule_time_for(cutoff - 1.day))
+      create(:team_game, game: final, team_season:, team: team_season.team, home: true,
+                         offensive_rating: 100, defensive_rating: 90, field_goals_made: 20,
+                         field_goals_attempted: 40, three_pt_made: 10, three_pt_attempted: 20,
+                         turnover_rate: 0.1)
+      aggregator.run
+      baseline = team_season.reload.attributes
+      [true, false, true].each_with_index do |home, index|
+        game = create(:game, season:, status: :final_unmatched, home_team_score: 100, away_team_score: 90,
+                             in_conference: true, possessions: 200, minutes: 40, away_team_name: "Unknown #{index}",
+                             start_time: Game.schedule_time_for(index == 2 ? cutoff + 1.day : cutoff))
+        create(:team_game, game:, team_season:, team: team_season.team, home:,
+                           offensive_rating: 999, defensive_rating: 999, field_goals_made: 999,
+                           field_goals_attempted: 999, three_pt_made: 999, three_pt_attempted: 999,
+                           turnover_rate: 0.9)
+      end
+      aggregator.run
+      expect(team_season.reload).to have_attributes(wins: 2, losses: 1, conference_wins: 0, conference_losses: 0)
+      expect(team_season.attributes.except('wins', 'losses')).to eq(baseline.except('wins', 'losses'))
+    end
+  end
 end

@@ -76,7 +76,7 @@ module Importer
       return 'created' if before.empty?
       return 'updated' if changes.any?
 
-      before['status'] == 'final' ? 'protected' : 'unchanged'
+      %w[final final_unmatched].include?(before['status']) ? 'protected' : 'unchanged'
     end
 
     def unmatched_teams

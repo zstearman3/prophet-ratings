@@ -36,6 +36,32 @@ RSpec.describe ProphetRatings::AdjustedStatCalculator, type: :service do
     end
   end
 
+  describe 'unmatched mathematical exclusion' do
+    [nil, 'corrected_v1'].each do |formula|
+      it "keeps #{formula} observations and eligibility counts unchanged by stale unmatched boxes" do
+        season = create(:season)
+        as_of = season.start_date + 30.days
+        teams = create_three_team_round_robin(season:, stat: :effective_fg_percentage, date: as_of)
+        config = RatingsConfigVersion.published_default.settings.deep_dup.merge(ratings_formula: formula)
+        config.delete(:factors) unless formula
+        version = create(:ratings_config_version, config:)
+        calculator = described_class.new(season:, raw_stat: :effective_fg_percentage,
+                                         adj_stat: :adj_effective_fg_percentage,
+                                         adj_stat_allowed: :adj_effective_fg_percentage_allowed, as_of:,
+                                         ratings_config_version: version)
+        index = teams.map(&:team_id).each_with_index.to_h
+        original = calculator.send(:build_matrix_components, index, 3, 0.5)
+        game = create(:game, season:, status: :final_unmatched, start_time: Game.schedule_time_for(as_of - 1.day))
+        teams.first(2).each_with_index do |team, side|
+          create(:team_game, game:, team_season: team, team: team.team, home: side.zero?,
+                             effective_fg_percentage: 0.99)
+        end
+        expect(calculator.send(:build_matrix_components, index, 3, 0.5)).to eq(original)
+        expect(calculator.send(:finalized_team_game_count, teams.first.reload)).to eq(2)
+      end
+    end
+  end
+
   describe 'preseason blending limits' do
     let(:season) { create(:season, :current) }
 

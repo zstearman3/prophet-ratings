@@ -2,6 +2,8 @@
 
 module Maintenance
   class DuplicateGamesRepair
+    STATUS_PRIORITY = { 'final' => 2, 'final_unmatched' => 1 }.freeze
+
     Result = Struct.new(:applied, :groups, :deleted_game_ids, :reassigned_counts, keyword_init: true)
     DuplicateGroup = Struct.new(:games, :survivor, :duplicates, :reasons, keyword_init: true)
 
@@ -143,7 +145,6 @@ module Maintenance
 
     def survivor_score(game)
       score = 0
-      score += 1_000 if game.final?
       score += 200 if complete_team_games?(game)
       score += 100 if game.predictions.any?
       score += 80 if game.game_odd.present?
@@ -153,7 +154,7 @@ module Maintenance
       score += 25 if venue_data_present?(game)
       score += 15 if unique_game_url?(game.url)
       score += 10 unless legacy_date_only?(game)
-      score
+      [STATUS_PRIORITY.fetch(game.status, 0), score]
     end
 
     def complete_team_games?(game)
@@ -239,8 +240,10 @@ module Maintenance
       attrs = {}
       copy_if_blank(attrs, :home_team_score, from: duplicate, to: survivor)
       copy_if_blank(attrs, :away_team_score, from: duplicate, to: survivor)
-      copy_if_blank(attrs, :minutes, from: duplicate, to: survivor)
-      copy_if_blank(attrs, :possessions, from: duplicate, to: survivor)
+      unless survivor.final_unmatched?
+        copy_if_blank(attrs, :minutes, from: duplicate, to: survivor)
+        copy_if_blank(attrs, :possessions, from: duplicate, to: survivor)
+      end
       attrs[:status] = duplicate.status if survivor.scheduled? && duplicate.final?
       attrs
     end
@@ -262,7 +265,8 @@ module Maintenance
 
     def reassign_team_games!(survivor, duplicate)
       TeamGame.where(game: duplicate).find_each do |team_game|
-        if TeamGame.exists?(game: survivor, home: team_game.home) || TeamGame.exists?(game: survivor, team_id: team_game.team_id)
+        if survivor.final_unmatched? || TeamGame.exists?(game: survivor, home: team_game.home) ||
+           TeamGame.exists?(game: survivor, team_id: team_game.team_id)
           team_game.destroy!
           reassigned_counts[:team_games_deleted] += 1
         else

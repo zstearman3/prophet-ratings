@@ -22,8 +22,8 @@ module ProphetRatings
         validate_finalization_prerequisites!
         game.home_team_game.calculate_game_stats
         game.away_team_game.calculate_game_stats
-        finalize_prediction!
         game.final!
+        finalize_prediction!
       end
     end
 
@@ -107,7 +107,7 @@ module ProphetRatings
 
     public_class_method def self.prediction_error_attributes(prediction)
       game = prediction.game
-      return if prediction.participant_exclusion_reason || !complete_error_inputs?(prediction, game)
+      return if game.final_unmatched? || prediction.participant_exclusion_reason || !complete_error_inputs?(prediction, game)
 
       home_game = game.home_team_game
       away_game = game.away_team_game
@@ -125,7 +125,7 @@ module ProphetRatings
       predicted = prediction.attributes.values_at('home_offensive_efficiency', 'away_offensive_efficiency',
                                                   'home_defensive_efficiency', 'away_defensive_efficiency', 'pace')
       actual = [game.home_team_game, game.away_team_game].flat_map do |side|
-        [side.offensive_efficiency, side.defensive_efficiency]
+        [side&.offensive_efficiency, side&.defensive_efficiency]
       end
       (predicted + actual + [game.pace]).all? { |value| EvaluationObservation.finite?(value) }
     end

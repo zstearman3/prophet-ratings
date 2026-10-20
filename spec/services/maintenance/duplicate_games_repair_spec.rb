@@ -185,4 +185,39 @@ RSpec.describe Maintenance::DuplicateGamesRepair do
 
     expect(result.groups).to be_empty
   end
+
+  it 'hard-orders unmatched results before populated schedules without importing their stale boxes' do
+    attrs = { season:, start_time: Game.schedule_time_for(Date.new(2025, 1, 1)),
+              home_team_name: home_team.school, away_team_name: away_team.school, url: '/same.html' }
+    scheduled = create_game(attrs.merge(status: :scheduled, possessions: 80, minutes: 40))
+    create(:team_game, game: scheduled, team: home_team, team_season: home_team_season, home: true, offensive_rating: 999)
+    create(:team_game, game: scheduled, team: away_team, team_season: away_team_season, home: false, offensive_rating: 999)
+    create_bookmaker_odd_for(scheduled)
+    create(:game_odd, game: scheduled, fetched_at: Time.current)
+    version = create(:ratings_config_version)
+    snapshots = [home_team_season, away_team_season].map do |team_season|
+      create(:team_rating_snapshot, team_season:, ratings_config_version: version)
+    end
+    create(:prediction, game: scheduled, ratings_config_version: version,
+                        home_team_snapshot: snapshots.first, away_team_snapshot: snapshots.last)
+    unmatched = create_game(attrs.merge(status: :final_unmatched, home_team_score: 70, away_team_score: 60))
+    side = create(:team_game, game: unmatched, team: home_team, team_season: home_team_season, home: true, assists: 4)
+
+    report = described_class.new(output:).call
+    expect(report.groups.first.survivor).to eq(unmatched)
+    expect(Game.exists?(scheduled.id)).to be(true)
+    described_class.new(apply: true, output:).call
+    expect(unmatched.reload).to have_attributes(status: 'final_unmatched', home_team_score: 70,
+                                                away_team_score: 60, possessions: nil, minutes: nil)
+    expect(unmatched).to have_attributes(home_team_game: side, away_team_game: nil)
+    expect(side.reload).to have_attributes(assists: 4, offensive_rating: nil)
+  end
+
+  it 'prioritizes strict finals over unmatched completed duplicates' do
+    attrs = { season:, start_time: Game.schedule_time_for(Date.new(2025, 1, 1)),
+              home_team_name: home_team.school, away_team_name: away_team.school, url: '/same.html' }
+    create_game(attrs.merge(status: :final_unmatched))
+    final = create_game(attrs.merge(status: :final))
+    expect(described_class.new(output:).call.groups.first.survivor).to eq(final)
+  end
 end

@@ -146,4 +146,10 @@ RSpec.describe ProphetRatings::PreseasonInitializer do
     create(:game, season:, status: :final)
     expect { initializer.call }.to raise_error(ArgumentError, /in-season outputs/)
   end
+
+  it 'refuses preseason publication for an inactive season with an unmatched completed result' do
+    create(:game, season:, status: :final_unmatched)
+    expect { initializer.call }.to raise_error(ArgumentError, /in-season outputs/)
+    expect(TeamRatingSnapshot.count).to eq(0)
+  end
 end

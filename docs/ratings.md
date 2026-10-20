@@ -100,6 +100,20 @@ The aggregator also updates:
 
 Volatility and home-court values use previous prediction errors when available. If sample size is too small, the code falls back toward configured baselines from `config/ratings.yml`.
 
+### Completed results versus mathematical inputs
+
+Overall W–L uses `Game.completed` through the same Eastern cutoff: strict finals
+plus source-confirmed `final_unmatched` results with a known TeamSeason side.
+Wins and losses compare stored side scores, including when the known team is
+away. Conference W–L requires a strict final and its stored conference flag; an
+unresolved opponent's conference or division is never inferred.
+
+All statistical averages, pace deviations, adjustment/solver observations,
+two-game eligibility counts, prediction residuals, evaluation samples, volatility
+and home-court learning continue to require strict `Game.final` inputs. Raw or
+stale derived values on unmatched results cannot enter those cohorts. No model
+formula, solver contract or configuration hash changes.
+
 ### Undefined rates
 
 Game stat formulas return null when their required inputs are missing/nonfinite
