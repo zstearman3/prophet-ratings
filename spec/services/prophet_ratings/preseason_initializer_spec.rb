@@ -167,4 +167,154 @@ RSpec.describe ProphetRatings::PreseasonInitializer do
     expect { initializer.call }.to raise_error(ArgumentError, /in-season outputs/)
     expect(TeamRatingSnapshot.count).to eq(0)
   end
+
+  describe 'publication guard evaluation' do
+    let(:participation_review) { instance_double(SeasonParticipationReview, validate_publication: nil) }
+
+    before do
+      allow(SeasonParticipationReview).to receive(:new).with(season).and_return(participation_review)
+    end
+
+    it 'validates participation and dates before checking whether the season is current' do
+      allow(participation_review).to receive(:validate_publication).and_raise(ArgumentError, 'invalid review')
+      allow(season).to receive(:current?).and_return(true)
+
+      expect { initializer.send(:validate_publication) }.to raise_error(ArgumentError, 'invalid review')
+      expect(season).not_to have_received(:current?)
+    end
+
+    it 'keeps the in-season refusal message and stops before later relations for a current season' do
+      allow(season).to receive_messages(games: nil, team_rating_snapshots: nil, rating_team_seasons: nil)
+      allow(season).to receive(:current?).and_return(true)
+
+      expect { initializer.send(:validate_publication) }.to raise_error(
+        ArgumentError,
+        'Existing in-season outputs must be preserved; use an explicitly scoped season:rebuild_ratings.'
+      )
+      expect(season).not_to have_received(:games)
+      expect(season).not_to have_received(:team_rating_snapshots)
+      expect(season).not_to have_received(:rating_team_seasons)
+    end
+
+    it 'stops after finalized games and does not query snapshots or scan team seasons' do
+      completed_relation = double
+      games = double(completed: completed_relation)
+      allow(season).to receive_messages(current?: false, games:, team_rating_snapshots: nil, rating_team_seasons: nil)
+      allow(completed_relation).to receive(:exists?).and_return(true)
+
+      expect { initializer.send(:validate_publication) }.to raise_error(ArgumentError, /season:rebuild_ratings/)
+      expect(games).to have_received(:completed).once
+      expect(completed_relation).to have_received(:exists?).once
+      expect(season).not_to have_received(:team_rating_snapshots)
+      expect(season).not_to have_received(:rating_team_seasons)
+    end
+
+    it 'refuses a snapshot on another date before scanning team seasons' do
+      completed_relation = double
+      games = double(completed: completed_relation)
+      snapshot_scope = double(exists?: true)
+      snapshot_date_relation = double(not: snapshot_scope)
+      snapshots = double(where: snapshot_date_relation)
+      allow(season).to receive_messages(current?: false, games:, team_rating_snapshots: snapshots, rating_team_seasons: nil)
+      allow(completed_relation).to receive(:exists?).and_return(false)
+
+      expect { initializer.send(:validate_publication) }.to raise_error(ArgumentError, /season:rebuild_ratings/)
+      expect(season).not_to have_received(:rating_team_seasons)
+    end
+
+    it 'checks finalized games before reaching the snapshot relation' do
+      completed_relation = double
+      games = double(completed: completed_relation)
+      snapshots = double(where: double(not: double(exists?: false)))
+      allow(season).to receive_messages(current?: false, games:, team_rating_snapshots: snapshots,
+                                        rating_team_seasons: [home, away])
+      allow(completed_relation).to receive(:exists?).and_return(false)
+      allow(described_class).to receive(:changed_ratings?).and_return(false)
+
+      initializer.send(:validate_publication)
+
+      expect(games).to have_received(:completed).once
+      expect(completed_relation).to have_received(:exists?).once
+      expect(snapshots).to have_received(:where).with(no_args).once
+    end
+
+    it 'excludes only the publication date when checking existing snapshots' do
+      completed_relation = double
+      games = double(completed: completed_relation)
+      snapshot_scope = double(exists?: false)
+      snapshot_date_relation = double(not: snapshot_scope)
+      snapshots = double(where: snapshot_date_relation)
+      allow(season).to receive_messages(current?: false, games:, team_rating_snapshots: snapshots,
+                                        rating_team_seasons: [home, away])
+      allow(completed_relation).to receive(:exists?).and_return(false)
+      allow(described_class).to receive(:changed_ratings?).and_return(false)
+
+      initializer.send(:validate_publication)
+
+      expect(snapshot_date_relation).to have_received(:not).with(snapshot_date: season.start_date - 1.day).once
+      expect(snapshot_scope).to have_received(:exists?).once
+    end
+
+    it 'scans team seasons once only after earlier checks pass and stops at the first changed row' do
+      rows = [home, away]
+      allow(season).to receive_messages(current?: false, rating_team_seasons: rows)
+      allow(season).to receive_messages(games: double(completed: double(exists?: false)),
+                                        team_rating_snapshots: double(where: double(not: double(exists?: false))))
+      allow(described_class).to receive(:changed_ratings?).with(home).and_return(true)
+      allow(described_class).to receive(:changed_ratings?).with(away).and_return(false)
+
+      expect { initializer.send(:validate_publication) }.to raise_error(ArgumentError, /season:rebuild_ratings/)
+      expect(season).to have_received(:rating_team_seasons).once
+      expect(described_class).to have_received(:changed_ratings?).with(home).once
+      expect(described_class).not_to have_received(:changed_ratings?).with(away)
+    end
+
+    it 'allows an unchanged inactive season after the publication checks pass' do
+      completed_relation = double
+      games = double(completed: completed_relation)
+      snapshot_scope = double(exists?: false)
+      snapshot_date_relation = double(not: snapshot_scope)
+      snapshots = double(where: snapshot_date_relation)
+      rows = [home, away]
+      allow(season).to receive_messages(current?: false, games:, team_rating_snapshots: snapshots, rating_team_seasons: rows)
+      allow(completed_relation).to receive(:exists?).and_return(false)
+      allow(described_class).to receive(:changed_ratings?).and_return(false)
+
+      expect { initializer.send(:validate_publication) }.not_to raise_error
+    end
+
+    it 'scans each team season once after earlier checks pass' do
+      completed_relation = double
+      games = double(completed: completed_relation)
+      snapshots = double(where: double(not: double(exists?: false)))
+      rows = [home, away]
+      allow(season).to receive_messages(current?: false, games:, team_rating_snapshots: snapshots, rating_team_seasons: rows)
+      allow(completed_relation).to receive(:exists?).and_return(false)
+      allow(described_class).to receive(:changed_ratings?).and_return(false)
+
+      initializer.send(:validate_publication)
+
+      expect(season).to have_received(:rating_team_seasons).once
+      expect(described_class).to have_received(:changed_ratings?).with(home).once
+      expect(described_class).to have_received(:changed_ratings?).with(away).once
+    end
+
+    it 'checks each core rating while preserving equality, nil and non-core behavior' do
+      %w[adj_offensive_efficiency adj_defensive_efficiency adj_pace].each do |stat|
+        changed = { stat => 110.0, "preseason_#{stat}" => 100.0 }
+        expect(described_class.changed_ratings?(double(attributes: changed))).to be(true)
+
+        equal = { stat => 100.0, "preseason_#{stat}" => 100.0 }
+        expect(described_class.changed_ratings?(double(attributes: equal))).to be(false)
+
+        nil_live = { stat => nil, "preseason_#{stat}" => 100.0 }
+        expect(described_class.changed_ratings?(double(attributes: nil_live))).to be(false)
+
+        nil_preseason = { stat => 100.0, "preseason_#{stat}" => nil }
+        expect(described_class.changed_ratings?(double(attributes: nil_preseason))).to be(true)
+      end
+
+      expect(described_class.changed_ratings?(double(attributes: { 'adj_effective_fg_percentage' => 0.5 }))).to be(false)
+    end
+  end
 end
