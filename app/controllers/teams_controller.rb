@@ -72,10 +72,9 @@ class TeamsController < ApplicationController
 
     @team_games.each do |tg|
       game = tg.game
-      latest_snapshot_date = @snapshots.last&.snapshot_date
-      next unless latest_snapshot_date
-
-      @predictions_by_game[game.id] = game.current_prediction(ratings_config_version: @config)
+      prediction = game.historical_prediction(ratings_config_version: @config)
+      prediction ||= game.current_prediction(ratings_config_version: @config)
+      @predictions_by_game[game.id] = prediction if prediction
     end
   end
 

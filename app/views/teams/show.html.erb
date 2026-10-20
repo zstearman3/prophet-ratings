@@ -18,26 +18,26 @@
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div class="bg-white p-4 rounded-lg shadow">
             <p class="text-sm text-gray-600">Rating</p>
-            <p class="text-lg font-semibold text-prophet-black"><%= @snapshots.last.rating.round(1) %>
-              <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.overall_rank %></span>
+            <p class="text-lg font-semibold text-prophet-black"><%= @snapshots.last.rating&.round(1) || 'N/A' %>
+              <span class="text-xs text-gray-400 ml-1"><%= @snapshots.last.overall_rank ? "##{@snapshots.last.overall_rank}" : 'N/A' %></span>
             </p>
           </div>
           <div class="bg-white p-4 rounded-lg shadow">
             <p class="text-sm text-gray-600">Adj ORtg</p>
-            <p class="text-lg font-semibold text-prophet-black"><%= @snapshots.last.adj_offensive_efficiency.round(1) %>
-              <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.adj_offensive_efficiency_rank %></span>
+            <p class="text-lg font-semibold text-prophet-black"><%= @snapshots.last.adj_offensive_efficiency&.round(1) || 'N/A' %>
+              <span class="text-xs text-gray-400 ml-1"><%= @snapshots.last.adj_offensive_efficiency_rank ? "##{@snapshots.last.adj_offensive_efficiency_rank}" : 'N/A' %></span>
             </p>
           </div>
           <div class="bg-white p-4 rounded-lg shadow">
             <p class="text-sm text-gray-600">Adj DRtg</p>
-            <p class="text-lg font-semibold text-prophet-black"><%= @snapshots.last.adj_defensive_efficiency.round(1) %>
-              <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.adj_defensive_efficiency_rank %></span>
+            <p class="text-lg font-semibold text-prophet-black"><%= @snapshots.last.adj_defensive_efficiency&.round(1) || 'N/A' %>
+              <span class="text-xs text-gray-400 ml-1"><%= @snapshots.last.adj_defensive_efficiency_rank ? "##{@snapshots.last.adj_defensive_efficiency_rank}" : 'N/A' %></span>
             </p>
           </div>
           <div class="bg-white p-4 rounded-lg shadow">
             <p class="text-sm text-gray-600">Adj Pace</p>
-            <p class="text-lg font-semibold text-prophet-black"><%= @snapshots.last.adj_pace.round(1) %>
-              <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.adj_pace_rank %></span>
+            <p class="text-lg font-semibold text-prophet-black"><%= @snapshots.last.adj_pace&.round(1) || 'N/A' %>
+              <span class="text-xs text-gray-400 ml-1"><%= @snapshots.last.adj_pace_rank ? "##{@snapshots.last.adj_pace_rank}" : 'N/A' %></span>
             </p>
           </div>
         </div>
@@ -55,36 +55,36 @@
               <div>
                 <p class="text-gray-600">eFG%</p>
                 <p class="text-lg font-semibold text-prophet-black">
-                  <%= @snapshots.last.adj_effective_fg_percentage.round(3) %>
-                  <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.adj_effective_fg_percentage_rank %></span>
+                  <%= @snapshots.last.adj_effective_fg_percentage&.round(3) || 'N/A' %>
+                  <span class="text-xs text-gray-400 ml-1"><%= @snapshots.last.adj_effective_fg_percentage_rank ? "##{@snapshots.last.adj_effective_fg_percentage_rank}" : 'N/A' %></span>
                 </p>
               </div>
               <div>
                 <p class="text-gray-600">TO%</p>
                 <p class="text-lg font-semibold text-prophet-black">
-                  <%= @snapshots.last.adj_turnover_rate.round(3) %>
-                  <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.adj_turnover_rate_rank %></span>
+                  <%= @snapshots.last.adj_turnover_rate&.round(3) || 'N/A' %>
+                  <span class="text-xs text-gray-400 ml-1"><%= @snapshots.last.adj_turnover_rate_rank ? "##{@snapshots.last.adj_turnover_rate_rank}" : 'N/A' %></span>
                 </p>
               </div>
               <div>
                 <p class="text-gray-600">ORB%</p>
                 <p class="text-lg font-semibold text-prophet-black">
-                  <%= @snapshots.last.adj_offensive_rebound_rate.round(3) %>
-                  <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.adj_offensive_rebound_rate_rank %></span>
+                  <%= @snapshots.last.adj_offensive_rebound_rate&.round(3) || 'N/A' %>
+                  <span class="text-xs text-gray-400 ml-1"><%= @snapshots.last.adj_offensive_rebound_rate_rank ? "##{@snapshots.last.adj_offensive_rebound_rate_rank}" : 'N/A' %></span>
                 </p>
               </div>
               <div>
                 <p class="text-gray-600">FT Rate</p>
                 <p class="text-lg font-semibold text-prophet-black">
-                  <%= @snapshots.last.adj_free_throw_rate.round(3) %>
-                  <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.adj_free_throw_rate_rank %></span>
+                  <%= @snapshots.last.adj_free_throw_rate&.round(3) || 'N/A' %>
+                  <span class="text-xs text-gray-400 ml-1"><%= @snapshots.last.adj_free_throw_rate_rank ? "##{@snapshots.last.adj_free_throw_rate_rank}" : 'N/A' %></span>
                 </p>
               </div>
               <div>
                 <p class="text-gray-600">3PT Proficiency</p>
                 <p class="text-lg font-semibold text-prophet-black">
-                  <%= @snapshots.last.adj_three_pt_proficiency.round(3) %>
-                  <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.adj_three_pt_proficiency_rank %></span>
+                  <%= @snapshots.last.adj_three_pt_proficiency&.round(3) || 'N/A' %>
+                  <span class="text-xs text-gray-400 ml-1"><%= @snapshots.last.adj_three_pt_proficiency_rank ? "##{@snapshots.last.adj_three_pt_proficiency_rank}" : 'N/A' %></span>
                 </p>
               </div>
             </div>
@@ -97,36 +97,36 @@
               <div>
                 <p class="text-gray-600">eFG% Allowed</p>
                 <p class="text-lg font-semibold text-prophet-black">
-                  <%= @snapshots.last.adj_effective_fg_percentage_allowed.round(3) %>
-                  <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.adj_effective_fg_percentage_allowed_rank %></span>
+                  <%= @snapshots.last.adj_effective_fg_percentage_allowed&.round(3) || 'N/A' %>
+                  <span class="text-xs text-gray-400 ml-1"><%= @snapshots.last.adj_effective_fg_percentage_allowed_rank ? "##{@snapshots.last.adj_effective_fg_percentage_allowed_rank}" : 'N/A' %></span>
                 </p>
               </div>
               <div>
                 <p class="text-gray-600">TO% Forced</p>
                 <p class="text-lg font-semibold text-prophet-black">
-                  <%= @snapshots.last.adj_turnover_rate_forced.round(3) %>
-                  <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.adj_turnover_rate_forced_rank %></span>
+                  <%= @snapshots.last.adj_turnover_rate_forced&.round(3) || 'N/A' %>
+                  <span class="text-xs text-gray-400 ml-1"><%= @snapshots.last.adj_turnover_rate_forced_rank ? "##{@snapshots.last.adj_turnover_rate_forced_rank}" : 'N/A' %></span>
                 </p>
               </div>
               <div>
                 <p class="text-gray-600">DReb%</p>
                 <p class="text-lg font-semibold text-prophet-black">
-                  <%= @snapshots.last.adj_defensive_rebound_rate.round(3) %>
-                  <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.adj_defensive_rebound_rate_rank %></span>
+                  <%= @snapshots.last.adj_defensive_rebound_rate&.round(3) || 'N/A' %>
+                  <span class="text-xs text-gray-400 ml-1"><%= @snapshots.last.adj_defensive_rebound_rate_rank ? "##{@snapshots.last.adj_defensive_rebound_rate_rank}" : 'N/A' %></span>
                 </p>
               </div>
               <div>
                 <p class="text-gray-600">FT Rate Allowed</p>
                 <p class="text-lg font-semibold text-prophet-black">
-                  <%= @snapshots.last.adj_free_throw_rate_allowed.round(3) %>
-                  <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.adj_free_throw_rate_allowed_rank %></span>
+                  <%= @snapshots.last.adj_free_throw_rate_allowed&.round(3) || 'N/A' %>
+                  <span class="text-xs text-gray-400 ml-1"><%= @snapshots.last.adj_free_throw_rate_allowed_rank ? "##{@snapshots.last.adj_free_throw_rate_allowed_rank}" : 'N/A' %></span>
                 </p>
               </div>
               <div>
                 <p class="text-gray-600">3PT Proficiency Allowed</p>
                 <p class="text-lg font-semibold text-prophet-black">
-                  <%= @snapshots.last.adj_three_pt_proficiency_allowed.round(3) %>
-                  <span class="text-xs text-gray-400 ml-1">#<%= @snapshots.last.adj_three_pt_proficiency_allowed_rank %></span>
+                  <%= @snapshots.last.adj_three_pt_proficiency_allowed&.round(3) || 'N/A' %>
+                  <span class="text-xs text-gray-400 ml-1"><%= @snapshots.last.adj_three_pt_proficiency_allowed_rank ? "##{@snapshots.last.adj_three_pt_proficiency_allowed_rank}" : 'N/A' %></span>
                 </p>
               </div>
             </div>
@@ -170,33 +170,58 @@
             <% @team_games.each do |tg| %>
               <% game = tg.game %>
               <% opponent_game = tg.home? ? game.away_team_game : game.home_team_game %>
-              <% next unless game && opponent_game %>
-              <% opponent = opponent_game.team %>
+              <% next unless game %>
+              <% opponent = opponent_game&.team %>
+              <% opponent_name = opponent&.school || (tg.home? ? game.away_team_name : game.home_team_name) %>
               <tr>
                 <td class="px-6 py-4 whitespace-nowrap">
                   <%= link_to game.start_time.to_date, game_path(game), class: "text-sm text-prophet-black hover:text-blue-600" %>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                   <%= '@ ' unless tg.home? %>
-                  <%= link_to opponent.school, team_path(opponent.slug), class: "text-sm text-prophet-black hover:text-blue-600" %>
+                  <% if opponent %>
+                    <%= link_to opponent_name, team_path(opponent.slug), class: "text-sm text-prophet-black hover:text-blue-600" %>
+                  <% else %>
+                    <%= opponent_name %>
+                  <% end %>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-prophet-black">
-                  <%= game.final? ? (game.winning_team == @team ? 'W' : 'L') : game.status.titleize %>
+                  <% if game.completed? && game.home_team_score && game.away_team_score %>
+                    <% team_score = tg.home? ? game.home_team_score : game.away_team_score %>
+                    <% opponent_score = tg.home? ? game.away_team_score : game.home_team_score %>
+                    <%= team_score == opponent_score ? '—' : (team_score > opponent_score ? 'W' : 'L') %>
+                  <% else %>
+                    <%= game.completed? ? game.status_string : game.status.titleize %>
+                  <% end %>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-prophet-black">
-                  <%= game.final? ? "#{game.away_team_score} - #{game.home_team_score}" : '-' %>
+                  <%= if game.completed?
+                        game.away_team_score && game.home_team_score ? "#{game.away_team_score} - #{game.home_team_score}" : 'N/A'
+                      else
+                        '-'
+                      end %>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-prophet-black">
                   <% prediction = @predictions_by_game[game.id] %>
                   <% if prediction %>
-                    <span class="text-xs text-gray-500"><%= prediction.provenance_label %></span>
-                    <%= link_to prediction.predicted_score_string, game_path(game), class: "hover:text-blue-600" %>
+                    <span class="text-xs text-gray-500"><%= if game.final_unmatched?
+                                                               prediction.forecast_kind == 'pregame' ? 'Historical pregame forecast' : "Historical · #{prediction.provenance_label}"
+                                                             else
+                                                               prediction.provenance_label
+                                                             end %></span>
+                    <% if prediction.home_score && prediction.away_score %>
+                      <%= link_to prediction.predicted_score_string, game_path(game), class: "hover:text-blue-600" %>
+                    <% else %>
+                      Prediction unavailable
+                    <% end %>
+                  <% elsif game.final_unmatched? %>
+                    Prediction unavailable
                   <% else %>
                     <%= game.current_prediction_unavailable_reason(ratings_config_version: @config)&.humanize || '—' %>
                   <% end %>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm uppercase">
-                  <% if prediction && game.final? %>
+                  <% if prediction && game.final? && prediction.home_win_probability && game.home_team_score && game.away_team_score %>
                     <% if prediction.correct? %>
                       <span title="Prediction was correct" class="text-green-600">✔</span>
                     <% else %>

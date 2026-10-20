@@ -102,6 +102,17 @@ RSpec.describe 'Teams' do
       )
       create(:team_game, game: final_game, team:, team_season:, home: true)
       create(:team_game, game: final_game, team: opponent, team_season: opponent_team_season, home: false)
+      create(:prediction, game: final_game, home_team_snapshot: home_snapshot, away_team_snapshot: opponent_snapshot,
+                          ratings_config_version: config, home_score: 75, away_score: 68,
+                          home_win_probability: 0.7, pace: 68.0)
+      missing_probability_game = create(:game, season:, start_time: 2.days.ago, status: :final,
+                                               home_team_score: 72, away_team_score: 65,
+                                               home_team_name: team.school, away_team_name: opponent.school)
+      create(:team_game, game: missing_probability_game, team:, team_season:, home: true)
+      create(:team_game, game: missing_probability_game, team: opponent, team_season: opponent_team_season, home: false)
+      create(:prediction, game: missing_probability_game, home_team_snapshot: home_snapshot,
+                          away_team_snapshot: opponent_snapshot, ratings_config_version: config,
+                          home_score: 72, away_score: 65, home_win_probability: nil, pace: 68.0)
 
       get "/teams/#{team.slug}", params: { year: season.year }
       document = response.parsed_body
@@ -113,10 +124,17 @@ RSpec.describe 'Teams' do
 
       expect(response).to have_http_status(:success)
       expect(table.css('th').map { |cell| cell.text.strip }).to eq(['Date', 'Opponent', 'Result', 'Score', 'Prediction', 'Correct?'])
-      expect(score_cells).to include(opponent.school, 'Scheduled', '-', 'W', '68 - 75', '—')
+      expect(score_cells).to include(opponent.school, 'Scheduled', '-', 'W', '68 - 75')
       expect(prediction_link).to be_present
       expect(table.at_css("a[href='/teams/#{opponent.slug}']").text).to eq(opponent.school)
       expect(table.at_css("a[href='/games/#{final_game.id}']").text).to include(final_game.start_time.to_date.to_s)
+      final_row = table.css('tbody tr').find { |row| row.at_css("a[href='/games/#{final_game.id}']") }
+      expect(final_row.css('td')[4].text).to include('68 - 75')
+      expect(final_row.css('td')[5].text).to include('✔')
+      missing_probability_row = table.css('tbody tr').find do |row|
+        row.at_css("a[href='/games/#{missing_probability_game.id}']")
+      end
+      expect(missing_probability_row.css('td')[5].text.strip).to eq('-')
     end
 
     it 'renders when the team season has no conference membership' do
@@ -140,6 +158,91 @@ RSpec.describe 'Teams' do
       expect(response).to have_http_status(:success)
       expect(response.body).to include('Independent')
       expect(response.parsed_body.css('.overflow-x-auto > table tbody tr')).to be_empty
+    end
+
+    it 'shows unmatched home and away results with stored opponent names and no evaluation verdict' do
+      season = create(:season, :current, year: 2026, start_date: Date.new(2025, 11, 1), end_date: Date.new(2026, 4, 1))
+      create(:ratings_config_version, name: 'v1.2-default', current: true)
+      team = create(:team, school: 'Known Team', slug: 'known-team')
+      team_season = create(:team_season, team:, season:, wins: 8, losses: 4, conference_wins: 0, conference_losses: 0)
+      create(:team_rating_snapshot, team_season:, team:, season:, ratings_config_version: RatingsConfigVersion.current,
+                                    snapshot_date: Date.current, rating: nil, overall_rank: nil, stats: {})
+      home_win = create(:game, season:, start_time: 1.day.ago, status: :final_unmatched,
+                               home_team_name: team.school, away_team_name: 'A Very Long Unmatched Opponent Name',
+                               home_team_score: 72, away_team_score: 61)
+      create(:team_game, game: home_win, team:, team_season:, home: true)
+      away_loss = create(:game, season:, start_time: 2.days.ago, status: :final_unmatched,
+                                home_team_name: 'Unresolved Home School', away_team_name: team.school,
+                                home_team_score: 80, away_team_score: 70)
+      create(:team_game, game: away_loss, team:, team_season:, home: false)
+      away_win = create(:game, season:, start_time: 3.days.ago, status: :final_unmatched,
+                               home_team_name: 'Unresolved Winning Home', away_team_name: team.school,
+                               home_team_score: 60, away_team_score: 65)
+      create(:team_game, game: away_win, team:, team_season:, home: false)
+      home_loss = create(:game, season:, start_time: 4.days.ago, status: :final_unmatched,
+                                home_team_name: team.school, away_team_name: 'Unresolved Winning Away',
+                                home_team_score: 70, away_team_score: 75)
+      create(:team_game, game: home_loss, team:, team_season:, home: true)
+
+      get "/teams/#{team.slug}", params: { year: season.year }
+
+      document = response.parsed_body
+      table = document.at_css('.overflow-x-auto > table')
+      rows = table.css('tbody tr')
+      expect(response).to have_http_status(:success)
+      expect(document.text).to include('8-4')
+      expect(rows.size).to eq(4)
+      opponent_cells = rows.map { |row| row.css('td')[1].text.gsub(/\s+/, ' ').strip }
+      expect(opponent_cells).to include('A Very Long Unmatched Opponent Name', '@ Unresolved Home School',
+                                        '@ Unresolved Winning Home', 'Unresolved Winning Away')
+      expect(rows.map { |row| row.css('td')[2].text.strip }.sort).to eq(%w[L L W W])
+      expect(rows.map { |row| row.css('td')[3].text.strip }).to include('61 - 72', '70 - 80', '65 - 60', '75 - 70')
+      expect(rows.map { |row| row.css('td')[5].text.strip }).to all(eq('-'))
+      [home_win, away_loss, away_win, home_loss].each do |game|
+        expect(table.at_css("a[href='/games/#{game.id}']")).to be_present
+      end
+      expect(document.css("a[href^='/teams/']").map(&:text)).not_to include('A Very Long Unmatched Opponent Name', 'Unresolved Home School')
+      expect(document.text).to include('N/A')
+      expect(table.ancestors.any? { |node| node['class']&.include?('overflow-x-auto') }).to be(true)
+    end
+
+    it 'retains a captured forecast when the known team has no current rating snapshot' do
+      season = create(:season, :current, year: 2026, start_date: Date.new(2025, 11, 1), end_date: Date.new(2026, 4, 1))
+      config = create(:ratings_config_version, name: 'v1.2-default', current: true)
+      team = create(:team, school: 'Known Home', slug: 'known-home')
+      opponent = create(:team, school: 'Captured Away')
+      team_season = create(:team_season, team:, season:)
+      opponent_season = create(:team_season, team: opponent, season:)
+      game = create(:game, season:, start_time: 2.days.from_now, status: :final_unmatched,
+                           home_team_name: team.school, away_team_name: opponent.school,
+                           home_team_score: 70, away_team_score: 65)
+      create(:team_game, game:, team:, team_season:, home: true)
+      unresolved_side = create(:team_game, game:, team: opponent, team_season: opponent_season, home: false)
+      snapshots = [team_season, opponent_season].map do |entry|
+        create(:team_rating_snapshot, :with_forecast_inputs, team_season: entry,
+                                                             ratings_config_version: config,
+                                                             snapshot_date: game.schedule_date - 1)
+      end
+      context = ProphetRatings::ForecastContext.capture(game, snapshots, config)
+      prediction = create(:prediction, game:, ratings_config_version: config,
+                                       home_team_snapshot: snapshots.first, away_team_snapshot: snapshots.last,
+                                       forecast_kind: 'pregame', calculation_context: context,
+                                       revision_key: 'team-history', generated_at: game.start_time - 1.hour,
+                                       forecast_start_time: game.start_time, input_cutoff: game.schedule_date - 1,
+                                       home_score: 72, away_score: 66, home_win_probability: 0.7, pace: 70,
+                                       home_offensive_efficiency: 110, away_offensive_efficiency: 100,
+                                       home_defensive_efficiency: 100, away_defensive_efficiency: 110)
+      unresolved_side.destroy!
+      prediction.update_columns(home_team_snapshot_id: nil, away_team_snapshot_id: nil) # rubocop:disable Rails/SkipsModelValidations
+      snapshots.each(&:destroy!)
+
+      get "/teams/#{team.slug}", params: { year: season.year }
+
+      row = response.parsed_body.at_css('.overflow-x-auto > table tbody tr')
+      expect(response).to have_http_status(:success)
+      expect(row.css('td')[1].text.strip).to eq('Captured Away')
+      expect(row.css('td')[4].text).to include('Historical pregame forecast', '66 - 72')
+      expect(row.css('td')[5].text.strip).to eq('-')
     end
   end
 end
