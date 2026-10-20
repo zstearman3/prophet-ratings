@@ -753,6 +753,15 @@ Apply the migration before the new code. Its down migration deliberately raises
 column to avoid destroying newly issued precision. Deployment neither publishes
 nor activates the authored bundle.
 
+The `numeric(5,4)` to `double precision` conversion rewrites `predictions`
+and holds an `ACCESS EXCLUSIVE` lock until the migration transaction commits,
+blocking reads and writes; see [PostgreSQL ALTER TABLE](https://www.postgresql.org/docs/15/sql-altertable.html).
+Before rollout, inspect production table size and workload, rehearse migration
+duration on a representative copy, and schedule a planned maintenance window.
+Synthetic migration specs establish value preservation, not production lock
+duration. If an acceptable lock duration cannot be met, defer rollout for a
+separately reviewed staged migration.
+
 ## Frozen forecast context and revisions
 
 ### Participant corrections and outcome alignment
