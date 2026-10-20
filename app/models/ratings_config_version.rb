@@ -105,7 +105,10 @@ class RatingsConfigVersion < ApplicationRecord
   private
 
   def validate_new_authoring_config
-    ProphetRatings::ConfigurationSchema.validate_authoring(config)
+    normalized = ProphetRatings::ConfigurationSchema.validate_authoring(config)
+    return if name == normalized.fetch(:bundle_name)
+
+    errors.add(:name, 'must match config.bundle_name')
   rescue ArgumentError => error
     errors.add(:config, error.message)
   end

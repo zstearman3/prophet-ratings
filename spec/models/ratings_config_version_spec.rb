@@ -64,4 +64,30 @@ RSpec.describe RatingsConfigVersion do
     expect(version.errors.full_messages.join).to include('bundle_name')
     expect { described_class.publish!(payload) }.to raise_error(ArgumentError, /bundle_name/)
   end
+
+  it 'rejects a new row name that differs from its normalized config bundle name' do
+    payload = described_class.authored_config.merge(bundle_name: 'canonical-name')
+    version = described_class.new(name: 'alias-name', config: payload)
+
+    expect(version.save).to be(false)
+    expect(version.errors.full_messages.join).to include('must match config.bundle_name')
+    expect(described_class.exists?(name: 'alias-name')).to be(false)
+  end
+
+  it 'reuses a matching canonical factory row without activation' do
+    payload = described_class.authored_config.merge(bundle_name: 'canonical-name')
+    version = described_class.find_or_create_by_config(payload)
+    expect(described_class.find_or_create_by_config(payload.deep_stringify_keys)).to eq(version)
+    expect(described_class.where(name: 'canonical-name').count).to eq(1)
+    expect(version.current).to be(false)
+  end
+
+  it 'allows description updates and reads on a historical alias while preserving identity immutability' do
+    historical = create(:ratings_config_version, name: 'historical-alias')
+    legacy_config = described_class.authored_config.merge(bundle_name: 'canonical-name').deep_stringify_keys
+    historical.update_columns(config: legacy_config) # rubocop:disable Rails/SkipsModelValidations
+    expect(historical.update(description: 'legacy note')).to be(true)
+    expect(historical.reload.settings[:bundle_name]).to eq('canonical-name')
+    expect(historical.update(name: 'changed')).to be(false)
+  end
 end

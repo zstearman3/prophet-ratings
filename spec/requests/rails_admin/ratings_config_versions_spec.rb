@@ -44,6 +44,20 @@ RSpec.describe 'RailsAdmin ratings config versions', type: :request do
     expect(RatingsConfigVersion.current).to eq(active)
   end
 
+  it 'rejects a JSON config whose bundle name differs from the record name' do
+    payload = RatingsConfigVersion.authored_config.merge(bundle_name: 'canonical-admin-name')
+    active = create(:ratings_config_version, name: 'admin-active', current: true)
+
+    post create_path, params: {
+      ratings_config_version: { name: 'alias-admin-name', current: '0', config: submitted_config(payload) }
+    }
+
+    expect(response).not_to have_http_status(:internal_server_error)
+    expect(response.body).to include('must match config.bundle_name')
+    expect(RatingsConfigVersion.exists?(name: 'alias-admin-name')).to be(false)
+    expect(RatingsConfigVersion.current).to eq(active)
+  end
+
   it 'renders shape errors for a malformed required nested object' do
     payload = RatingsConfigVersion.authored_config.merge(weighting: 'bad')
 

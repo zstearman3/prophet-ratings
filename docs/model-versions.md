@@ -28,8 +28,10 @@ compatibility API; calculation and evaluation paths no longer call it.
 All supported new-row paths enforce the same strict authoring contract:
 `publish!`, a factory lookup that must create a row, ordinary Active Record
 creation, and RailsAdmin creation reject unknown keys, malformed objects, and
-invalid values. A factory lookup first returns an identical row by its stored
-name/config, preserving compatibility with historical payloads. Existing rows
+invalid values. For a new row, the model `name` must equal the normalized
+`config.bundle_name`; this keeps ordinary/admin creation aligned with the
+factory's canonical lookup key. A factory lookup first returns an identical
+row by its stored name/config, preserving compatibility with historical payloads. Existing rows
 remain readable and replayable under their existing runtime policy; incomplete
 legacy contracts still cannot be newly calculated. Updating descriptions or
 activation state remains supported, while name and config are immutable.

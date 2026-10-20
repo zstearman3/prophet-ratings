@@ -44,7 +44,8 @@ RSpec.describe ProphetRatings::AdjustedStatCalculator, type: :service do
         teams = create_three_team_round_robin(season:, stat: :effective_fg_percentage, date: as_of)
         config = RatingsConfigVersion.published_default.settings.deep_dup.merge(ratings_formula: formula)
         config.delete(:factors) unless formula
-        version = create(:ratings_config_version, config:)
+        config[:bundle_name] = "test-unmatched-#{formula || 'legacy'}"
+        version = create(:ratings_config_version, name: config.fetch(:bundle_name), config:)
         calculator = described_class.new(season:, raw_stat: :effective_fg_percentage,
                                          adj_stat: :adj_effective_fg_percentage,
                                          adj_stat_allowed: :adj_effective_fg_percentage_allowed, as_of:,
