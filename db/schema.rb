@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_17_220000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_20_000000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -291,7 +291,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_17_220000) do
     t.datetime "updated_at", null: false
     t.bigint "home_team_snapshot_id"
     t.bigint "away_team_snapshot_id"
-    t.decimal "home_win_probability", precision: 5, scale: 4
+    t.float "home_win_probability"
     t.decimal "vegas_spread", precision: 6, scale: 3
     t.decimal "vegas_total", precision: 6, scale: 3
     t.bigint "ratings_config_version_id"

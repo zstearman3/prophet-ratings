@@ -1,5 +1,6 @@
 default: &default
   uncertainty_model: shared_pace_v1
+  probability_precision: float64_v1
   # Legacy contract fields: current predictions always report Uncalibrated.
   confidence_levels:
     high_max: 2.0

@@ -143,8 +143,8 @@ publication/lookup/activation separation, and legacy evaluation.
 
 ## Prediction arithmetic versions
 
-The authored bundle is now `v1.9-ratings-corrections`. It retains the v1.7 stored
-`prediction.uncertainty_model: shared_pace_v1` selects the exact shared-pace
+The authored bundle is now `v1.12-probability-precision`. It retains the v1.7 stored
+`prediction.uncertainty_model: shared_pace_v1`, which selects the exact shared-pace
 moments and efficiency-difference win probability described in
 [Ratings](ratings.md#shared-pace-uncertainty-baseline). Contract version 1 rows
 without this key select the legacy numerical behavior. Unknown selector values
@@ -153,7 +153,7 @@ rows and predictions are preserved, and no publication/activation happens on
 code deployment. Confidence labels are uncalibrated across both paths.
 
 Publish and explicitly select/activate the new bundle using the commands above
-with `MODEL_VERSION=v1.9-ratings-corrections`. New snapshots must belong to that version;
+with `MODEL_VERSION=v1.12-probability-precision`. New snapshots must belong to that version;
 review the existing live-input/reset safeguards before any authorized rollout.
 No automatic historical rewrite or calibration claim accompanies this change.
 
@@ -162,3 +162,15 @@ pace, home-defense and three-point corrections described in
 [Ratings](ratings.md#corrected-in-season-ratings-v19-ratings-corrections).
 Blowout weighting remains off by default. Persisted bundles without this selector
 retain legacy ratings arithmetic.
+
+The v1.12 bundle adds `prediction.probability_precision: float64_v1` and retains
+the v1.11 learning settings and coefficients. This selector requires
+`shared_pace_v1`; unknown precision selectors fail validation. It preserves the
+existing CDF Float through frozen replay, double precision storage/reload and
+metrics; only display may round. Absence retains historical four-decimal output.
+Existing saved forecasts are never recalculated and their lost digits cannot be
+recovered. Apply `PreservePredictionProbabilityPrecision` before the new code;
+its down migration is intentionally irreversible. Roll back code while keeping
+wide storage. See the [precision contract](ratings.md#issued-win-probability-precision)
+for deterministic endpoints and floating-point limits. No activation or accuracy
+claim accompanies this bundle.

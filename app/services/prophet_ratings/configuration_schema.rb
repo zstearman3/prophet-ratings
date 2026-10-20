@@ -19,7 +19,7 @@ module ProphetRatings
       baseline_volatility: { efficiency_volatility: nil, pace_volatility: nil },
       home_court_advantage: nil, home_court_adjusted_stats: nil,
       ridge: { alpha: nil }, anchor: { weight: nil },
-      prediction: { uncertainty_model: nil, confidence_levels: { high_max: nil, medium_max: nil } },
+      prediction: { uncertainty_model: nil, probability_precision: nil, confidence_levels: { high_max: nil, medium_max: nil } },
       defaults: { season_defaults: { average_pace: nil, average_efficiency: nil } },
       factors: FactorForecast::FIELDS.keys.index_with { FactorForecast::SETTINGS.index_with(nil) },
       learning: { volatility: LEARNING, home_court: LEARNING }

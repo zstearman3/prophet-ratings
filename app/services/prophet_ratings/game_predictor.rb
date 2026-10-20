@@ -179,7 +179,8 @@ module ProphetRatings
     def win_probability_home
       return legacy_win_probability_home unless config.dig(:prediction, :uncertainty_model) == 'shared_pace_v1'
 
-      score_moments.home_win_probability.round(4)
+      probability = score_moments.home_win_probability
+      config.dig(:prediction, :probability_precision) == 'float64_v1' ? probability : probability.round(4)
     end
 
     def score_moments
