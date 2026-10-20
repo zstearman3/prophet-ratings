@@ -65,7 +65,7 @@ module ProphetRatings
       season.rating_team_seasons.order(:team_id).map do |row|
         row.team_offseason_profile&.validate_revision_evidence
         inputs = calculator.preview_inputs(row).as_json
-        self.class.preview_row(row, inputs, ratings_config_version.config)
+        PreseasonReportBuilder.new(row, inputs, ratings_config_version.config, prior: row.preseason_prior).call
       end
     end
 
@@ -96,17 +96,6 @@ module ProphetRatings
       when Array then value.map(&transform)
       else value
       end
-    end
-
-    public_class_method def self.preview_row(row, inputs, config)
-      prior = row.preseason_prior
-      {
-        team_id: row.team_id, team_season_id: row.id, added: prior.blank?,
-        profile_before: prior&.inputs&.fetch('profile', nil), profile_after: inputs['profile'],
-        outputs_before: prior&.outputs, outputs_after: PreseasonPriorFormula.new(inputs, config).call,
-        coaching: PreseasonPriorFormula.new(inputs, config).pace_report,
-        efficiency: PreseasonPriorFormula.new(inputs, config).efficiency_report, inputs: inputs
-      }
     end
 
     public_class_method def self.validate_preview_key(report, key)
