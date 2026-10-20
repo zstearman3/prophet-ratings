@@ -1,36 +1,55 @@
 import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
-  static values  = { state: Boolean }
-  static targets = [ "menu", "x", "bars" ]
+  static values = { state: Boolean }
+  static targets = ["menu", "button", "x", "bars"]
+
+  connect() {
+    this.stateValue = false
+    this.render()
+    this.menuLinkWasFocused = false
+    document.addEventListener("focusin", this.rememberFocus)
+    this.breakpoint = window.matchMedia("(min-width: 768px)")
+    this.breakpoint.addEventListener("change", this.handleBreakpointChange)
+  }
+
+  disconnect() {
+    this.breakpoint?.removeEventListener("change", this.handleBreakpointChange)
+    document.removeEventListener("focusin", this.rememberFocus)
+  }
 
   toggle() {
     this.stateValue = !this.stateValue
+    this.render()
+  }
 
-    if (this.stateValue) {
-      this.openMenu()
-      this.showX()
-    } else {
-      this.closeMenu()
-      this.showBars()
+  close() {
+    if (!this.stateValue || this.breakpoint.matches) return
+
+    this.stateValue = false
+    this.render()
+    this.buttonTarget.focus()
+  }
+
+  rememberFocus = (event) => {
+    if (event.target !== document.body) {
+      this.menuLinkWasFocused = this.menuTarget.contains(event.target)
     }
   }
 
-  openMenu() {
-    this.menuTarget.classList.remove("hidden");
+  handleBreakpointChange = (event) => {
+    if (event.matches && document.activeElement === this.buttonTarget) {
+      this.buttonTarget.blur()
+    } else if (!event.matches && !this.stateValue && (this.menuTarget.contains(document.activeElement) || this.menuLinkWasFocused)) {
+      this.buttonTarget.focus()
+    }
   }
 
-  closeMenu() {
-    this.menuTarget.classList.add("hidden");
-  }
-
-  showBars() {
-    this.xTarget.classList.add("hidden")
-    this.barsTarget.classList.remove("hidden")
-  }
-
-  showX() {
-    this.xTarget.classList.remove("hidden")
-    this.barsTarget.classList.add("hidden")
+  render() {
+    this.menuTarget.classList.toggle("hidden", !this.stateValue)
+    this.buttonTarget.setAttribute("aria-expanded", String(this.stateValue))
+    this.buttonTarget.setAttribute("aria-label", this.stateValue ? "Collapse menu" : "Expand menu")
+    this.xTarget.classList.toggle("hidden", !this.stateValue)
+    this.barsTarget.classList.toggle("hidden", this.stateValue)
   }
 }
