@@ -199,6 +199,44 @@ RSpec.describe 'Games' do
       expect(response.body).not_to include('No prediction available for this game.')
     end
 
+    context 'when a saved prediction has different participants' do
+      let(:current_config) { false }
+      let(:config) do
+        create(:ratings_config_version, name: Rails.application.config_for(:ratings).bundle_name, current: current_config)
+      end
+      let!(:excluded_prediction) do
+        home_snapshot = create(:team_rating_snapshot, team_season: away_team_season, ratings_config_version: config)
+        away_snapshot = create(:team_rating_snapshot, team_season: home_team_season, ratings_config_version: config)
+        create(:prediction, game:, ratings_config_version: config,
+                            home_team_snapshot: home_snapshot, away_team_snapshot: away_snapshot)
+      end
+
+      it 'does not show a fallback configuration reason when there is no current configuration' do
+        expect(RatingsConfigVersion.current).to be_nil
+        expect(RatingsConfigVersion.published_default).to eq(config)
+        expect(excluded_prediction.participant_exclusion_reason).to eq('participant_side_mismatch')
+        expect(game.current_prediction_unavailable_reason).to eq('participant_side_mismatch')
+
+        get "/games/#{game.id}"
+
+        expect(response).to have_http_status(:success)
+        expect(response.body).to include('No prediction available for this game.')
+        expect(response.body).not_to include('Participant side mismatch')
+      end
+
+      context 'when its configuration is current' do
+        let(:current_config) { true }
+
+        it 'shows the humanized participant exclusion reason' do
+          get "/games/#{game.id}"
+
+          expect(response).to have_http_status(:success)
+          expect(response.body).to include('Participant side mismatch')
+          expect(response.body).not_to include('No prediction available for this game.')
+        end
+      end
+    end
+
     context 'when the game is an unmatched final' do
       let(:game) do
         create(:game, season:, start_time: Date.current.beginning_of_day + 12.hours,
@@ -222,6 +260,7 @@ RSpec.describe 'Games' do
         expect(response.parsed_body.css('tbody tr').first.css('td')[1].text.strip).to eq('N/A')
         expect(response.body).not_to include('FINAL_UNMATCHED')
         expect(response.body).not_to include('Winning Team:')
+        expect(response.body).to include('No prediction available for this game.')
       end
 
       it 'shows a persisted forecast as historical using captured school names without an evaluation verdict' do

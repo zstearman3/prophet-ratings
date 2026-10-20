@@ -294,7 +294,7 @@
         </div>
       <% else %>
         <div class="bg-white p-6 rounded-lg shadow">
-          <p class="text-gray-600"><%= @game.final_unmatched? ? 'No prediction available for this game.' : (@game.current_prediction_unavailable_reason&.humanize || 'No prediction available for this game.') %></p>
+          <p class="text-gray-600"><%= @game.final_unmatched? ? 'No prediction available for this game.' : (@game.current_prediction_unavailable_reason(ratings_config_version: @config)&.humanize || 'No prediction available for this game.') %></p>
         </div>
       <% end %>
     </div>
