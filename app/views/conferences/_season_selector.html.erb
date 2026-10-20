@@ -1,0 +1,9 @@
+<%= form_with url: action, method: :get, local: true, class: 'flex flex-wrap items-end gap-2' do %>
+  <div>
+    <%= label_tag :season, 'Season', class: 'block text-sm font-medium' %>
+    <%= select_tag :season, options_for_select(seasons.map { |item| [item.year, item.year] }, season&.year), prompt: 'Select a season', required: true, class: 'rounded border-gray-300' %>
+  </div>
+  <% if params[:stats] == 'more' %><%= hidden_field_tag :stats, 'more' %><% end %>
+  <% if params[:sort].present? %><%= hidden_field_tag :sort, params[:sort] %><%= hidden_field_tag :direction, params[:direction] %><% end %>
+  <%= submit_tag 'View season', class: 'rounded bg-gray-100 px-3 py-2 hover:bg-gray-200' %>
+<% end %>

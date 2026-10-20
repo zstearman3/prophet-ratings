@@ -7,8 +7,8 @@
     </div>
     <div class="flex items-center">
       <span class="text-sm text-gray-600 mr-2">
-        <%= "#{@team_season.wins}-#{@team_season.losses}
-            (#{@team_season.conference_wins}-#{@team_season.conference_losses} in #{@team_season.conference&.abbreviation || 'Independent'})" %>
+        <% conference = @team_season.conference %>
+        <%= "#{@team_season.wins}-#{@team_season.losses} (#{@team_season.conference_wins}-#{@team_season.conference_losses} in " %><%= conference ? link_to(conference.abbreviation.presence || conference.name, conference_path(conference, season: @season.year)) : 'Independent' %>)
       </span>
     </div>
 

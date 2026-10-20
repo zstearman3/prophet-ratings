@@ -124,6 +124,10 @@ RSpec.describe 'Teams' do
 
       expect(response).to have_http_status(:success)
       expect(table.css('th').map { |cell| cell.text.strip }).to eq(['Date', 'Opponent', 'Result', 'Score', 'Prediction', 'Correct?'])
+      expect(document.text.gsub(/\s+/, ' ')).to include('10-5 (4-2 in TC)')
+      conference_link = document.css('a').find { |link| link.text == 'TC' }
+      expect(conference_link['href']).to eq(conference_path(conference, season: season.year))
+      expect(document.css('a').map(&:text)).not_to include('Conferences')
       expect(score_cells).to include(opponent.school, 'Scheduled', '-', 'W', '68 - 75')
       expect(prediction_link).to be_present
       expect(table.at_css("a[href='/teams/#{opponent.slug}']").text).to eq(opponent.school)
@@ -157,7 +161,46 @@ RSpec.describe 'Teams' do
 
       expect(response).to have_http_status(:success)
       expect(response.body).to include('Independent')
+      independent_label = response.parsed_body.css('span').find { |span| span.text.include?('Independent') }
+      expect(independent_label.at_css('a')).to be_nil
       expect(response.parsed_body.css('.overflow-x-auto > table tbody tr')).to be_empty
+    end
+
+    it 'links to the conference membership for the displayed historical season' do
+      historical_season = create(:season, year: 2025, start_date: Date.new(2024, 11, 1), end_date: Date.new(2025, 4, 1))
+      current_season = create(:season, :current, year: 2026, start_date: Date.new(2025, 11, 1), end_date: Date.new(2026, 4, 1))
+      old_conference = create(:conference, name: 'Old Conference', abbreviation: 'OLD')
+      new_conference = create(:conference, name: 'New Conference', abbreviation: 'NEW')
+      team = create(:team, school: 'Realigned Team')
+      create(:team_conference, team:, conference: old_conference, start_season: historical_season, end_season: historical_season)
+      create(:team_conference, team:, conference: new_conference, start_season: current_season)
+      create(:team_season, team:, season: historical_season, wins: 18, losses: 1, conference_wins: 10, conference_losses: 0)
+      create(:team_season, team:, season: current_season, wins: 1, losses: 18, conference_wins: 0, conference_losses: 10)
+
+      get "/teams/#{team.slug}", params: { year: historical_season.year }
+
+      document = response.parsed_body
+      conference_link = document.css('a').find { |link| link.text == 'OLD' }
+      expect(response).to have_http_status(:success)
+      expect(document.text.gsub(/\s+/, ' ')).to include('18-1 (10-0 in OLD)')
+      expect(conference_link['href']).to eq(conference_path(old_conference, season: historical_season.year))
+      expect(document.css('a').map(&:text)).not_to include('NEW')
+    end
+
+    it 'uses the conference name when its abbreviation is blank or missing' do
+      season = create(:season, :current, year: 2026, start_date: Date.new(2025, 11, 1), end_date: Date.new(2026, 4, 1))
+      ['', nil].each_with_index do |abbreviation, index|
+        conference = create(:conference, name: "Conference Without Abbreviation #{index}", abbreviation:)
+        team = create(:team, school: "Unabbreviated Team #{index}")
+        create(:team_conference, team:, conference:, start_season: season)
+        create(:team_season, team:, season:, wins: 5, losses: 2, conference_wins: 3, conference_losses: 1)
+
+        get "/teams/#{team.slug}", params: { year: season.year }
+
+        label = response.parsed_body.css('span').find { |span| span.text.include?(conference.name) }
+        expect(label.at_css('a')['href']).to eq(conference_path(conference, season: season.year))
+        expect(label.at_css('a').text).to eq(conference.name)
+      end
     end
 
     it 'shows unmatched home and away results with stored opponent names and no evaluation verdict' do

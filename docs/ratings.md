@@ -1,5 +1,21 @@
 # Ratings System
 
+## Conference ratings pages
+
+The `/conferences` directory is available directly, and conference pages are
+also reached from the conference label in a team's record header. The team label
+uses that team's membership for the displayed season, so historical team pages
+link to the conference they belonged to then. `/conferences/:id` shows a
+conference's members using the season's inclusive conference membership dates.
+The optional `season=YYYY` parameter selects a historical season; when it is
+omitted, the current season is used. The compact table displays each stored
+`TeamSeason.overall_rank` as the national rank, so ranks can have gaps within a
+conference. In the compact view, a missing stored rank or rating is shown as an
+em dash; expanded conference stats also show em dashes for missing values while
+retaining observed zeros. The season heading uses its stored name, with an
+ending-year fallback. “Show more stats” exposes the same ratings columns as the
+homepage.
+
 This document explains how Prophet Ratings currently computes team ratings. It is intended for agents and contributors working on ratings, predictions, snapshots, or model evaluation.
 
 ## High-level entry point
