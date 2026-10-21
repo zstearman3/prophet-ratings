@@ -267,7 +267,7 @@ class OffseasonSetupProgress
 
     def load_latest_evidence
       @evidence = RecruitingEvidence.new(batch: RecruitingBatch.where(season:).order(id: :desc).first,
-                                         revision: OffseasonInputRevision.where(season:, kind: 'recruiting').order(id: :desc).last,
+                                         revision: OffseasonInputRevision.where(season:, kind: 'recruiting').order(id: :desc).first,
                                          report: nil, stale: false, coverage: nil)
     end
 

@@ -128,6 +128,27 @@ RSpec.describe OffseasonSetupProgress do
     expect(step.last_result).to include('Coverage: 1 of 2 team seasons point to this revision')
   end
 
+  it 'reports the latest approved revision after a second publication in the same season' do
+    season = create(:season, year: 2027)
+    team = create(:team, school: 'Test College')
+    team_season = create(:team_season, season:, team:)
+    first_batch = publish_recruiting(season, team, snapshot: 'first retained source snapshot')
+    first_revision = first_batch.revision
+
+    second_batch = publish_recruiting(season, team, snapshot: 'second retained source snapshot')
+    second_revision = second_batch.revision
+    step = described_class.new(season).steps.find { |entry| entry.key == 'recruiting' }
+
+    expect(second_revision.id).to be > first_revision.id
+    expect(OffseasonInputRevision.where(season:, kind: 'recruiting').order(:id).pluck(:id)).to eq(
+      [first_revision.id, second_revision.id]
+    )
+    expect(team_season.reload.team_offseason_profile.recruiting_revision_id).to eq(second_revision.id)
+    expect(step).to have_attributes(status: 'complete',
+                                    last_result: a_string_including("Approved revision ##{second_revision.id} retained."))
+    expect(step.last_result).not_to include("Approved revision ##{first_revision.id} retained.")
+  end
+
   it 'keeps an older approval visible but pending when a newer recruiting batch is ready for review' do
     season = create(:season, year: 2027)
     team = create(:team, school: 'Test College')
@@ -176,11 +197,11 @@ RSpec.describe OffseasonSetupProgress do
     [season, team, conference]
   end
 
-  def publish_recruiting(season, team)
+  def publish_recruiting(season, team, snapshot: 'retained recruiting fixture')
     bytes = Rails.root.join('spec/fixtures/recruiting/partial.json').read
-    dataset = Recruiting::Dataset.new(bytes, 'retained recruiting fixture')
+    dataset = Recruiting::Dataset.new(bytes, snapshot)
     batch = RecruitingBatch.create!(season:, source_year: 2026, status: 'ready', source_status: 'ok',
-                                    extract_bytes: bytes, snapshot_bytes: 'retained recruiting fixture',
+                                    extract_bytes: bytes, snapshot_bytes: snapshot,
                                     dataset_revision: dataset.manifest.fetch('dataset_revision'))
     Recruiting::Preview.new(dataset, season).call.fetch('rows').each do |row|
       batch.entries.create!(RecruitingEntry.source_attributes(row))
