@@ -322,8 +322,9 @@ RSpec.describe Importer::GamesImporter do
 
     expect do
       described_class.import([row.merge(url: daily_schedule_url), other_row.merge(url: daily_schedule_url)])
-    end.not_to change(Game, :count)
-    expect(GameObservation.last(2).map(&:reason)).to eq(%w[missing_stable_game_identity missing_stable_game_identity])
+    end.to change(Game, :count).by(2)
+    expect(GameObservation.last(2).map(&:outcome)).to eq(%w[projected projected])
+    expect(Game.last(2).map(&:home_team_score)).to eq([nil, nil])
   end
 
   it 'matches existing games by Eastern schedule date when enriched start time crosses UTC midnight' do

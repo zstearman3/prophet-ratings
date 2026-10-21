@@ -23,7 +23,9 @@ module Ingestion
 
     def url_games
       url = @data[:source_url]
-      url.present? ? Game.where(url:).to_a : []
+      return [] if @resolution.observation.schedule_projection? || url.to_s.include?('/cbb/boxscores/index.cgi')
+
+      Game.where(url:).to_a
     end
 
     def validate_candidates(candidates)
@@ -36,10 +38,16 @@ module Ingestion
       self.class.date_games(Date.iso8601(@data[:schedule_date]))
     end
 
+    def projection_alias_match?(names)
+      return false unless @resolution.observation.schedule_projection?
+
+      names.all? { |name| Team.matching_school_or_alias(name).exists?(id: @resolution.teams) }
+    end
+
     def participant_match?(candidate)
       values = candidate.attributes.values_at('home_team_name', 'away_team_name')
       ids = TeamGame.where(game: candidate).pluck(:team_id).sort
-      ids == @resolution.teams.map(&:id).sort || values == @resolution.incoming_names
+      ids == @resolution.teams.map(&:id).sort || values == @resolution.incoming_names || projection_alias_match?(values)
     end
   end
 end

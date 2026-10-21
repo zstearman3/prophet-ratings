@@ -85,7 +85,7 @@ RSpec.describe Importer::ScheduleRowImporter do
 
   it 'retains a reliable URL through placeholder refresh so a later date move reuses the game' do
     game = create(:game, season:, start_time: Game.schedule_time_for(date), status: :scheduled, url: '/stable.html')
-    expect(import_row(row.merge(url: '/cbb/boxscores/index.cgi?day=1'))).to include(reason: 'missing_stable_game_identity')
+    expect(import_row(row.merge(url: '/cbb/boxscores/index.cgi?day=1'))).to include(game_id: game.id, projected: true, accepted: false)
     expect(game.reload.url).to eq('/stable.html')
     moved = import_row(row.merge(date: date + 1.day, url: '/stable.html'))
     expect(moved).to include(game_id: game.id, outcome: 'scheduled')

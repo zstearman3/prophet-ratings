@@ -12,7 +12,9 @@ module Ingestion
     end
 
     def attributes
-      { season_id: resolution.season.id, start_time:, url: source_url }.merge(self.class.side_attributes(data)).merge(venue_attributes)
+      sides = self.class.side_attributes(data)
+      sides = sides.except(:home_team_score, :away_team_score) if observation.schedule_projection?
+      { season_id: resolution.season.id, start_time:, url: source_url }.merge(sides).merge(venue_attributes)
     end
 
     def changes
@@ -66,7 +68,7 @@ module Ingestion
 
     def source_url
       stored = game.url
-      return stored if game.persisted? && other_provider_provenance?
+      return stored if game.persisted? && (observation.schedule_projection? || other_provider_provenance?)
 
       data[:source_url].presence || stored || data[:external_game_id]
     end

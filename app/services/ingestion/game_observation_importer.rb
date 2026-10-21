@@ -55,12 +55,13 @@ module Ingestion
     end
 
     def apply_observation
+      return ObservationScheduleProjection.new(observation, resolution, game).call if observation.schedule_projection?
+
       writer = ObservationWriter.new(observation, resolution, game)
       if writer.identical?
         associate_identity
         return retain('unchanged', 'canonical_values_unchanged')
       end
-      validate_update
       write_observation(writer)
     end
 
@@ -70,6 +71,7 @@ module Ingestion
     end
 
     def write_observation(writer)
+      validate_update
       changes = writer.changes
       writer.call
       associate_identity

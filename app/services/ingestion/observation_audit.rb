@@ -3,6 +3,8 @@
 module Ingestion
   # Append one attempt without rewriting accepted provenance or discarding rejected evidence.
   class ObservationAudit
+    PROJECTION_REASON = 'missing_stable_game_identity_projection'
+
     def initialize(observation, game)
       @data = observation.data
       @game = game
@@ -16,8 +18,10 @@ module Ingestion
 
     def self.report(record)
       game_id, outcome, reason, accepted = record.attributes.values_at('game_id', 'outcome', 'reason', 'accepted')
-      { outcome:, reason:, game_id:, observation_id: record.id, accepted:,
-        applied: accepted || (outcome == 'unchanged' && game_id.present?) }
+      projected = %w[projected unchanged].include?(outcome) && reason == PROJECTION_REASON
+      { outcome:, reason:, game_id:, observation_id: record.id, accepted:, projected:,
+        scheduled: record.normalized_payload['source_status'] == 'scheduled',
+        applied: accepted || projected || (outcome == 'unchanged' && game_id.present?) }
     end
 
     private
@@ -26,7 +30,7 @@ module Ingestion
 
     def attributes
       { game_id: persisted_game_id, provider: data[:provider], external_game_id: data[:external_game_id],
-        semantic_profile: data[:semantic_profile], normalized_payload: data.as_json,
+        semantic_profile: data[:semantic_profile], normalized_payload: data.except(:raw_payload).as_json,
         raw_payload: data.fetch(:raw_payload, {}).as_json, payload_digest: data[:payload_digest],
         captured_at: data[:captured_at], source_updated_at: data[:source_updated_at] }
     end

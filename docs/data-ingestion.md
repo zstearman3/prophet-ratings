@@ -291,7 +291,7 @@ Importer::GamesImporter.import(data)
 `data` is expected to be an array of row hashes from `Scraper::GamesScraper`.
 
 `import` now returns an array of reconciliation reports. `import_game(row,
-season:)` returns the resolved persisted `Game`, or `nil` for audit-only rows;
+season:)` returns the resolved persisted `Game`, or `nil` when no game matched;
 `import_report` exposes the full report. `ScheduleRowImporter` returns that same
 report. All entry points translate through `SportsReferenceObservationAdapter`
 and call `Ingestion::GameObservationImporter`; acquisition never writes boxes
@@ -322,16 +322,21 @@ A second adapter supplies the same normalized hash (synthetic example):
 
 `Ingestion::GameObservationImporter.new(observation: payload, season:).call`
 returns `outcome`, explicit `reason`, optional `game_id`, `observation_id`,
-`accepted`, `applied`, `changes`, `unmatched`, and `possible_move_ids`.
-`accepted` identifies a canonical mutation with committed provenance. `applied`
-counts such mutations and unchanged existing canonical records; audit-only rows
-are never counted as imported games. Repeats may append attempts, but do not
-rewrite canonical timestamps, boxes, forecasts, or the accepted provenance head.
+`accepted`, `applied`, `projected`, `scheduled`, `changes`, `unmatched`, and
+`possible_move_ids`. `accepted` identifies a canonical mutation with committed
+provider provenance. `projected` identifies a safe missing-ID schedule projection,
+which retains `accepted: false`. `applied` counts accepted mutations, unchanged
+canonical records, and changed or unchanged safe schedule projections. Held rows
+are not counted as imported games. `scheduled` identifies source scheduled rows
+for coverage review. Repeats may append attempts, but do not rewrite canonical timestamps, boxes, forecasts, or the accepted provenance head.
+New audit records keep the exact original evidence only in `raw_payload`; normalized
+JSON excludes that duplicate field. Digests, capture/upstream timestamps, profiles
+and append-only history are unchanged; historical audit rows are not rewritten.
 
 Statuses are `scheduled`, `live`, `final`, `postponed`, `cancelled`, `unknown`.
 Only `final` plus literal completion confirmation and retained evidence can
 finalize. Missing required statistics yield `incomplete`; unmatched participants,
-season membership or stable game ID yield `unmatched`. Rejections distinguish
+season membership or a required stable result ID yield `unmatched`. Rejections distinguish
 `invalid`, `ambiguous`, `conflict`, `stale`, and `superseded`. Missing statistics
 are never zero-filled. Counts accept nonnegative integers or digit strings up to
 the database integer limit; blanks/null remain unknown. Each side's
@@ -362,9 +367,23 @@ finalization and accepted provenance commit atomically. Rejected updates preserv
 the exact previous domain state; infrastructure failures propagate.
 
 A stable box URL is the Sports Reference game key. Shared daily schedule URLs
-are **not** game identities. Missing stable IDs and unresolved opponents now
-remain audit-only review candidates rather than creating scheduled or
-`final_unmatched` Games. This intentionally tightens legacy projection. Existing
+are **not** game identities or URL bootstrap candidates, including when a later
+stable-ID observation arrives. A missing-ID row may project only literal
+`source_status: scheduled`, `source_completed: false` metadata for two uniquely
+resolved, distinct teams with existing memberships. It uses the same bootstrap
+and row locks and same-date participant checks (including uniquely resolvable
+stored aliases when membership links are missing); it never guesses a cross-date
+reschedule from a shared source document. New Games retain a document URL and
+known tip or date sentinel, with membership links for pregame use. Refreshes retain
+existing usable URLs and stronger/manual venue evidence. Projection never creates
+external identities or copies incoming scores, box counts, derived values, result
+statuses or forecast inputs. Completed and canceled Games remain untouched.
+Changed projections report `outcome: projected`; repeats report `unchanged`, both
+with `projected: true`, `accepted: false`, `applied: true`, the matched `game_id`,
+and reason `missing_stable_game_identity_projection`. Accepted provenance is not
+replaced. A later compatible stable-ID observation reuses the projected Game.
+Other missing-ID statuses and unresolved opponents remain audit-only review
+candidates, without creating results or `final_unmatched` Games. Existing
 `final_unmatched` records keep their status/local IDs and may promote when a
 stable candidate, both memberships and a complete confirmed box resolve.
 Unresolved refreshes preserve existing records/associations. No partial participant
@@ -385,7 +404,13 @@ conflicting result. Identical observations from another profile/provider may add
 a safe identity but never replace the accepted provenance head. Initial compatible
 scheduled-to-final transitions use explicit source completion evidence. Pending
 schedule revisions also respect available upstream ordering and provider/profile
-authority; unknown ordering permits compatible pending updates, never final corrections.
+authority, including prior compatible projected metadata and successful unchanged
+projection attempts. Missing-ID projections compare provider/profile without
+inventing or adopting a stable identity. Existing
+accepted stable-ID authority remains the head for later canonical updates. Actual
+upstream ordering remains protected even after an update with unknown ordering;
+older/equal-conflicting changes are held. Unknown ordering permits compatible
+pending updates, never final corrections.
 
 Manual venue corrections win. Unknown venue stays unknown. A parsed time carries
 `time_precision: 'instant'`; fallback dates carry `'date'`. Legacy adapter rows
@@ -405,6 +430,10 @@ conflicting observations. Accepted rows/audits roll back together; rejected raw
 and normalized evidence is retained after that rollback, with rolled-back foreign
 keys removed. Stale/superseded rows are safe skips. Unmatched, unchanged and valid
 nonfinal rows retain distinct reports without claiming strict finalization.
+Future refresh includes matched/projected IDs in its seen set. If a scheduled
+source row has no safely matched local Game, absence conclusions are suppressed
+for its entire date. Fully reconciled dates and recognized empty dates still
+report genuine absences; ambiguity/conflicts still fail and roll back the date.
 
 ## Provider-scoped external identities
 
@@ -471,13 +500,14 @@ observations. Reviewed mapping and bulk reconciliation belong to ticket 05;
 Identity-bearing teams/games cannot be destroyed: association restrictions run
 before destructive dependent callbacks, and foreign keys also protect database
 ownership. Duplicate-game repair checks all planned deletion candidates for any
-external identities, including superseded ones, before applying any group. It
-raises `ArgumentError` with the sorted affected game IDs and an instruction to
-review identity mappings before repair. Reconcile those mappings through reviewed
-work first; repair does not transfer or delete identity history. Dry runs remain
-read-only, and an identity on the chosen survivor alone does not prevent repair.
+external identities, including superseded ones, and immutable observations of any
+outcome before applying any group. It raises `ArgumentError` with the sorted
+affected game IDs and an instruction to review identity mappings or observation history before repair (identity guidance
+takes priority when both exist). Resolve protected duplicates through reviewed
+work first; repair does not transfer or delete either history. Dry runs remain
+read-only, and evidence on the chosen survivor alone does not prevent repair.
 Each group is checked again after its game locks and frozen-forecast validation,
-before dependent moves. A mapping added after preflight can therefore reject a
+before dependent moves. Evidence added after preflight can therefore reject a
 later group; groups already committed remain applied in that concurrent case.
 
 ## Venue classification
@@ -791,12 +821,13 @@ RepairDuplicateGamesJob.perform_later(season_id: season.id, apply: true)
 ```
 
 Before any group is applied, deletion candidates with external identities
-(including superseded mappings) reject the run with an `ArgumentError` listing
-the affected game IDs. Review identity mappings before retrying; repair neither
-transfers nor deletes mappings. Identity-bearing survivors are allowed, and dry
+(including superseded mappings) or immutable observations reject the run with an
+`ArgumentError` listing sorted affected game IDs. Review identity mappings or
+observation history before retrying; identity errors take priority. Repair neither
+transfers nor deletes that evidence. Protected survivors are allowed, and dry
 runs still report planned groups without writes. After locking each group and
 validating frozen forecasts, apply rechecks deletion candidates before merging.
-A concurrent mapping added after preflight can reject a later group without
+Concurrent protected evidence added after preflight can reject a later group without
 undoing earlier committed groups.
 
 The apply mode reassigns safe dependent records such as `TeamGame`, `Prediction`, `GameOdd`, `BookmakerOdd`, and `BetRecommendation` where unique constraints allow it, deletes conflicting duplicate dependents, and then deletes duplicate `Game` records. You can restrict the scope with `YEAR=<year>` or `SEASON_ID=<id>`.

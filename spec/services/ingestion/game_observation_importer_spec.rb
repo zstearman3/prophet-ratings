@@ -100,6 +100,21 @@ RSpec.describe Ingestion::GameObservationImporter do
   end
 
   shared_examples 'canonical persistence' do
+    it 'stores raw evidence once for accepted, unchanged and rejected attempts' do
+      raw = { exact: ['evidence', nil] }
+      row = payload.merge(raw_payload: raw, payload_digest: 'exact-digest')
+      ingest(row)
+      ingest(row)
+      ingest(row.merge(source_updated_at: nil).deep_merge(home: { score: 101 }))
+      expect(GameObservation.order(:id).pluck(:outcome)).to eq(%w[final unchanged conflict])
+      GameObservation.find_each do |record|
+        expect(record.normalized_payload).not_to have_key('raw_payload')
+        expect(record).to have_attributes(raw_payload: raw.as_json, payload_digest: 'exact-digest',
+                                          captured_at: Time.iso8601(payload[:captured_at]), semantic_profile: payload[:semantic_profile])
+        expect(record.normalized_payload.except('raw_payload')).to include('payload_digest' => 'exact-digest')
+      end
+    end
+
     it 'creates one strictly finalized game, sides and external identity atomically' do
       report = ingest
       expect(report).to include(outcome: 'final', accepted: true)
@@ -358,6 +373,308 @@ RSpec.describe Ingestion::GameObservationImporter do
       expect(GameObservation.where(game_id: first[:game_id], accepted: true).count).to eq(1)
       expect(GameExternalIdentity.where(game_id: first[:game_id]).count).to eq(2)
       expect(Game.find(first[:game_id]).url).to eq(payload[:source_url])
+    end
+  end
+
+  context 'with an unlinked schedule' do
+    let(:daily_url) { 'https://www.sports-reference.com/cbb/boxscores/index.cgi?month=1&day=1&year=2025' }
+    let(:payload) do
+      canonical_payload.merge(external_game_id: nil, source_status: 'scheduled', source_completed: false,
+                              completion_evidence: nil, source_url: daily_url, source_updated_at: nil,
+                              raw_payload: { exact: ['raw', nil] }, payload_digest: 'original-digest')
+    end
+
+    let(:alternate_authorities) { [{ provider: 'other' }, { semantic_profile: 'sports-reference-legacy-v1' }] }
+    let(:projection_revisions) { ['2025-01-01T11:00:00Z', '2025-01-02T11:00:00Z'] }
+
+    it 'projects only schedule metadata and memberships, appends compact raw evidence and repeats without domain writes' do
+      first = ingest
+      aggregate_failures do
+        expect(first).to include(outcome: 'projected', accepted: false, projected: true, applied: true)
+        game = Game.find(first[:game_id])
+        expect(game).to have_attributes(status: 'scheduled', home_team_score: nil, away_team_score: nil, minutes: nil, possessions: nil)
+        expect(game.home_team_game).to have_attributes(team_season: home_team_season, opponent_team_season: away_team_season, points: nil)
+        before_state = participant_domain_state(game)
+        expect(ingest).to include(outcome: 'unchanged', game_id: game.id, accepted: false, projected: true, applied: true)
+        expect(participant_domain_state(game)).to eq(before_state)
+        expect(GameObservation.count).to eq(2)
+        record = GameObservation.last
+        expect(record.normalized_payload).not_to have_key('raw_payload')
+        expect(record).to have_attributes(raw_payload: { 'exact' => ['raw', nil] }, payload_digest: 'original-digest', accepted: false)
+        expect(record.normalized_payload).to include('start_time' => nil, 'semantic_profile' => 'official-team-totals-v1')
+        expect(GameExternalIdentity.count).to eq(0)
+        expect(TeamExternalIdentity.count).to eq(0)
+      end
+    end
+
+    it 'keeps separate games sharing a daily URL and reuses the projection when a stable ID arrives' do
+      first = ingest
+      other = create(:team, school: 'Another Home')
+      create(:team_season, team: other, season:)
+      second = ingest(payload.deep_merge(home: { name: other.school }))
+      expect([first[:game_id], second[:game_id]].compact.uniq.size).to eq(2)
+      promoted = ingest(payload.merge(external_game_id: 'stable-1', source_url: daily_url))
+      expect(promoted).to include(game_id: first[:game_id], applied: true)
+      expect(Game.count).to eq(2)
+      expect(GameExternalIdentity.last).to have_attributes(game_id: first[:game_id], external_id: 'stable-1')
+    end
+
+    it 'updates known tip metadata while preserving stable URLs, manual venue and raw side values' do
+      game = create(:game, season:, start_time: Game.schedule_time_for(date), home_team_name: home_team.school,
+                           away_team_name: away_team.school, url: '/stable-box', status: :scheduled, venue_type: 'neutral',
+                           venue_confidence: 'manual', venue_source: 'manual_override', neutral: true)
+      report = ingest(payload.merge(start_time: '2025-01-02T01:00:00Z', venue: { venue_type: 'home', neutral: false }))
+      expect(report).to include(outcome: 'projected', game_id: game.id)
+      expect(game.reload).to have_attributes(url: '/stable-box', start_time: Time.iso8601('2025-01-02T01:00:00Z'),
+                                             venue_type: 'neutral', neutral: true, home_team_score: nil)
+      expect(ingest).to include(outcome: 'unchanged', game_id: game.id)
+      expect(game.reload.start_time).to eq(Time.iso8601('2025-01-02T01:00:00Z'))
+    end
+
+    %w[live final postponed cancelled unknown].each do |status|
+      it "does not project missing-ID #{status} rows" do
+        expect(ingest(payload.merge(source_status: status))).to include(reason: 'missing_stable_game_identity', applied: false)
+        expect(Game.count).to eq(0)
+      end
+    end
+
+    it 'holds unresolved teams and unmapped IDs without partial writes' do
+      [payload.deep_merge(home: { name: 'Unknown opponent' }), payload.deep_merge(home: { external_team_id: 'unknown' })].each do |row|
+        expect(ingest(row)).to include(outcome: 'unmatched', applied: false)
+      end
+      away_team_season.destroy!
+      expect(ingest).to include(reason: 'missing_team_season')
+      expect([Game.count, TeamGame.count, GameExternalIdentity.count]).to eq([0, 0, 0])
+    end
+
+    it 'holds ambiguous candidates, reversed orientation and cross-season matches without domain writes' do
+      game = create(:game, season:, start_time: Game.schedule_time_for(date), home_team_name: home_team.school,
+                           away_team_name: away_team.school, url: daily_url)
+      duplicate = game.dup
+      duplicate.save!(validate: false)
+      state = Game.order(:id).map(&:attributes)
+      expect(ingest).to include(outcome: 'ambiguous', applied: false)
+      expect(Game.order(:id).map(&:attributes)).to eq(state)
+      duplicate.destroy!
+      create(:team_game, game:, team: away_team, team_season: away_team_season, home: true)
+      create(:team_game, game:, team: home_team, team_season: home_team_season, home: false)
+      expect(ingest).to include(outcome: 'conflict', reason: 'participant_or_orientation_conflict')
+      game.home_team_game.destroy!
+      game.away_team_game.destroy!
+      game.update!(season: create(:season, year: 2026))
+      expect(ingest).to include(outcome: 'ambiguous', reason: 'multiple_or_cross_season_candidates')
+    end
+
+    it 'holds reversed same-day stored names even when membership links are absent' do
+      game = create(:game, season:, status: :scheduled, start_time: Game.schedule_time_for(date),
+                           home_team_name: away_team.school, away_team_name: home_team.school, url: daily_url)
+      state = participant_domain_state(game)
+      expect(ingest).to include(outcome: 'conflict', reason: 'participant_or_orientation_conflict', applied: false)
+      expect(participant_domain_state(game)).to eq(state)
+      expect(Game.count).to eq(1)
+    end
+
+    [false, true].each do |partial_side|
+      it "reuses uniquely resolved stored aliases with #{partial_side ? 'one' : 'no'} membership links" do
+        create(:team_alias, team: home_team, value: 'Historic Home', source: 'reviewed')
+        create(:team_alias, team: away_team, value: 'Historic Away', source: 'reviewed')
+        game = create(:game, season:, status: :scheduled, start_time: Game.schedule_time_for(date),
+                             home_team_name: 'Historic Home', away_team_name: 'Historic Away', url: daily_url)
+        create(:team_game, game:, team: home_team, team_season: home_team_season, home: true) if partial_side
+        expect(ingest).to include(outcome: 'projected', game_id: game.id)
+        expect(Game.count).to eq(1)
+        expect(game.reload.home_team_game.team).to eq(home_team)
+        expect(game.away_team_game.team).to eq(away_team)
+      end
+    end
+
+    it 'holds ambiguous stored aliases rather than creating a second schedule' do
+      other = create(:team, school: 'Conflicting historic home')
+      [home_team, other].each { |team| create(:team_alias, team:, value: 'Historic Home', source: "reviewed-#{team.id}") }
+      create(:team_alias, team: away_team, value: 'Historic Away', source: 'reviewed')
+      game = create(:game, season:, status: :scheduled, start_time: Game.schedule_time_for(date),
+                           home_team_name: 'Historic Home', away_team_name: 'Historic Away', url: daily_url)
+      state = participant_domain_state(game)
+      expect(ingest).to include(outcome: 'ambiguous', reason: 'ambiguous_stored_participant', applied: false)
+      expect(participant_domain_state(game)).to eq(state)
+      expect(Game.count).to eq(1)
+    end
+
+    it 'holds a new projection without a usable document URL rather than inventing a key' do
+      expect(ingest(payload.merge(source_url: nil))).to include(outcome: 'unmatched', applied: false)
+      expect([Game.count, TeamGame.count]).to eq([0, 0])
+    end
+
+    it 'never guesses a reschedule across dates' do
+      first = ingest(payload.merge(source_url: '/shared-source-document'))
+      second = ingest(payload.merge(schedule_date: '2025-01-02', source_url: '/shared-source-document'))
+      expect(second).to include(outcome: 'projected')
+      expect(second[:game_id]).not_to eq(first[:game_id])
+    end
+
+    %w[final final_unmatched canceled].each do |status|
+      it "protects stored #{status} records and their frozen forecasts byte-for-byte" do
+        game = Game.find(ingest(canonical_payload)[:game_id])
+        version = create(:ratings_config_version)
+        snapshots = [home_team_season, away_team_season].map do |membership|
+          create(:team_rating_snapshot, :with_forecast_inputs, team_season: membership, ratings_config_version: version,
+                                                               snapshot_date: date - 1)
+        end
+        context = ProphetRatings::ForecastContext.capture(game, snapshots, version)
+        create(:prediction, game:, ratings_config_version: version, home_team_snapshot: snapshots.first,
+                            away_team_snapshot: snapshots.last, forecast_kind: 'pregame', calculation_context: context,
+                            revision_key: 'protected-schedule', generated_at: game.start_time - 1.hour,
+                            forecast_start_time: game.start_time, input_cutoff: date - 1, home_win_probability: 0.7)
+        game.update!(status:)
+        before_state = participant_domain_state(game)
+        expect(ingest).to include(game_id: game.id, accepted: false, applied: false)
+        expect(participant_domain_state(game)).to eq(before_state)
+      end
+    end
+
+    [true, false].each do |accepted|
+      context "with #{accepted ? 'accepted' : 'projected'} pending authority" do
+        before do
+          initial = payload.merge(source_updated_at: '2025-01-02T11:00:00Z')
+          initial = initial.merge(external_game_id: 'stable-1', source_url: '/stable-1') if accepted
+          ingest(initial)
+        end
+
+        it 'rejects older and equal-conflicting upstream revisions without using capture time' do
+          game = Game.last
+          state = participant_domain_state(game)
+          projection_revisions.each do |revision|
+            row = payload.merge(start_time: '2025-01-02T01:00:00Z', source_updated_at: revision, captured_at: '2025-02-01T12:00:00Z')
+            expect(ingest(row)).to include(applied: false, accepted: false)
+          end
+          expect(participant_domain_state(game)).to eq(state)
+        end
+
+        it 'rejects provider/profile changes but allows compatible unknown-order pending updates' do
+          game = Game.last
+          state = participant_domain_state(game)
+          alternate_authorities.each do |metadata|
+            expect(ingest(payload.merge(metadata).merge(start_time: '2025-01-02T01:00:00Z')))
+              .to include(outcome: 'conflict', reason: 'provider_or_profile_conflict', applied: false)
+          end
+          expect(participant_domain_state(game)).to eq(state)
+          expect(ingest(payload.merge(start_time: '2025-01-02T01:00:00Z'))).to include(outcome: 'projected', game_id: game.id)
+          expect(game.reload.url).to eq(accepted ? '/stable-1' : daily_url)
+        end
+      end
+    end
+
+    it 'preserves an accepted stable-ID authority after missing-ID metadata changes' do
+      first = ingest(payload.merge(external_game_id: 'accepted-id', source_url: '/accepted-id'))
+      game = Game.find(first[:game_id])
+      expect(ingest(payload.merge(start_time: '2025-01-02T01:00:00Z'))).to include(outcome: 'projected')
+      state = participant_domain_state(game)
+      wrong_id = payload.merge(external_game_id: 'different-id', source_url: '/different-id', start_time: '2025-01-02T02:00:00Z')
+      expect(ingest(wrong_id)).to include(outcome: 'conflict', reason: 'provider_or_profile_conflict', applied: false)
+      expect(participant_domain_state(game)).to eq(state)
+      expect(GameExternalIdentity.where(game:).pluck(:external_id)).to eq(['accepted-id'])
+    end
+
+    [nil, '2025-01-01T11:00:00Z'].each do |initial_revision|
+      it "retains newer actual ordering from an unchanged projection after #{initial_revision || 'unknown'} freshness" do
+        game = Game.find(ingest(payload.merge(source_updated_at: initial_revision))[:game_id])
+        version = create(:ratings_config_version)
+        snapshots = [home_team_season, away_team_season].map do |membership|
+          create(:team_rating_snapshot, :with_forecast_inputs, team_season: membership, ratings_config_version: version,
+                                                               snapshot_date: date - 1)
+        end
+        context = ProphetRatings::ForecastContext.capture(game, snapshots, version)
+        create(:prediction, game:, ratings_config_version: version, home_team_snapshot: snapshots.first,
+                            away_team_snapshot: snapshots.last, forecast_kind: 'pregame', calculation_context: context,
+                            revision_key: 'unchanged-projection-order', generated_at: game.start_time - 1.hour,
+                            forecast_start_time: game.start_time, input_cutoff: date - 1, home_win_probability: 0.7)
+        state = participant_domain_state(game)
+        unchanged = ingest(payload.merge(source_updated_at: '2025-01-03T11:00:00Z'))
+        changed = payload.merge(start_time: '2025-01-02T01:00:00Z', captured_at: '2025-02-01T12:00:00Z')
+
+        aggregate_failures do
+          expect(unchanged).to include(outcome: 'unchanged', reason: 'missing_stable_game_identity_projection',
+                                       projected: true, accepted: false, applied: true, game_id: game.id)
+          expect(participant_domain_state(game)).to eq(state)
+          expect(ingest(changed.merge(source_updated_at: '2025-01-02T11:00:00Z')))
+            .to include(outcome: 'stale', reason: 'older_source_revision', applied: false, accepted: false, game_id: game.id)
+          expect(participant_domain_state(game)).to eq(state)
+          expect(GameObservation.last).to have_attributes(outcome: 'stale', reason: 'older_source_revision')
+          expect(ingest(changed.merge(source_updated_at: '2025-01-03T11:00:00Z')))
+            .to include(outcome: 'conflict', reason: 'equal_source_revision_conflict', applied: false, accepted: false, game_id: game.id)
+          expect(participant_domain_state(game)).to eq(state)
+          expect(GameObservation.last).to have_attributes(outcome: 'conflict', reason: 'equal_source_revision_conflict')
+          expect(ingest(changed.merge(source_updated_at: '2025-01-04T11:00:00Z')))
+            .to include(outcome: 'projected', projected: true, accepted: false, applied: true, game_id: game.id)
+          expect(game.reload.start_time).to eq(Time.iso8601('2025-01-02T01:00:00Z'))
+        end
+      end
+    end
+
+    %i[provider semantic_profile].each do |authority_field|
+      it "excludes alternate #{authority_field} canonical unchanged evidence from projection authority" do
+        first = ingest(payload.merge(source_updated_at: '2025-01-01T11:00:00Z'))
+        game = Game.find(first[:game_id])
+        alternate = authority_field == :provider ? 'alternate-provider' : 'sports-reference-legacy-v1'
+        canonical = payload.deep_merge(external_game_id: 'unchanged-stable-id', source_updated_at: '2025-01-03T11:00:00Z',
+                                       home: { score: nil }, away: { score: nil }).merge(authority_field => alternate)
+        attempt = ingest(canonical)
+        identities = GameExternalIdentity.where(game:).order(:id).map(&:attributes)
+
+        aggregate_failures do
+          expect(attempt).to include(outcome: 'unchanged', reason: 'canonical_values_unchanged', accepted: false, projected: false)
+          expect(GameObservation.where(game:, accepted: true)).to be_empty
+          expect(ingest(payload.merge(source_updated_at: '2025-01-02T11:00:00Z', start_time: '2025-01-02T01:00:00Z')))
+            .to include(outcome: 'projected', projected: true, game_id: game.id)
+          expect(GameExternalIdentity.where(game:).order(:id).map(&:attributes)).to eq(identities)
+        end
+      end
+    end
+
+    it 'retains known upstream ordering after a compatible unknown-order projection' do
+      first = ingest(payload.merge(source_updated_at: '2025-01-02T11:00:00Z'))
+      expect(ingest(payload.merge(start_time: '2025-01-02T01:00:00Z'))).to include(outcome: 'projected')
+      game = Game.find(first[:game_id])
+      state = participant_domain_state(game)
+      expect(ingest(payload.merge(start_time: '2025-01-02T02:00:00Z', source_updated_at: '2025-01-01T11:00:00Z')))
+        .to include(outcome: 'stale', reason: 'older_source_revision', applied: false)
+      expect(participant_domain_state(game)).to eq(state)
+    end
+
+    it 'uses projection authority for later stable-ID promotion without cross-provider or stale changes' do
+      initial = ingest(payload.merge(source_updated_at: '2025-01-02T11:00:00Z'))
+      game = Game.find(initial[:game_id])
+      state = participant_domain_state(game)
+      row = payload.merge(external_game_id: 'stable', source_url: '/stable', start_time: '2025-01-02T01:00:00Z')
+      expect(ingest(row.merge(provider: 'other'))).to include(outcome: 'conflict', reason: 'provider_or_profile_conflict')
+      expect(ingest(row.merge(source_updated_at: '2025-01-01T11:00:00Z'))).to include(outcome: 'stale')
+      expect(participant_domain_state(game)).to eq(state)
+      expect(ingest(row.merge(source_updated_at: '2025-01-03T11:00:00Z'))).to include(outcome: 'scheduled', game_id: game.id)
+    end
+
+    it 'preserves stronger schedule venue evidence over a header fallback' do
+      first = ingest(payload.merge(venue: { venue_type: 'neutral', neutral: true, venue_source: 'sports_reference_team_schedule',
+                                            venue_confidence: 'confirmed', venue_name: 'Tournament Arena' }))
+      game = Game.find(first[:game_id])
+      state = participant_domain_state(game)
+      header = { venue_type: 'home', neutral: false, venue_source: 'sports_reference_box_score_header',
+                 venue_confidence: 'confirmed', venue_name: 'Other Arena' }
+      expect(ingest(payload.merge(venue: header))).to include(outcome: 'unchanged', game_id: game.id)
+      expect(participant_domain_state(game)).to eq(state)
+    end
+
+    it 'rolls back projected metadata, sides and audits with its outer date transaction' do
+      Game.transaction do
+        expect(ingest).to include(outcome: 'projected')
+        raise ActiveRecord::Rollback
+      end
+      expect([Game.count, TeamGame.count, GameObservation.count]).to eq([0, 0, 0])
+    end
+
+    it 'rolls back projection if audit persistence fails' do
+      allow(GameObservation).to receive(:create!).and_raise(ActiveRecord::ReadOnlyRecord)
+      expect { ingest }.to raise_error(ActiveRecord::ReadOnlyRecord)
+      expect([Game.count, TeamGame.count]).to eq([0, 0])
     end
   end
 

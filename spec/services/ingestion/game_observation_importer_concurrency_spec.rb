@@ -56,6 +56,33 @@ RSpec.describe Ingestion::GameObservationImporter do
     end
   end
 
+  it 'serializes a missing-ID projection with stable-ID bootstrap through the outer commit' do
+    projection = payload.merge(external_game_id: nil, source_url: '/cbb/boxscores/index.cgi?day=1')
+    threads << Thread.new do
+      ActiveRecord::Base.connection_pool.with_connection do
+        Game.transaction do
+          results << described_class.new(observation: projection, season:).call
+          first_applied << true
+          release_first.pop
+        end
+      end
+    end
+    Timeout.timeout(10) { first_applied.pop }
+    start_second_writer(payload)
+    wait_for_advisory_waiter(Timeout.timeout(10) { second_pid.pop })
+    expect(results.size).to eq(1)
+    release_first << true
+    threads.each { |thread| Timeout.timeout(10) { thread.value } }
+    reports = Array.new(2) { results.pop }
+    aggregate_failures do
+      expect(reports.pluck(:outcome)).to eq(%w[projected scheduled])
+      expect(reports.pluck(:game_id).uniq.size).to eq(1)
+      expect(Game.where(season:).count).to eq(1)
+      expect(TeamGame.where(game_id: reports.pluck(:game_id)).count).to eq(2)
+      expect(GameExternalIdentity.where(game_id: reports.pluck(:game_id)).count).to eq(1)
+    end
+  end
+
   def start_first_writer
     threads << Thread.new do
       ActiveRecord::Base.connection_pool.with_connection do
@@ -68,11 +95,11 @@ RSpec.describe Ingestion::GameObservationImporter do
     end
   end
 
-  def start_second_writer
+  def start_second_writer(values = payload.merge(provider: "second-#{token}"))
     threads << Thread.new do
       ActiveRecord::Base.connection_pool.with_connection do |connection|
         second_pid << connection.select_value('SELECT pg_backend_pid()')
-        results << described_class.new(observation: payload.merge(provider: "second-#{token}"), season:).call
+        results << described_class.new(observation: values, season:).call
       end
     end
   end

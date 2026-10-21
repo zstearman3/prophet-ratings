@@ -229,7 +229,7 @@ RSpec.describe Maintenance::DuplicateGamesRepair do
     end
 
     def stored_repair_records
-      [Game, TeamGame, Prediction, GameOdd, BookmakerOdd, BetRecommendation, GameExternalIdentity].index_with do |model|
+      [Game, TeamGame, Prediction, GameOdd, BookmakerOdd, BetRecommendation, GameExternalIdentity, GameObservation].index_with do |model|
         model.order(:id).map(&:attributes)
       end
     end
@@ -242,6 +242,56 @@ RSpec.describe Maintenance::DuplicateGamesRepair do
       end
       ActiveSupport::Notifications.subscribed(subscriber, 'sql.active_record', &)
       writes
+    end
+
+    %w[scheduled unmatched invalid].each do |outcome|
+      it "preflights observation-bearing later duplicates (#{outcome}) before any SQL writes" do
+        _survivor, safe_duplicate = duplicate_pair(1)
+        _protected_survivor, duplicate = duplicate_pair(2)
+        create(:game_odd, game: safe_duplicate, fetched_at: Time.current)
+        GameObservation.create!(game: duplicate, outcome:, accepted: outcome == 'scheduled')
+        before_records = stored_repair_records
+        writes = capture_writes do
+          expect { described_class.new(apply: true, output:).call }
+            .to raise_error(ArgumentError, /#{duplicate.id}.*review observation history/)
+        end
+        expect(writes).to be_empty
+        expect(stored_repair_records).to eq(before_records)
+      end
+    end
+
+    it 'reports protected observations on dry runs and permits survivor-only evidence' do
+      survivor, duplicate = duplicate_pair(1)
+      record = GameObservation.create!(game: duplicate, outcome: 'unmatched')
+      before_records = stored_repair_records
+      expect(capture_writes { described_class.new(output:).call }).to be_empty
+      expect(stored_repair_records).to eq(before_records)
+      record.delete # Synthetic fixture only; repair must never move immutable history.
+      record = GameObservation.create!(game: survivor, outcome: 'scheduled', accepted: true)
+      original = record.attributes
+      expect(described_class.new(apply: true, output:).call.deleted_game_ids).to eq([duplicate.id])
+      expect(record.reload.attributes).to eq(original)
+    end
+
+    it 'prioritizes identity guidance over observation protection' do
+      _survivor, duplicate = duplicate_pair(1)
+      GameObservation.create!(game: duplicate, outcome: 'invalid')
+      GameExternalIdentity.associate!(game: duplicate, provider: 'synthetic', external_id: 'protected')
+      expect { described_class.new(apply: true, output:).call }
+        .to raise_error(ArgumentError, /review identity mappings/)
+    end
+
+    it 'rechecks late observation evidence under locks before moving dependents' do
+      _survivor, duplicate = duplicate_pair(1)
+      create(:game_odd, game: duplicate, fetched_at: Time.current)
+      before_records = stored_repair_records
+      repair = described_class.new(apply: true, output:)
+      allow(repair).to receive(:validate_frozen_forecasts!).and_wrap_original do |method, group|
+        method.call(group)
+        GameObservation.create!(game: duplicate, outcome: 'unmatched')
+      end
+      expect { repair.call }.to raise_error(ArgumentError, /review observation history/)
+      expect(stored_repair_records).to eq(before_records)
     end
 
     it 'rejects all groups before any merge or dependent write when later deletion candidates have identities' do

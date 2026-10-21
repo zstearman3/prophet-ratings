@@ -108,9 +108,7 @@ module Maintenance
       normalized_url(url).present? && !daily_schedule_url?(url)
     end
 
-    def normalized_url(url)
-      url.to_s.strip
-    end
+    def normalized_url(url) = url.to_s.strip
 
     def daily_schedule_url?(url)
       normalized_url(url).include?('/cbb/boxscores/index.cgi')
@@ -186,24 +184,26 @@ module Maintenance
     end
 
     def apply_repairs(groups)
-      reject_identity_bearing_duplicates(groups)
+      reject_protected_duplicates(groups)
       groups.each { |group| apply_group(group) }
     end
 
     def apply_group(group)
       ActiveRecord::Base.transaction do
         validate_frozen_forecasts!(group)
-        reject_identity_bearing_duplicates([group])
+        reject_protected_duplicates([group])
         group.duplicates.each { |duplicate| merge_duplicate!(group.survivor, duplicate) }
       end
     end
 
-    def reject_identity_bearing_duplicates(groups)
-      protected_ids = GameExternalIdentity.where(game: groups.flat_map(&:duplicates)).distinct.order(:game_id).pluck(:game_id).join(', ')
-      return if protected_ids.blank?
+    def reject_protected_duplicates(groups)
+      [[GameExternalIdentity, 'external identities', 'identity mappings'],
+       [GameObservation, 'observations', 'observation history']].each do |model, label, guidance|
+        ids = model.where(game: groups.flat_map(&:duplicates)).distinct.order(:game_id).pluck(:game_id).join(', ')
+        next if ids.blank?
 
-      raise ArgumentError, "Duplicate repair cannot delete games with external identities: #{protected_ids}; " \
-                           'review identity mappings before applying repair'
+        raise ArgumentError, "Duplicate repair cannot delete games with #{label}: #{ids}; review #{guidance} before applying repair"
+      end
     end
 
     def validate_frozen_forecasts!(group)

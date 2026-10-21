@@ -33,7 +33,10 @@ module Ingestion
     end
 
     def source_identity
-      GameExternalIdentity.find_by(provider: data[:provider], external_id: data[:external_game_id])
+      external_id = data[:external_game_id]
+      return if external_id.blank?
+
+      GameExternalIdentity.find_by(provider: data[:provider], external_id:)
     end
 
     def lock_keys
@@ -90,7 +93,7 @@ module Ingestion
       date = Date.iso8601(data[:schedule_date])
       valid = season && season.year == data[:season_year] && (season.start_date..season.end_date).cover?(date)
       hold('unmatched', 'invalid_season_context') unless valid
-      hold('unmatched', 'missing_stable_game_identity') unless data[:external_game_id]
+      hold('unmatched', 'missing_stable_game_identity') unless data[:external_game_id] || observation.schedule_projection?
     end
 
     def resolve_participants

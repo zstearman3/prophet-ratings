@@ -28,6 +28,10 @@ module Ingestion
       data[:source_status] == 'final' && data[:source_completed] == true && data[:completion_evidence].present?
     end
 
+    def schedule_projection?
+      data[:external_game_id].blank? && data[:source_status] == 'scheduled' && data[:source_completed] == false
+    end
+
     def complete?
       SIDES.all? { |label| self.class.complete_side?(data.fetch(label)) }
     end
