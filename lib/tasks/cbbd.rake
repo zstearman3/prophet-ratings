@@ -24,3 +24,21 @@ namespace :cbbd do
     abort 'CBBD replay remains incomplete; inspect private manifest' unless result['complete']
   end
 end
+
+namespace :cbbd do
+  desc 'Compare a bounded offline replay to local identities; create a private review report'
+  task compare: :environment do
+    puts JSON.generate(Ingestion::Reconciliation::Files.compare(manifest: ENV.fetch('MANIFEST'), report: ENV.fetch('REPORT')))
+  rescue KeyError, ArgumentError, ActiveRecord::RecordNotFound, Errno::EEXIST, Errno::ENOENT => e
+    abort "CBBD comparison rejected: #{e.message}"
+  end
+
+  desc 'Apply explicit reviewed identity mappings only (no canonical game/stat refresh)'
+  task apply_mappings: :environment do
+    puts JSON.generate(Ingestion::Reconciliation::Files.apply(manifest: ENV.fetch('MANIFEST'), report: ENV.fetch('REPORT'),
+                                                              decisions: ENV.fetch('DECISIONS')))
+  rescue KeyError, ArgumentError, ActiveRecord::ActiveRecordError, TeamExternalIdentity::Conflict,
+         GameExternalIdentity::Conflict, Ingestion::Reconciliation::Apply::RetryableConflict, Errno::ENOENT => e
+    abort "CBBD mappings rejected: #{e.message}"
+  end
+end
