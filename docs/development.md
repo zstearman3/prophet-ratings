@@ -33,6 +33,7 @@ In another terminal, or from an agent:
 | `bin/dev --detach` | Explicitly keep development running in the background |
 | `bin/stop` | Stop a detached session; preserve data and images |
 | `bin/compose logs --tail=100 -f web worker` | Follow recent application/job logs |
+| `bin/backfill-ratings --help` | Chunked local ratings replay with resume and memory/progress output |
 | `bin/compose ps` | Check this project's containers |
 | `bin/console` | Rails console in the running app; accepts Rails console arguments |
 | `bin/migrate` | Apply migrations and update the tracked schema; no running app required |
@@ -58,6 +59,32 @@ containers; logs remain available after a crash. An exit code of 137 can indicat
 an out-of-memory kill; confirm `OOMKilled` in the container's Docker inspect state
 before changing memory limits. The Seasons and model-version admin pages omit
 large history associations to avoid loading entire ratings archives into memory.
+
+### Bounded local ratings replays
+
+Use `bin/backfill-ratings` for long local replays against an existing populated
+Compose database. See [the recovery workflow](offseason.md#chunked-local-ratings-replay)
+for initialization and resume rules. It launches fresh one-off web containers from
+this checkout, without building images or starting dependencies. The existing `db`
+service must be running, migrations applied, and the development image must contain
+this branch's dependencies. Set `--project` or `COMPOSE_PROJECT_NAME` to the intended
+existing stack; a worktree's default project may otherwise select a different database.
+
+It prints each date's start/commit plus chunk elapsed time and Docker memory use
+every 30 seconds. `--chunk-days` defaults to 7; smaller chunks trade extra Rails
+startup time for more frequent memory release. `--memory 1g` optionally overrides
+the inherited web container cap for this command alone. This is a ceiling, not an
+allocation or a guarantee that a single date will fit. No services or volumes are
+reconfigured. Process isolation bounds accumulation across chunks; it does not
+optimize the solver or bound memory within one date.
+
+Ctrl-C/TERM stops only the command's currently owned container. Successful
+containers are removed; failures retain the named container, exit status and
+`OOMKilled` diagnostic for `docker inspect NAME` / `docker logs NAME`. Remove that
+specific stopped container with `docker rm NAME` when finished inspecting it.
+The next invocation replans from persisted coverage, so it does not need a local
+checkpoint file. An operation already holding the ratings lock causes a visible
+failure; let it finish before retrying. This command does not stop another replay.
 
 ## First-time setup
 

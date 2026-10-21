@@ -896,7 +896,13 @@ Resume/rebuild restores each eligible team from the selected immutable `Preseaso
 on each calculation date. Reviewed seasons restore only included participants;
 excluded rows do not require captures and retain their stored non-rank values.
 Games involving excluded teams are not reconstructed from their untouched live
-ratings. Unreviewed seasons retain the existing reconstruction cohort. It validates all three outputs against the captured
+ratings. Games missing either prepared home or away participant are also skipped
+for prediction reconstruction, with a warning identifying the game ID. Their game
+and team-game records remain unchanged, and daily rating publication continues.
+This does not classify an unresolved opponent's division or create substitute
+ratings. Complete matching captured priors remain required for every included
+prepared team; missing or invalid priors still fail the replay. Unreviewed
+seasons otherwise retain the existing reconstruction cohort. It validates all three outputs against the captured
 formula/config, applies the captured preseason fields/model identity, clears
 adjusted Five Factors and core values, then restores captured core values.
 Zero/one-game teams and pre-gate dates therefore use captured priors rather than
@@ -922,12 +928,28 @@ For games on D, replay first reconstructs working ratings/baselines through D-1
 without publishing snapshots. Frozen forecast context contains those numeric
 inputs, each captured prior ID and result cutoff; snapshot source IDs/timestamps
 are null because the working inputs are reconstructed, not archived snapshots.
+For models with factor diagnostics enabled, these working snapshots also carry
+factor anchors captured once after the D-1 calculation from the included teams'
+cutoff-bounded raw aggregates. The reconstructed prediction freezes the resulting
+factor forecasts, anchors and numeric inputs in `calculation_context.factor_forecasts`.
+Factors with unavailable ratings or anchors remain omitted, including before the
+adjustment gate; no future/live snapshot supplies a substitute. This affects factor
+diagnostics only, not score or win-probability calculations. Existing saved
+reconstructions are preserved; an explicit replay creates a new revision when
+these previously missing factor inputs become available. The chunked runner's
+completion checkpoints do not automatically regenerate already completed dates.
+
 Predictions are always labeled `reconstruction`, even for a future tipoff today,
 and retain actual wall-clock generation time. Identical repeats reuse the latest
 revision. Then ratings through D are published at D. The whole day's working
 state, predictions and snapshots share a savepoint; failed days roll back while
 completed resume dates survive. Explicit rebuild retains its complete rollback
 and scoped deletion/dependency guards. No snapshots are created outside its window.
+
+For long local runs, the [chunked replay runner](offseason.md#chunked-local-ratings-replay)
+uses these same daily calculations with fresh processes and persisted snapshot
+coverage as its resume checkpoint. It does not change model math or forecast
+provenance; completed days remain committed after a later failure.
 
 Live state remains at the final processed date. Use an explicit resume date window
 to restore the desired live cutoff; preserved later snapshots never seed replay.
@@ -1273,6 +1295,53 @@ and `#generate_efficiency_diagnostics` remain available with the optional charts
 bundle. Both use the shared report calculations and accept `directory:` to avoid
 overwriting another run's files. Empty chart series produce no PNG; choose a fresh
 directory to avoid confusing earlier exports with an empty run.
+
+### Illustrative comparison script
+
+Compare separately selected forecast types when one model has legacy forecasts
+and another has historical reconstructions. After publishing and rerunning the
+candidate, run this from the checkout serving the local app:
+
+```bash
+bin/compose exec web bin/rails runner script/compare_model_predictions.rb \
+  --year 2026 \
+  --baseline v1.2-default \
+  --candidate v1.12-probability-precision \
+  --csv tmp/model-comparison-2026.csv
+```
+
+The script reads saved predictions and current finalized results; it never
+publishes/activates models, calculates ratings, generates forecasts or changes
+database records. The default baseline type is `legacy_unverified` and candidate
+type is `reconstruction`. Override them independently with `--baseline-mode` and
+`--candidate-mode`; each accepts `pregame`, `legacy_unverified`, or `reconstruction`.
+Optional `--from YYYY-MM-DD` and `--through YYYY-MM-DD` select inclusive Eastern
+game dates within the season. Omitted bounds use the stored season dates.
+Use `--help` for all options.
+
+The terminal report shows margin/total MAE, Brier score, log loss, winner accuracy
+(a fraction), and pace/efficiency/margin/total observation counts, MAE, RMSE and
+bias. Bias is predicted minus actual. Both models' metrics use only common games
+with valid aligned participants, scores, probabilities and outcomes; each model's
+coverage separately identifies invalid selected forecasts and valid games without
+a counterpart. Missing pace/efficiency inputs have their own observation counts.
+Forecast selection follows the evaluator's existing latest-revision rules.
+
+The optional CSV contains two rows per common game, with baseline/candidate roles,
+model names, forecast types, prediction IDs, team names, absolute score/margin/
+total/pace/efficiency errors, Brier score and log loss. Missing pace/efficiency
+errors are blank. CSV numbers retain their computed precision; terminal metrics
+round to six decimals. Impossible outcomes retain infinite log loss. With no
+common games, metrics are `N/A` and the CSV contains only its header. The CSV
+path is inside the container's bind-mounted checkout and is **overwritten**;
+choose an existing directory and a fresh filename to retain earlier reports.
+
+These comparisons are illustrative, including when legacy forecasts are compared
+with reconstructions. They do not establish live predictive performance or
+isolate model changes from historical source/code differences. A new candidate
+without verified pregame forecasts retains the configured volatility/home-court
+learning defaults during replay. Source corrections can change reports. The
+script does not make an incomplete legacy bundle eligible for recalculation.
 
 ### Versioned Five Factor forecasts
 
