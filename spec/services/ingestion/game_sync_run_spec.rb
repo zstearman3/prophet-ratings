@@ -249,4 +249,20 @@ RSpec.describe Ingestion::GameSyncRun do
     expect(Game.last.attributes).to eq(state)
     expect(GameSyncDate.find_by!(schedule_date: date).status).to eq('failed')
   end
+
+  it 'keeps CBBD rankings disabled after successful past coverage and a held future row within one budget' do
+    schedule_only!
+    fixture['games'].first['startDate'] = '2025-11-04T23:00:00Z'
+    TeamExternalIdentity.where(team: away).delete_all
+    operation = lambda do
+      SyncNightlyGamesJob.perform_now(season.id, provider: 'cbbd', provider_options: options,
+                                                 past_lookback_days: 2, future_end_date: date + 5)
+    end
+    expect(&operation).to raise_error(Ingestion::GameSyncProvider::Incomplete) do |error|
+      expect(error.report).to include(past_complete: true, future_complete: false, attempts: 2,
+                                      past_failed_dates: [], future_failed_dates: [date + 3])
+    end
+    expect(requests.length).to eq(2)
+    expect(enqueued_jobs).to be_empty
+  end
 end

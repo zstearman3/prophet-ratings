@@ -38,11 +38,10 @@ If no date is provided, the job defaults to yesterday in the Eastern schedule-da
 
 Flow:
 
-1. Build `Ingestion::GamesIngestionService.new(date:)`.
-2. The service scrapes games in batches of 10 URLs.
-3. Each batch is enriched with Sports Reference team schedule venue data.
-4. The enriched rows are passed to `Importer::GamesImporter.import`.
-5. Log the imported row count.
+1. Validate the Eastern schedule date and resolve an explicit `season_id:` when provided.
+2. With a season, run one scoped `Ingestion::GameSyncRun` for the date with `resume: false`, using the configured provider and atomic checkpoint/import behavior.
+3. Without a season, use `Ingestion::GamesIngestionService.new(date:)` for the unscoped Sports Reference path only. CBBD requires an explicit season.
+4. Sports Reference acquisition still scrapes batches, enriches venue data and imports canonical observations. Return the ingestion report.
 
 This job does not enqueue ratings by itself.
 
@@ -67,17 +66,37 @@ The default sync window includes:
 - Recently completed or stale dates from the current Eastern schedule date minus two days through yesterday.
 - Upcoming scheduled dates from the current Eastern schedule date through the season end, unless `future_end_date` is provided.
 
-For each date, it runs:
+The job captures the current Eastern schedule date once, builds both windows from
+that boundary and runs one `Ingestion::GameSyncRun` with `resume: false` across all
+requested dates. CBBD therefore retains one acquisition/request budget across both
+windows. The report preserves global `complete`, `failed_dates` and `retry_window`,
+and adds `schedule_date`, `past_dates`, `future_dates`, `past_complete`,
+`future_complete`, `past_failed_dates` and `future_failed_dates`. Today belongs to
+the future window even if acquisition crosses midnight.
 
-```ruby
-SyncDailyGamesJob.perform_now(date)
-```
+Sports Reference enqueues `UpdateRankingsJob.perform_later(season.id)` after a
+fully successful run, or after every date in a nonempty requested past window
+succeeds even if future refresh fails. Ratings use games through Eastern yesterday;
+future schedule coverage is reported separately. `enqueue_rankings: false` always
+opts out, and CBBD never automatically enqueues rankings. An empty past window
+cannot independently authorize rankings for a partial failed run; existing fully
+successful future-only behavior is preserved.
 
-After all dates sync, it enqueues:
-
-```ruby
-UpdateRankingsJob.perform_later(season.id)
-```
+A future-only failure still leaves the overall operation incomplete and raises a
+structured `GameSyncProvider::Incomplete`. It receives no automatic ActiveJob
+retry, preventing a renewed run from duplicating rankings already queued for the
+successful past window. Only rankings released from a partially successful run
+carry `sync_schedule_date:` authorization. At the actual calculation boundary,
+`UpdateRankingsJob` reads the execution Eastern date once, compares it with that
+guard and derives yesterday from the same read. If midnight or a queue delay has
+made the guard stale, it logs a skip and returns without rating publication or
+prediction enqueue. It does not pin a historical cutoff or change ordinary
+unguarded/all-complete/manual callers. Inspect and explicitly resume unfinished
+future dates, then start a fresh authorized sync instead of retrying the stale
+guarded job.
+Any past failure blocks rankings and preserves the Sports Reference
+`IncompleteSync` retry policy; CBBD incomplete operations never renew their budget
+automatically.
 
 This is the most relevant job for ongoing nightly ingestion during a season.
 
@@ -1186,7 +1205,9 @@ defaults to `sports_reference`; Ruby callers can supply `provider:` and
 `provider_options:`. There is no fallback or provider blending. Historical and
 future windows use strict inclusive `YYYY-MM-DD` Eastern schedule dates inside the
 explicit season. A daily CBBD call requires `season_id:`. Nightly passes its target
-season through the same atomic date importer, and incomplete dates prevent rankings.
+season through the same atomic date importer. Sports Reference past failures prevent
+rankings; successful nonempty past coverage can release rankings while future
+coverage remains explicitly incomplete. CBBD never automatically enqueues rankings.
 
 Apply the additive `ScopeGameSyncDatesToProvider` migration before using these
 entry points. Completion now identifies season/date/provider/contract/semantic
