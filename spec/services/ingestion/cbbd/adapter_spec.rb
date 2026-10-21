@@ -19,6 +19,21 @@ RSpec.describe Ingestion::Cbbd::Adapter do
     described_class.new(**options).call
   end
 
+  it 'acquires and replays only game endpoints within the original two-request budget' do
+    requests = []
+    recording_transport = lambda do |uri, _key|
+      requests << uri.path
+      payload = { '/games' => fixture['games'], '/games/teams' => fixture['boxes'] }.fetch(uri.path)
+      { status: 200, headers: {}, body: payload.to_json }
+    end
+    result = described_class.new(**options, transport: recording_transport, max_requests: 2).call
+    expect(result['acquisition']).to include('complete' => true, 'attempts' => 2)
+    expect(result['acquisition']['partitions'].pluck('endpoint')).to eq(%w[/games /games/teams])
+    expect(requests).to eq(%w[/games /games/teams])
+    allow(Ingestion::Cbbd::Client).to receive(:new).and_raise('Replay must remain offline')
+    expect(described_class.replay(manifest: result['manifest'])).to eq(result)
+  end
+
   it 'retains an unmapped valid final with official totals' do
     observation = run_adapter.fetch('observations').sole
     expect(observation).to include('format' => 'ingestion-v1', 'semantic_profile' => 'official-team-totals-v1',

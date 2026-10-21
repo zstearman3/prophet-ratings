@@ -1,3 +1,11 @@
+<% if proposal['provider'] == 'cbbd' %>
+  <% pending = SeasonSchoolImport.pending(@object) %>
+  <% if pending.any? %>
+    <h3>CBBD schools needing manual setup</h3>
+    <p>CBBD directory evidence does not supply required Team metadata. In RailsAdmin, create or complete the Team with a user-supplied valid URL and verified metadata, add a TeamAlias and target-year TeamSeason, and associate the exact CBBD ID using TeamExternalIdentity (provider cbbd). Names and aliases never establish identity. Fetch again after setup.</p>
+    <ul><% pending.each do |source| %><li><%= source.fetch('team_name') %> — CBBD ID <%= source.fetch('team_external_id') %></li><% end %></ul>
+  <% end %>
+<% else %>
 <% if @school_import %>
   <h3><%= @school_import['existing'] ? 'Finish existing school setup' : 'Review school defaults' %></h3>
   <% if @school_import['url'] %><p>Source school: <%= link_to @school_import['source_name'], "https://www.sports-reference.com#{@school_import['url']}", target: '_blank', rel: 'noopener' %></p><% end %>
@@ -27,4 +35,5 @@
       <%= button_tag 'Import / finish setup', name: nil, class: 'btn btn-secondary' %>
     <% end %>
   <% end %>
+<% end %>
 <% end %>

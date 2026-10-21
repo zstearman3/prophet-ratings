@@ -23,7 +23,7 @@ module Ingestion
       private
 
       def selected_rows(payloads)
-        rows = Client::ENDPOINTS.index_with { [] }
+        rows = BoundedRetriever::ID_FIELDS.keys.index_with { [] }
         ledger.fetch('selected_captures').each { |id| append_capture(rows, id, payloads.fetch(id)) }
         rows
       end

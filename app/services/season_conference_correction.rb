@@ -39,7 +39,12 @@ class SeasonConferenceCorrection
   attr_reader :season, :submission
 
   def locked(&)
-    Season.with_ratings_lock { season.with_lock(&) }
+    Season.with_ratings_lock do
+      Season.transaction do
+        SeasonMembershipProposal.lock_identities
+        season.with_lock(&)
+      end
+    end
   end
 
   def publish
@@ -69,7 +74,8 @@ class SeasonConferenceCorrection
     record = {
       'reviewed_by' => submission.fetch('reviewed_by'), 'reviewed_at' => Time.current.iso8601,
       'scope' => 'conference_only', 'target_year' => season.year, 'evidence' => submission.fetch('evidence').strip,
-      'source' => proposal.slice('source_url', 'source_year', 'target_year', 'captured_at', 'source_rows', 'issues'),
+      'source' => proposal.slice('provider', 'version', 'acquisition', 'source_url', 'source_year', 'target_year',
+                                 'captured_at', 'source_rows', 'issues'),
       'decisions' => decisions, 'memberships_before' => before, 'memberships_after' => self.class.membership_state(decisions),
       'target_year_confirmed' => submission['confirm_target_year'] == '1'
     }
