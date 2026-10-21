@@ -35,6 +35,29 @@ RSpec.describe SeasonConferenceAlignment do
     Rake::Task[task].invoke
   end
 
+  %w[season:align_conferences season:bootstrap season:activate].each do |task|
+    it "rejects #{task} before Sports Reference HTTP when CBBD is selected" do
+      create(:season, year: 2027)
+      ENV['YEAR'] = '2027'
+      ENV['GAME_SYNC_PROVIDER'] = 'cbbd'
+      expect do
+        expect { invoke(task) }.to raise_error(SystemExit)
+      end.to output(/CBBD requires season:prepare and reviewed memberships/).to_stderr
+      expect(Scraper::ConferenceStandingsScraper).not_to have_received(:new)
+      expect(TeamConference.count).to eq(0)
+    end
+  end
+
+  it 'keeps CBBD season preparation local and permits explicit manual bootstrap' do
+    ENV['YEAR'] = '2027'
+    ENV['GAME_SYNC_PROVIDER'] = 'cbbd'
+    expect { invoke('season:prepare') }.to output(/Season prepared/).to_stdout
+    ENV['ALIGN_CONFERENCES'] = 'false'
+    expect { invoke('season:bootstrap') }.to output(/Season bootstrap complete/).to_stdout
+    expect(Scraper::ConferenceStandingsScraper).not_to have_received(:new)
+    expect(TeamConference.count).to eq(0)
+  end
+
   it 'defaults to the greatest stored year rather than current season or insertion order' do
     create(:season, year: 2026)
     create(:season, :current, year: 2024)

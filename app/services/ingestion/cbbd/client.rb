@@ -7,7 +7,8 @@ module Ingestion
   module Cbbd
     # Bounded read-only requests; the same counter covers endpoints and retries.
     class Client
-      ENDPOINTS = %w[/games /games/teams].freeze
+      # Transport allowlist; game acquisition and replay own their narrower endpoint set.
+      ENDPOINTS = %w[/games /games/teams /teams/directory].freeze
       TRANSIENT = %w[timeout transport quota].freeze
 
       def initialize(store:, api_key:, **options)
@@ -95,7 +96,7 @@ module Ingestion
       end
 
       def retain(response, filters)
-        parsed = Response.new(response, @options.fetch(:api_key))
+        parsed = Response.new(response, @options.fetch(:api_key), endpoint: filters.fetch('endpoint'))
         reference = @store.capture(body: parsed.body, metadata: parsed.metadata.merge('request' => filters))
         captures << reference
         parsed.outcome.merge('capture' => reference)

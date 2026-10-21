@@ -18,7 +18,7 @@ module Ingestion
       end
 
       def call
-        rows = Client::ENDPOINTS.index_with { |endpoint| endpoint_rows(endpoint) }
+        rows = ID_FIELDS.keys.index_with { |endpoint| endpoint_rows(endpoint) }
         ledger.merge!(attempt_summary)
         rows
       end

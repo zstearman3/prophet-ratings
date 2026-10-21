@@ -28,7 +28,9 @@ module RailsAdmin
                 end
               rescue ArgumentError, ActiveRecord::ActiveRecordError, Season::OperationInProgress,
                      Scraper::ConferenceStandingsScraper::Error, SeasonConferenceAlignment::Error => error
-                @school_import = params[:school_import]&.to_unsafe_h if params[:operation] == 'save_school'
+                if params[:operation] == 'save_school' && @object.membership_proposal['provider'] != 'cbbd'
+                  @school_import = params[:school_import]&.to_unsafe_h
+                end
                 @review_error = error.message
                 @object.reload
                 render :review_memberships, status: :unprocessable_content

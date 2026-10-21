@@ -343,3 +343,54 @@ always revisits its explicit future bounds without deleting absent games. An
 incomplete CBBD run requires deliberate operator resumption and receives no
 automatic ActiveJob retry/new budget. Production cadence/defaults remain
 unactivated and require operational review.
+
+### CBBD reviewed season memberships
+
+With `GAME_SYNC_PROVIDER=cbbd`, **Review memberships** fetches only
+`/teams/directory?season=YEAR`. YEAR is the season's ending year. The previous-year
+button explicitly requests YEAR−1 and marks the proposal unverified for the target;
+there is no automatic fallback to older seasons or an unfiltered current roster.
+Use the same explicit CBBD API key, private capture directory, maximum requests and
+retry settings documented in [data ingestion](data-ingestion.md#provider-aware-sync-and-completion-scope).
+Fetching requires these settings; viewing or mapping a retained proposal needs no
+API credentials and performs no HTTP requests. Failed acquisition preserves the
+previous proposal. Raw sanitized response captures remain private immutable files;
+the proposal retains their hashes and request provenance. Keep those files with
+the operator's evidence, outside the public web root and version control.
+
+CBBD matches only stored `TeamExternalIdentity` and
+`ConferenceExternalIdentity` records with provider `cbbd` and the exact opaque
+source ID (`id`, never `sourceId`). Names, abbreviations, aliases and Sports
+Reference slugs are display metadata. Map unmatched conference IDs explicitly on
+the review screen; mappings cannot be reparented, and do not modify canonical
+conference IDs/slugs or Sports Reference aliases. Saving mappings rebuilds the
+retained source without fetching. Changed local identities require a fresh fetch.
+
+For missing/unprepared schools, manually create or complete the Team in RailsAdmin
+using an explicitly supplied valid URL and verified required metadata, add a
+TeamAlias and target-year TeamSeason, and associate the exact CBBD school ID via
+TeamExternalIdentity. Then fetch again. The directory does not provide all required
+school/venue metadata; the Sports Reference school-import buttons are unavailable
+for CBBD. A TeamAlias helps local coverage but never establishes CBBD identity.
+
+A nonempty directory and matching echoed season do **not** prove complete D1
+population coverage or announced future realignment: open-ended upstream membership
+ranges can extend into future years. Independently verify the complete target-year
+roster, arrivals/departures and realignment, then check the explicit source coverage
+confirmation before full approval. This attestation is retained in the approved
+participation review. Missing source schools stay unresolved; absence or null
+conference information never establishes departure or independence. Unknown source
+schools block full approval until manually resolved. Previous-year drafts require
+the additional target-year confirmation. Selected conference-only corrections do
+not certify the full roster or replace its approved participation review.
+
+CBBD full approval and selected corrections change **only the target year** and
+preserve surrounding finite/open membership ranges. Prepare missing YEAR−1/YEAR+1
+boundary seasons when instructed, then fetch again. Full approval still protects
+current seasons and stored outputs; corrections preserve participation, dates,
+games, ratings and predictions. No model calculation is triggered.
+
+For CBBD use `season:prepare` and the review screen. Legacy `season:align_conferences`,
+automatic bootstrap alignment and automatic activation alignment reject CBBD before
+Sports Reference HTTP. Explicit `ALIGN_CONFERENCES=false` preserves the existing
+manual bootstrap/activation path after review; CSV/manual reconciliation is separate.

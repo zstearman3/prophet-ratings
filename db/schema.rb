@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_21_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_21_140000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -94,6 +94,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_130000) do
     t.text "discovery_error"
     t.index ["year"], name: "index_coaching_reviews_on_year", unique: true
     t.check_constraint "year >= 1 AND year <= 9999", name: "coaching_review_year"
+  end
+
+  create_table "conference_external_identities", force: :cascade do |t|
+    t.bigint "conference_id", null: false
+    t.string "provider", null: false
+    t.string "external_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["conference_id"], name: "index_conference_external_identities_on_conference_id"
+    t.index ["provider", "external_id"], name: "idx_on_provider_external_id_4998627b48", unique: true
   end
 
   create_table "conferences", force: :cascade do |t|
@@ -706,6 +716,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_130000) do
   add_foreign_key "coaching_changes", "teams", column: "discovery_previous_team_id"
   add_foreign_key "coaching_changes", "teams", column: "discovery_team_id"
   add_foreign_key "coaching_changes", "teams", column: "previous_team_id"
+  add_foreign_key "conference_external_identities", "conferences"
   add_foreign_key "game_external_identities", "games"
   add_foreign_key "game_observations", "games"
   add_foreign_key "game_odds", "games"
