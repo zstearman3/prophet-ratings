@@ -186,12 +186,24 @@ module Maintenance
     end
 
     def apply_repairs(groups)
-      groups.each do |group|
-        ActiveRecord::Base.transaction do
-          validate_frozen_forecasts!(group)
-          group.duplicates.each { |duplicate| merge_duplicate!(group.survivor, duplicate) }
-        end
+      reject_identity_bearing_duplicates(groups)
+      groups.each { |group| apply_group(group) }
+    end
+
+    def apply_group(group)
+      ActiveRecord::Base.transaction do
+        validate_frozen_forecasts!(group)
+        reject_identity_bearing_duplicates([group])
+        group.duplicates.each { |duplicate| merge_duplicate!(group.survivor, duplicate) }
       end
+    end
+
+    def reject_identity_bearing_duplicates(groups)
+      protected_ids = GameExternalIdentity.where(game: groups.flat_map(&:duplicates)).distinct.order(:game_id).pluck(:game_id).join(', ')
+      return if protected_ids.blank?
+
+      raise ArgumentError, "Duplicate repair cannot delete games with external identities: #{protected_ids}; " \
+                           'review identity mappings before applying repair'
     end
 
     def validate_frozen_forecasts!(group)
@@ -295,11 +307,8 @@ module Maintenance
     end
 
     def matching_prediction?(survivor, prediction)
-      Prediction.exists?(
-        game: survivor,
-        home_team_snapshot_id: prediction.home_team_snapshot_id,
-        away_team_snapshot_id: prediction.away_team_snapshot_id
-      )
+      Prediction.exists?(game: survivor, home_team_snapshot_id: prediction.home_team_snapshot_id,
+                         away_team_snapshot_id: prediction.away_team_snapshot_id)
     end
 
     def reassign_game_odd!(survivor, duplicate)
@@ -330,11 +339,8 @@ module Maintenance
     end
 
     def matching_bookmaker_odd?(survivor, bookmaker_odd)
-      survivor.bookmaker_odds.find_by(
-        bookmaker: bookmaker_odd.bookmaker,
-        market: bookmaker_odd.market,
-        team_name: bookmaker_odd.team_name
-      )
+      survivor.bookmaker_odds.find_by(bookmaker: bookmaker_odd.bookmaker, market: bookmaker_odd.market,
+                                      team_name: bookmaker_odd.team_name)
     end
 
     def reassign_bet_recommendations!(survivor, duplicate)
@@ -351,11 +357,8 @@ module Maintenance
 
     def matching_bet_recommendation?(recommendation)
       BetRecommendation
-        .where(
-          prediction_id: recommendation.prediction_id,
-          game_odd_id: recommendation.game_odd_id,
-          bet_type: recommendation.bet_type
-        )
+        .where(prediction_id: recommendation.prediction_id, game_odd_id: recommendation.game_odd_id,
+               bet_type: recommendation.bet_type)
         .where.not(id: recommendation.id)
         .exists?
     end

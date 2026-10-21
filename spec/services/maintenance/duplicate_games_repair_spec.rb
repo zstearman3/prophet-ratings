@@ -220,4 +220,97 @@ RSpec.describe Maintenance::DuplicateGamesRepair do
     final = create_game(attrs.merge(status: :final))
     expect(described_class.new(output:).call.groups.first.survivor).to eq(final)
   end
+
+  describe 'external identity safeguards' do
+    def duplicate_pair(day)
+      attrs = { season:, start_time: Game.schedule_time_for(Date.new(2025, 1, day)),
+                home_team_name: home_team.school, away_team_name: away_team.school, url: "/duplicate-#{day}.html" }
+      [create_game(attrs.merge(status: :final)), create_game(attrs.merge(status: :scheduled))]
+    end
+
+    def stored_repair_records
+      [Game, TeamGame, Prediction, GameOdd, BookmakerOdd, BetRecommendation, GameExternalIdentity].index_with do |model|
+        model.order(:id).map(&:attributes)
+      end
+    end
+
+    def capture_writes(&)
+      writes = []
+      subscriber = lambda do |*args|
+        sql = args.last[:sql]
+        writes << sql if sql.match?(/\A\s*(?:INSERT|UPDATE|DELETE)\b/i)
+      end
+      ActiveSupport::Notifications.subscribed(subscriber, 'sql.active_record', &)
+      writes
+    end
+
+    it 'rejects all groups before any merge or dependent write when later deletion candidates have identities' do
+      _safe_survivor, safe_duplicate = duplicate_pair(1)
+      _active_survivor, active_duplicate = duplicate_pair(2)
+      _retired_survivor, retired_duplicate = duplicate_pair(3)
+      create(:team_game, game: safe_duplicate, team: home_team, team_season: home_team_season, home: true)
+      [safe_duplicate, active_duplicate, retired_duplicate].each do |game|
+        create(:game_odd, game:, fetched_at: Time.current)
+      end
+      GameExternalIdentity.associate!(game: active_duplicate, provider: 'provider_a', external_id: 'active')
+      GameExternalIdentity.create!(game: retired_duplicate, provider: 'provider_a', external_id: 'retired', superseded_at: 1.day.ago)
+      before_records = stored_repair_records
+      repair = described_class.new(scope: Game.order(:id), apply: true, output:)
+      allow(repair).to receive(:merge_duplicate!).and_call_original
+      blocked_ids = [active_duplicate.id, retired_duplicate.id].sort.join(', ')
+
+      writes = capture_writes do
+        expect { repair.call }.to raise_error(ArgumentError, /#{blocked_ids}.*review identity mappings/)
+      end
+
+      expect(repair).not_to have_received(:merge_duplicate!)
+      expect(writes).to be_empty
+      expect(stored_repair_records).to eq(before_records)
+    end
+
+    it 'keeps dry runs read-only and reports an identity-bearing deletion candidate' do
+      _survivor, duplicate = duplicate_pair(1)
+      GameExternalIdentity.associate!(game: duplicate, provider: 'provider_a', external_id: 'active')
+      before_records = stored_repair_records
+      result = nil
+
+      writes = capture_writes { result = described_class.new(output:).call }
+
+      expect(result.groups.first.duplicates).to eq([duplicate])
+      expect(result.deleted_game_ids).to be_empty
+      expect(output.string).to include('DRY RUN', "duplicates=#{duplicate.id}")
+      expect(writes).to be_empty
+      expect(stored_repair_records).to eq(before_records)
+    end
+
+    it 'allows a survivor-only identity and preserves it while merging safe dependents' do
+      survivor, duplicate = duplicate_pair(1)
+      identity = GameExternalIdentity.associate!(game: survivor, provider: 'provider_a', external_id: 'survivor')
+      original_identity = identity.attributes
+      odd = create(:game_odd, game: duplicate, fetched_at: Time.current)
+
+      result = described_class.new(apply: true, output:).call
+
+      expect(result.deleted_game_ids).to eq([duplicate.id])
+      expect(odd.reload.game).to eq(survivor)
+      expect(identity.reload.attributes).to eq(original_identity)
+      expect(GameExternalIdentity.count).to eq(1)
+    end
+
+    it 'rechecks deletion candidates after group locks before moving any dependents' do
+      _survivor, duplicate = duplicate_pair(1)
+      create(:game_odd, game: duplicate, fetched_at: Time.current)
+      before_records = stored_repair_records
+      repair = described_class.new(apply: true, output:)
+      allow(repair).to receive(:merge_duplicate!).and_call_original
+      allow(repair).to receive(:validate_frozen_forecasts!).and_wrap_original do |method, group|
+        method.call(group)
+        GameExternalIdentity.associate!(game: duplicate, provider: 'provider_a', external_id: 'late')
+      end
+
+      expect { repair.call }.to raise_error(ArgumentError, /#{duplicate.id}.*review identity mappings/)
+      expect(repair).not_to have_received(:merge_duplicate!)
+      expect(stored_repair_records).to eq(before_records)
+    end
+  end
 end

@@ -413,9 +413,15 @@ importer. Reviewed mapping and bulk reconciliation belong to ticket 05;
 
 Identity-bearing teams/games cannot be destroyed: association restrictions run
 before destructive dependent callbacks, and foreign keys also protect database
-ownership. In particular, duplicate-game repair cannot delete an identity-bearing
-duplicate until its mappings have been explicitly reconciled through reviewed
-work. It fails instead of silently deleting or transferring identity history.
+ownership. Duplicate-game repair checks all planned deletion candidates for any
+external identities, including superseded ones, before applying any group. It
+raises `ArgumentError` with the sorted affected game IDs and an instruction to
+review identity mappings before repair. Reconcile those mappings through reviewed
+work first; repair does not transfer or delete identity history. Dry runs remain
+read-only, and an identity on the chosen survivor alone does not prevent repair.
+Each group is checked again after its game locks and frozen-forecast validation,
+before dependent moves. A mapping added after preflight can therefore reject a
+later group; groups already committed remain applied in that concurrent case.
 
 ## Venue classification
 
@@ -726,6 +732,15 @@ You can also enqueue directly:
 ```ruby
 RepairDuplicateGamesJob.perform_later(season_id: season.id, apply: true)
 ```
+
+Before any group is applied, deletion candidates with external identities
+(including superseded mappings) reject the run with an `ArgumentError` listing
+the affected game IDs. Review identity mappings before retrying; repair neither
+transfers nor deletes mappings. Identity-bearing survivors are allowed, and dry
+runs still report planned groups without writes. After locking each group and
+validating frozen forecasts, apply rechecks deletion candidates before merging.
+A concurrent mapping added after preflight can reject a later group without
+undoing earlier committed groups.
 
 The apply mode reassigns safe dependent records such as `TeamGame`, `Prediction`, `GameOdd`, `BookmakerOdd`, and `BetRecommendation` where unique constraints allow it, deletes conflicting duplicate dependents, and then deletes duplicate `Game` records. You can restrict the scope with `YEAR=<year>` or `SEASON_ID=<id>`.
 
