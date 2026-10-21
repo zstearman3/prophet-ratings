@@ -15,6 +15,13 @@ RSpec.describe Ingestion::HistoricalSyncDay do
   end
 
   before do
+    sides = %i[home_team away_team]
+    rows.each do |row|
+      sides.each do |key|
+        team = create(:team, school: row[key])
+        create(:team_season, team:, season:)
+      end
+    end
     allow(day).to receive(:sleep)
     allow(Scraper::GamesScraper).to receive(:new).with(date).and_return(scraper)
     allow(Ingestion::GameRowEnricher).to receive(:new).and_return(enricher)
@@ -45,5 +52,22 @@ RSpec.describe Ingestion::HistoricalSyncDay do
     allow(scraper).to receive(:game_count).and_return(0)
     expect(day.call).to include(status: 'completed', imported_rows: 0, attempts: 7)
     expect(GameSyncDate.first.completed_at).to be_present
+  end
+
+  it 'rolls back accepted rows for a rejected date but retains the rejected audit after rollback' do
+    allow(scraper).to receive_messages(game_count: 2, to_json_in_batches: [rows.first, rows.last.merge(home_team: '')])
+    result = day.call
+    expect(result).to include(status: 'failed', attempts: 6, error: /Rejected source games/)
+    aggregate_failures do
+      expect(season.games.count).to eq(0)
+      expect(TeamGame.count).to eq(0)
+      expect(GameExternalIdentity.count).to eq(0)
+      expect(GameObservation.where(accepted: true)).to be_empty
+      expect(GameObservation.count).to eq(6)
+      expect(GameObservation.distinct.pluck(:outcome)).to eq(['invalid'])
+      expect(GameObservation.last.raw_payload['home_team']).to eq('')
+      expect(GameObservation.last.game_id).to be_nil
+      expect(GameSyncDate.first).to have_attributes(status: 'failed', completed_at: nil)
+    end
   end
 end

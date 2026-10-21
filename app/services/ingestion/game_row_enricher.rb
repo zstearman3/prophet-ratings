@@ -34,6 +34,7 @@ module Ingestion
         venue_confidence: 'confirmed',
         venue_name: schedule_row[:venue_name],
         date: schedule_row[:start_time],
+        time_precision: schedule_row[:time_precision] || 'date',
         neutral: venue_type == 'neutral'
       }.compact
     end

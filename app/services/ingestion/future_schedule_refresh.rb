@@ -41,10 +41,20 @@ module Ingestion
 
     def refresh_day(date, attempt: 0)
       GamesIngestionService.with_date_lock(date) do
-        Game.transaction { GamesIngestionService.new(date:, season:).call }.merge(date:)
+        refresh_transaction(date).merge(date:)
       end
     rescue StandardError => error
+      HistoricalSyncDay.retain_rejection(error)
       retry_or_report(date, error, attempt)
+    end
+
+    def refresh_transaction(date)
+      Game.transaction(requires_new: true) do
+        result = GamesIngestionService.new(date:, season:).call
+        HistoricalSyncDay::ReconciliationError.validate(result)
+
+        result
+      end
     end
 
     def retry_or_report(date, error, attempt)

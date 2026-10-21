@@ -60,6 +60,14 @@ RSpec.describe Ingestion::FutureScheduleRefresh do
     expect(refresh.call[:absent_ids]).to be_empty
   end
 
+  it 'fails dates with canonical conflicts rather than counting rejected rows as successful refreshes' do
+    allow(service).to receive(:call).and_return(imported_rows: 0, games: [{ outcome: 'conflict', reason: 'unknown_source_freshness' }])
+    result = refresh.call
+    expect(result[:failed_dates]).to eq((today..(today + 2.days)).to_a)
+    expect(result[:days].first[:error]).to include('Rejected source games', 'unknown_source_freshness')
+    expect(result[:absent_ids]).to be_empty
+  end
+
   it 'rejects missing, reversed, historical and out-of-season windows before ingestion' do
     [[nil, today], [today + 1.day, today], [today - 1.day, today], [today, season.end_date + 1.day]].each do |first, last|
       expect { described_class.new(season:, start_date: first, end_date: last) }.to raise_error(ArgumentError)

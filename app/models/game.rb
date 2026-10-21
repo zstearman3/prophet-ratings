@@ -82,6 +82,7 @@ class Game < ApplicationRecord
   end
 
   belongs_to :season
+  has_many :game_observations, dependent: :restrict_with_exception
   has_many :game_external_identities, dependent: :restrict_with_exception
   has_one :home_team_game, -> { where(home: true) }, inverse_of: :game, class_name: 'TeamGame', dependent: :destroy
   has_one :away_team_game, -> { where(home: false) }, inverse_of: :game, class_name: 'TeamGame', dependent: :destroy

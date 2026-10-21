@@ -74,6 +74,9 @@ RSpec.describe Importer::GamesImporter do
 
   let(:completed_row) do
     row.merge(
+      source_completed: true,
+      source_completion_evidence: 'boxscore',
+      source_updated_at: '2025-01-02T12:00:00Z',
       home_team_stats: home_team_stats,
       away_team_stats: away_team_stats
     )
@@ -103,6 +106,7 @@ RSpec.describe Importer::GamesImporter do
   it 'persists explicit venue fields from enriched game rows' do
     enriched_row = row.merge(
       date: Time.zone.local(2025, 1, 1, 18, 30),
+      time_precision: 'instant',
       venue_type: 'neutral',
       venue_source: 'sports_reference_team_schedule',
       venue_confidence: 'confirmed',
@@ -157,6 +161,53 @@ RSpec.describe Importer::GamesImporter do
       venue_name: 'Neutral Arena',
       neutral: true
     )
+  end
+
+  ['Home Arena', 'Unrecognized Pavilion'].each do |header|
+    it "preserves confirmed neutral schedule venue when finalizing with header #{header}" do
+      home_team.update!(home_venue: 'Home Arena')
+      initial = row.merge(venue_type: 'neutral', venue_source: 'sports_reference_team_schedule',
+                          venue_confidence: 'confirmed', venue_name: 'Neutral Arena', neutral: true)
+      described_class.import([initial])
+      game = Game.last
+      venue = game.attributes.slice('venue_type', 'venue_source', 'venue_confidence', 'venue_name', 'neutral')
+
+      described_class.import([completed_row.merge(box_score_location: header)])
+
+      expect(game.reload).to be_final
+      expect(game.attributes.slice(*venue.keys)).to eq(venue)
+    end
+  end
+
+  it 'still permits an explicit enriched venue update over stored source evidence' do
+    initial = row.merge(venue_type: 'neutral', venue_source: 'sports_reference_team_schedule',
+                        venue_confidence: 'confirmed', venue_name: 'Previous Arena', neutral: true)
+    described_class.import([initial])
+    game = Game.last
+    enriched = completed_row.merge(venue_type: 'home', venue_source: 'sports_reference_team_schedule',
+                                   venue_confidence: 'confirmed', venue_name: 'Reviewed Home Arena', neutral: false,
+                                   box_score_location: 'Lower Priority Header')
+
+    described_class.import([enriched])
+
+    expect(game.reload).to have_attributes(status: 'final', venue_type: 'home', venue_source: 'sports_reference_team_schedule',
+                                           venue_confidence: 'confirmed', venue_name: 'Reviewed Home Arena', neutral: false)
+  end
+
+  it 'preserves confirmed venue on an ordered repeated final without schedule enrichment' do
+    home_team.update!(home_venue: 'Home Arena')
+    initial = completed_row.merge(venue_type: 'neutral', venue_source: 'sports_reference_team_schedule',
+                                  venue_confidence: 'confirmed', venue_name: 'Neutral Arena', neutral: true)
+    described_class.import([initial])
+    game = Game.last
+    original = game.attributes
+    accepted = GameObservation.where(game:, accepted: true).map(&:attributes)
+
+    result = described_class.import([completed_row.merge(box_score_location: 'Home Arena', source_updated_at: '2025-01-03T12:00:00Z')])
+
+    expect(result.first).to include(outcome: 'unchanged', accepted: false)
+    expect(game.reload.attributes).to eq(original)
+    expect(GameObservation.where(game:, accepted: true).map(&:attributes)).to eq(accepted)
   end
 
   it 'preserves manual venue fields when a complete game is re-imported' do
@@ -271,13 +322,15 @@ RSpec.describe Importer::GamesImporter do
 
     expect do
       described_class.import([row.merge(url: daily_schedule_url), other_row.merge(url: daily_schedule_url)])
-    end.to change(Game, :count).by(2)
+    end.not_to change(Game, :count)
+    expect(GameObservation.last(2).map(&:reason)).to eq(%w[missing_stable_game_identity missing_stable_game_identity])
   end
 
   it 'matches existing games by Eastern schedule date when enriched start time crosses UTC midnight' do
     existing_game = create(
       :game,
       season:,
+      status: :scheduled,
       start_time: Time.zone.local(2025, 1, 1, 23, 0),
       home_team_name: home_team.school,
       away_team_name: away_team.school,
@@ -286,6 +339,7 @@ RSpec.describe Importer::GamesImporter do
 
     late_row = row.merge(
       date: ActiveSupport::TimeZone['Eastern Time (US & Canada)'].parse('2025-01-01 9:00pm'),
+      time_precision: 'instant',
       url: 'http://example.com/enriched-game'
     )
 
@@ -300,6 +354,7 @@ RSpec.describe Importer::GamesImporter do
     existing_game = create(
       :game,
       season:,
+      status: :scheduled,
       start_time: Time.zone.local(2025, 1, 1),
       home_team_name: home_team.school,
       away_team_name: away_team.school,
@@ -308,6 +363,7 @@ RSpec.describe Importer::GamesImporter do
 
     late_row = row.merge(
       date: ActiveSupport::TimeZone['Eastern Time (US & Canada)'].parse('2025-01-01 9:00pm'),
+      time_precision: 'instant',
       url: box_score_url
     )
 
@@ -322,6 +378,7 @@ RSpec.describe Importer::GamesImporter do
     existing_game = create(
       :game,
       season:,
+      status: :scheduled,
       start_time: Time.zone.local(2025, 1, 1),
       home_team_name: away_team.school,
       away_team_name: home_team.school,
@@ -342,19 +399,16 @@ RSpec.describe Importer::GamesImporter do
     expect do
       described_class.import([neutral_row])
     end.not_to change(Game, :count)
-    expect(existing_game.reload).to have_attributes(
-      home_team_name: home_team.school,
-      away_team_name: away_team.school,
-      venue_name: 'Neutral Arena'
-    )
-    expect(existing_game.home_team_game.team).to eq(home_team)
-    expect(existing_game.away_team_game.team).to eq(away_team)
+    expect(GameObservation.last).to have_attributes(outcome: 'conflict', reason: 'participant_or_orientation_conflict')
+    expect(existing_game.reload.home_team_game.team).to eq(away_team)
+    expect(existing_game.away_team_game.team).to eq(home_team)
   end
 
   it 'matches legacy UTC-date games by teams and raw stored date' do
     existing_game = create(
       :game,
       season:,
+      status: :scheduled,
       start_time: Time.zone.local(2025, 1, 1),
       home_team_name: home_team.school,
       away_team_name: away_team.school,
@@ -363,6 +417,7 @@ RSpec.describe Importer::GamesImporter do
 
     late_row = row.merge(
       date: ActiveSupport::TimeZone['Eastern Time (US & Canada)'].parse('2025-01-01 9:00pm'),
+      time_precision: 'instant',
       url: '/cbb/boxscores/2025-01-01-00-home.html'
     )
 
@@ -409,10 +464,8 @@ RSpec.describe Importer::GamesImporter do
 
     expect { described_class.import([invalid_completed_row]) }.not_to raise_error
 
-    game = Game.last
-    expect(game).to be_scheduled
-    expect(game.minutes).to be_nil
-    expect(game.pace).to be_nil
+    expect(Game.last).to be_nil
+    expect(GameObservation.last).to have_attributes(outcome: 'invalid')
   end
 
   it 'keeps new malformed complete boxes scheduled and logs the field reason' do
@@ -422,9 +475,9 @@ RSpec.describe Importer::GamesImporter do
 
     described_class.import([malformed])
 
-    expect(Game.last).to have_attributes(status: 'scheduled', minutes: nil, possessions: nil)
-    expect(Game.last.home_team_game.offensive_rating).to be_nil
-    expect(Rails.logger).to have_received(:warn).with(/Skipping finalization.*home.*score/)
+    expect(Game.last).to be_nil
+    expect(TeamGame.count).to eq(0)
+    expect(GameObservation.last).to have_attributes(outcome: 'invalid', reason: /home.*score/)
   end
 
   it 'preserves a final game and both boxes after an invalid complete correction inside an outer transaction' do
@@ -475,6 +528,7 @@ RSpec.describe Importer::GamesImporter do
         original_sides = TeamGame.where(game:).order(:id).map(&:attributes)
         original_prediction = prediction.reload.attributes
         correction = completed_row.deep_dup
+        correction[:source_updated_at] = '2025-01-03T12:00:00Z'
         correction[:home_team_score] = correction[:home_team_stats][:points] = 101
         correction[:home_team_stats][:free_throws_made] = 20
         correction[:away_team] = incoming_name
@@ -494,6 +548,7 @@ RSpec.describe Importer::GamesImporter do
     described_class.import([completed_row])
     game = Game.last
     correction = completed_row.deep_dup
+    correction[:source_updated_at] = '2025-01-03T12:00:00Z'
     correction[:home_team_score] = correction[:home_team_stats][:points] = 101
     correction[:home_team_stats][:free_throws_made] = 20
 
@@ -506,8 +561,8 @@ RSpec.describe Importer::GamesImporter do
   it 'leaves a complete row with an unmatched side scheduled instead of averaging only one team' do
     unknown = completed_row.merge(away_team: 'Unknown Team')
     described_class.import([unknown])
-    expect(Game.last).to have_attributes(status: 'scheduled', minutes: nil, possessions: nil)
-    expect(Game.last.away_team_game).to be_nil
+    expect(Game.last).to be_nil
+    expect(GameObservation.last).to have_attributes(outcome: 'unmatched')
   end
 
   it 'does not resave rolled-back derived fields when normalized minutes are invalid' do
@@ -517,7 +572,8 @@ RSpec.describe Importer::GamesImporter do
 
     described_class.import([malformed])
 
-    expect(Game.last).to have_attributes(status: 'scheduled', minutes: nil, possessions: nil)
+    expect(Game.last).to be_nil
+    expect(GameObservation.last).to have_attributes(outcome: 'invalid')
   end
 
   it 'does not downgrade an existing final game when an incomplete row is imported later' do
@@ -531,14 +587,15 @@ RSpec.describe Importer::GamesImporter do
     expect(game.away_team_score).to eq(90)
   end
 
-  it 'downgrades a broken legacy final game to scheduled when incoming data is incomplete' do
+  it 'holds incomplete refreshes even for broken legacy finals' do
     described_class.import([completed_row])
     game = Game.last
     game.update!(minutes: nil, possessions: nil) # simulate bad historical finalization
 
     described_class.import([row.merge(home_team_score: nil, away_team_score: nil)])
 
-    expect(game.reload).to be_scheduled
+    expect(game.reload).to be_final
+    expect(GameObservation.last).to have_attributes(outcome: 'conflict')
   end
 
   it 'creates a second game for a true double header (same teams, same day, different time)' do
@@ -553,211 +610,63 @@ RSpec.describe Importer::GamesImporter do
   end
 
   describe 'source-confirmed unmatched results' do
-    let(:unmatched_row) { completed_row.merge(away_team: 'Unknown School', source_completed: true) }
+    let(:unmatched_row) { completed_row.merge(away_team: 'Unknown School') }
 
-    it 'adds completed semantics without changing strict final or legacy enum values' do
+    it 'retains unresolved raw evidence without creating partial domain records' do
+      expect { described_class.import([unmatched_row]) }.not_to change(Game, :count)
+      expect(TeamGame.count).to eq(0)
+      expect(Team.count).to eq(2)
+      expect(GameObservation.last.normalized_payload.dig('home', 'stats', 'points')).to eq(100)
+      expect(GameObservation.last).to have_attributes(outcome: 'unmatched', accepted: false)
+    end
+
+    it 'preserves the completed enum meanings for existing legacy results' do
       expect(Game.statuses).to include('scheduled' => 0, 'final' => 1, 'canceled' => 2, 'final_unmatched' => 3)
-      described_class.import([unmatched_row])
-      game = Game.last
-      expect(game).to be_completed
+      game = create(:game, season:, status: :final_unmatched)
       expect(Game.completed).to include(game)
       expect(Game.final).not_to include(game)
     end
 
-    it 'retains raw known-side data without placeholders or calculations' do
-      expect { described_class.import([unmatched_row]) }.not_to change(Team, :count)
-      game = Game.last
-      expect(game).to have_attributes(status: 'final_unmatched', minutes: nil, possessions: nil, in_conference: false)
-      expect(game.home_team_game).to have_attributes(points: 100, assists: 16, offensive_rating: nil, turnover_rate: nil)
-      expect(game.away_team_game).to be_nil
-      expect([game.predictions.count, TeamSeason.count]).to eq([0, 2])
-    end
-
-    it 'handles the known away side, absent TeamSeason, and neither side resolving' do
-      away_team_season.destroy!
-      described_class.import([completed_row.merge(source_completed: true)])
-      expect(Game.last).to be_final_unmatched
-      expect(Game.last.away_team_game).to be_nil
-      Game.last.destroy!
-      described_class.import([row.merge(home_team: 'Unknown Home', source_completed: true)])
-      expect(Game.last).to have_attributes(home_team_game: nil, away_team_game: nil, status: 'final_unmatched')
-      Game.last.destroy!
-      away_team_season = create(:team_season, team: away_team, season:)
-      described_class.import([row.merge(home_team: 'Unknown Home', source_completed: true)])
-      expect(Game.last.away_team_game.team_season).to eq(away_team_season)
-      expect(Game.last).to be_final_unmatched
-    end
-
     [nil, false, 'true', 1].each do |confirmation|
-      it "requires literal confirmation rather than #{confirmation.inspect}" do
-        described_class.import([unmatched_row.merge(source_completed: confirmation)])
-        expect(Game.last).to be_scheduled
+      it "keeps unresolved observations audit-only with confirmation #{confirmation.inspect}" do
+        expect { described_class.import([unmatched_row.merge(source_completed: confirmation)]) }.not_to change(Game, :count)
+        expect(GameObservation.last.accepted).to be(false)
       end
     end
 
     [nil, -1, 1.5, '1.5', 'bad', '100', true].each do |score|
-      it "rejects an invalid or tied unmatched away score #{score.inspect}" do
-        described_class.import([unmatched_row.merge(away_team_score: score)])
-        expect(Game.last).to be_scheduled
+      it "never synthesizes an unresolved result for score #{score.inspect}" do
+        expect { described_class.import([unmatched_row.merge(away_team_score: score)]) }.not_to change(Game, :count)
+        expect(GameObservation.last.accepted).to be(false)
       end
     end
 
-    it 'requires present distinct names' do
+    it 'requires distinct present participants' do
       ['', home_team.school].each do |name|
-        described_class.import([unmatched_row.merge(away_team: name)])
-        expect(Game.last).to be_scheduled
-        Game.last.destroy!
+        expect { described_class.import([unmatched_row.merge(away_team: name)]) }.not_to change(Game, :count)
+        expect(GameObservation.last).to have_attributes(accepted: false)
       end
     end
 
-    it 'accepts digit-string scores and score-only confirmed results' do
-      described_class.import([row.merge(away_team: 'Unknown School', source_completed: true,
-                                        home_team_score: '100', away_team_score: '90')])
-      expect(Game.last).to have_attributes(status: 'final_unmatched', home_team_score: 100, away_team_score: 90)
+    it 'keeps digit-string raw scores available in retained evidence' do
+      described_class.import([unmatched_row.merge(home_team_score: '100', away_team_score: '90')])
+      expect(GameObservation.last.normalized_payload.dig('home', 'score')).to eq(100)
+      expect(Game.count).to eq(0)
     end
 
     it 'cannot bypass ordinary matched box validation' do
-      described_class.import([row.merge(source_completed: true)])
-      expect(Game.last).to be_scheduled
-      described_class.import([completed_row.merge(source_completed: true, home_team_stats: home_team_stats.merge(points: 1))])
-      expect(Game.last).to be_scheduled
-    end
-
-    it 'preserves completed unmatched state across partial refresh and repeated daily URL imports' do
-      daily_url = 'https://www.sports-reference.com/cbb/boxscores/index.cgi?month=1&day=1&year=2025'
-      incoming = unmatched_row.merge(url: daily_url)
-      described_class.import([incoming])
-      game = Game.last
-      described_class.import([incoming])
-      original = game.reload.attributes
-      sides = TeamGame.where(game:).map(&:attributes)
-      described_class.import([incoming.merge(source_completed: false, home_team_score: nil, away_team_score: nil,
-                                             home_team_stats: {}, away_team_stats: {})])
-      expect(Game.count).to eq(1)
-      expect(game.reload.attributes).to eq(original)
-      expect(TeamGame.where(game:).map(&:attributes)).to eq(sides)
-    end
-
-    it 'clears stale unresolved associations and all prior raw/derived values on replacement' do
-      described_class.import([completed_row])
-      game = Game.last
-      game.scheduled!
-      replacement = create(:team, school: 'Replacement Home')
-      create(:team_alias, team: replacement, value: replacement.school, source: 'sports_reference')
-      replacement_season = create(:team_season, team: replacement, season:)
-      described_class.import([unmatched_row.merge(home_team: replacement.school, home_team_stats: { assists: 4 })])
-      expect(game.reload).to have_attributes(status: 'final_unmatched', minutes: nil, possessions: nil, in_conference: false)
-      expect(game.away_team_game).to be_nil
-      expect(game.home_team_game).to have_attributes(team_season: replacement_season, assists: 4,
-                                                     points: nil, offensive_rating: nil, turnover_rate: nil,
-                                                     opponent_team_season_id: nil)
-    end
-
-    it 'adds a newly resolved side and its overall record to the same unmatched result' do
-      home_team_season.destroy!
-      described_class.import([unmatched_row])
-      game = Game.last
-      expect(TeamGame.where(game:)).to be_empty
-      resolved_season = create(:team_season, team: home_team, season:)
-      version = create(:ratings_config_version)
-
-      expect { described_class.import([unmatched_row]) }.not_to change(Game, :count)
-      ProphetRatings::TeamSeasonStatsAggregator.new(season:, as_of: date, ratings_config_version: version).run
-
-      aggregate_failures 'persisted unmatched result and record' do
-        expect(game.reload).to have_attributes(status: 'final_unmatched', minutes: nil, possessions: nil)
-        expect(TeamGame.where(game:).count).to eq(1)
-        expect(game.home_team_game).to have_attributes(team_season: resolved_season, points: 100,
-                                                       offensive_rating: nil, turnover_rate: nil)
-        expect(resolved_season.reload).to have_attributes(wins: 1, losses: 0, conference_wins: 0,
-                                                          offensive_efficiency: nil, pace: nil)
-        expect(Game.final).not_to include(game)
-      end
-    end
-
-    describe 'confirmed refreshes' do
-      let(:game) do
-        described_class.import([unmatched_row])
-        Game.last
-      end
-      let(:prediction) do
-        version = create(:ratings_config_version)
-        snapshots = [home_team_season, away_team_season].map do |team_season|
-          create(:team_rating_snapshot, team_season:, ratings_config_version: version, snapshot_date: date - 1.day)
-        end
-        create(:prediction, game:, ratings_config_version: version,
-                            home_team_snapshot: snapshots.first, away_team_snapshot: snapshots.last,
-                            home_offensive_efficiency: 110, away_offensive_efficiency: 100,
-                            home_defensive_efficiency: 100, away_defensive_efficiency: 110, pace: 70)
-      end
-
-      it 'corrects confirmed scores and overall W-L without calculating statistics or residuals' do
-        original_prediction = prediction.attributes
-        version = prediction.ratings_config_version
-        aggregator = ProphetRatings::TeamSeasonStatsAggregator.new(season:, as_of: date, ratings_config_version: version)
-        aggregator.run
-        expect(home_team_season.reload).to have_attributes(wins: 1, losses: 0)
-        correction = unmatched_row.merge(home_team_score: 80, away_team_score: 90, home_team_stats: { points: 80 })
-
-        expect { described_class.import([correction]) }.not_to change(Game, :count)
-        aggregator.run
-
-        aggregate_failures 'corrected raw result and record' do
-          expect(game.reload).to have_attributes(status: 'final_unmatched', home_team_score: 80, away_team_score: 90,
-                                                 minutes: nil, possessions: nil, in_conference: false)
-          expect(game.home_team_game).to have_attributes(points: 80, assists: nil, offensive_rating: nil, turnover_rate: nil)
-          expect(home_team_season.reload).to have_attributes(wins: 0, losses: 1, conference_losses: 0,
-                                                             offensive_efficiency: nil, pace: nil)
-          expect(prediction.reload.attributes).to eq(original_prediction)
-          expect(Game.final).not_to include(game)
-        end
-      end
-
-      it 'preserves the game, raw side and prediction on an unconfirmed partial refresh' do
-        original_prediction = prediction.attributes
-        original_game = game.attributes
-        original_sides = TeamGame.where(game:).order(:id).map(&:attributes)
-        partial = unmatched_row.merge(source_completed: false, home_team_score: nil, away_team_score: nil,
-                                      home_team_stats: {}, away_team_stats: {})
-
-        described_class.import([partial])
-
-        expect(game.reload.attributes).to eq(original_game)
-        expect(TeamGame.where(game:).order(:id).map(&:attributes)).to eq(original_sides)
-        expect(prediction.reload.attributes).to eq(original_prediction)
-      end
-
-      it 'rolls back score and side writes after a raising persistence failure inside an outer transaction' do
-        original_prediction = prediction.attributes
-        original_game = game.attributes
-        original_sides = TeamGame.where(game:).order(:id).map(&:attributes)
-        correction = unmatched_row.merge(home_team: 'Still Unknown', away_team: away_team.school,
-                                         home_team_score: 80, away_team_score: 95)
-        allow(Game).to receive(:find_by).with(url: unmatched_row[:url]).and_return(game)
-        allow(game).to receive(:update!).and_wrap_original do |method, attributes|
-          if attributes[:status] == :final_unmatched
-            expect(Game.find(game.id)).to have_attributes(status: 'scheduled', home_team_score: 80, away_team_score: 95)
-            expect(TeamGame.where(game:).pluck(:team_season_id)).to eq([away_team_season.id])
-            game.readonly!
-          end
-          method.call(attributes)
-        end
-
-        Game.transaction do
-          expect { described_class.import([correction]) }.to raise_error(ActiveRecord::ReadOnlyRecord)
-          aggregate_failures 'restored persisted state' do
-            expect(game.reload.attributes).to eq(original_game)
-            expect(TeamGame.where(game:).order(:id).map(&:attributes)).to eq(original_sides)
-            expect(prediction.reload.attributes).to eq(original_prediction)
-          end
-        end
-      end
+      described_class.import([completed_row.merge(home_team_stats: home_team_stats.merge(points: 1))])
+      expect(Game.count).to eq(0)
+      expect(GameObservation.last).to have_attributes(outcome: 'invalid')
     end
 
     describe 'promotion' do
       let(:game) do
-        described_class.import([unmatched_row])
-        Game.last
+        record = create(:game, season:, start_time: Game.schedule_time_for(date), url: row[:url],
+                               home_team_name: home_team.school, away_team_name: away_team.school,
+                               home_team_score: 100, away_team_score: 90, status: :final_unmatched)
+        create(:team_game, game: record, team: home_team, team_season: home_team_season, home: true, points: 100)
+        record
       end
       let(:prediction) do
         version = create(:ratings_config_version)
