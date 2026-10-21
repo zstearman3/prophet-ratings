@@ -26,7 +26,7 @@ namespace :import do
     Season.order(year: :asc).each do |season|
       puts JSON.pretty_generate(SyncFullSeasonGamesJob.new.perform(season))
     end
-  rescue SyncFullSeasonGamesJob::IncompleteSync => e
+  rescue SyncFullSeasonGamesJob::IncompleteSync, Ingestion::GameSyncProvider::Incomplete => e
     puts JSON.pretty_generate(e.report)
     abort(e.message)
   rescue ArgumentError => e

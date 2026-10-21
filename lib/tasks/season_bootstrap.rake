@@ -78,7 +78,7 @@ namespace :season do
     )
     puts JSON.pretty_generate(report)
     puts "Games sync complete for year=#{season.year}. Review unmatched games and venue coverage."
-  rescue SyncFullSeasonGamesJob::IncompleteSync => e
+  rescue SyncFullSeasonGamesJob::IncompleteSync, Ingestion::GameSyncProvider::Incomplete => e
     puts JSON.pretty_generate(e.report)
     abort(e.message)
   rescue ArgumentError => e

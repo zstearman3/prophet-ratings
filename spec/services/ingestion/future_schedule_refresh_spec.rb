@@ -107,8 +107,8 @@ RSpec.describe Ingestion::FutureScheduleRefresh do
       game = create(:game, season:, start_time: Game.schedule_time_for(today), status: :scheduled)
       allow(scraper).to receive(:to_json_in_batches).and_return([row.merge(away_team: 'Unknown visitor')])
       result = refresh.call
-      expect(result[:failed_dates]).to be_empty
-      expect(result[:days].first[:games].first).to include(outcome: 'unmatched', applied: false)
+      expect(result[:failed_dates]).to eq([today])
+      expect(GameObservation.last.outcome).to eq('unmatched')
       expect(result[:absent_ids]).not_to include(game.id)
     end
 

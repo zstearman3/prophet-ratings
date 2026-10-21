@@ -13,26 +13,28 @@ class SyncFullSeasonGamesJob < ApplicationJob
     end
   end
 
-  def perform(season, start_date: nil, end_date: nil, resume: true, dedupe: false)
-    @sync_season = season.is_a?(Season) ? season : Season.find(season)
-    dates = Ingestion::HistoricalSyncWindow.new(season: sync_season, start_date:, end_date:).dates
-    days = dates.map { |date| Ingestion::HistoricalSyncDay.new(season: sync_season, date:, resume:).call }
-    @failed_dates = days.select { |day| day[:error] }.pluck(:date)
-    report = { year: sync_season.year, days:, failed_dates:, retry_window: }
-    Rails.logger.info { "Historical sync: #{report.to_json}" }
-    raise IncompleteSync, report if failed_dates.any?
+  rescue_from Ingestion::GameSyncProvider::Incomplete do |error|
+    raise error
+  end
 
-    RepairDuplicateGamesJob.perform_later(season_id: sync_season.id, apply: true) if dedupe
+  def perform(season, start_date: nil, end_date: nil, resume: true, **options)
+    dedupe = options.delete(:dedupe)
+    target = season.is_a?(Season) ? season : Season.find(season)
+    dates = Ingestion::HistoricalSyncWindow.new(season: target, start_date:, end_date:).dates
+    report = Ingestion::GameSyncRun.new(season: target, dates:, resume:, **options).call
+    Rails.logger.info { "Historical sync: #{report.to_json}" }
+    validate_report(report)
+    RepairDuplicateGamesJob.perform_later(season_id: target.id, apply: true) if dedupe
     report
   end
 
   private
 
-  attr_reader :failed_dates, :sync_season
+  def validate_report(report)
+    return if report[:complete]
 
-  def retry_window
-    return if failed_dates.empty?
+    raise Ingestion::GameSyncProvider::Incomplete, report if report.dig(:scope, :provider) == 'cbbd'
 
-    { start_date: failed_dates.min, end_date: failed_dates.max, resume: true }
+    raise IncompleteSync, report
   end
 end

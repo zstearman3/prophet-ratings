@@ -16,16 +16,18 @@ RSpec.describe SyncNightlyGamesJob do
   end
 
   before do
-    allow(SyncDailyGamesJob).to receive(:perform_now) { |date| synced_dates << date }
+    allow(Ingestion::GamesIngestionService).to receive(:new) do |date:, **|
+      synced_dates << date
+      instance_double(Ingestion::GamesIngestionService, call: { imported_rows: 0, games: [] })
+    end
     allow(UpdateRankingsJob).to receive(:perform_later)
     allow(Game).to receive(:current_schedule_date).and_return(today)
   end
 
   it 'does not select an unactivated season when no current season exists' do
     create(:season, year: 2027)
-    allow(SyncDailyGamesJob).to receive(:perform_now)
     described_class.perform_now
-    expect(SyncDailyGamesJob).not_to have_received(:perform_now)
+    expect(Ingestion::GamesIngestionService).not_to have_received(:new)
   end
 
   it 'syncs the recent past lookback window and all upcoming scheduled dates' do
@@ -78,6 +80,16 @@ RSpec.describe SyncNightlyGamesJob do
   it 'can skip enqueuing rankings generation' do
     described_class.perform_now(season.id, enqueue_rankings: false)
 
+    expect(UpdateRankingsJob).not_to have_received(:perform_later)
+  end
+
+  it 'does not enqueue rankings when scraper ingestion is incomplete' do
+    failure = instance_double(Ingestion::GamesIngestionService, call: { imported_rows: 0, games: [{ outcome: 'unmatched' }] })
+    allow(Ingestion::GamesIngestionService).to receive(:new).and_return(failure)
+    allow(Ingestion::HistoricalSyncDay).to receive(:new).and_wrap_original do |original, **arguments|
+      original.call(**arguments).tap { |day| allow(day).to receive(:sleep) }
+    end
+    expect { described_class.new.perform(season.id) }.to raise_error(SyncFullSeasonGamesJob::IncompleteSync)
     expect(UpdateRankingsJob).not_to have_received(:perform_later)
   end
 end

@@ -69,4 +69,17 @@ RSpec.describe Ingestion::FutureScheduleRefresh do
     ENV.delete('SCHEDULE_END_DATE')
     expect { invoke }.to raise_error(SystemExit, /requires an ordered/)
   end
+
+  it 'routes the configured CBBD provider without certifying failed retrieval as empty success' do
+    season.update!(start_date: Date.new(2027, 11, 1), end_date: Date.new(2027, 11, 3))
+    allow(Game).to receive(:current_schedule_date).and_return(Date.new(2027, 11, 1))
+    ENV.update('GAME_SYNC_PROVIDER' => 'cbbd', 'CBBD_API_KEY' => 'synthetic',
+               'CBBD_CAPTURE_DIRECTORY' => '/tmp/synthetic', 'CBBD_MAX_REQUESTS' => '2', 'CBBD_RETRIES' => '0')
+    result = { 'complete' => false, 'observations' => [], 'acquisition' => { 'complete' => false, 'attempts' => 2 } }
+    adapter = instance_double(Ingestion::Cbbd::Adapter, call: result)
+    allow(Ingestion::Cbbd::Adapter).to receive(:new).and_return(adapter)
+    expect { invoke }.to raise_error(SystemExit, /incomplete/).and output(/"retrieval_complete": false/).to_stdout
+    expect(adapter).to have_received(:call).once
+    expect(Game.count).to eq(0)
+  end
 end

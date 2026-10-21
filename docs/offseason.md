@@ -330,3 +330,16 @@ see [replay limits](ratings.md#bounded-historical-ratings-reconstruction).
 Conference corrections alone do not recalculate historical outputs. Duplicate repair
 is a separate destructive workflow and refuses groups with frozen forecasts.
 Broad `ratings:backfill`, `ratings:backfill_all` and `bin/setup_data` are not rollover tools.
+
+### Provider-specific game-sync recovery
+
+Game sync defaults to Sports Reference. The additive provider-scope checkpoint
+migration leaves old completion records explicitly legacy; initial current-scope
+runs revisit them. See [provider-aware sync](data-ingestion.md#provider-aware-sync-and-completion-scope)
+for CBBD runtime secrets/storage, explicit total request/retry budgets, mapping
+prerequisites and structured incomplete reports. Existing `season:sync_games`
+windows support `SYNC_RESUME=false` correction rescans; `season:refresh_schedule`
+always revisits its explicit future bounds without deleting absent games. An
+incomplete CBBD run requires deliberate operator resumption and receives no
+automatic ActiveJob retry/new budget. Production cadence/defaults remain
+unactivated and require operational review.
