@@ -926,6 +926,17 @@ For games on D, replay first reconstructs working ratings/baselines through D-1
 without publishing snapshots. Frozen forecast context contains those numeric
 inputs, each captured prior ID and result cutoff; snapshot source IDs/timestamps
 are null because the working inputs are reconstructed, not archived snapshots.
+For models with factor diagnostics enabled, these working snapshots also carry
+factor anchors captured once after the D-1 calculation from the included teams'
+cutoff-bounded raw aggregates. The reconstructed prediction freezes the resulting
+factor forecasts, anchors and numeric inputs in `calculation_context.factor_forecasts`.
+Factors with unavailable ratings or anchors remain omitted, including before the
+adjustment gate; no future/live snapshot supplies a substitute. This affects factor
+diagnostics only, not score or win-probability calculations. Existing saved
+reconstructions are preserved; an explicit replay creates a new revision when
+these previously missing factor inputs become available. The chunked runner's
+completion checkpoints do not automatically regenerate already completed dates.
+
 Predictions are always labeled `reconstruction`, even for a future tipoff today,
 and retain actual wall-clock generation time. Identical repeats reuse the latest
 revision. Then ratings through D are published at D. The whole day's working

@@ -97,6 +97,86 @@ RSpec.describe ResumeSeasonRatingsJob do
     end
   end
 
+  it 'freezes all five factor forecasts with anchors from before the game date' do
+    date = season.start_date + 30
+    game_on(date - 2)
+    game_on(date - 1)
+    game = game_on(date)
+    game.update!(home_team_score: 72)
+    TeamGame.where(game:).find_each do |row|
+      row.update!(field_goals_made: 36, effective_fg_percentage: 0.9625, turnover_rate: 0.4,
+                  offensive_rebound_rate: 0.6, free_throw_rate: 0.8)
+    end
+    TeamGame.where(game: game_on(date + 10)).find_each { |row| row.update!(field_goals_made: 40, free_throw_rate: 0.9) }
+    replay(date)
+    forecast = game.predictions.sole.calculation_context.fetch('factor_forecasts')
+    # Prior games: eFG=(20+.5*5)/40; three-point proficiency=(2*5/10+10/40)/3.
+    anchors = { 'effective_fg_percentage' => 0.5625, 'turnover_rate' => 0.1, 'offensive_rebound_rate' => 0.2,
+                'free_throw_rate' => 0.3, 'three_pt_proficiency' => (5.0 / 12).round(5) }
+    expect(forecast.keys).to match_array(anchors.keys)
+    anchors.each do |name, anchor|
+      expect(forecast.fetch(name).fetch('baseline')).to be_within(1e-8).of(anchor)
+      expect(forecast.fetch(name).fetch('inputs').pluck('baseline')).to all(be_within(1e-8).of(anchor))
+    end
+    observations = ProphetRatings::FactorEvaluation.observations(game.predictions.sole)
+    expect(observations.transform_values(&:size)).to eq(anchors.transform_values { 2 })
+    expect(forecast.fetch('offensive_rebound_rate').fetch('home')).to be_within(1e-8).of(0.2)
+  end
+
+  it 'repeats frozen factor forecasts after later replay and contaminated live factor values' do
+    date = season.start_date + 30
+    game_on(date - 2)
+    game_on(date - 1)
+    game = game_on(date)
+    later = game_on(date + 10)
+    TeamGame.where(game: later).find_each { |row| row.update!(field_goals_made: 40, free_throw_rate: 0.9) }
+    replay(date)
+    original = game.predictions.sole.calculation_context.fetch('factor_forecasts')
+    expect(original).not_to be_empty
+    replay(date + 10)
+    teams.each { |row| row.update!(effective_fg_percentage: 0.99, free_throw_rate: 0.99, adj_free_throw_rate: 0.99) }
+    replay(date)
+    expect(game.predictions.count).to eq(1)
+    expect(game.predictions.sole.calculation_context.fetch('factor_forecasts')).to eq(original)
+  end
+
+  it 'omits unavailable opening-day factors instead of inventing historical inputs' do
+    game = game_on(season.start_date)
+    replay(season.start_date)
+    expect(game.predictions.sole.calculation_context.fetch('factor_forecasts')).to be_empty
+  end
+
+  it 'creates a factor-bearing revision without changing an earlier forecast or its score means' do
+    date = season.start_date + 30
+    game_on(date - 2)
+    game_on(date - 1)
+    game = game_on(date)
+    allow(ProphetRatings::FactorForecast).to receive(:capture).and_return({})
+    replay(date)
+    original = game.predictions.sole
+    attributes = original.attributes
+    allow(ProphetRatings::FactorForecast).to receive(:capture).and_call_original
+    replay(date)
+    latest = game.predictions.order(:generated_at, :id).last
+    score_fields = %w[home_score away_score home_win_probability pace]
+    expect(game.predictions.count).to eq(2)
+    expect(original.reload.attributes).to eq(attributes)
+    expect(latest.calculation_context.fetch('factor_forecasts').size).to eq(5)
+    expect(latest.attributes.slice(*score_fields)).to eq(original.attributes.slice(*score_fields))
+    replay(date)
+    expect(game.predictions.count).to eq(2)
+  end
+
+  it 'omits only the factor whose historical anchor is unavailable' do
+    date = season.start_date + 30
+    prior_games = [game_on(date - 2), game_on(date - 1)]
+    TeamGame.where(game: prior_games).find_each { |row| row.update!(free_throw_rate: nil) }
+    game = game_on(date)
+    replay(date)
+    forecast = game.predictions.sole.calculation_context.fetch('factor_forecasts')
+    expect(forecast.keys).to match_array(%w[effective_fg_percentage turnover_rate offensive_rebound_rate three_pt_proficiency])
+  end
+
   def add_other_model_prediction(game, snapshots)
     other_version = create(:ratings_config_version)
     other_snapshots = snapshots.map do |snapshot|

@@ -17,11 +17,10 @@ module ProphetRatings
 
     def reconstruct(games, date)
       cutoff = date - 1
-      OverallRatingsCalculator.new(@season, ratings_config_version: @version)
-                              .call(as_of: cutoff, replay: true, publish_snapshots: false)
+      factor_anchors = prepare_reconstruction(cutoff)
       included_ids = @season.rating_team_seasons.ids if @season.participation_review.present?
       games.each do |game|
-        reconstruct_game(game, cutoff) if self.class.reconstructable_participants?(game, included_ids)
+        reconstruct_game(game, cutoff, factor_anchors) if self.class.reconstructable_participants?(game, included_ids)
       end
     end
 
@@ -35,7 +34,7 @@ module ProphetRatings
       !included_ids || (sides - included_ids).empty?
     end
 
-    def self.snapshot(team_season, date)
+    def self.snapshot(team_season, date, factor_anchors: nil)
       raise ArgumentError, 'Historical game lacks a prepared participant' unless team_season
 
       team_season.reload
@@ -44,6 +43,7 @@ module ProphetRatings
                              ratings_config_version: team_season.ratings_config_version,
                              snapshot_date: date, **attributes.slice('rating', *ForecastContext::RATING_FIELDS).symbolize_keys,
                              stats: attributes.slice(*TeamRatingSnapshot::STORED_STATS, 'rating_anchors').merge(
+                               'factor_anchors' => factor_anchors,
                                'season_forecast_inputs' => SeasonForecastInputs.reconstruction(team_season, date),
                                'reconstruction' => { 'preseason_prior_id' => team_season.preseason_prior_id,
                                                      'result_cutoff' => date.iso8601 }
@@ -52,8 +52,14 @@ module ProphetRatings
 
     private
 
-    def reconstruct_game(game, cutoff)
-      snapshots = [game.home_team_season, game.away_team_season].map { |record| self.class.snapshot(record, cutoff) }
+    def prepare_reconstruction(cutoff)
+      OverallRatingsCalculator.new(@season, ratings_config_version: @version)
+                              .call(as_of: cutoff, replay: true, publish_snapshots: false)
+      FactorForecast.anchors(@season) if @version.settings[:factors]
+    end
+
+    def reconstruct_game(game, cutoff, factor_anchors)
+      snapshots = [game.home_team_season, game.away_team_season].map { |record| self.class.snapshot(record, cutoff, factor_anchors:) }
       GamePredictionBuilder.new(game, ratings_config_version: @version).reconstruct(snapshots:)
     end
 
