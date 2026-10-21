@@ -76,14 +76,17 @@ module Ingestion
         reference = result.fetch('capture')
         ledger['selected_captures'] << reference['id']
         partition['selected'] = true
-        result.fetch('rows').each_with_index.map { |row, index| selected_entry(row, index, partition) }
+        result.fetch('rows').each_with_index.filter_map { |row, index| selected_entry(row, index, partition) }
       end
 
       def selected_entry(row, index, partition)
-        reference = @client.captures.find { |capture| capture['id'] == partition['capture_id'] }
         error = SourceRowValidator.new(row, partition).call
-        fail_partition(error, partition) if error
-        { 'raw' => row, 'provenance' => reference.merge('row_index' => index) }
+        if error
+          fail_partition(error, partition.merge('row_index' => index))
+          return
+        end
+        { 'raw' => row,
+          'provenance' => @client.captures.find { |capture| capture['id'] == partition['capture_id'] }.merge('row_index' => index) }
       end
 
       def retain_entry(retained, entry, fields)

@@ -53,12 +53,46 @@ RSpec.describe Ingestion::Cbbd::BoundedRetriever do
     expect(Ingestion::Cbbd::Adapter.replay(manifest: result['manifest'])).to eq(result)
   end
 
-  it 'rejects out of window, wrong season and invalid identity rows' do
-    rows = [fixture['games'].first.merge('id' => nil), fixture['games'].first.merge('id' => 2, 'season' => 2025),
-            fixture['games'].first.merge('id' => 3, 'startDate' => '2025-11-03T12:00:00Z')]
-    responses.push(rows, [])
-    result = Ingestion::Cbbd::Adapter.new(**adapter_options, row_cap: 10).call
-    expect(result['acquisition']['failures'].pluck('reason')).to contain_exactly('invalid_identity', 'season_mismatch', 'out_of_window')
+  context 'with invalid source rows before valid rows and duplicates' do
+    let(:game) { fixture['games'].first }
+    let(:box) { fixture['boxes'].first }
+    let(:invalid_games) do
+      [game.merge('id' => nil), game.merge('season' => 2025),
+       game.merge('startDate' => '2025-11-03T12:00:00Z'), game.merge('startDate' => 'malformed')]
+    end
+    let(:invalid_boxes) do
+      [box.merge('teamId' => nil), box.merge('season' => 2025),
+       box.merge('startDate' => '2025-11-03T12:00:00Z'), box.merge('startDate' => 'malformed')]
+    end
+    let(:result) { Ingestion::Cbbd::Adapter.new(**adapter_options, row_cap: 10).call }
+    let(:ledger) { result['acquisition'] }
+
+    before { responses.push(invalid_games + [game, game], invalid_boxes + fixture['boxes'] + [box]) }
+
+    it 'excludes invalid games and boxes without shifting valid provenance indexes' do
+      observation = result['observations'].sole
+      expect(observation['numeric_valid']).to be(true)
+      expect(observation['provenance'].pluck('row_index')).to eq([4, 4, 5])
+      expect(result['orphan_boxes']).to be_empty
+      expect(ledger['complete']).to be(false)
+    end
+
+    it 'retains each invalid raw row and its original capture index as acquisition failure evidence' do
+      expect(ledger['failures'].pluck('reason')).to eq(%w[invalid_identity season_mismatch out_of_window unknown_source_time] * 2)
+      ledger['captures'].each_with_index do |capture, index|
+        failures = ledger['failures'].select { |failure| failure.dig('evidence', 'capture_id') == capture['id'] }
+        expect(failures.map { |failure| failure.dig('evidence', 'row_index') }).to eq([0, 1, 2, 3])
+        raw = JSON.parse(Ingestion::Cbbd::CaptureStore.new(directory).read(capture))
+        expect(raw.first(4)).to eq([invalid_games, invalid_boxes][index])
+      end
+    end
+
+    it 'replays the same filtered observations and original duplicate decisions without upgrading completeness' do
+      expect(ledger['decisions'].pluck('outcome')).to eq(%w[identical identical])
+      expect(ledger['decisions'].map { |decision| decision.dig('retained', 'row_index') }).to eq([4, 4])
+      expect(ledger['decisions'].map { |decision| decision.dig('duplicate', 'row_index') }).to eq([5, 6])
+      expect(Ingestion::Cbbd::Adapter.replay(manifest: result['manifest'])).to eq(result)
+    end
   end
 
   it 'fails closed at a saturated one-second interval' do

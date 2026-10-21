@@ -1017,7 +1017,7 @@ Dates must be explicit strict `YYYY-MM-DD`, ordered and within July 1 through
 June 30 of the ending-year season. Bounds are inclusive Eastern calendar dates,
 converted to UTC through the last millisecond of the final date, including DST.
 These are source observation bounds, not a claim that every scheduled game has
-been published. The command prints a small JSON summary and private report path;
+been published. The command prints a small JSON summary and private manifest path;
 acquisition failures, unresolved coverage, conflicting duplicates/metadata and
 orphan boxes exit nonzero. Missing/invalid numeric boxes are retained with reasons
 and counted separately; acquisition success is not statistical or model eligibility.

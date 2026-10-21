@@ -42,7 +42,9 @@ module Ingestion
       end
 
       def accepted_entries(payload, reference)
-        entries = JSON.parse(payload).each_with_index.map { |row, index| self.class.entry(row, index, reference) }
+        entries = JSON.parse(payload).each_with_index.filter_map do |row, index|
+          self.class.entry(row, index, reference) unless SourceRowValidator.new(row, reference.fetch('request')).call
+        end
         rejected = ledger.fetch('decisions').pluck('duplicate')
         entries.reject { |entry| rejected.include?(entry['provenance']) }
       end
