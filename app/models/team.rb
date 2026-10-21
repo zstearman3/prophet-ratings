@@ -30,6 +30,7 @@ class Team < ApplicationRecord
 
   before_validation :set_slug, on: :create
 
+  has_many :team_external_identities, dependent: :restrict_with_exception
   has_many :team_seasons, dependent: :destroy
   has_many :team_games, dependent: :destroy
   has_many :home_team_games, -> { where(home: true) }, inverse_of: :team, class_name: 'TeamGame', dependent: :destroy

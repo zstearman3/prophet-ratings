@@ -346,6 +346,83 @@ Schedule reconciliation reports unchanged completed results as protected, and
 played-season safeguards recognize both statuses. No historical rewrite, import
 or backfill is performed by this change.
 
+## Provider-scoped external identities
+
+`TeamExternalIdentity` and `GameExternalIdentity` attach durable provider keys to
+existing local records. They are storage and lookup APIs only: the importer still
+uses its existing discovery/matching path above. Adding an identity preserves
+Prophet primary keys, team-game relationships, predictions, aliases, manual venue
+corrections and existing odds identifiers. The migration creates empty tables;
+it does not convert aliases, guess mappings or backfill provider IDs.
+
+Supply stable string identifiers. Provider namespaces and external IDs are opaque,
+case-sensitive and nonblank: no trimming or lowercasing occurs, and `"00042"` is
+distinct from `"42"`. Rails string attributes can cast numeric input, so callers
+must preserve the provider's original string rather than converting it to a number.
+Each entity type has a database-unique `(provider, external_id)` and a real foreign
+key to its local owner. Team and game keys occupy separate namespaces.
+
+```ruby
+TeamExternalIdentity.associate!(team:, provider: 'provider_a', external_id: '00042')
+TeamExternalIdentity.associate!(team:, provider: 'provider_b', external_id: '00042')
+GameExternalIdentity.associate!(game:, provider: 'provider_a', external_id: 'source-game-1')
+GameExternalIdentity.associate!(game:, provider: 'provider_b', external_id: 'another-key')
+
+identity = TeamExternalIdentity.find_by(provider: 'provider_b', external_id: '00042')
+identity&.team # nil lookup when no exact mapping exists
+```
+
+Repeated `associate!` returns the same identity without changing its timestamps.
+An existing key assigned to a different owner raises that model's `Conflict`;
+it never reparents the mapping. Normal model updates cannot change provider,
+external ID or owner. Invalid attributes raise `ActiveRecord::RecordInvalid`.
+Database indexes arbitrate competing inserts. A game has at most one active key
+per provider, while keys from different providers may coexist; this establishes
+no cross-provider update precedence.
+
+A reviewed reschedule/source replacement explicitly retires the old game key:
+
+```ruby
+old_source = GameExternalIdentity.find_by!(provider: 'provider_a', external_id: 'source-game-1')
+new_source = old_source.supersede!(external_id: 'source-game-2')
+old_source.reload.superseded? # true; old key still resolves to the same game
+new_source.superseded?        # false
+GameExternalIdentity.active.where(game:)
+```
+
+Replacement locks the game and reloads the source inside a transaction savepoint.
+The original mapping remains with `superseded_at`; the replacement keeps the same
+local game/provider. Blank targets, ownership conflicts and persistence failures
+roll back retirement and all replacement writes, even if an outer transaction
+rescues the error. `supersede!` raises; `supersede` returns false for validation or
+authority conflicts and still propagates unexpected persistence failures. Reload
+objects after a failed write before inspecting their persisted state.
+
+A same-key request on an active source is a no-op. Retrying a retired source is
+idempotent only when the requested key is currently active for that game/provider.
+A different target, a target retired by a later replacement, or a retired key
+requested as a new replacement raises `GameExternalIdentity::Conflict`. Repeated
+association of a retired key returns it as superseded and never reactivates it.
+Normal timestamp updates cannot retire or reactivate a source.
+
+Future provider ingestion (ticket 04) must reload the resolved game identity and
+check `superseded?` before applying observations; a superseded observation must
+not update the game. This ticket does not wire that guard into the current
+importer. Reviewed mapping and bulk reconciliation belong to ticket 05;
+`TeamAlias` remains a separate label/bootstrap discovery mechanism.
+
+Identity-bearing teams/games cannot be destroyed: association restrictions run
+before destructive dependent callbacks, and foreign keys also protect database
+ownership. Duplicate-game repair checks all planned deletion candidates for any
+external identities, including superseded ones, before applying any group. It
+raises `ArgumentError` with the sorted affected game IDs and an instruction to
+review identity mappings before repair. Reconcile those mappings through reviewed
+work first; repair does not transfer or delete identity history. Dry runs remain
+read-only, and an identity on the chosen survivor alone does not prevent repair.
+Each group is checked again after its game locks and frozen-forecast validation,
+before dependent moves. A mapping added after preflight can therefore reject a
+later group; groups already committed remain applied in that concurrent case.
+
 ## Venue classification
 
 Games store explicit venue metadata:
@@ -655,6 +732,15 @@ You can also enqueue directly:
 ```ruby
 RepairDuplicateGamesJob.perform_later(season_id: season.id, apply: true)
 ```
+
+Before any group is applied, deletion candidates with external identities
+(including superseded mappings) reject the run with an `ArgumentError` listing
+the affected game IDs. Review identity mappings before retrying; repair neither
+transfers nor deletes mappings. Identity-bearing survivors are allowed, and dry
+runs still report planned groups without writes. After locking each group and
+validating frozen forecasts, apply rechecks deletion candidates before merging.
+A concurrent mapping added after preflight can reject a later group without
+undoing earlier committed groups.
 
 The apply mode reassigns safe dependent records such as `TeamGame`, `Prediction`, `GameOdd`, `BookmakerOdd`, and `BetRecommendation` where unique constraints allow it, deletes conflicting duplicate dependents, and then deletes duplicate `Game` records. You can restrict the scope with `YEAR=<year>` or `SEASON_ID=<id>`.
 
