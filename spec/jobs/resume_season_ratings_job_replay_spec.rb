@@ -62,6 +62,27 @@ RSpec.describe ResumeSeasonRatingsJob do
     expect(season.team_rating_snapshots.where(snapshot_date: season.start_date - 2).count).to eq(0)
   end
 
+  %i[home_team_game away_team_game].each do |side|
+    it "skips a game missing its #{side} while preserving data and continuing daily publication" do
+      incomplete = game_on(season.start_date)
+      incomplete.public_send(side).destroy!
+      complete = game_on(season.start_date + 1)
+      complete.update!(start_time: incomplete.start_time, home_team_name: 'Another prepared home team')
+      later = game_on(season.start_date + 1)
+      original = [incomplete.attributes, TeamGame.order(:id).map(&:attributes)]
+      log = StringIO.new
+      allow(Rails).to receive(:logger).and_return(ActiveSupport::Logger.new(log))
+
+      replay(season.start_date, season.start_date + 1)
+
+      expect(incomplete.predictions).to be_empty
+      expect(Prediction.where(game: [complete, later]).pluck(:forecast_kind)).to eq(%w[reconstruction reconstruction])
+      expect(season.team_rating_snapshots.where(snapshot_date: season.start_date..(season.start_date + 1)).count).to eq(4)
+      expect(log.string).to include("game=#{incomplete.id}", 'missing prepared participant')
+      expect([incomplete.reload.attributes, TeamGame.order(:id).map(&:attributes)]).to eq(original)
+    end
+  end
+
   it 'solves equal neutral observations with independently known zero effects' do
     date = season.start_date + 30
     game_on(date - 2)

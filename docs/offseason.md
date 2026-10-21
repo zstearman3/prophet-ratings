@@ -284,6 +284,44 @@ that Eastern date window. Out-of-window prediction dependencies block deletion.
 starting at season opening; use this for a reviewed in-season model switch.
 The whole rebuild is transactional and holds the ratings lock: plan a maintenance window.
 
+### Chunked local ratings replay
+
+For a large local replay, use the host runner from the checkout containing the
+new code, targeting the intended **existing populated** Compose project:
+
+```bash
+COMPOSE_PROJECT_NAME=prophet-ratings bin/backfill-ratings \
+  --year 2026 --model v1.12-probability-precision \
+  --from 2025-11-01 --through 2026-04-10 \
+  --initialize-preseason --chunk-days 7 --progress-seconds 30
+```
+
+`--initialize-preseason` explicitly permits capture for a fresh selected model.
+It requires the season opening date and refuses to initialize over any existing
+season/model predictions or snapshots. Existing complete matching captures are
+reused, even when this flag is supplied again; partial/invalid captures require
+review. This command never resets existing model outputs or activates the model.
+Use the separate explicit rebuild workflow when intentionally replacing history.
+
+Rerun the same command after a failure: planning finds the earliest date missing
+full included-team snapshot coverage, then replays from there through the requested
+end. A complete range is a no-op. Snapshot coverage is the checkpoint, relying on
+the existing daily transaction to publish ratings and predictions together; it is
+not an audit of manually edited or imported outputs. Use an explicit resume/rebuild
+for deliberate source corrections rather than this completion-oriented runner.
+Snapshots with conflicting participation provenance are rejected, including when
+a smaller roster would otherwise appear complete. The model ID, season dates and participant IDs are pinned and checked between
+chunks; changed selections or missing earlier checkpoints require replanning.
+
+Each day commits independently, including the opening-day preseason capture. A
+failure rolls back that date while retaining earlier days. Every chunk starts a
+fresh Rails process; this trades whole-season atomicity for bounded process
+lifetimes and recovery. The original `season:rebuild_ratings` remains atomic.
+The shared ratings lock is held per chunk, including planning, and refuses an
+already-running operation. Run this only after any current replay finishes.
+See [local runtime details](development.md#bounded-local-ratings-replays) for
+memory caps, progress, dependency requirements and retained failure containers.
+
 Both tools leave live values at their final replay date. Resume explicitly through
 the desired cutoff before returning to ordinary use; later preserved snapshots do
 not restore live state. Review/correct stored finalized results through ingestion

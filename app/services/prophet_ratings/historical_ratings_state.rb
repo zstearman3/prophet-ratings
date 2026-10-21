@@ -21,11 +21,18 @@ module ProphetRatings
                               .call(as_of: cutoff, replay: true, publish_snapshots: false)
       included_ids = @season.rating_team_seasons.ids if @season.participation_review.present?
       games.each do |game|
-        sides = [game.home_team_season&.id, game.away_team_season&.id]
-        next if included_ids && sides.any? { |id| included_ids.exclude?(id) }
-
-        reconstruct_game(game, cutoff)
+        reconstruct_game(game, cutoff) if self.class.reconstructable_participants?(game, included_ids)
       end
+    end
+
+    def self.reconstructable_participants?(game, included_ids)
+      sides = [game.home_team_season&.id, game.away_team_season&.id]
+      if sides.include?(nil)
+        Rails.logger.warn("Historical reconstruction skipped for game=#{game.id}: missing prepared participant")
+        return false
+      end
+
+      !included_ids || (sides - included_ids).empty?
     end
 
     def self.snapshot(team_season, date)
