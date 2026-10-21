@@ -1,6 +1,6 @@
-<details class="forecast-provenance inline-block align-middle ml-1">
-  <summary aria-label="Forecast provenance" aria-describedby="<%= dom_id(prediction, :provenance) %>" class="list-none cursor-pointer rounded px-1 text-sm text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">
+<span class="forecast-provenance inline-block align-middle ml-1" data-controller="forecast-provenance" data-action="resize@window->forecast-provenance#position scroll@window->forecast-provenance#position:capture">
+  <button type="button" popovertarget="<%= dom_id(prediction, :provenance) %>" aria-label="Forecast provenance" aria-describedby="<%= dom_id(prediction, :provenance) %>" data-forecast-provenance-target="trigger" class="cursor-pointer rounded px-1 text-sm text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">
     <span aria-hidden="true">ⓘ</span>
-  </summary>
-  <p id="<%= dom_id(prediction, :provenance) %>" class="w-56 whitespace-normal rounded border border-gray-200 bg-white p-2 text-left text-xs font-normal text-gray-700 shadow"><%= label %></p>
-</details>
+  </button>
+  <span id="<%= dom_id(prediction, :provenance) %>" popover="auto" role="tooltip" data-forecast-provenance-target="popover" data-action="beforetoggle->forecast-provenance#position toggle->forecast-provenance#position" class="fixed inset-auto z-50 m-0 w-56 max-w-[calc(100vw-1rem)] whitespace-normal rounded border border-gray-200 bg-white p-2 text-left text-xs font-normal text-gray-700 shadow"><%= label %></span>
+</span>

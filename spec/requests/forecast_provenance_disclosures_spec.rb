@@ -46,19 +46,28 @@ RSpec.describe 'Forecast provenance disclosures' do
   end
 
   def expect_disclosure(table, label)
-    disclosure = table.at_css('details.forecast-provenance')
+    disclosure = table.at_css('.forecast-provenance')
     expect(disclosure).to be_present
-    expect(disclosure['open']).to be_nil
-    summary = disclosure.at_css('summary')
-    expect(summary['aria-label']).to eq('Forecast provenance')
-    expect(summary['class']).to include('focus-visible:ring-2')
-    expect(table.at_css("##{summary['aria-describedby']}").text.strip).to eq(label)
+    popover = disclosure.at_css('[popover="auto"]')
+    expect(popover).to be_present
+    expect(popover['role']).to eq('tooltip')
+    expect_provenance_trigger(disclosure.at_css('button'), popover['id'])
+    expect(popover.text.strip).to eq(label)
     expect_compact_table(table, label)
+  end
+
+  def expect_provenance_trigger(trigger, popover_id)
+    expect(trigger).to be_present
+    expect(trigger['type']).to eq('button')
+    expect(trigger['aria-label']).to eq('Forecast provenance')
+    expect(trigger['class']).to include('focus-visible:ring-2')
+    expect(trigger['popovertarget']).to eq(popover_id)
+    expect(trigger['aria-describedby']).to eq(popover_id)
   end
 
   def expect_compact_table(table, label)
     compact_table = table.dup
-    compact_table.css('details > :not(summary)').remove
+    compact_table.css('[popover]').remove
     expect(compact_table.text).not_to include(label)
   end
 
@@ -94,9 +103,32 @@ RSpec.describe 'Forecast provenance disclosures' do
 
       expect(response).to have_http_status(:success)
       expect(game.reload.current_prediction).to be_nil
-      expect(table.at_css('details.forecast-provenance')).to be_nil
+      expect(table.at_css('.forecast-provenance')).to be_nil
       expect(table.text).not_to include('64 - 76', 'Postgame reconstruction')
     end
+  end
+
+  kinds.each do |kind, label|
+    it "keeps #{kind} provenance behind the game detail info control" do
+      create_forecast(kind)
+
+      get "/games/#{game.id}"
+
+      expect(response).to have_http_status(:success)
+      expect_disclosure(response.parsed_body, label)
+    end
+  end
+
+  it 'keeps historical game detail provenance behind the same info control' do
+    create_forecast('pregame')
+    game.update!(status: :final_unmatched, home_team_score: 70, away_team_score: 60)
+    game.away_team_game.destroy!
+
+    get "/games/#{game.id}"
+
+    expect(response).to have_http_status(:success)
+    expect_disclosure(response.parsed_body, 'Historical pregame forecast')
+    expect(response.parsed_body.text).to include('no evaluation result')
   end
 
   it 'selects the betting forecast only once for its condition, title, disclosure and score' do
@@ -142,7 +174,7 @@ RSpec.describe 'Forecast provenance disclosures' do
       excluded_table = request_table('betting')
       expect(excluded_table.text).to include('Missing current participants')
       expect(excluded_table.text).not_to include('Predicted Score:')
-      expect(excluded_table.at_css('details.forecast-provenance')).to be_nil
+      expect(excluded_table.at_css('.forecast-provenance')).to be_nil
 
       # A persisted participant repair can restore the captured identity before the result is finalized.
       create(:team_game, game:, team: participants.last.team, team_season: participants.last, home: false)

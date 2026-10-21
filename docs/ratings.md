@@ -880,13 +880,15 @@ forecast archive. Nightly prediction jobs now select only scheduled upcoming gam
 This contract adds no fitted coefficients or confidence/calibration claims.
 
 Schedule, team schedule and betting tables retain forecast provenance as a hover
-tooltip on the predicted score. An adjacent info disclosure also exposes the exact
-label to keyboard, touch and screen reader users; select it to open or close the
-label. Missing saved scores keep their unavailable text and the same disclosure.
-The betting table's Details button opens the existing expanded row with keyboard
-or touch, in addition to clicking the row. Unmatched results retain a historical
-label even if participant records have been repaired before finalization. The game
-detail page displays the label explicitly.
+tooltip on the predicted score. An adjacent info button opens the exact label in a
+native browser popover; the game detail page uses the same control beside
+Prediction Analysis. The popover overlays the page without resizing rows or being
+clipped by table scroll containers. Keyboard and touch activation remain available;
+Escape or clicking outside closes the popover. Missing saved scores keep their
+unavailable text and the same info button. The betting table's Details button
+opens the existing expanded row with keyboard or touch, in addition to clicking
+the row. Unmatched results retain a historical label even if participant records
+have been repaired before finalization.
 
 ## Bounded historical ratings reconstruction
 

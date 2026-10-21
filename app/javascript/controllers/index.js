@@ -15,3 +15,6 @@ application.register("betting-expand", BettingExpandController)
 
 import BettingSortController from "./betting_sort_controller"
 application.register("betting-sort", BettingSortController)
+
+import ForecastProvenanceController from "./forecast_provenance_controller"
+application.register("forecast-provenance", ForecastProvenanceController)
