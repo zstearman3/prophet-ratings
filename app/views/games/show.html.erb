@@ -196,9 +196,15 @@
     </div>
 
     <div class="mt-8">
-      <h2 class="text-xl font-semibold text-prophet-black mb-4">Prediction Analysis</h2>
+      <div class="flex items-center gap-1 mb-4">
+        <h2 class="text-xl font-semibold text-prophet-black">Prediction Analysis</h2>
+        <% forecast = @prediction || @historical_prediction %>
+        <% if forecast %>
+          <% prediction_label = @historical_prediction ? (forecast.forecast_kind == 'pregame' ? 'Historical pregame forecast' : "Historical · #{forecast.provenance_label}") : forecast.provenance_label %>
+          <%= render 'shared/forecast_provenance', prediction: forecast, label: prediction_label %>
+        <% end %>
+      </div>
       <% if @prediction %>
-        <p class="text-sm text-gray-600"><%= @prediction.provenance_label %></p>
         <div class="bg-white p-6 rounded-lg shadow">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -280,7 +286,6 @@
         </div>
       <% elsif @historical_prediction %>
         <% captured_teams = @historical_prediction.forecast_kind == 'pregame' ? @historical_prediction.calculation_context.fetch('snapshots', []).map { |snapshot| snapshot['school'] } : [] %>
-        <p class="text-sm text-gray-600"><%= @historical_prediction.forecast_kind == 'pregame' ? 'Historical pregame forecast' : "Historical · #{@historical_prediction.provenance_label}" %></p>
         <div class="bg-white p-6 rounded-lg shadow">
           <% if @historical_prediction.away_score && @historical_prediction.home_score %>
             <p><%= captured_teams[1].presence || 'Away team' %> <%= @historical_prediction.away_score.round %> - <%= captured_teams[0].presence || 'Home team' %> <%= @historical_prediction.home_score.round %></p>

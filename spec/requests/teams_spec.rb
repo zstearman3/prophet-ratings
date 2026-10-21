@@ -131,7 +131,7 @@ RSpec.describe 'Teams' do
       expect(score_cells).to include(opponent.school, 'Scheduled', '-', 'W', '68 - 75')
       expect(prediction_link).to be_present
       expect(prediction_link['title']).to eq(prediction.provenance_label)
-      table.css('details > :not(summary)').remove
+      table.css('[popover]').remove
       expect(table.text).not_to include(prediction.provenance_label)
       expect(table.at_css("a[href='/teams/#{opponent.slug}']").text).to eq(opponent.school)
       expect(table.at_css("a[href='/games/#{final_game.id}']").text).to include(final_game.start_time.to_date.to_s)
@@ -288,8 +288,8 @@ RSpec.describe 'Teams' do
       expect(response).to have_http_status(:success)
       expect(row.css('td')[1].text.strip).to eq('Captured Away')
       expect(row.css('td')[4].text).to include('66 - 72')
-      expect(row.css('td')[4].at_css('details').text).to include('Historical pregame forecast')
-      row.css('details > :not(summary)').remove
+      expect(row.css('td')[4].at_css('[popover]').text).to include('Historical pregame forecast')
+      row.css('[popover]').remove
       expect(row.css('td')[4].text).not_to include('Historical pregame forecast')
       expect(row.css('td')[4].at_css('a')['title']).to eq('Historical pregame forecast')
       expect(row.css('td')[5].text.strip).to eq('-')
