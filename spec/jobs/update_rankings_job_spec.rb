@@ -141,4 +141,74 @@ RSpec.describe UpdateRankingsJob do
     expect(calculator).not_to have_received(:call)
     expect(GenerateNightlyPredictionsJob).not_to have_received(:perform_later)
   end
+
+  context 'with serialized partial-sync authorization' do
+    include ActiveJob::TestHelper
+
+    let(:boundary) { Date.new(2099, 2, 3) }
+
+    around do |example|
+      adapter = ActiveJob::Base.queue_adapter
+      ActiveJob::Base.queue_adapter = :test
+      example.run
+    ensure
+      ActiveJob::Base.queue_adapter = adapter
+    end
+
+    before do
+      clear_enqueued_jobs
+      allow(Game).to receive(:current_schedule_date).and_return(boundary)
+    end
+
+    after { clear_enqueued_jobs }
+
+    it 'retains the serialized guard and performs same-day rankings and predictions' do
+      queued = described_class.perform_later(season.id, sync_schedule_date: boundary)
+      restored_arguments = ActiveJob::Arguments.deserialize(queued.serialize.fetch('arguments'))
+      expect(restored_arguments.last).to include(sync_schedule_date: boundary)
+      perform_enqueued_jobs(only: described_class)
+      expect(calculator).to have_received(:call).with(as_of: boundary - 1)
+      expect(GenerateNightlyPredictionsJob).to have_received(:perform_later).with(season.id, ratings_config_version_id: model_version.id)
+    end
+
+    it 'skips stale serialized authorization without calculator, publication or predictions' do
+      described_class.perform_later(season.id, sync_schedule_date: boundary)
+      allow(Game).to receive(:current_schedule_date).and_return(boundary + 1)
+      allow(Rails.logger).to receive(:info).and_call_original
+      perform_enqueued_jobs(only: described_class)
+      expect(ProphetRatings::OverallRatingsCalculator).not_to have_received(:new)
+      expect(calculator).not_to have_received(:call)
+      expect(GenerateNightlyPredictionsJob).not_to have_received(:perform_later)
+      expect(Rails.logger).to have_received(:info).with(/Skipping UpdateRankingsJob: partial sync authorization/)
+    end
+
+    it 'checks authorization after a date shift between perform entry and recalculate' do
+      described_class.perform_later(season.id, sync_schedule_date: boundary)
+      allow(described_class).to receive(:recalculate).and_wrap_original do |original, *arguments, **options|
+        allow(Game).to receive(:current_schedule_date).and_return(boundary + 1)
+        original.call(*arguments, **options)
+      end
+      perform_enqueued_jobs(only: described_class)
+      expect(Game).to have_received(:current_schedule_date).once
+      expect(calculator).not_to have_received(:call)
+      expect(GenerateNightlyPredictionsJob).not_to have_received(:perform_later)
+    end
+
+    it 'derives the actual cutoff and guard comparison from one execution-date read' do
+      described_class.perform_later(season.id, sync_schedule_date: boundary)
+      allow(Game).to receive(:current_schedule_date).and_return(boundary, boundary + 1)
+      perform_enqueued_jobs(only: described_class)
+      expect(Game).to have_received(:current_schedule_date).once
+      expect(calculator).to have_received(:call).with(as_of: boundary - 1)
+      expect(GenerateNightlyPredictionsJob).to have_received(:perform_later)
+    end
+
+    it 'preserves unguarded serialized callers and their actual execution-time cutoff' do
+      described_class.perform_later(season.id)
+      allow(Game).to receive(:current_schedule_date).and_return(boundary + 1)
+      perform_enqueued_jobs(only: described_class)
+      expect(calculator).to have_received(:call).with(as_of: boundary)
+      expect(GenerateNightlyPredictionsJob).to have_received(:perform_later)
+    end
+  end
 end

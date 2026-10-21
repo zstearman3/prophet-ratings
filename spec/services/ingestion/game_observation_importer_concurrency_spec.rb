@@ -83,6 +83,45 @@ RSpec.describe Ingestion::GameObservationImporter do
     end
   end
 
+  it 'locks a shared canonical game across providers moving it to different schedule dates', :aggregate_failures do
+    initial = described_class.new(observation: payload, season:).call
+    other = payload.merge(provider: "second-#{token}")
+    expect(described_class.new(observation: other, season:).call[:game_id]).to eq(initial[:game_id])
+    first = payload.merge(schedule_date: '2025-01-02')
+    second = other.merge(schedule_date: '2025-01-03')
+    threads << Thread.new do
+      ActiveRecord::Base.connection_pool.with_connection do
+        Game.transaction do
+          results << described_class.new(observation: first, season:).call
+          first_applied << true
+          release_first.pop
+        end
+      end
+    end
+    Timeout.timeout(10) { first_applied.pop }
+    start_second_writer(second)
+    wait_for_game_waiter(Timeout.timeout(10) { second_pid.pop })
+    expect(results.size).to eq(1)
+    release_first << true
+    threads.each { |thread| Timeout.timeout(10) { thread.value } }
+    reports = Array.new(2) { results.pop }
+    expect(reports.pluck(:game_id).uniq).to eq([initial[:game_id]])
+    expect(reports.pluck(:outcome)).to eq(%w[scheduled conflict])
+    expect(Game.where(season:).count).to eq(1)
+    expect(Game.find(initial[:game_id]).schedule_date).to eq(Date.new(2025, 1, 2))
+  end
+
+  def wait_for_game_waiter(pid)
+    Timeout.timeout(10) do
+      loop do
+        wait = ActiveRecord::Base.connection.select_value("SELECT wait_event FROM pg_stat_activity WHERE pid = #{Integer(pid)}")
+        break if %w[transactionid tuple].include?(wait)
+
+        sleep(0.01)
+      end
+    end
+  end
+
   def start_first_writer
     threads << Thread.new do
       ActiveRecord::Base.connection_pool.with_connection do

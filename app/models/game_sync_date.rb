@@ -4,7 +4,8 @@
 class GameSyncDate < ApplicationRecord
   belongs_to :season
 
-  validates :schedule_date, presence: true, uniqueness: { scope: :season_id }
+  validates :schedule_date, presence: true, uniqueness: { scope: %i[season_id provider contract_version semantic_profile adapter_revision] }
+  validates :provider, :contract_version, :semantic_profile, :adapter_revision, presence: true
   validates :status, inclusion: { in: %w[pending failed completed] }
 
   def completed?

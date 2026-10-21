@@ -38,11 +38,10 @@ If no date is provided, the job defaults to yesterday in the Eastern schedule-da
 
 Flow:
 
-1. Build `Ingestion::GamesIngestionService.new(date:)`.
-2. The service scrapes games in batches of 10 URLs.
-3. Each batch is enriched with Sports Reference team schedule venue data.
-4. The enriched rows are passed to `Importer::GamesImporter.import`.
-5. Log the imported row count.
+1. Validate the Eastern schedule date and resolve an explicit `season_id:` when provided.
+2. With a season, run one scoped `Ingestion::GameSyncRun` for the date with `resume: false`, using the configured provider and atomic checkpoint/import behavior.
+3. Without a season, use `Ingestion::GamesIngestionService.new(date:)` for the unscoped Sports Reference path only. CBBD requires an explicit season.
+4. Sports Reference acquisition still scrapes batches, enriches venue data and imports canonical observations. Return the ingestion report.
 
 This job does not enqueue ratings by itself.
 
@@ -67,17 +66,37 @@ The default sync window includes:
 - Recently completed or stale dates from the current Eastern schedule date minus two days through yesterday.
 - Upcoming scheduled dates from the current Eastern schedule date through the season end, unless `future_end_date` is provided.
 
-For each date, it runs:
+The job captures the current Eastern schedule date once, builds both windows from
+that boundary and runs one `Ingestion::GameSyncRun` with `resume: false` across all
+requested dates. CBBD therefore retains one acquisition/request budget across both
+windows. The report preserves global `complete`, `failed_dates` and `retry_window`,
+and adds `schedule_date`, `past_dates`, `future_dates`, `past_complete`,
+`future_complete`, `past_failed_dates` and `future_failed_dates`. Today belongs to
+the future window even if acquisition crosses midnight.
 
-```ruby
-SyncDailyGamesJob.perform_now(date)
-```
+Sports Reference enqueues `UpdateRankingsJob.perform_later(season.id)` after a
+fully successful run, or after every date in a nonempty requested past window
+succeeds even if future refresh fails. Ratings use games through Eastern yesterday;
+future schedule coverage is reported separately. `enqueue_rankings: false` always
+opts out, and CBBD never automatically enqueues rankings. An empty past window
+cannot independently authorize rankings for a partial failed run; existing fully
+successful future-only behavior is preserved.
 
-After all dates sync, it enqueues:
-
-```ruby
-UpdateRankingsJob.perform_later(season.id)
-```
+A future-only failure still leaves the overall operation incomplete and raises a
+structured `GameSyncProvider::Incomplete`. It receives no automatic ActiveJob
+retry, preventing a renewed run from duplicating rankings already queued for the
+successful past window. Only rankings released from a partially successful run
+carry `sync_schedule_date:` authorization. At the actual calculation boundary,
+`UpdateRankingsJob` reads the execution Eastern date once, compares it with that
+guard and derives yesterday from the same read. If midnight or a queue delay has
+made the guard stale, it logs a skip and returns without rating publication or
+prediction enqueue. It does not pin a historical cutoff or change ordinary
+unguarded/all-complete/manual callers. Inspect and explicitly resume unfinished
+future dates, then start a fresh authorized sync instead of retrying the stale
+guarded job.
+Any past failure blocks rankings and preserves the Sports Reference
+`IncompleteSync` retry policy; CBBD incomplete operations never renew their budget
+automatically.
 
 This is the most relevant job for ongoing nightly ingestion during a season.
 
@@ -130,20 +149,21 @@ Optional parameters:
 - `resume:` defaults to true and skips only completed `GameSyncDate` checkpoints in the window. False explicitly rescans completed dates.
 - `dedupe:` defaults to false; opt in to enqueue duplicate repair only after a fully successful sync. Ratings are never enqueued by this job.
 
-Each date gets an initial attempt and up to five retries with 5/10/20/40/80-second
+With Sports Reference each date gets an initial attempt and up to five retries with 5/10/20/40/80-second
 backoff. Imports and completion commit together; failed partial batches roll back.
 Recognized empty dates complete with zero rows; failures and interruptions remain
 failed/pending. Cumulative attempts, timestamps, row counts and last failure evidence
 are persisted. Existing game presence does not create checkpoints automatically.
 Completion certifies ingestion of a recognized source date, not finalization,
-complete publication, team matching or venue coverage. Ambiguous reconciliation
-fails the date rather than recording completion.
+complete publication or venue coverage. Unmatched, incomplete-final, rejected and
+protected reconciliation outcomes fail the date rather than recording completion.
 
 Later dates continue after exhaustion, then `IncompleteSync` raises with a JSON-ready
 report (`days`, exact `failed_dates`, bounding `retry_window`). Historical operator
 tasks invoke the job body directly so failures exit nonzero instead of silently
-enqueuing ActiveJob retries. Async jobs retain the existing job retry policy, with
-default resume skipping completed dates. The shared date lock prevents concurrent
+enqueuing ActiveJob retries. Sports Reference async jobs retain the existing job retry policy, with
+default resume skipping matching completed dates. CBBD uses one explicit run budget
+and does not automatically retry incomplete operations; see provider configuration below. The shared date lock prevents concurrent
 ingestion across sync/refresh/daily/team callers.
 
 This job is used by `season:sync_games` and the explicit legacy all-season
@@ -1176,6 +1196,88 @@ identities remain unmapped and every observation has `model_eligible: false`.
 Offline tests use small synthetic provider-shaped fixtures. They exercise failures,
 bounded splitting, replay and statistical edge cases, not provider-wide live payload
 coverage or an SLA. No production ingestion path consumes these observations yet.
+
+## Provider-aware sync and completion scope
+
+`SyncFullSeasonGamesJob`, `SyncDailyGamesJob`, `SyncNightlyGamesJob` and
+`FutureScheduleRefresh` select one provider for each operation. `GAME_SYNC_PROVIDER`
+defaults to `sports_reference`; Ruby callers can supply `provider:` and
+`provider_options:`. There is no fallback or provider blending. Historical and
+future windows use strict inclusive `YYYY-MM-DD` Eastern schedule dates inside the
+explicit season. A daily CBBD call requires `season_id:`. Nightly passes its target
+season through the same atomic date importer. Sports Reference past failures prevent
+rankings; successful nonempty past coverage can release rankings while future
+coverage remains explicitly incomplete. CBBD never automatically enqueues rankings.
+
+Apply the additive `ScopeGameSyncDatesToProvider` migration (`20261021130000`)
+before using these entry points. Completion now identifies season/date/provider/contract/semantic
+profile/adapter revision. Existing rows keep their attempts/status/error and are
+marked `legacy-unscoped`; they do not certify the current Sports Reference bridge
+or CBBD. The first current-scope run revisits them. Resume skips only matching
+completed dates; a normalization revision invalidates incompatible completion.
+Imports and date completion commit together under the shared provider-neutral date
+lock. Existing identity/bootstrap/game locks also serialize cross-provider games
+and known identities that move across dates. Unknown cross-provider moves remain
+held for review. Source absence never deletes or cancels a stored game.
+
+CBBD requires reviewed team mappings and explicit runtime configuration:
+
+- `CBBD_API_KEY` through the runtime environment; never include it in commands/logs.
+- `CBBD_CAPTURE_DIRECTORY`, a private writable evidence directory (captures are 0600,
+  directory 0700). It must persist for operator review/replay and needs an operator
+  retention/storage policy.
+- `CBBD_MAX_REQUESTS`, a positive integer covering both endpoints, partitions and
+  all retries for the entire operation.
+- `CBBD_RETRIES`, an explicit integer from 0 through 5 for bounded transport/quota
+  retries. No implicit production request ceiling or correction cadence is activated.
+
+Ruby `provider_options:` accepts corresponding `api_key`, `capture_directory`,
+`max_requests` and `retries` values. Do not serialize secrets into queued job
+arguments; use runtime environment configuration for async production jobs.
+CBBD acquires one bounded range across pending dates, then imports only those dates;
+completed interior dates can be retrieved between resume holes but are ignored.
+Empty pending sets make no source requests. Reports include provider scope,
+retrieval/acquisition completeness, request attempts/retries/quota, private manifest
+path, ignored observations, failed/deferred dates and retry windows. Private capture
+bodies and normalized source payloads stay out of these reports.
+
+Each date reports valid empty coverage, outcome counts, accepted/protected/rejected/
+unmatched/incomplete counts and final-box coverage separately. A recognized empty
+window can complete. Scheduled/live rows can succeed without final boxes; final
+rows missing required boxes, invalid/conflicting/ambiguous/unmatched rows and stale
+or superseded holds leave the date unfinished. Any earlier domain writes on that
+date roll back. Retained rejection audits have `accepted:false`, `game_id:nil` and
+an explicit `date_rolled_back` reason; failed reports mark `rolled_back` and zero
+committed accepted rows. Sports Reference and CBBD both classify final-box coverage
+from the current source observation as `complete`, `missing`, `invalid` or
+`not_final`; unchanged stored values cannot supply missing source boxes.
+`unknown` remains only for callers that provide no observation coverage metadata.
+Missing fields and zero values retain original availability evidence in the audit;
+no source update timestamp is inferred from capture time.
+
+CBBD date failures do not repeat acquisition, and ActiveJob does not automatically
+retry incomplete CBBD runs with a new budget. Operator tasks print structured
+reports and exit nonzero. Inspect the private manifest, repair mappings/evidence
+or wait for quota recovery, then explicitly resume with a fresh reviewed budget.
+An exception during acquisition is memoized as failed for the operation, so later
+dates do not renew it. Legacy scraper bounded retry behavior remains available.
+
+After reviewing operational scope and supplying the runtime configuration above:
+
+```bash
+GAME_SYNC_PROVIDER=cbbd YEAR=2026 SYNC_START_DATE=2025-11-01 SYNC_END_DATE=2025-11-03 bin/rails season:sync_games
+GAME_SYNC_PROVIDER=cbbd YEAR=2026 SYNC_START_DATE=2025-11-01 SYNC_END_DATE=2025-11-03 SYNC_RESUME=false bin/rails season:sync_games
+GAME_SYNC_PROVIDER=cbbd YEAR=2027 SCHEDULE_START_DATE=2026-11-01 SCHEDULE_END_DATE=2026-11-03 bin/rails season:refresh_schedule
+```
+
+`SYNC_RESUME=false` is an explicit correction rescan. Future refresh always revisits
+its bounded dates and reports absences only for fully successful dates, including
+globally seen moved-game IDs. Nightly CBBD additionally requires explicit
+`past_lookback_days:` and `future_end_date:` and refuses `enqueue_rankings:true`;
+there is no new scheduled CBBD activation. Review production mappings, budgets,
+correction/lookahead cadence and capture storage before enabling it. Verification
+uses synthetic HTTP responses and disposable databases; no live source coverage,
+quota plan or production operational readiness is established by the test suite.
 
 ## Offline CBBD identity reconciliation
 

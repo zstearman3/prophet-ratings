@@ -6,17 +6,18 @@ module Ingestion
     MAX_RETRIES = 3
     BASE_DELAY_SECONDS = 5
 
-    def initialize(season:, start_date:, end_date:)
+    def initialize(season:, start_date:, end_date:, **options)
       @season = season
-      @start_date = start_date
-      @end_date = end_date
+      @window = [start_date && HistoricalSyncWindow.parse_date(start_date), end_date && HistoricalSyncWindow.parse_date(end_date)]
       validate_window
+      @provider_run = GameSyncProvider.new(season:, dates: (self.start_date..self.end_date).to_a,
+                                           provider: options[:provider], options: options.fetch(:provider_options, {}))
     end
 
     def call
       days = (start_date..end_date).map { |date| refresh_day(date) }
       failed, @successful_days = days.partition { |day| day[:error] }
-      { year: season.year, days:, absent_ids: absent_games, failed_dates: failed.pluck(:date) }
+      sync_report(days, failed.pluck(:date))
     end
 
     def self.complete_coverage?(day)
@@ -25,7 +26,15 @@ module Ingestion
 
     private
 
-    attr_reader :season, :start_date, :end_date, :successful_days
+    attr_reader :season, :successful_days, :provider_run
+
+    def sync_report(days, failed_dates)
+      { year: season.year, days:, absent_ids: absent_games, failed_dates:, retry_window: GameSyncRun.retry_window(failed_dates),
+        complete: failed_dates.empty?, **provider_run.summary }
+    end
+
+    def start_date = @window.first
+    def end_date = @window.last
 
     def validate_window
       unless start_date && end_date && start_date <= end_date
@@ -58,7 +67,7 @@ module Ingestion
 
     def refresh_transaction(date)
       Game.transaction(requires_new: true) do
-        result = GamesIngestionService.new(date:, season:).call
+        result = provider_run.call(date)
         HistoricalSyncDay::ReconciliationError.validate(result)
 
         result
@@ -66,7 +75,7 @@ module Ingestion
     end
 
     def retry_or_report(date, error, attempt)
-      return { date:, error: "#{error.class}: #{error.message}" } if attempt >= MAX_RETRIES
+      return HistoricalSyncDay.failure_report(error).merge(date:) if provider_run.cbbd? || attempt >= MAX_RETRIES
 
       wait_before_retry(attempt)
       refresh_day(date, attempt: attempt + 1)

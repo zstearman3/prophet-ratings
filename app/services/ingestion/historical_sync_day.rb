@@ -5,19 +5,34 @@ module Ingestion
   class HistoricalSyncDay
     # Carries rejected evidence out of the date savepoint without preserving rolled-back foreign keys.
     class ReconciliationError < StandardError
-      attr_reader :rejections
+      attr_reader :rejections, :report
 
-      def initialize(reports)
-        @rejections = ::GameObservation.where(id: reports.map { |report| report[:observation_id] }).map do |record|
-          record.attributes.except('id', 'created_at', 'updated_at', 'game_id')
-        end
+      def initialize(result)
+        reports = result.fetch(:games).select { |game| GameSyncProvider.held?(game) }
+        @report = ReconciliationError.rollback_report(result)
+        @rejections = ReconciliationError.rejected_attributes(reports)
         super("Rejected source games: #{reports}")
       end
 
+      def self.rollback_report(result)
+        result.merge(complete: false, rolled_back: true, attempted_rows: result[:imported_rows], imported_rows: 0,
+                     counts: result.fetch(:counts, {}).merge(accepted: 0),
+                     games: result.fetch(:games).map do |game|
+                       game.merge(accepted: false, applied: false, game_id: nil, observation_id: nil)
+                     end)
+      end
+
+      def self.rejected_attributes(reports)
+        ::GameObservation.where(id: reports.map { |report| report[:observation_id] }).map do |record|
+          record.attributes.except('id', 'created_at', 'updated_at').merge(
+            'accepted' => false, 'game_id' => nil, 'reason' => "date_rolled_back: #{record.reason}"
+          )
+        end
+      end
+
       def self.validate(result)
-        failures = %w[invalid ambiguous conflict]
-        rejected = result.fetch(:games, []).select { |game| failures.include?(game[:outcome]) }
-        raise self, rejected if rejected.any?
+        rejected = result.fetch(:games, []).select { |game| GameSyncProvider.held?(game) }
+        raise self, result if rejected.any?
       end
 
       def retain
@@ -28,10 +43,10 @@ module Ingestion
     MAX_RETRIES = 5
     BASE_DELAY_SECONDS = 5
 
-    def initialize(season:, date:, resume:)
+    def initialize(season:, date:, resume:, provider_run: nil)
       @season = season
       @date = date
-      @resume = resume
+      @options = { resume:, provider_run: }
     end
 
     def call
@@ -43,13 +58,22 @@ module Ingestion
       error.retain if error.is_a?(ReconciliationError)
     end
 
+    def self.failure_report(error)
+      report = error.is_a?(ReconciliationError) ? error.report : {}
+      report.merge(error: "#{error.class}: #{error.message}")
+    end
+
     private
 
-    attr_reader :season, :date, :resume, :checkpoint
+    attr_reader :season, :date, :checkpoint
+
+    def provider_run
+      @options[:provider_run] ||= GameSyncProvider.new(season:, dates: [date])
+    end
 
     def sync_day
-      @checkpoint = GameSyncDate.find_or_create_by!(season:, schedule_date: date)
-      return { date:, status: 'skipped' } if resume && checkpoint.completed?
+      @checkpoint = GameSyncDate.find_or_create_by!(season:, schedule_date: date, **provider_run.scope)
+      return { date:, status: 'skipped' } if @options[:resume] && checkpoint.completed?
 
       ingest_with_retries
     end
@@ -63,7 +87,10 @@ module Ingestion
     end
 
     def retry_or_report(retries)
-      return { date:, status: 'failed', attempts: checkpoint.attempts, error: checkpoint.last_error } if retries >= MAX_RETRIES
+      if provider_run.cbbd? || retries >= MAX_RETRIES
+        return @options.fetch(:failure_report, {}).merge(date:, status: 'failed', attempts: checkpoint.attempts,
+                                                         error: checkpoint.last_error)
+      end
 
       sleep(BASE_DELAY_SECONDS * (2**retries))
       ingest_with_retries(retries + 1)
@@ -75,7 +102,7 @@ module Ingestion
 
     def import_transaction
       GameSyncDate.transaction(requires_new: true) do
-        result = GamesIngestionService.new(date:, season:).call
+        result = provider_run.call(date)
         ReconciliationError.validate(result)
         checkpoint.complete(result)
         result
@@ -83,8 +110,10 @@ module Ingestion
     end
 
     def record_failure(error)
-      self.class.retain_rejection(error)
+      day_class = self.class
+      day_class.retain_rejection(error)
       checkpoint.record_failure("#{error.class}: #{error.message}")
+      @options[:failure_report] = day_class.failure_report(error)
     end
   end
 end

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_21_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_21_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -166,7 +166,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_120000) do
     t.text "last_error"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index ["season_id", "schedule_date"], name: "index_game_sync_dates_on_season_id_and_schedule_date", unique: true
+    t.string "provider", default: "sports_reference", null: false
+    t.string "contract_version", default: "legacy-unscoped", null: false
+    t.string "semantic_profile", default: "sports-reference-legacy-v1", null: false
+    t.string "adapter_revision", default: "legacy-unscoped", null: false
+    t.index ["season_id", "schedule_date", "provider", "contract_version", "semantic_profile", "adapter_revision"], name: "index_game_sync_dates_on_provider_scope", unique: true
     t.index ["season_id"], name: "index_game_sync_dates_on_season_id"
   end
 

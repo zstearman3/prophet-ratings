@@ -18,7 +18,24 @@ module Importer
 
       def import_report(row, season: nil)
         observation = Ingestion::SportsReferenceObservationAdapter.new(row, season:).call
-        Ingestion::GameObservationImporter.new(observation:, season:).call
+        coverage = source_box_coverage(observation)
+        Ingestion::GameObservationImporter.new(observation:, season:).call.merge(final_box: coverage)
+      end
+
+      # Inspect a copy before canonical equality can conceal missing current-source inputs.
+      def source_box_coverage(observation)
+        source = Ingestion::GameObservation.new(observation.data).validate
+        return 'not_final' unless source.data[:source_status] == 'final'
+        return 'missing' unless source.strict_final?
+
+        complete_source_box(source)
+      rescue Ingestion::GameObservation::Invalid
+        'invalid'
+      end
+
+      def complete_source_box(source)
+        source.validate_duration
+        'complete'
       end
     end
   end

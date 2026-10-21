@@ -89,4 +89,17 @@ RSpec.describe Ingestion::HistoricalSyncDay do
       .and output(/HTTP 503/).to_stdout
     expect(SyncFullSeasonGamesJob).not_to have_received(:perform_later)
   end
+
+  it 'routes the configured CBBD provider and prints an incomplete report before exiting nonzero' do
+    season
+    ENV.update('GAME_SYNC_PROVIDER' => 'cbbd', 'CBBD_API_KEY' => 'synthetic',
+               'CBBD_CAPTURE_DIRECTORY' => '/tmp/synthetic', 'CBBD_MAX_REQUESTS' => '2', 'CBBD_RETRIES' => '0')
+    result = { 'complete' => false, 'observations' => [], 'acquisition' => { 'complete' => false, 'attempts' => 2 } }
+    adapter = instance_double(Ingestion::Cbbd::Adapter, call: result)
+    allow(Ingestion::Cbbd::Adapter).to receive(:new).and_return(adapter)
+    expect { invoke }.to raise_error(SystemExit, /Provider game sync incomplete/).and output(/"provider": "cbbd"/).to_stdout
+    expect(adapter).to have_received(:call).once
+    expect(Ingestion::GamesIngestionService).not_to have_received(:new)
+    expect(GameSyncDate.distinct.pluck(:status)).to eq(['failed'])
+  end
 end
