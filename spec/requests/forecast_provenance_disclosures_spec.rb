@@ -163,10 +163,9 @@ RSpec.describe 'Forecast provenance disclosures' do
       prediction = create_forecast(kind)
       create_forecast(kind, home_score: 88, revision_key: 'older', generated_at: game.start_time - 2.hours) if kind == 'pregame'
       create(:team_alias, team: participants.first.team, value: game.home_team_name, source: 'sports_reference')
-      Importer::GamesImporter.import_game(
-        { date: game.start_time, url: game.url, home_team: game.home_team_name, away_team: 'Unresolved Opponent',
-          home_team_score: 70, away_team_score: 60, source_completed: true }, season:
-      )
+      # Legacy stored unmatched results remain readable; new unresolved observations are audit-only.
+      game.update!(status: :final_unmatched, home_team_score: 70, away_team_score: 60)
+      game.away_team_game.destroy!
       expect(game.reload).to be_final_unmatched
       expect(game.away_team_game).to be_nil
       expect(game.current_prediction).to be_nil

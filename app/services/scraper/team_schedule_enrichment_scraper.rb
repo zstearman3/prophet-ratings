@@ -7,6 +7,7 @@ module Scraper
     def initialize(team:, season:)
       @team = team
       @season = season
+      @time_precision = 'date'
     end
 
     def schedule_data
@@ -48,6 +49,7 @@ module Scraper
       {
         date:,
         start_time: start_time_from(row, date),
+        time_precision: @time_precision,
         opponent_name:,
         game_location: row.at_css("td[data-stat='game_location']")&.text.to_s.strip,
         venue_name:,
@@ -71,19 +73,23 @@ module Scraper
     end
 
     def start_time_from(row, date)
+      @time_precision = 'date'
+      fallback = Game.schedule_time_for(date)
       time_text = row.at_css("td[data-stat='time_game']")&.text.to_s.strip
-      return date.in_time_zone if time_text.blank?
+      return fallback if time_text.blank?
 
       cleaned = time_text.downcase.delete('.')
       time_token = cleaned[/\A\d{1,2}:\d{2}(?:\s*[ap]m?)?/]
-      return date.in_time_zone if time_token.blank?
+      return fallback if time_token.blank?
 
       cleaned_time = time_token.delete(' ')
       cleaned_time = "#{cleaned_time}m" if cleaned_time.match?(/\A\d{1,2}:\d{2}[ap]\z/)
 
-      SPORTS_REFERENCE_TIME_ZONE.parse("#{date} #{cleaned_time}")&.in_time_zone || date.in_time_zone
+      parsed_time = SPORTS_REFERENCE_TIME_ZONE.parse("#{date} #{cleaned_time}")
+      @time_precision = 'instant' if parsed_time
+      parsed_time&.in_time_zone || fallback
     rescue StandardError
-      date.in_time_zone
+      Game.schedule_time_for(date)
     end
 
     def schedule_url

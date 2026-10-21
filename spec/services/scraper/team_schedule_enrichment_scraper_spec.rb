@@ -88,6 +88,7 @@ RSpec.describe Scraper::TeamScheduleEnrichmentScraper do
     {
       date: attrs[:date],
       start_time: ActiveSupport::TimeZone['Eastern Time (US & Canada)'].parse(attrs[:start_time]).in_time_zone,
+      time_precision: 'instant',
       opponent_name: attrs[:opponent_name],
       game_location: attrs[:game_location],
       venue_name: attrs[:venue_name],

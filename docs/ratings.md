@@ -1461,3 +1461,24 @@ No domain imports or ratings backfills are needed. Apply the additive anchor
 migration before using the new policy, then use the existing explicit preseason
 initialization/rebuild and model-selection safeguards. Existing outputs must not
 be relabeled to acquire missing anchors.
+
+
+## Canonical game input provenance
+
+`ingestion-v1` observations retain the accepted provider, source game key,
+semantic profile, raw/normalized evidence and actual upstream update time alongside
+canonical game changes. `official-team-totals-v1` means official player-plus-team
+rebounds excluding dead-ball rebounds and player-plus-team turnovers.
+`sports-reference-legacy-v1` explicitly retains the uncertified historical scraper
+basis. Identical alternate-profile observations do not relabel accepted provenance;
+changed cross-profile finals are held for review. Existing games without observation
+provenance are not backfilled or silently certified.
+
+The approved input semantics preserve all existing formula coefficients (including
+0.475 in possessions), finalizer math, model configuration hashes and published
+snapshots. Source acquisition never supplies derived possessions or ratings.
+Strict finalization recalculates eligible stored prediction outcome errors while
+preserving frozen forecast contexts/snapshot associations and participant mismatch
+safeguards. Historical input revision, model impact assessment and production
+cutover remain separate operator decisions. See [Data Ingestion](data-ingestion.md)
+for contract fields, freshness, audit outcomes and transactional rollback behavior.

@@ -79,6 +79,7 @@ RSpec.describe Scraper::GamesScraper do
       home_team_score: nil,
       away_team_score: nil,
       date: Game::SCHEDULE_TIME_ZONE.parse("#{date} 7:00pm").in_time_zone,
+      time_precision: 'instant',
       away_team_stats: {},
       home_team_stats: {},
       source_completed: false,

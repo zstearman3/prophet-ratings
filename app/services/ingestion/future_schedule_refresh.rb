@@ -19,6 +19,10 @@ module Ingestion
       { year: season.year, days:, absent_ids: absent_games, failed_dates: failed.pluck(:date) }
     end
 
+    def self.complete_coverage?(day)
+      day.fetch(:games, []).none? { |report| report.values_at(:scheduled, :game_id) == [true, nil] }
+    end
+
     private
 
     attr_reader :season, :start_date, :end_date, :successful_days
@@ -34,17 +38,31 @@ module Ingestion
 
     def absent_games
       seen_ids = successful_days.flat_map { |day| day.fetch(:games, []) }.filter_map { |game| game[:game_id] }
-      successful_days.pluck(:date).flat_map do |date|
+      absence_dates.flat_map do |date|
         season.games.scheduled.on_schedule_date(date).where.not(id: seen_ids).pluck(:id)
       end
     end
 
+    def absence_dates
+      successful_days.select { |day| self.class.complete_coverage?(day) }.pluck(:date)
+    end
+
     def refresh_day(date, attempt: 0)
       GamesIngestionService.with_date_lock(date) do
-        Game.transaction { GamesIngestionService.new(date:, season:).call }.merge(date:)
+        refresh_transaction(date).merge(date:)
       end
     rescue StandardError => error
+      HistoricalSyncDay.retain_rejection(error)
       retry_or_report(date, error, attempt)
+    end
+
+    def refresh_transaction(date)
+      Game.transaction(requires_new: true) do
+        result = GamesIngestionService.new(date:, season:).call
+        HistoricalSyncDay::ReconciliationError.validate(result)
+
+        result
+      end
     end
 
     def retry_or_report(date, error, attempt)

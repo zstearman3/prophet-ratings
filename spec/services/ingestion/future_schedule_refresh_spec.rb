@@ -60,6 +60,72 @@ RSpec.describe Ingestion::FutureScheduleRefresh do
     expect(refresh.call[:absent_ids]).to be_empty
   end
 
+  it 'fails dates with canonical conflicts rather than counting rejected rows as successful refreshes' do
+    allow(service).to receive(:call).and_return(imported_rows: 0, games: [{ outcome: 'conflict', reason: 'unknown_source_freshness' }])
+    result = refresh.call
+    expect(result[:failed_dates]).to eq((today..(today + 2.days)).to_a)
+    expect(result[:days].first[:error]).to include('Rejected source games', 'unknown_source_freshness')
+    expect(result[:absent_ids]).to be_empty
+  end
+
+  context 'with the real canonical service and adapter' do
+    let(:scraper) { instance_double(Scraper::GamesScraper) }
+    let(:home) { create(:team, school: 'Projected Home') }
+    let(:away) { create(:team, school: 'Projected Away') }
+    let(:row) do
+      { date: today, home_team: home.school, away_team: away.school, source_status: 'scheduled',
+        source_completed: false, url: 'https://www.sports-reference.com/cbb/boxscores/index.cgi?day=1' }
+    end
+    let(:refresh) { described_class.new(season:, start_date: today, end_date: today) }
+
+    before do
+      allow(Ingestion::GamesIngestionService).to receive(:new).and_call_original
+      allow(Scraper::GamesScraper).to receive(:new).with(today).and_return(scraper)
+      allow(scraper).to receive_messages(game_count: 1, to_json_in_batches: [row])
+      enrichment = instance_double(Scraper::TeamScheduleEnrichmentScraper, schedule_data: [])
+      allow(Scraper::TeamScheduleEnrichmentScraper).to receive(:new).and_return(enrichment)
+      [home, away].each { |team| create(:team_season, team:, season:) }
+    end
+
+    it 'matches and creates unlinked pregame schedules and counts changed and unchanged projections' do
+      absent = create(:game, season:, start_time: Game.schedule_time_for(today), status: :scheduled)
+      first = refresh.call
+      aggregate_failures do
+        expect(first[:failed_dates]).to be_empty
+        expect(first[:days].first[:imported_rows]).to eq(1)
+        game = Game.find(first[:days].first[:games].first[:game_id])
+        expect(game.home_team_season.team).to eq(home)
+        expect(first[:absent_ids]).to eq([absent.id])
+        second = refresh.call
+        expect(second[:days].first[:games].first).to include(game_id: game.id, outcome: 'unchanged', projected: true)
+        expect(second[:days].first[:imported_rows]).to eq(1)
+        expect(second[:absent_ids]).to eq([absent.id])
+      end
+    end
+
+    it 'suppresses every absence conclusion on a date with an unresolved scheduled row' do
+      game = create(:game, season:, start_time: Game.schedule_time_for(today), status: :scheduled)
+      allow(scraper).to receive(:to_json_in_batches).and_return([row.merge(away_team: 'Unknown visitor')])
+      result = refresh.call
+      expect(result[:failed_dates]).to be_empty
+      expect(result[:days].first[:games].first).to include(outcome: 'unmatched', applied: false)
+      expect(result[:absent_ids]).not_to include(game.id)
+    end
+
+    it 'fails an ambiguous date and rolls back earlier successful projections and their audits' do
+      other = create(:team, school: 'Ambiguous Visitor')
+      create(:team_alias, team: other, value: away.school, source: 'ambiguous')
+      safe = create(:team, school: 'Safe Visitor')
+      create(:team_season, team: safe, season:)
+      allow(scraper).to receive_messages(game_count: 2, to_json_in_batches: [row.merge(away_team: safe.school), row])
+      result = refresh.call
+      expect(result[:failed_dates]).to eq([today])
+      expect([Game.count, TeamGame.count, GameExternalIdentity.count]).to eq([0, 0, 0])
+      expect(GameObservation.where(outcome: 'projected').count).to eq(0)
+      expect(GameObservation.where(outcome: 'ambiguous').count).to eq(4)
+    end
+  end
+
   it 'rejects missing, reversed, historical and out-of-season windows before ingestion' do
     [[nil, today], [today + 1.day, today], [today - 1.day, today], [today, season.end_date + 1.day]].each do |first, last|
       expect { described_class.new(season:, start_date: first, end_date: last) }.to raise_error(ArgumentError)

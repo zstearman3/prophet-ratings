@@ -47,20 +47,13 @@ module Ingestion
     def import_rows(rows)
       enriched_rows = game_row_enricher.call(rows)
       games = import_games(enriched_rows)
-      { imported_rows: imported_count(enriched_rows, games), games: }
-    end
-
-    def imported_count(rows, games)
-      season ? games.count { |game| game[:outcome] != 'ambiguous' } : rows.size
+      { imported_rows: games.count { |game| game[:applied] }, games: }
     end
 
     def import_games(rows)
-      unless season
-        Importer::GamesImporter.import(rows)
-        return []
-      end
-
       validate_schedule_rows(rows)
+      return Importer::GamesImporter.import(rows) unless season
+
       rows.map { |row| Importer::ScheduleRowImporter.new(season:, row:).call }
     end
 

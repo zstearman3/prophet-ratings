@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_21_001000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_21_010000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -117,6 +117,26 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_001000) do
     t.index ["game_id"], name: "index_game_external_identities_on_game_id"
     t.index ["provider", "external_id"], name: "index_game_external_identities_on_provider_and_external_id", unique: true
     t.index ["provider", "game_id"], name: "index_game_external_identities_on_active_provider_game", unique: true, where: "(superseded_at IS NULL)"
+  end
+
+  create_table "game_observations", force: :cascade do |t|
+    t.bigint "game_id"
+    t.string "provider"
+    t.string "external_game_id"
+    t.string "semantic_profile"
+    t.string "outcome", null: false
+    t.text "reason"
+    t.boolean "accepted", default: false, null: false
+    t.jsonb "normalized_payload", default: {}, null: false
+    t.jsonb "raw_payload", default: {}, null: false
+    t.string "payload_digest"
+    t.datetime "captured_at"
+    t.datetime "source_updated_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["game_id", "accepted", "id"], name: "index_game_observations_on_game_id_and_accepted_and_id"
+    t.index ["game_id"], name: "index_game_observations_on_game_id"
+    t.index ["provider", "external_game_id"], name: "index_game_observations_on_provider_and_external_game_id"
   end
 
   create_table "game_odds", force: :cascade do |t|
@@ -670,6 +690,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_001000) do
   add_foreign_key "coaching_changes", "teams", column: "discovery_team_id"
   add_foreign_key "coaching_changes", "teams", column: "previous_team_id"
   add_foreign_key "game_external_identities", "games"
+  add_foreign_key "game_observations", "games"
   add_foreign_key "game_odds", "games"
   add_foreign_key "game_sync_dates", "seasons"
   add_foreign_key "offseason_input_revisions", "offseason_input_revisions", column: "predecessor_id"

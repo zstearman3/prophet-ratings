@@ -7,6 +7,7 @@ module Scraper
 
     def initialize(date = Game.current_schedule_date)
       @date = date
+      @time_precision = 'date'
     end
 
     def to_json(*_args)
@@ -118,6 +119,7 @@ module Scraper
         home_team_score: score_from_row(home_row),
         away_team_score: score_from_row(away_row),
         date: scheduled_start_time(time_from_rows(rows)),
+        time_precision: @time_precision,
         away_team_stats: {},
         home_team_stats: {},
         source_completed: source_completion_evidence.present?,
@@ -208,6 +210,7 @@ module Scraper
     end
 
     def scheduled_start_time(time_text)
+      @time_precision = 'date'
       return fallback_start_time if time_text.blank?
 
       cleaned = time_text.strip.downcase.delete('.')
@@ -218,8 +221,10 @@ module Scraper
       cleaned_time = "#{cleaned_time}m" if cleaned_time.match?(/\A\d{1,2}:\d{2}[ap]\z/)
 
       parsed_time = Game::SCHEDULE_TIME_ZONE.parse("#{@date} #{cleaned_time}")
+      @time_precision = 'instant' if parsed_time
       parsed_time&.in_time_zone || fallback_start_time
     rescue StandardError
+      @time_precision = 'date'
       fallback_start_time
     end
 
@@ -227,12 +232,18 @@ module Scraper
       return fallback_start_time if date_text.blank?
 
       parsed_time = Game::SCHEDULE_TIME_ZONE.parse(date_text)
+      record_completed_precision(date_text)
       parsed_time&.in_time_zone || fallback_start_time
     rescue StandardError
       fallback_start_time
     end
 
+    def record_completed_precision(date_text)
+      @time_precision = date_text.match?(/\d{1,2}:\d{2}/) ? 'instant' : 'date'
+    end
+
     def fallback_start_time
+      @time_precision = 'date'
       Game.schedule_time_for(@date)
     end
 
@@ -295,6 +306,7 @@ module Scraper
         home_team_score:,
         away_team_score:,
         date:,
+        time_precision: @time_precision,
         box_score_location:,
         away_team_stats:,
         home_team_stats:,
