@@ -1207,8 +1207,12 @@ Stable provider mappings precede labels. Bootstrap uses the union of exact canon
 names and aliases and requires existing target-season memberships. Games retain all
 matching participant pairs within the season; different-date pairs are possible
 reschedules, not proven identity. Reversed non-neutral sides, legacy midnight date
-shifts, manual venue classifications and multiple candidates require review. No
-fuzzy matching, membership creation, team creation or duplicate merging occurs.
+shifts and multiple candidates require review. A manual venue classification is
+retained as `manual_venue` evidence; by itself it does not escalate an otherwise
+clean, unique, ordered, same-date match beyond `proposed` or exclude it from read-only
+shadow comparisons. Existing manual venue values remain untouched. Every new mapping
+still requires an explicit reviewed decision. No fuzzy matching, membership creation,
+team creation or duplicate merging occurs.
 
 Write explicit decisions using IDs actually listed in the original report, e.g.:
 
