@@ -36,7 +36,18 @@ RSpec.describe 'Admin offseason setup' do
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include('Ending year 2027', "value=\"#{selected.id}\"", 'Review memberships, participation and dates',
-                                     'Departure review and model selection remain existing manual work')
+                                     'Departure review and model selection remain existing manual work',
+                                     'Use the ending year: 2027 means the 2026–27 season.')
+    document = response.parsed_body
+    year_field = document.at_css('input[name="preparation[year]"]')
+    expect(year_field['min']).to eq('2')
+    expect(year_field['max']).to eq('9999')
+    expect(year_field['required']).to eq('required')
+    expect(document.at_css('label[for="preparation_start_date"]').text).to include('(optional)')
+    expect(document.at_css('label[for="preparation_end_date"]').text).to include('(optional)')
+    expect(document.at_css('input[type="submit"][value="View season"]')['class'].split).to eq(
+      %w[bg-prophet-indigo hover:bg-prophet-indigo/80 text-white font-bold py-2 px-4 rounded inline-flex items-center space-x-2]
+    )
     expect(response.body.index('Prepare target season')).to be < response.body.index('Review memberships, participation and dates')
     expect(response.body).not_to include("season_id=#{first.id}")
   end

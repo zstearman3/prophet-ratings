@@ -8,7 +8,7 @@
 
   <section class="rounded border p-5 space-y-4" aria-labelledby="prepare-season-heading">
     <h2 id="prepare-season-heading" class="text-xl font-semibold">Prepare a target season</h2>
-    <p>Enter the ending year: 2027 means the 2026–27 season. Supported years are 2 through 9999. Leave dates blank to preserve existing dates or use the service defaults for a new season. Enter a date only when you intend to change it.</p>
+    <p>Use the ending year: 2027 means the 2026–27 season.</p>
     <%= form_with url: admin_offseason_setup_path, scope: :preparation, method: :post, data: { turbo: false }, class: 'grid gap-4 sm:grid-cols-3' do |form| %>
       <div><%= form.label :year, 'Ending year' %><%= form.number_field :year, value: @page[:preparation]['year'], min: 2, max: 9999, required: true, class: 'block w-full rounded border p-2' %></div>
       <div><%= form.label :start_date, 'Start date (optional)' %><%= form.date_field :start_date, value: @page[:preparation]['start_date'], class: 'block w-full rounded border p-2' %></div>
@@ -23,7 +23,7 @@
       <%= form_with url: admin_offseason_setup_path, method: :get, class: 'flex gap-2 items-end' do |form| %>
         <%= form.label :season_id, 'Target season', class: 'sr-only' %>
         <%= form.collection_select :season_id, @page[:seasons], :id, :year, { selected: @page[:season]&.id, prompt: 'Choose a season' }, class: 'rounded border p-2' %>
-        <%= form.submit 'View season', class: 'rounded border px-3 py-2' %>
+        <%= form.submit 'View season', class: 'bg-prophet-indigo hover:bg-prophet-indigo/80 text-white font-bold py-2 px-4 rounded inline-flex items-center space-x-2' %>
       <% end %>
     </div>
     <% if @page[:season] %>

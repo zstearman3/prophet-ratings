@@ -78,6 +78,13 @@ RSpec.describe 'layouts/_navbar' do
     expect(document.at_css('details[data-admin-navigation][open]')).not_to be_nil
     expect(document.at_css('a[aria-current="page"]')&.text).to include('Offseason setup')
     expect(document.css('details[data-admin-navigation] a').map { |link| link.text.strip }).to eq(['Offseason setup', 'Model analysis'])
+    parent_classes = document.at_css('details[data-admin-navigation]').parent['class'].split
+    submenu = document.at_css('details[data-admin-navigation] > ul')
+    submenu_classes = submenu['class'].split
+    expect({ parent: parent_classes, submenu: submenu_classes }).to match(
+      parent: include('md:relative'),
+      submenu: include('ml-5', 'border-l-2', 'border-purple-200', 'pl-3', 'md:right-0', 'md:ml-0', 'md:border-l')
+    )
     expect(document.at_css('nav')['data-action']).to include('keydown.esc->navbar#close')
   end
 
