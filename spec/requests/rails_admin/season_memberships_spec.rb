@@ -52,6 +52,7 @@ RSpec.describe 'RailsAdmin season membership review', type: :request do
       get path
       expect(response).to have_http_status(:ok)
       expect(response.body).to include('Fetch proposals from Sports Reference')
+      expect(response.body).to include("/admin/offseason_setup?season_id=#{season.id}")
       expect(scraper).not_to have_received(:call)
     end
 
@@ -60,6 +61,7 @@ RSpec.describe 'RailsAdmin season membership review', type: :request do
       expect(response).to redirect_to(path)
       follow_redirect!
       expect(response.body).to include('Example U', '2026 Membership', '2027 Proposed Membership', 'Big 12', 'not in D1')
+      expect(response.body).to include("/admin/offseason_setup?season_id=#{season.id}")
       expect(TeamConference.count).to eq(0)
       expect(season.reload.participation_review).to eq({})
     end

@@ -1,4 +1,5 @@
 <h2>Review <%= @object.year %> season memberships</h2>
+<p><%= link_to 'Back to offseason setup', main_app.admin_offseason_setup_path(season_id: @object.id), class: 'text-blue-700 underline' %></p>
 <% established = @object.current? || @object.rating_outputs? %>
 <p>Fetch and inspect proposals for any season. Full participation/date approval is available before preseason publication.</p>
 <% if established %>

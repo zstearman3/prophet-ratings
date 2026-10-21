@@ -1,5 +1,6 @@
 <section class="space-y-6 pb-10">
   <h1 class="text-3xl font-bold">Recruiting review</h1>
+  <% if @listing.fetch(:season) %><p><%= link_to 'Back to offseason setup', admin_offseason_setup_path(season_id: @listing.fetch(:season).id), class: 'text-blue-700 underline' %></p><% end %>
   <%= form_tag admin_recruiting_batches_path, method: :get do %>
     <%= label_tag :season_id, 'Target season' %>
     <%= select_tag :season_id, options_from_collection_for_select(@listing.fetch(:seasons), :id, :year, @listing.fetch(:season)&.id), class: 'border rounded p-2' %>

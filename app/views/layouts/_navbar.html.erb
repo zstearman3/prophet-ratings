@@ -46,6 +46,22 @@
             <span>Betting</span>
           <% end %>
         </li>
+        <% if user_signed_in? && current_user.admin? %>
+          <% admin_nav_current = request.path.start_with?('/admin/offseason_setup', '/admin/prediction_evaluation') %>
+          <li class="md:relative">
+            <details class="group rounded-lg" <%= 'open' if admin_nav_current %> data-admin-navigation>
+              <summary class="<%= nav_link_class %> <%= active_link_class if admin_nav_current %> list-none cursor-pointer" aria-label="Admin tools">
+                <span>Admin</span><span aria-hidden="true" class="text-xs">▾</span>
+              </summary>
+              <ul class="ml-5 border-l-2 border-purple-200 pl-3 md:absolute md:right-0 md:z-20 md:ml-0 md:mt-1 md:min-w-52 md:rounded-lg md:border md:border-l md:bg-white md:p-1 md:shadow-lg">
+                <% offseason_current = request.path.start_with?('/admin/offseason_setup') %>
+                <% analysis_current = request.path.start_with?('/admin/prediction_evaluation') %>
+                <li><%= link_to 'Offseason setup', admin_offseason_setup_path, aria: nav_link_aria.call(offseason_current), class: [nav_link_class, (active_link_class if offseason_current)].compact.join(' ') %></li>
+                <li><%= link_to 'Model analysis', admin_prediction_evaluation_path, aria: nav_link_aria.call(analysis_current), class: [nav_link_class, (active_link_class if analysis_current)].compact.join(' ') %></li>
+              </ul>
+            </details>
+          </li>
+        <% end %>
       </ul>
     </div>
   </div>

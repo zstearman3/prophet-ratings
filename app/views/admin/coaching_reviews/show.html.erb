@@ -1,5 +1,6 @@
 <% state = @page.fetch(:state) %>
 <section class="space-y-5 pb-10">
+  <% if (target_season = Season.find_by(year: @workflow.year)) %><%= link_to 'Back to offseason setup', admin_offseason_setup_path(season_id: target_season.id), class: 'text-blue-700 underline' %><% end %>
   <%= link_to 'All coaching years', admin_coaching_reviews_path, class: 'text-blue-700 underline' %>
   <h1 class="text-3xl font-bold">Review <%= @workflow.year %> coaching changes</h1>
   <% if notice %><p role="status" class="bg-green-100 p-3 rounded"><%= notice %></p><% end %>

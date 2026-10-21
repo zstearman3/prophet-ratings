@@ -26,6 +26,10 @@ RSpec.describe 'Admin coaching review workflow', type: :request do
     expect(response).to redirect_to(path)
     get path
     expect(response).to have_http_status(:ok)
+    expect(response.body).to include(admin_offseason_setup_path(season_id: season.id))
+    post "#{path}/candidate"
+    follow_redirect!
+    expect(response.body).to include("/admin/offseason_setup?season_id=#{season.id}")
     expect(response.body).to include('Fetch coaching changes', 'Save and mark year ready', 'Add a manual coaching candidate')
   end
 

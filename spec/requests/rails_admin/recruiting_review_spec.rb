@@ -42,9 +42,11 @@ RSpec.describe 'Admin recruiting dataset review', type: :request do
     expect(response).to redirect_to("#{path}?season_id=#{season.id}")
     get path, params: { season_id: season.id }
     expect(response.body).to include('Fetch recruiting data', '2026', '2027')
+    expect(response.body).to include(admin_offseason_setup_path(season_id: season.id))
     get batch_path
     expect(response).to have_http_status(:ok)
     expect(response.body).to include('Test College', '70.123456789123456789', 'Approve and publish recruiting inputs', 'Class points')
+    expect(response.body).to include(admin_offseason_setup_path(season_id: season.id))
     expect(response.body).not_to include('REVIEW_PATH', 'INPUT_HASH', 'base64')
     expect(OffseasonInputRevision.count).to eq(0)
   end
@@ -58,6 +60,7 @@ RSpec.describe 'Admin recruiting dataset review', type: :request do
     expect(response).to redirect_to("#{path}/#{record.id}")
     follow_redirect!
     expect(response.body).to include('background worker', 'Refresh status')
+    expect(response.body).to include(admin_offseason_setup_path(season_id: season.id))
   end
 
   it 'renders a failed report once without retrying it inside the error handler' do

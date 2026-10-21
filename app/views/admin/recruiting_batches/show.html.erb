@@ -1,4 +1,5 @@
 <section class="space-y-5 pb-10">
+  <%= link_to 'Back to offseason setup', admin_offseason_setup_path(season_id: @batch.season_id), class: 'text-blue-700 underline' %>
   <%= link_to 'All recruiting batches', admin_recruiting_batches_path(season_id: @batch.season_id), class: 'text-blue-700 underline' %>
   <h1 class="text-3xl font-bold">Review recruiting · <%= @batch.season.year %> season</h1>
   <% if notice %><p role="status" class="bg-green-100 p-3 rounded"><%= notice %></p><% end %>
