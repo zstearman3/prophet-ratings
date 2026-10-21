@@ -37,6 +37,7 @@
             <% if step.key == 'memberships' %><%= link_to 'Review memberships and participation', rails_admin.review_memberships_path(model_name: 'season', id: @page[:season].id), class: 'text-blue-700 underline' %><% end %>
             <% if step.key == 'recruiting' %><%= link_to 'Review recruiting batches', admin_recruiting_batches_path(season_id: @page[:season].id), class: 'text-blue-700 underline' %><% end %>
             <% if step.key == 'coaching' %><%= link_to 'Review coaching changes', admin_coaching_review_path(@page[:season].year), class: 'text-blue-700 underline' %><% end %>
+            <% if step.key == 'departures' %><%= link_to 'Review departure batches', admin_departure_batches_path(season_id: @page[:season].id), class: 'text-blue-700 underline' %><% end %>
             <% if step.key == 'preseason' %><%= link_to 'Model analysis', admin_prediction_evaluation_path, class: 'text-blue-700 underline' %><% end %>
           </li>
         <% end %>

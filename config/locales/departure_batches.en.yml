@@ -1,0 +1,14 @@
+{
+  "en": {
+    "admin": {
+      "departure_batches": {
+        "prepared": "Departure preparation saved.",
+        "saved": "Departure draft saved. Review the saved report before approval.",
+        "queued": "Acquisition queued; refresh to see worker progress.",
+        "recovered": "Saved HTML retained in a successor attempt.",
+        "published": "Reviewed departure inputs published. Model selection remains separate.",
+        "correction": "Correction draft opened using retained evidence; approval and acknowledgement cleared."
+      }
+    }
+  }
+}

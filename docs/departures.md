@@ -214,3 +214,50 @@ all player/team identity evidence, zero/excluded cases, denominator discrepancie
 missingness and the mapping hash. Save the actual dataset hash, separate
 `reviewed_revision` hash, reviewer/time, manifest and preview together. Preview
 hashes are provenance, not proof of human approval or historical availability.
+
+## Saved admin workflow
+
+From **Offseason setup → Review departure batches**, select a prepared target
+season. Save explicit draft, prior and target ending years, the actual expected
+pick numbers (exclude rescinded picks), and operator-selected supported HTTPS
+sources. Add/remove source rows with the form; school totals require the exact
+published school label and final overall scope evidence. No JSON, local paths or
+manual hashes are needed. At most 200 configured sources are accepted.
+
+Queue acquisition and refresh the batch page. The existing GoodJob worker must
+be running. Attempts expose queued/running/completed/incomplete/failed states;
+each source's original bytes and metadata are retained privately in PostgreSQL,
+including blocked HTTP responses. Duplicate deliveries do not refetch terminal
+attempts. A redelivered running attempt is marked interrupted; explicitly queue
+its successor. Earlier attempts are never relabelled or erased.
+
+If normal permitted access provides an original saved HTML response, use the
+recovery form. Supply its actual configured URL, successful HTTP status, capture
+and observation timestamps, and publication timestamp or an explicit unknown
+reason. Upload unchanged HTML (maximum 5 MiB); server-side hashing and the same
+source-specific parsers apply. Unsupported/wrong-season pages remain explicit
+failures. Recovery creates a successor attempt; it does not bypass restrictions.
+Original HTML downloads are admin-only attachments, never executed as app HTML.
+
+Every parsed selection from both rounds is listed. Save its accounting category,
+reason, captured evidence choices and school player/team mappings. Facts and
+production totals are read-only. To record multiple prior-season stints, fill the
+blank stint, save, then fill the next blank stint. No teams, aliases or memberships
+are created by this screen. Unfinished decisions can be saved and resumed; invalid
+identities, conflicting evidence, duplicates and invalid totals block approval.
+
+Review the saved report before explicitly approving it. Unknown/partial losses
+remain null; a verified zero requires the existing complete accounting contract.
+Allowed partial publication lists actual unresolved selections, missing expected
+picks, source failures and unknown target-team losses, and requires an explicit
+acknowledgement retained with reviewer/time and those exact gaps. Acknowledgement
+never overrides failed sources or other hard validation. Changed drafts/evidence,
+aliases, memberships, profiles or latest revisions require fresh review.
+
+Publication uses the existing immutable input revision/import contracts, retains
+the authenticated reviewer's email and time, and never calculates or activates
+ratings. Exact publication retries return the same revision without rewinding
+profile pointers. Start a correction with an explicit reason; its new draft can
+reuse the prior immutable capture for decision-only corrections, or acquire/recover
+new evidence. It receives fresh approval and gap acknowledgement. CLI/file workflows
+remain supported for compatibility.

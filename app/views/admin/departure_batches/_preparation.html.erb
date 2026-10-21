@@ -1,0 +1,21 @@
+<%= form_with url: destination, scope: :preparation, method: verb, data: { turbo: false }, class: 'space-y-3' do |form| %>
+  <%= hidden_field_tag :season_id, season.id %>
+  <% { 'draft_year' => 'Draft year', 'prior_season_year' => 'Prior season ending year', 'target_year' => 'Target ending year' }.each do |key, label| %>
+    <div><%= form.label key, label %> <%= form.number_field key, value: preparation[key], required: true %></div>
+  <% end %>
+  <div><%= form.label :expected_picks, 'Actual expected picks (comma or space separated; omit rescinded picks)' %><%= form.text_field :expected_picks, value: preparation['expected_picks'], required: true, class: 'block w-full border' %></div>
+  <p>Supported sources: official annual NBA results, Sidearm final overall totals, and retained identity/participation evidence. For school totals, explain final scope including postseason and excluding exhibitions. Maximum 200 sources.</p>
+  <% preparation.fetch('sources', {}).each do |key, source| %>
+    <fieldset class="border p-3 space-y-2"><legend>Source <%= key %></legend>
+      <%= fields_for "preparation[sources][#{key}]" do |entry| %>
+        <div><%= entry.label :type, 'Parser' %> <%= entry.select :type, Departures::SourceSnapshot::TYPES.map { |type| [type.humanize, type] }, selected: source['type'] %></div>
+        <div><%= entry.label :url, 'Original HTTPS URL' %><%= entry.url_field :url, value: source['url'], class: 'block w-full border' %></div>
+        <div><%= entry.label :team_name_source, 'School name exactly as published (school totals)' %><%= entry.text_field :team_name_source, value: source['team_name_source'] %></div>
+        <div><%= entry.label :scope_evidence, 'Final overall scope evidence (school totals)' %><%= entry.text_field :scope_evidence, value: source['scope_evidence'], class: 'block w-full border' %></div>
+        <%= entry.check_box :remove %><%= entry.label :remove, 'Remove source when saving' %>
+      <% end %>
+    </fieldset>
+  <% end %>
+  <%= button_tag 'Add source row', name: :add_source, value: '1', formnovalidate: true, class: 'border p-2' %>
+  <%= form.submit 'Save preparation', class: 'border p-2' %>
+<% end %>

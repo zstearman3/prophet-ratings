@@ -221,3 +221,14 @@ requires `source_reference`, `observed_on`, `input_units` and `manual_adjustment
 is `local_score`, returning minutes is `fraction`, manual adjustment is
 `points_per_100_possessions_per_side`. Nil means missing; zero means observed zero.
 Provider class points belong in reviewed input revisions, not these legacy fields.
+
+### Departure browser review
+
+Use **Offseason setup → Review departure batches** for saved preparation,
+background acquisition, original saved HTML recovery, resumable decisions and
+explicit publication. See [the departure workflow](departures.md#saved-admin-workflow)
+for supported sources and limits. Database-retained attempts and immutable revisions
+must be included in private backups. The browser needs the migration and GoodJob
+worker; it needs no capture directory. File/CLI callers retain their existing
+contracts. Publication only selects reviewed input evidence; model selection,
+preseason calculation and activation remain separate operations.

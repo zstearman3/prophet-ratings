@@ -15,6 +15,15 @@ Rails.application.routes.draw do
         post :candidate
       end
     end
+    resources :departure_batches, only: %i[index create show update] do
+      member do
+        post :acquire
+        post :recover
+        post :correct
+        patch :publish
+        get :source
+      end
+    end
     resources :recruiting_batches, only: %i[index create show update] do
       patch :publish, on: :member
     end

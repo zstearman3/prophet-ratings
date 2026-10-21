@@ -22,7 +22,7 @@ RSpec.describe OffseasonSetupProgress do
     expect(results).to eq(['Discovery queued; 0 pending candidates.',
                            'No participation approval is stored. No reviewed roster is stored.',
                            'Readiness review and activation remain separate operations; this dashboard does not activate seasons.',
-                           'Departure review and model selection remain existing manual work; this dashboard does not certify them.'])
+                           'Review departure batches and coverage; model selection remains manual.'])
   end
 
   it 'shows the latest queued recruiting attempt even when no approval exists' do

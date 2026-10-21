@@ -1,0 +1,54 @@
+<section class="mx-auto max-w-6xl space-y-5 pb-12">
+  <h1 class="text-3xl font-bold">Departure batch #<%= @batch.id %> · Target <%= @batch.season.year %></h1>
+  <p><%= link_to 'Back to offseason setup', admin_offseason_setup_path(season_id: @batch.season_id) %> · <%= link_to 'All departure batches', admin_departure_batches_path(season_id: @batch.season_id) %> · <%= link_to 'Refresh status', admin_departure_batch_path(@batch) %></p>
+  <% if notice %><p role="status"><%= notice %></p><% end %>
+  <% if @page[:error] %><p role="alert"><%= @page[:error] %></p><% end %>
+  <p>Batch: <%= @batch.status %>. Inputs only: publication does not calculate ratings or activate a season.</p>
+  <% if @batch.revision %><p>Published revision #<%= @batch.revision_id %> by <%= @batch.reviewed_by %> at <%= @batch.reviewed_at %>.</p><% end %>
+  <% if @batch.predecessor %><p>Correction of <%= link_to "batch ##{@batch.predecessor_id}", admin_departure_batch_path(@batch.predecessor) %>: <%= @batch.correction_reason %></p><% end %>
+  <% @batch.acquisitions.order(:id).each do |attempt| %>
+    <section class="border p-3"><h2 class="font-semibold">Attempt #<%= attempt.id %>: <%= attempt.status %></h2>
+      <p>Started <%= attempt.started_at %>; finished <%= attempt.finished_at %>; predecessor <%= attempt.predecessor_id %>. <%= attempt.failure %></p>
+      <% attempt.manifest.fetch('sources', []).each do |source| %>
+        <p><%= source['id'] %> · <%= link_to source['url'], source['url'] %> · HTTP <%= source['http_status'] %> · captured <%= source['captured_at'] %> · observed <%= source['observed_at'] %> · as of <%= source['source_as_of'] || source['source_as_of_reason'] %> · <%= source['failure'] %>
+          <% if source['snapshot_location'] %><%= link_to 'Download original HTML', source_admin_departure_batch_path(@batch, attempt_id: attempt.id, source_id: source['id']) %><% end %>
+        </p>
+      <% end %>
+      <% attempt.dataset.fetch('failures', []).each do |failure| %><p role="alert"><%= failure['id'] %>: <%= failure['failure'] %></p><% end %>
+    </section>
+  <% end %>
+  <% editable = @batch.status == 'draft' && !@batch.attempt&.status.in?(%w[queued running]) %>
+  <% if editable %>
+    <details><summary>Edit preparation (clears decisions)</summary><%= render 'preparation', preparation: @page[:preparation], season: @batch.season, destination: admin_departure_batch_path(@batch), verb: :patch %></details>
+    <%= button_to 'Queue acquisition', acquire_admin_departure_batch_path(@batch) %>
+    <% if @batch.attempt&.terminal? %>
+      <details><summary>Recover with saved HTML from permitted normal access</summary>
+        <p>Upload unchanged original HTML, at most 5 MiB. Supply the actual original URL and capture metadata; never bypass access restrictions. This retains a successor and clears decisions.</p>
+        <%= form_with url: recover_admin_departure_batch_path(@batch), scope: :recovery, multipart: true, data: { turbo: false } do |form| %>
+          <%= form.label :source_id, 'Source to replace' %><%= form.select :source_id, @batch.attempt.plan.fetch('sources').map { |source| ["#{source['id']} · #{source['url']}", source['id']] } %>
+          <% { url: 'Actual original URL', http_status: 'Actual HTTP status (200)', captured_at: 'Captured at (ISO 8601)', observed_at: 'Observed at (ISO 8601)', source_as_of: 'Source publication time (ISO 8601, if known)', source_as_of_reason: 'Reason publication time is unknown' }.each do |key, label| %><div><%= form.label key, label %><%= form.text_field key %></div><% end %>
+          <%= form.label :html, 'Original saved HTML' %><%= form.file_field :html, accept: '.html,text/html', required: true %><%= form.submit 'Retain recovery attempt' %>
+        <% end %>
+      </details>
+    <% end %>
+  <% end %>
+  <h2 class="text-xl font-semibold">Saved draft report</h2>
+  <% @page[:report].fetch('errors').each do |error| %><p role="alert"><%= error %></p><% end %>
+  <% @page[:report].fetch('gaps').each do |gap| %><p><%= gap %></p><% end %>
+  <table><thead><tr><th>Team</th><th>Known points</th><th>Team points</th><th>Loss share</th><th>Coverage</th></tr></thead><tbody>
+    <% @page[:report].fetch('teams').each do |row| %><tr><td><%= Team.find(row['team_id']).school %></td><td><%= row['known_points_subtotal'] %></td><td><%= row['team_points'] %></td><td><%= row['loss_share'].nil? ? 'Unknown / partial' : row['loss_share'] %></td><td><%= row['reason'] %></td></tr><% end %>
+  </tbody></table>
+  <% if editable && @batch.attempt&.dataset.present? %>
+    <%= render 'decisions' %>
+    <h2 class="text-xl font-semibold">Approve saved decisions</h2>
+    <p>Approval uses only saved decisions above. Review every listed gap before acknowledging partial publication. Failed sources, conflicting evidence and invalid facts cannot be acknowledged away.</p>
+    <%= form_with url: publish_admin_departure_batch_path(@batch), scope: :review, method: :patch, data: { turbo: false } do |form| %>
+      <%= form.hidden_field :review_key, value: @page[:review].review_key %>
+      <% if @page[:report].fetch('gaps').any? %><%= form.check_box :acknowledge_gaps %><%= form.label :acknowledge_gaps, 'I acknowledge each displayed coverage gap and unknown loss' %><% end %>
+      <%= form.check_box :confirm %><%= form.label :confirm, 'I approve these saved departure decisions' %><%= form.submit 'Publish reviewed inputs' %>
+    <% end %>
+  <% end %>
+  <% if @batch.status == 'published' %>
+    <%= form_with url: correct_admin_departure_batch_path(@batch), method: :post do |form| %><%= form.label :reason, 'Correction reason' %><%= form.text_field :reason, required: true %><%= form.submit 'Start correction with retained evidence' %><% end %>
+  <% end %>
+</section>

@@ -34,10 +34,7 @@ class OffseasonSetupProgress
   end
 
   def departures
-    revision = OffseasonInputRevision.where(season:, kind: 'departures').order(:id).last
-    result = revision ? "Departure revision ##{revision.id} is retained." : 'No reviewed departure revision is stored.'
-    Step.new(key: 'departures', label: 'Review departures and select model', status: 'manual', last_result: result,
-             next_action: 'Departure review and model selection remain existing manual work; this dashboard does not certify them.')
+    DepartureProgress.new(season).call
   end
 
   def preseason
