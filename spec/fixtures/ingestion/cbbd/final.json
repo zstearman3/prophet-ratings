@@ -1,0 +1,194 @@
+{
+  "games": [
+    {
+      "season": 2026,
+      "startDate": "2025-11-01T23:00:00Z",
+      "startTimeTbd": false,
+      "neutralSite": false,
+      "id": 1,
+      "status": "final",
+      "homeTeamId": 10,
+      "awayTeamId": 20,
+      "homeTeam": "Synthetic Home",
+      "awayTeam": "Synthetic Away",
+      "homePoints": 65,
+      "awayPoints": 64,
+      "homePeriodPoints": [
+        30,
+        35
+      ],
+      "awayPeriodPoints": [
+        30,
+        34
+      ]
+    }
+  ],
+  "boxes": [
+    {
+      "season": 2026,
+      "startDate": "2025-11-01T23:00:00Z",
+      "startTimeTbd": false,
+      "neutralSite": false,
+      "gameId": 1,
+      "teamId": 10,
+      "opponentId": 20,
+      "isHome": true,
+      "gameMinutes": 40,
+      "teamStats": {
+        "fieldGoals": {
+          "made": 25,
+          "attempted": 55
+        },
+        "twoPointFieldGoals": {
+          "made": 20,
+          "attempted": 40
+        },
+        "threePointFieldGoals": {
+          "made": 5,
+          "attempted": 15
+        },
+        "freeThrows": {
+          "made": 10,
+          "attempted": 12
+        },
+        "rebounds": {
+          "offensive": 10,
+          "defensive": 20,
+          "total": 30
+        },
+        "turnovers": {
+          "total": 10,
+          "teamTotal": 2
+        },
+        "fouls": {
+          "total": 15
+        },
+        "points": {
+          "total": 65
+        },
+        "assists": 12,
+        "blocks": 0,
+        "steals": 4
+      },
+      "opponentStats": {
+        "fieldGoals": {
+          "made": 25,
+          "attempted": 55
+        },
+        "twoPointFieldGoals": {
+          "made": 20,
+          "attempted": 40
+        },
+        "threePointFieldGoals": {
+          "made": 5,
+          "attempted": 15
+        },
+        "freeThrows": {
+          "made": 9,
+          "attempted": 12
+        },
+        "rebounds": {
+          "offensive": 10,
+          "defensive": 20,
+          "total": 30
+        },
+        "turnovers": {
+          "total": 10,
+          "teamTotal": 2
+        },
+        "fouls": {
+          "total": 15
+        },
+        "points": {
+          "total": 64
+        },
+        "assists": 12,
+        "blocks": 0,
+        "steals": 4
+      }
+    },
+    {
+      "season": 2026,
+      "startDate": "2025-11-01T23:00:00Z",
+      "startTimeTbd": false,
+      "neutralSite": false,
+      "gameId": 1,
+      "teamId": 20,
+      "opponentId": 10,
+      "isHome": false,
+      "gameMinutes": 40,
+      "teamStats": {
+        "fieldGoals": {
+          "made": 25,
+          "attempted": 55
+        },
+        "twoPointFieldGoals": {
+          "made": 20,
+          "attempted": 40
+        },
+        "threePointFieldGoals": {
+          "made": 5,
+          "attempted": 15
+        },
+        "freeThrows": {
+          "made": 9,
+          "attempted": 12
+        },
+        "rebounds": {
+          "offensive": 10,
+          "defensive": 20,
+          "total": 30
+        },
+        "turnovers": {
+          "total": 10,
+          "teamTotal": 2
+        },
+        "fouls": {
+          "total": 15
+        },
+        "points": {
+          "total": 64
+        },
+        "assists": 12,
+        "blocks": 0,
+        "steals": 4
+      },
+      "opponentStats": {
+        "fieldGoals": {
+          "made": 25,
+          "attempted": 55
+        },
+        "twoPointFieldGoals": {
+          "made": 20,
+          "attempted": 40
+        },
+        "threePointFieldGoals": {
+          "made": 5,
+          "attempted": 15
+        },
+        "freeThrows": {
+          "made": 10,
+          "attempted": 12
+        },
+        "rebounds": {
+          "offensive": 10,
+          "defensive": 20,
+          "total": 30
+        },
+        "turnovers": {
+          "total": 10,
+          "teamTotal": 2
+        },
+        "fouls": {
+          "total": 15
+        },
+        "points": {
+          "total": 65
+        },
+        "assists": 12,
+        "blocks": 0,
+        "steals": 4
+      }
+    }
+  ]
+}

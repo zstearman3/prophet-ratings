@@ -990,3 +990,101 @@ its rollback does not undo earlier deliberate input imports. Old captures retain
 their original evidence, so a correction requires a new model revision to affect
 future publication. See the checklist for explicit incomplete-preview reporting
 when annual evidence or stored history has not yet been supplied.
+
+## CBBD bounded dry run and replay
+
+`Ingestion::Cbbd::Adapter` is an additive, file-only acquisition adapter. It does
+not call the importer, resolve local team identities, write games, enqueue jobs,
+activate a provider or change ratings. Its canonical observations use format
+`ingestion-v1`, normalization version `1` and semantic profile
+`official-team-totals-v1`. This records the October 20, 2026 approved official team
+rebound/turnover basis separately from legacy data: rebounds include team rebounds
+and exclude dead-ball rebounds; `turnovers.total` includes team turnovers, with no
+addition/subtraction of `teamTotal`. Existing formula coefficients stay unchanged.
+Vendor possessions, ratings and Four Factors are excluded from canonical inputs.
+
+Supply the API key securely through `CBBD_API_KEY` in the runtime environment;
+never put it in command arguments, tracked files or reports. Example bounded
+commands, inside the application's configured runtime:
+
+```bash
+SEASON=2026 START_DATE=2025-11-01 END_DATE=2025-11-02 \
+  CAPTURE_DIRECTORY=/private/persistent/cbbd bundle exec rake cbbd:dry_run
+MANIFEST=/private/persistent/cbbd/run-UUID.json bundle exec rake cbbd:replay
+```
+
+Dates must be explicit strict `YYYY-MM-DD`, ordered and within July 1 through
+June 30 of the ending-year season. Bounds are inclusive Eastern calendar dates,
+converted to UTC through the last millisecond of the final date, including DST.
+These are source observation bounds, not a claim that every scheduled game has
+been published. The command prints a small JSON summary and private manifest path;
+acquisition failures, unresolved coverage, conflicting duplicates/metadata and
+orphan boxes exit nonzero. Missing/invalid numeric boxes are retained with reasons
+and counted separately; acquisition success is not statistical or model eligibility.
+
+The adapter reads `/games` and `/games/teams` only. Public OpenAPI 1.30.1 inspected
+October 20, 2026 describes both as returning up to 3,000 games, with inclusive
+`startDateRange`/`endDateRange`, no pagination. Retained feasibility evidence observed
+3,000 team rows. Both endpoints therefore conservatively treat **3,000 rows** as
+saturated. Saturation splits the same bounded interval into overlapping inclusive
+children. Identical identities deduplicate deterministically; disagreement remains
+incomplete with both references. Repeated duplicate rows count toward saturation.
+Saturation at a one-second interval is incomplete. The estimate starts at two
+requests; subdivision is data-dependent and is not an exact call estimate.
+
+Default limits are 50 total HTTP attempts across both endpoints, including retries,
+and two extra attempts per request. Ruby callers can lower `max_requests:` or change
+`retries:` (0–5); tests inject a small `row_cap:`. Timeout, transport/5xx and 429
+responses can retry with 1/2-second backoff. Numeric or HTTP-date `Retry-After` is
+honored; a delay above 30 seconds stops retries instead of waiting a shorter time.
+401/403 authentication, other HTTP failures (including redirects), malformed JSON
+and malformed envelopes are distinct non-retried outcomes. Redirects are never
+followed. Production quota/cap stability is not guaranteed; no authenticated live
+verification was performed for this implementation.
+
+Each attempt retains a unique immutable `.body` plus metadata `.json`: safe
+endpoint/filters, UTC capture time, status/outcome, digest/byte size and allowlisted
+quota/retry headers. Network exception messages are discarded. Credentials and
+request headers are never retained; exact API-key echoes are redacted from response
+bytes/allowed headers and sanitized bodies are labelled. Digests describe retained
+bytes after any redaction. Capture failures raise rather than claiming acquisition
+success. Files use mode 0600 and the explicit directory 0700. Choose a private
+persistent mounted directory when running in containers; application deployment does
+not provision one. The operator owns backups, retention and deliberate removal.
+Do not commit raw captures or share the directory as public assets.
+
+The run manifest records requested bounds, every attempt and partition, selected
+successful leaf capture IDs, original failures and deterministic duplicate/conflict
+decisions. Saturated parents and failed attempts remain separate evidence. Replay
+verifies **every** retained body digest, reconstructs only selected leaves and
+original duplicate decisions, then runs the current normalizer without API keys
+or HTTP. Original acquisition failures/completeness and capture times are preserved;
+replay cannot upgrade incomplete acquisition. Treat the manifest as trusted private
+input (body digests are integrity checks, not cryptographic authentication of the
+manifest). New source corrections require a new capture/run and never overwrite old
+evidence. Normalization versions identify changed interpretations on later replays.
+
+Every one of the 18 basic totals retains value, availability/reason, raw value,
+source path, units and derivation. Absent, null, blank and invalid values never turn
+into zero. Nonnegative representable integer counts and lossless trimmed digit
+strings are accepted; booleans, fractions, negatives and overflow are rejected.
+`gameMinutes` converts once to summed player minutes (40→200, 45→225), with equal
+side duration, regulation/OT grid, period, shooting, rebound, score and positive
+possession checks. Mirrors are checked when supplied, never used to fill missing
+authoritative totals. Conflicting participant/orientation/season/date/status/neutral
+metadata rejects the observation; orphan boxes remain visible in the report.
+
+Canonical statuses are scheduled/live/final/postponed/cancelled/unknown. Only literal
+source `final` with unequal valid integer scores and no contradictory box status
+confirms completion. A malformed final keeps its final claim and rejection reasons.
+Scheduled/postponed/cancelled zero scores are unknown placeholders with raw zeros
+retained. A timezone is required for an exact instant. A CBBD TBD timestamp supplies
+its Eastern schedule date by the provider timestamp convention, while the start
+instant stays null. Missing/invalid timestamps retain unknowns; no midnight is
+invented. Only `neutralSite: true` proves a neutral venue; false/absent leaves venue
+certainty unknown. Home/away orientation does not establish home venue. All internal
+identities remain unmapped and every observation has `model_eligible: false`.
+
+Offline tests use small synthetic provider-shaped fixtures. They exercise failures,
+bounded splitting, replay and statistical edge cases, not provider-wide live payload
+coverage or an SLA. No production ingestion path consumes these observations yet.
