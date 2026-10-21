@@ -1377,6 +1377,40 @@ parity is not required. No report, shadow or apply command writes Game, TeamGame
 predictions, rating snapshots or ingestion observations; no importer is activated
 and model formulas/official-team-total semantics remain unchanged.
 
+### CBBD membership directory evidence
+
+Season membership preparation uses the season-specific
+[official teams directory](https://api.collegebasketballdata.com/api/teams), whose
+object envelope contains `season`, `teams` and `conferences`. This is distinct from
+the game endpoints' array envelopes. The directory must echo the requested ending
+year, contain nonempty school/conference arrays, unique stable IDs, school and
+conference labels, and referenced conference metadata. Empty, malformed, mismatched
+year, duplicate/conflicting and HTTP/authentication/quota failures are actionable
+acquisition errors; they never replace the saved proposal. Bounded retries share
+the total request budget. No fetch-time identity or membership writes occur.
+
+The [upstream directory implementation](https://raw.githubusercontent.com/CFBD/cbb-api/main/src/app/teams/directory.ts)
+filters conference membership ranges by the requested season; a matching echo is
+request provenance, not proof of a complete Division I roster. Open-ended ranges
+may project forward and missing memberships may omit schools. The official
+[data availability guidance](https://api.collegebasketballdata.com/data-availability)
+also distinguishes availability from complete team/field coverage. No authenticated
+live population coverage was established by this implementation. Synthetic specs
+use invented school/conference labels and IDs against this documented envelope;
+they are contract fixtures, not copied or asserted live domain data.
+
+See [CBBD reviewed preparation](offseason.md#cbbd-reviewed-season-memberships) for
+exact-ID mapping, manual metadata setup, coverage attestation and target-only history
+rules. Review, mapping, correction and proposal publication hold the existing ratings
+advisory lock and bounded transaction table locks: `seasons`, then
+`team_external_identities`, then `conference_external_identities`, in SHARE ROW
+EXCLUSIVE mode with a three-second timeout. Locks precede the season row lock and
+fingerprint check, serialize identity mutations for the short decision transaction,
+and agree with reconciliation's seasons-before-team-identities order. No network
+request runs under these locks. Contention rolls back and requires retry; fingerprints
+also reject changes made during acquisition or since discovery. These locks do not
+make unrelated roster metadata writers obey the ratings advisory lock.
+
 ## Browser CBBD identity review
 
 Admins can open **Season → Review CBBD identities** (or `/admin/cbbd_review_runs`).
@@ -1385,7 +1419,7 @@ maximum request budget (1–10,000), and 0–5 retries. `CBBD_API_KEY` is read o
 the worker's environment; `CBBD_MAX_REQUESTS` and `CBBD_RETRIES` can supply form
 defaults. Both endpoints, all subdivisions and retries share that run's budget.
 GoodJob workers must run to acquire a queued run. Apply the additive
-`20261021140000` migration before using the screen.
+`20261021150000` migration before using the screen.
 
 This browser workflow stores redacted response bytes, metadata and the manifest
 privately in PostgreSQL. It needs no `CBBD_CAPTURE_DIRECTORY` or new storage

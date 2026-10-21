@@ -83,7 +83,7 @@ RSpec.describe 'RailsAdmin conference source mappings', type: :request do
     other = create(:conference, sports_reference_slugs: ['american'])
     post path, params: { operation: 'map_conferences', mapping: mapping_values }
     expect(response).to have_http_status(:unprocessable_content)
-    expect(response.body).to include('no longer an unmatched source conference')
+    expect(response.body).to include('Local roster')
     expect(other.reload.sports_reference_slugs).to eq(['american'])
     expect(conference.reload.sports_reference_slugs).to be_empty
   end

@@ -5,9 +5,12 @@ class SeasonSchoolImport
   FIELDS = %w[school nickname short_name location home_venue primary_color].freeze
 
   def self.pending(season)
-    source = season.membership_proposal.fetch('source_rows', []).map(&:symbolize_keys)
+    proposal = season.membership_proposal
+    source = proposal.fetch('source_rows', []).map(&:symbolize_keys)
     ready_ids = ready_team_ids(season)
-    ConferenceAlignmentMatch.resolve(source).zip(source).filter_map do |match, row|
+    SeasonMembershipProposal.resolve(source,
+                                     proposal.fetch('provider',
+                                                    'sports_reference')).zip(source).filter_map do |match, row|
       row.stringify_keys if awaiting_setup?(match, ready_ids)
     end
   end
@@ -63,12 +66,24 @@ class SeasonSchoolImport
 
   def source_row(submission)
     proposal = season.membership_proposal
-    unless proposal.present? && submission['proposal_key'] == SeasonMembershipProposal.digest(proposal)
-      raise ArgumentError, 'Proposal changed; reload and review the school import again.'
-    end
+    ensure_supported_provider(proposal)
+    validate_proposal(proposal, submission)
 
-    source = self.class.pending(season).find { |row| row.fetch('team_slug') == submission['team_slug'] }
-    source || raise(ArgumentError, 'School is no longer awaiting setup in this proposal; reload and review again.')
+    self.class.pending(season).find { |row| row.fetch('team_slug') == submission['team_slug'] } ||
+      raise(ArgumentError, 'School is no longer awaiting setup in this proposal; reload and review again.')
+  end
+
+  def validate_proposal(proposal, submission)
+    return if proposal.present? && submission['proposal_key'] == SeasonMembershipProposal.digest(proposal)
+
+    raise ArgumentError, 'Proposal changed; reload and review the school import again.'
+  end
+
+  def ensure_supported_provider(proposal)
+    return unless proposal['provider'] == 'cbbd'
+
+    raise ArgumentError,
+          'CBBD requires manual Team metadata with a supplied URL, TeamAlias, TeamSeason and exact TeamExternalIdentity; then fetch again.'
   end
 
   def import(submission)
@@ -81,7 +96,8 @@ class SeasonSchoolImport
 
   def rebuild_proposal
     proposal = season.membership_proposal
-    builder = SeasonMembershipProposal.new(season, source_year: proposal.fetch('source_year', season.year))
-    season.update!(membership_proposal: builder.rebuild(**proposal.slice('source_rows', 'source_url', 'captured_at').symbolize_keys))
+    builder = SeasonMembershipProposal.from_saved(season)
+    season.update!(membership_proposal: builder.rebuild(**proposal.slice('source_rows', 'source_url', 'captured_at',
+                                                                         'acquisition').symbolize_keys))
   end
 end

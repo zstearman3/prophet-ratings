@@ -56,6 +56,11 @@ class SeasonConferenceAlignment
   attr_reader :season, :result, :target_memberships
 
   def scraper
+    if ENV.fetch('GAME_SYNC_PROVIDER', 'sports_reference') == 'cbbd'
+      raise ArgumentError,
+            'CBBD requires season:prepare and reviewed memberships in RailsAdmin; use ALIGN_CONFERENCES=false after approval.'
+    end
+
     @scraper ||= Scraper::ConferenceStandingsScraper.new(year:)
   end
 

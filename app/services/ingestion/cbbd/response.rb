@@ -7,7 +7,8 @@ module Ingestion
       HEADERS = %w[retry-after x-ratelimit-limit x-ratelimit-remaining x-ratelimit-reset].freeze
       STATUS_FAILURES = { 401 => 'authentication', 403 => 'authentication', 429 => 'quota' }.freeze
 
-      def initialize(response, key)
+      def initialize(response, key, endpoint: nil)
+        @endpoint = endpoint
         @response = response
         @key = key
         @status = response[:status]
@@ -68,9 +69,13 @@ module Ingestion
         'http' unless @status == 200
       end
 
+      def valid_envelope?(rows)
+        @endpoint == '/teams/directory' ? rows.is_a?(Hash) : self.class.valid_rows?(rows)
+      end
+
       def parse
         rows = JSON.parse(body)
-        return { 'outcome' => 'malformed_envelope', 'rows' => [] } unless self.class.valid_rows?(rows)
+        return { 'outcome' => 'malformed_envelope', 'rows' => [] } unless valid_envelope?(rows)
 
         { 'outcome' => 'success', 'rows' => rows }
       rescue JSON::ParserError

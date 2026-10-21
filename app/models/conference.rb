@@ -17,6 +17,7 @@
 #  index_conferences_on_slug  (slug)
 #
 class Conference < ApplicationRecord
+  has_many :conference_external_identities, dependent: :restrict_with_error
   has_many :team_conferences, dependent: :destroy
 
   validate :sports_reference_slug_format

@@ -64,10 +64,10 @@ RSpec.describe Ingestion::Cbbd::ReviewAcquisition do
         { status: 200, body: fixture['games'].to_json, headers: {} }
       end
       # Terminate outside Client's bounded transport handling, as a killed worker would.
-      allow(Ingestion::Cbbd::Response).to receive(:new).and_wrap_original do |original, *arguments|
+      allow(Ingestion::Cbbd::Response).to receive(:new).and_wrap_original do |original, *arguments, **keywords|
         raise Interrupt, 'synthetic worker termination' if attempts > 1
 
-        original.call(*arguments)
+        original.call(*arguments, **keywords)
       end
       expect { described_class.new(run, api_key: 'private-key', transport: interrupted, row_cap:).call }.to raise_error(Interrupt)
       expect(run.reload.manifest).to include('finalized' => false)

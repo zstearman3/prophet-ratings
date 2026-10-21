@@ -404,7 +404,7 @@ verification or the test suite.
 
 ### CBBD admin review prerequisites
 
-The private browser review uses PostgreSQL tables from migration `20261021140000`
+The private browser review uses PostgreSQL tables from migration `20261021150000`
 and the existing admin session and GoodJob worker. Use `bin/migrate` with an
 isolated worktree Compose project/ports, then configure the worker's `CBBD_API_KEY`.
 The browser requests explicit finite request/retry limits; `CBBD_MAX_REQUESTS` and

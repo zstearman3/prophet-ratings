@@ -17,18 +17,23 @@
     Refresh only if another review is needed.</div>
 <% end %>
 <%= form_tag rails_admin.review_memberships_path(model_name: 'season', id: @object.id, operation: 'refresh'), method: :post, id: 'membership-refresh-form', data: { turbo: false }, class: 'd-inline-block' do %>
-  <%= button_tag 'Fetch proposals from Sports Reference', name: nil, class: 'btn btn-secondary' %>
+  <%= button_tag "Fetch proposals from #{ENV.fetch('GAME_SYNC_PROVIDER', 'sports_reference') == 'cbbd' ? 'CBBD' : 'Sports Reference'}", name: nil, class: 'btn btn-secondary' %>
 <% end %>
 <%= form_tag rails_admin.review_memberships_path(model_name: 'season', id: @object.id, operation: 'refresh_previous'), method: :post, id: 'membership-previous-form', data: { turbo: false }, class: 'd-inline-block' do %>
   <%= button_tag "Start from previous season (#{@object.year - 1})", name: nil, class: 'btn btn-secondary', disabled: @object.year <= 1 %>
 <% end %>
-<p>The previous-season option explicitly fetches that year's standings. It never silently substitutes older data.</p>
+<p>The previous-season option explicitly fetches that year's selected source directory or standings. It never silently substitutes older data.</p>
 <% proposal = @object.membership_proposal %>
 <% if proposal.present? %>
   <% carried_forward = proposal['source_year'].present? && proposal['source_year'] != proposal['target_year'] %>
   <% if carried_forward %>
     <div class="alert alert-warning">Target <%= proposal.fetch('target_year') %> proposal based on <%= proposal.fetch('source_year') %> memberships.
       Carried-forward rows are unverified for the target year. Check realignment, arrivals and departures before approving.</div>
+  <% end %>
+  <p>Retained provider: <%= proposal.fetch('provider', 'sports_reference') %>.</p>
+  <% if proposal['provider'] == 'cbbd' %>
+    <div class="alert alert-warning">CBBD season-filtered affiliations and a matching season echo do not prove complete Division I coverage or settled future realignment. Independently verify the complete target-year roster. Missing schools or conference metadata never establish departure or independence.</div>
+    <p>CBBD school IDs: <%= proposal.fetch('source_rows').map { |row| row.fetch('team_external_id') }.join(', ') %>. Private capture references are retained with this proposal.</p>
   <% end %>
   <p>Source year: <%= proposal.fetch('source_year', @object.year) %> · Target year: <%= @object.year %>.</p>
   <p>Source: <%= link_to proposal.fetch('source_url'), proposal.fetch('source_url'), target: '_blank', rel: 'noopener' %>
@@ -65,6 +70,10 @@
     <% if carried_forward %>
       <p><%= check_box_tag 'review[confirm_target_year]', '1', @review_values['confirm_target_year'] == '1' %>
         <%= label_tag 'review_confirm_target_year', "I verified the rows being approved against target-year #{@object.year} evidence, including carried-forward memberships." %></p>
+    <% end %>
+    <% if proposal['provider'] == 'cbbd' && !established %>
+      <p><%= check_box_tag 'review[confirm_source_coverage]', '1', @review_values['confirm_source_coverage'] == '1' %>
+        <%= label_tag 'review_confirm_source_coverage', 'I independently verified complete target-year roster/source coverage, including arrivals, departures and realignment.' %></p>
     <% end %>
     <% unless established %>
       <p>Absence does not prove departure from Division I. Choose N/A only after checking. Full approval saves all displayed decisions and dates;

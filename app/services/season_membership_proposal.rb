@@ -2,6 +2,23 @@
 
 # Captures source proposals without changing memberships or the approved roster.
 class SeasonMembershipProposal
+  def self.resolve(rows, provider)
+    { 'cbbd' => CbbdMembershipMatch }.fetch(provider, ConferenceAlignmentMatch).resolve(rows)
+  end
+
+  def self.from_saved(season)
+    proposal = season.membership_proposal
+    new(season, source_year: proposal.fetch('source_year', season.year), provider: proposal.fetch('provider', 'sports_reference'))
+  end
+
+  # Serialize identity writes with the fingerprint read and subsequent review writes.
+  # The fixed order also agrees with reconciliation's team-identity table lock.
+  def self.lock_identities
+    connection = ApplicationRecord.connection
+    connection.execute("SET LOCAL lock_timeout = '3s'")
+    connection.execute('LOCK TABLE seasons, team_external_identities, conference_external_identities IN SHARE ROW EXCLUSIVE MODE')
+  end
+
   def self.digest(value)
     Digest::SHA256.hexdigest(JSON.generate(canonical(value)))
   end
@@ -59,8 +76,10 @@ class SeasonMembershipProposal
     raise ArgumentError, 'Confirm target-year verification of the unverified previous-season draft before approval.'
   end
 
-  def initialize(season, source_year: season.year)
+  def initialize(season, source_year: season.year, **options)
     @season = season
+    @provider = options[:provider].presence || ENV.fetch('GAME_SYNC_PROVIDER', 'sports_reference')
+    @provider_options = options.fetch(:provider_options, {})
     @source_year = SeasonPreparer.parse_year(source_year)
     validate_source_year
   end
@@ -71,23 +90,28 @@ class SeasonMembershipProposal
   end
 
   def call
+    return capture_directory if @provider == 'cbbd'
+
     scraper = Scraper::ConferenceStandingsScraper.new(year: source_year)
     source = scraper.call
     build(source, source_url: scraper.source_url, captured_at: Time.current.iso8601)
   end
 
-  def rebuild(source_rows:, source_url:, captured_at:)
-    build(source_rows.map(&:symbolize_keys), source_url:, captured_at:)
+  def rebuild(source_rows:, source_url:, **evidence)
+    source = source_rows.map(&:symbolize_keys)
+    captured_at, acquisition = evidence.values_at(:captured_at, :acquisition)
+    build(source, source_url:, captured_at:).tap { |proposal| proposal['acquisition'] = acquisition if acquisition }
   end
 
   def build(source, source_url:, captured_at:)
-    Scraper::ConferenceStandingsScraper.validate!(source)
-    matches = ConferenceAlignmentMatch.resolve(source)
+    Scraper::ConferenceStandingsScraper.validate!(source) unless @provider == 'cbbd'
+    builder = self.class
+    matches = builder.resolve(source, @provider)
     {
-      'source_year' => source_year, 'target_year' => season.year,
+      'provider' => @provider, 'version' => 1, 'source_year' => source_year, 'target_year' => season.year,
       'source_url' => source_url, 'captured_at' => captured_at,
       'fingerprint' => fingerprint, 'source_rows' => source.as_json,
-      'issues' => self.class.issues(matches), 'rows' => proposed_rows(matches)
+      'issues' => builder.issues(matches), 'rows' => proposed_rows(matches)
     }
   end
 
@@ -97,7 +121,9 @@ class SeasonMembershipProposal
                         Team.order(:id).pluck(:id, :school, :url), TeamAlias.order(:id).pluck(:team_id, :value, :source),
                         Conference.order(:id).pluck(:id, :name, :slug, :abbreviation, :sports_reference_slugs),
                         TeamConference.order(:id).pluck(:id, :team_id, :conference_id, :start_season_id, :end_season_id),
-                        Season.order(:id).pluck(:id, :year), season.team_seasons.order(:id).pluck(:team_id)
+                        Season.order(:id).pluck(:id, :year), season.team_seasons.order(:id).pluck(:team_id),
+                        TeamExternalIdentity.order(:id).pluck(:provider, :external_id, :team_id),
+                        ConferenceExternalIdentity.order(:id).pluck(:provider, :external_id, :conference_id)
                       ])
   end
 
@@ -113,7 +139,15 @@ class SeasonMembershipProposal
 
   attr_reader :season, :source_year
 
+  def capture_directory
+    source = Ingestion::Cbbd::MembershipDirectory.new(source_year:, **@provider_options).call
+    build(source.fetch('source_rows'), **source.slice('source_url', 'captured_at').symbolize_keys)
+      .merge('acquisition' => source.fetch('acquisition'))
+  end
+
   def validate_source_year
+    raise ArgumentError, 'Unsupported membership provider' unless %w[sports_reference cbbd].include?(@provider)
+
     year = season.year
     return if [year, year - 1].include?(source_year)
 

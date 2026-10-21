@@ -39,8 +39,8 @@ class SeasonMembershipReview
     @season = season
   end
 
-  def refresh(source_year: season.year)
-    proposal = SeasonMembershipProposal.new(season.reload, source_year:).capture
+  def refresh(source_year: season.year, provider: nil, provider_options: {})
+    proposal = SeasonMembershipProposal.new(season.reload, source_year:, provider:, provider_options:).capture
     locked do
       verify_capture(proposal)
       season.update!(membership_proposal: proposal)
@@ -64,7 +64,10 @@ class SeasonMembershipReview
 
   def locked(&)
     Season.with_ratings_lock do
-      season.with_lock(&)
+      Season.transaction do
+        SeasonMembershipProposal.lock_identities
+        season.with_lock(&)
+      end
     end
   end
 
@@ -83,9 +86,17 @@ class SeasonMembershipReview
 
   def publish_review
     decisions = review_decisions
-    SeasonMembershipAssignment.new(season).call(decisions)
+    assign_memberships(decisions)
     save_participation(decisions)
     season.update!(membership_proposal: {})
+  end
+
+  def assign_memberships(decisions)
+    if season.membership_proposal['provider'] == 'cbbd'
+      decisions.each { |decision| SeasonConferenceYearAssignment.new(season, decision).call }
+    else
+      SeasonMembershipAssignment.new(season).call(decisions)
+    end
   end
 
   def review_decisions
@@ -97,6 +108,9 @@ class SeasonMembershipReview
   def validate_proposal
     proposal = SeasonMembershipProposal.new(season).reviewed(submission)
     raise ArgumentError, 'Resolve source identities and refresh before approval.' if proposal.fetch('issues').any?
+    return unless proposal['provider'] == 'cbbd' && submission['confirm_source_coverage'] != '1'
+
+    raise ArgumentError, 'Confirm manual target-year source coverage verification before approval.'
   end
 
   def save_participation(decisions)
@@ -115,7 +129,8 @@ class SeasonMembershipReview
       'dates' => { 'start_date' => season.start_date.iso8601, 'end_date' => season.end_date.iso8601, 'evidence' => evidence },
       'teams' => decisions.map { |decision| decision.slice('team_id', 'status', 'reason') }, 'unresolved_identities' => [],
       'membership_source' => season.membership_proposal, 'membership_decisions' => decisions,
-      'target_year_confirmed' => submission['confirm_target_year'] == '1'
+      'target_year_confirmed' => submission['confirm_target_year'] == '1',
+      'source_coverage_confirmed' => submission['confirm_source_coverage'] == '1'
     }
   end
 end
