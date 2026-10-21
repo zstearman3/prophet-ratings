@@ -28,7 +28,14 @@ export default class extends Controller {
     if (control === document.activeElement) control.blur()
   }
 
-  close() {
+  close(event) {
+    const disclosure = event?.target?.closest?.('nav')?.querySelector('details[open]')
+    if (disclosure?.contains(document.activeElement)) {
+      const summary = disclosure.querySelector('summary')
+      disclosure.open = false
+      summary?.focus()
+    }
+
     if (!this.stateValue || this.breakpoint.matches) return
 
     this.stateValue = false

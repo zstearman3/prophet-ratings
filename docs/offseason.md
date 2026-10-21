@@ -3,6 +3,27 @@
 Prepare → review roster/conferences → review inputs → publish preseason → refresh
 schedule → activate. Setup never requires a published schedule.
 
+Admins can open **Admin → Offseason setup** for a season-specific dashboard and
+**Admin → Model analysis** for existing prediction evaluation. The dashboard
+links to the existing membership, recruiting and coaching reviews and returns to
+the selected target season from those screens. Its fixed progress sequence is a
+summary of stored evidence, recalculated on every page load; opening it does not
+create review records or fetch source data. Membership and input reviews remain
+independent actions. A changed membership/date or recruiting source/mapping can
+make only that evidence step require review again while its historical approval
+remains available. Coaching readiness follows the existing review's stored ready
+flag and pending candidates. Later preseason, schedule and activation steps are
+shown as manual/runbook work; the dashboard does not certify or execute them.
+
+On the dashboard, enter the season's **ending year** (2027 means 2026–27). The
+UI accepts 2–9999. Blank start/end dates preserve dates on an existing season,
+or use `season:prepare` defaults for a new one. Enter a date only when making an
+intentional date change. Preparation is locked and transactional, creates missing
+TeamSeason rows, and never selects the season as current or resets ratings.
+Recruiting capture is offered as an actionable next step only when its source
+supports the prior year (target ending years 1901–2201); outside that range the
+dashboard directs the operator to manual review.
+
 `YEAR=2027` means 2026–27. Run commands in the intended Rails environment; locally,
 prefix `bin/rails` with `bin/compose exec web` in an
 [isolated development stack](development.md). Dates below are examples, not verified

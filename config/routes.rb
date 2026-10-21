@@ -2,6 +2,8 @@
 
 Rails.application.routes.draw do
   namespace :admin do
+    get 'offseason_setup', to: 'offseason_setups#show', as: :offseason_setup
+    post 'offseason_setup', to: 'offseason_setups#create'
     resource :prediction_evaluation, only: :show
     resources :coaching_reviews, only: %i[index show update] do
       member do

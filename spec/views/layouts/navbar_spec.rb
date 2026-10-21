@@ -3,6 +3,8 @@
 require 'rails_helper'
 
 RSpec.describe 'layouts/_navbar' do
+  before { allow(view).to receive(:user_signed_in?).and_return(false) }
+
   it 'renders the four destinations with the current date in the schedule link and preserves the home logo' do
     allow(Date).to receive(:current).and_return(Date.new(2026, 10, 19))
     render partial: 'layouts/navbar'
@@ -64,6 +66,27 @@ RSpec.describe 'layouts/_navbar' do
     expect(toggle['aria-label']).to eq('Expand menu')
     expect(document.at_css('#navbar-menu.hidden')).not_to be_nil
     expect(document.at_css('nav')['data-action'].split).to include('pointerdown->navbar#blurAlreadyFocusedControl:capture')
+  end
+
+  it 'shows admin destinations only to admins and marks the active admin link' do
+    allow(view).to receive_messages(user_signed_in?: true, current_user: build_stubbed(:user, :admin))
+    allow(view.request).to receive(:path).and_return('/admin/offseason_setup')
+
+    render partial: 'layouts/navbar'
+
+    document = Nokogiri::HTML(rendered)
+    expect(document.at_css('details[data-admin-navigation][open]')).not_to be_nil
+    expect(document.at_css('a[aria-current="page"]')&.text).to include('Offseason setup')
+    expect(document.css('details[data-admin-navigation] a').map { |link| link.text.strip }).to eq(['Offseason setup', 'Model analysis'])
+    expect(document.at_css('nav')['data-action']).to include('keydown.esc->navbar#close')
+  end
+
+  it 'omits admin destinations for signed-in non-admins' do
+    allow(view).to receive_messages(user_signed_in?: true, current_user: build_stubbed(:user))
+
+    render partial: 'layouts/navbar'
+
+    expect(Nokogiri::HTML(rendered).at_css('details[data-admin-navigation]')).to be_nil
   end
 
   it 'shows navbar focus rings only for keyboard-visible focus' do

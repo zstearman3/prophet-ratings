@@ -1,0 +1,48 @@
+<section class="mx-auto max-w-5xl space-y-8 pb-12">
+  <header class="space-y-2">
+    <h1 class="text-3xl font-bold">Offseason setup</h1>
+    <p>Prepare one target season, review its stored evidence and return to existing review tools. Progress is recalculated from persisted records whenever this page loads.</p>
+    <% if notice %><p role="status" class="rounded bg-green-100 p-3"><%= notice %></p><% end %>
+    <% if @page[:error] %><p role="alert" class="rounded bg-red-100 p-3"><%= @page[:error] %></p><% end %>
+  </header>
+
+  <section class="rounded border p-5 space-y-4" aria-labelledby="prepare-season-heading">
+    <h2 id="prepare-season-heading" class="text-xl font-semibold">Prepare a target season</h2>
+    <p>Enter the ending year: 2027 means the 2026–27 season. Supported years are 2 through 9999. Leave dates blank to preserve existing dates or use the service defaults for a new season. Enter a date only when you intend to change it.</p>
+    <%= form_with url: admin_offseason_setup_path, scope: :preparation, method: :post, data: { turbo: false }, class: 'grid gap-4 sm:grid-cols-3' do |form| %>
+      <div><%= form.label :year, 'Ending year' %><%= form.number_field :year, value: @page[:preparation]['year'], min: 2, max: 9999, required: true, class: 'block w-full rounded border p-2' %></div>
+      <div><%= form.label :start_date, 'Start date (optional)' %><%= form.date_field :start_date, value: @page[:preparation]['start_date'], class: 'block w-full rounded border p-2' %></div>
+      <div><%= form.label :end_date, 'End date (optional)' %><%= form.date_field :end_date, value: @page[:preparation]['end_date'], class: 'block w-full rounded border p-2' %></div>
+      <div class="sm:col-span-3"><%= form.submit 'Prepare season', class: 'rounded bg-prophet-indigo px-4 py-2 text-white' %></div>
+    <% end %>
+  </section>
+
+  <section class="space-y-4" aria-labelledby="season-progress-heading">
+    <div class="flex flex-wrap items-end justify-between gap-3">
+      <div><h2 id="season-progress-heading" class="text-2xl font-semibold">Season progress</h2><p>Select an existing target to inspect its evidence and review links.</p></div>
+      <%= form_with url: admin_offseason_setup_path, method: :get, class: 'flex gap-2 items-end' do |form| %>
+        <%= form.label :season_id, 'Target season', class: 'sr-only' %>
+        <%= form.collection_select :season_id, @page[:seasons], :id, :year, { selected: @page[:season]&.id, prompt: 'Choose a season' }, class: 'rounded border p-2' %>
+        <%= form.submit 'View season', class: 'rounded border px-3 py-2' %>
+      <% end %>
+    </div>
+    <% if @page[:season] %>
+      <p class="text-lg font-medium"><%= @page[:season].name.presence || "Ending year #{@page[:season].year}" %> · <%= @page[:season].start_date %> to <%= @page[:season].end_date %><%= ' · Current season' if @page[:season].current? %></p>
+      <ol class="space-y-3">
+        <% @page[:steps].each do |step| %>
+          <li class="rounded border p-4 space-y-2">
+            <div class="flex flex-wrap justify-between gap-2"><h3 class="font-semibold"><%= step.label %></h3><span class="rounded bg-gray-100 px-2 py-1 text-sm"><%= step.status.humanize %></span></div>
+            <p><%= step.last_result %></p>
+            <p class="text-sm"><strong>Next action:</strong> <%= step.next_action %></p>
+            <% if step.key == 'memberships' %><%= link_to 'Review memberships and participation', rails_admin.review_memberships_path(model_name: 'season', id: @page[:season].id), class: 'text-blue-700 underline' %><% end %>
+            <% if step.key == 'recruiting' %><%= link_to 'Review recruiting batches', admin_recruiting_batches_path(season_id: @page[:season].id), class: 'text-blue-700 underline' %><% end %>
+            <% if step.key == 'coaching' %><%= link_to 'Review coaching changes', admin_coaching_review_path(@page[:season].year), class: 'text-blue-700 underline' %><% end %>
+            <% if step.key == 'preseason' %><%= link_to 'Model analysis', admin_prediction_evaluation_path, class: 'text-blue-700 underline' %><% end %>
+          </li>
+        <% end %>
+      </ol>
+    <% else %>
+      <p>No target season is stored yet. Prepare one above; this screen will not create records on page load.</p>
+    <% end %>
+  </section>
+</section>
