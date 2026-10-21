@@ -41,6 +41,13 @@ module Ingestion
         row.fetch('status', row['category'])
       end
 
+      def self.value_matches?(value, query)
+        items = value.is_a?(Hash) ? value.values : value
+        return items.any? { |item| value_matches?(item, query) } if items.is_a?(Array)
+
+        items.to_s.downcase.include?(query)
+      end
+
       private
 
       def source_rows(report)
@@ -54,9 +61,10 @@ module Ingestion
       end
 
       def matches?(row)
+        matcher = self.class
         status = @filters['status']
         query = @filters['q'].to_s.downcase
-        (status.blank? || status == self.class.row_status(row)) && row.to_json.downcase.include?(query)
+        (status.blank? || status == matcher.row_status(row)) && (query.empty? || matcher.value_matches?(row, query))
       end
     end
   end

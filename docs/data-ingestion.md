@@ -1407,7 +1407,10 @@ with a prominent incomplete warning; replay never upgrades their original result
 **Refresh comparison from retained evidence** verifies digests and creates an exact
 immutable report/replay version using the originally stored normalized evidence.
 It makes no HTTP requests and does not automatically renormalize old captures.
-Team/game tables filter by status and name/ID and paginate at 50 rows. Shadow
+Team/game tables filter by status and name/ID and paginate at 50 rows. Search
+matches literal evidence values case-insensitively, including nested values, rather
+than JSON field names or escaped characters. Team dropdowns offer only candidates
+with target-season membership; an empty eligible list offers no target. Shadow
 mismatches also paginate at 50 rows and filter by category or field/value/ID. Inspect
 source/local participant, time, venue, manual correction, reschedule and duplicate
 evidence, denominators and shadow category/field/value evidence before choosing

@@ -19,7 +19,11 @@ module Admin
     end
 
     def cbbd_target_options(row)
-      row.fetch('candidate_ids').map { |id| ["#{cbbd_target_label(id)} (#{id})", id] }
+      CbbdReviewRunsHelper.target_ids(row).map { |id| ["#{cbbd_target_label(id)} (#{id})", id] }
+    end
+
+    def self.target_ids(row)
+      row.fetch('eligible_ids') { row.fetch('candidate_ids') }
     end
 
     def cbbd_target_label(id)

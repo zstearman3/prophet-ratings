@@ -34,6 +34,13 @@ RSpec.describe 'Admin CBBD identity review', type: :request do
     queries
   end
 
+  def candidate_select(external_id)
+    row = response.parsed_body.css('tbody tr').find do |entry|
+      entry.at_css('input[name$="[external_id]"]')&.[]('value') == external_id
+    end
+    row.at_css('select[name$="[local_id]"]')
+  end
+
   it 'guards every endpoint with the existing admin session' do
     get admin_cbbd_review_runs_path
     expect(response).to redirect_to(new_user_session_path)
@@ -204,5 +211,45 @@ RSpec.describe 'Admin CBBD identity review', type: :request do
     expect(response.body).to include('Comparison version 1', 'Application history', 'Synthetic review', 'Synthetic Home')
     expect(run.review_comparison(applied.version)).to have_attributes(report: applied.report, replay: applied.replay,
                                                                       draft: applied.reload.draft)
+  end
+
+  it 'offers only target-season-eligible team options while another visible row can be saved' do
+    sign_in admin
+    outsider = create(:team, school: 'Synthetic outsider without membership')
+    create(:team_alias, team: outsider, value: teams.first.school)
+    comparison = Ingestion::Reconciliation::RunReview.new(run).compare
+    get admin_cbbd_review_run_path(run)
+    options = candidate_select('10').css('option')
+    expect(options.pluck('value')).to eq(['', teams.first.id.to_s])
+    expect(options.last.text).to eq("#{teams.first.school} (#{teams.first.id})")
+    expect(comparison.report['teams'].find { |row| row['external_id'] == '10' }['candidate_ids']).to include(outsider.id)
+    patch admin_cbbd_review_run_path(run), params: {
+      review: { comparison_id: comparison.id, draft_revision: 0, rows: {
+        '0' => { entity: 'team', external_id: '10', local_id: '', selected: '0', deferred: '0', action: 'associate' },
+        '1' => { entity: 'team', external_id: '20', local_id: teams.last.id, selected: '1', deferred: '0', action: 'associate' }
+      } }
+    }
+    expect(response).to have_http_status(:redirect)
+    expect(comparison.reload.selected_choices).to eq([choices.second])
+  end
+
+  it 'keeps a team dropdown empty when all exact candidates lack target-season membership' do
+    sign_in admin
+    teams.first.team_seasons.find_by!(season:).destroy!
+    comparison = Ingestion::Reconciliation::RunReview.new(run).compare
+    row = comparison.report['teams'].find { |entry| entry['external_id'] == '10' }
+    expect(row).to include('candidate_ids' => [teams.first.id], 'eligible_ids' => [])
+    get admin_cbbd_review_run_path(run)
+    expect(candidate_select('10').css('option').pluck('value')).to eq([''])
+  end
+
+  it 'keeps game candidate labels and IDs when there is no separate eligibility list' do
+    sign_in admin
+    game
+    Ingestion::Reconciliation::RunReview.new(run).compare
+    get admin_cbbd_review_run_path(run, entity: 'game')
+    options = candidate_select('1').css('option')
+    expect(options.pluck('value')).to eq(['', game.id.to_s])
+    expect(options.last.text).to eq("#{game.home_team_name} / #{game.away_team_name} (#{game.id})")
   end
 end
