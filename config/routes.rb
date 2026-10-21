@@ -4,6 +4,10 @@ Rails.application.routes.draw do
   namespace :admin do
     get 'offseason_setup', to: 'offseason_setups#show', as: :offseason_setup
     post 'offseason_setup', to: 'offseason_setups#create'
+    resources :cbbd_review_runs, only: %i[index create show update] do
+      post :compare, on: :member
+      post :apply, on: :member
+    end
     resource :prediction_evaluation, only: :show
     resources :coaching_reviews, only: %i[index show update] do
       member do

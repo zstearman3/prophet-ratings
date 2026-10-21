@@ -401,3 +401,16 @@ successful pulls delete it unless `--keep-dump` is supplied. After a failure dur
 restore, the recreated database can be empty. Resolve the error before retrying.
 Run `bin/stop` when finished. Production access is not part of environment
 verification or the test suite.
+
+### CBBD admin review prerequisites
+
+The private browser review uses PostgreSQL tables from migration `20261021150000`
+and the existing admin session and GoodJob worker. Use `bin/migrate` with an
+isolated worktree Compose project/ports, then configure the worker's `CBBD_API_KEY`.
+The browser requests explicit finite request/retry limits; `CBBD_MAX_REQUESTS` and
+`CBBD_RETRIES` are optional form defaults. No capture directory is needed for this
+screen; file/rake callers keep their existing requirement. Captures are included
+in private database backups and need an operator retention/capacity policy.
+See `docs/data-ingestion.md` for interrupted acquisitions, versioned review,
+stale/idempotent apply and the manual production setup review. No live API call,
+import, rating backfill or production migration is required to verify the feature.
