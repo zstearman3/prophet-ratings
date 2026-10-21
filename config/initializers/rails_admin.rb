@@ -3,13 +3,14 @@
 require Rails.root.join('lib/rails_admin/config/actions/new_team_conference')
 require Rails.root.join('lib/rails_admin/config/actions/review_memberships')
 require Rails.root.join('lib/rails_admin/config/actions/review_recruiting')
+require Rails.root.join('lib/rails_admin/config/actions/review_cbbd_identities')
 require Rails.root.join('lib/rails_admin/config/actions/review_coaching')
 require Rails.root.join('lib/rails_admin/config/actions/evaluate_predictions')
 
 # rubocop:disable Metrics/BlockLength
 RailsAdmin.config do |config|
   config.asset_source = :sprockets
-  config.excluded_models += %w[RecruitingBatch RecruitingEntry]
+  config.excluded_models += %w[RecruitingBatch RecruitingEntry CbbdReviewRun CbbdReviewCapture CbbdReviewComparison]
 
   ### Popular gems integration
 
@@ -206,6 +207,7 @@ RailsAdmin.config do |config|
     new_team_conference
     review_memberships
     review_recruiting
+    review_cbbd_identities
     review_coaching
     evaluate_predictions
     coaching_review_queue

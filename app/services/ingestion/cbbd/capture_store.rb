@@ -36,6 +36,11 @@ module Ingestion
         File.join(directory, name)
       end
 
+      # File callers finalize directly in manifest; database stores checkpoint before normalization.
+      def checkpoint(*)
+        nil
+      end
+
       def read(reference)
         name = reference.fetch('body_file')
         raise IntegrityError, 'invalid capture path' unless File.basename(name) == name

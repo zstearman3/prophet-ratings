@@ -2,6 +2,10 @@
 
 Rails.application.routes.draw do
   namespace :admin do
+    resources :cbbd_review_runs, only: %i[index create show update] do
+      post :compare, on: :member
+      post :apply, on: :member
+    end
     resource :prediction_evaluation, only: :show
     resources :coaching_reviews, only: %i[index show update] do
       member do

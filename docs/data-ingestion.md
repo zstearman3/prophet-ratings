@@ -1376,3 +1376,60 @@ supremacy. Field/game comparison counts are separate from mismatch counts. Exact
 parity is not required. No report, shadow or apply command writes Game, TeamGame,
 predictions, rating snapshots or ingestion observations; no importer is activated
 and model formulas/official-team-total semantics remain unchanged.
+
+## Browser CBBD identity review
+
+Admins can open **Season → Review CBBD identities** (or `/admin/cbbd_review_runs`).
+Select an ending-year season, strict inclusive Eastern start/end dates, a finite
+maximum request budget (1–10,000), and 0–5 retries. `CBBD_API_KEY` is read only from
+the worker's environment; `CBBD_MAX_REQUESTS` and `CBBD_RETRIES` can supply form
+defaults. Both endpoints, all subdivisions and retries share that run's budget.
+GoodJob workers must run to acquire a queued run. Apply the additive
+`20261021140000` migration before using the screen.
+
+This browser workflow stores redacted response bytes, metadata and the manifest
+privately in PostgreSQL. It needs no `CBBD_CAPTURE_DIRECTORY` or new storage
+service. Existing file/rake workflows still need their private directory. Database
+backups now include these captures; the operator owns access, capacity, backups
+and deliberate retention. There is no automatic deletion or public download URL.
+
+Refresh status to reopen a run after acquisition. Completed empty windows differ
+from failed/incomplete windows. Each captured response commits independently with
+a conservative `complete:false`, `finalized:false` interrupted manifest and unknown
+coverage. Worker termination after an accepted leaf or during subdivision cannot
+claim selected coverage; a redelivered running job fails as interrupted and does
+not renew its request budget. Start a new explicitly bounded run to reacquire.
+The complete retriever ledger is checkpointed before normalization. A failed
+normalizer retains all captures and the original ledger but cannot compare/apply.
+Failed, finalized acquisitions with retained normalized subsets can be compared
+with a prominent incomplete warning; replay never upgrades their original result.
+
+**Refresh comparison from retained evidence** verifies digests and creates an exact
+immutable report/replay version using the originally stored normalized evidence.
+It makes no HTTP requests and does not automatically renormalize old captures.
+Team/game tables filter by status and name/ID and paginate at 50 rows. Shadow
+mismatches also paginate at 50 rows and filter by category or field/value/ID. Inspect
+source/local participant, time, venue, manual correction, reschedule and duplicate
+evidence, denominators and shadow category/field/value evidence before choosing
+existing candidates. IDs in duplicate groups remain separate. Choosing a candidate
+or deferring a row is distinct from approving it. Save the visible draft before
+navigation; saves merge pages and reject stale browser forms. The explicit bulk
+button approves only eligible visible single-target proposed rows and validates
+the selected participant batch; save team approvals first when games need them.
+No checkbox is approved by default. Supersession requires the old same-game key.
+
+Apply requires saved approvals, a reason and explicit confirmation. The server
+records the signed-in user ID/email, exact choices, reason and time in immutable
+identity-decision history. Apply invokes the existing whole-artifact fingerprint,
+fixed-order table locks, three-second timeout and atomic selection validation.
+Run locks serialize saves and refreshes against apply. Changed evidence rejects
+the entire batch without mapping writes; retry contention unchanged or refresh and
+review changed evidence. An unchanged identical successful request returns its
+original audit while the post-apply state still matches. Applied versions cannot
+be edited. After partial apply, explicitly refresh remaining work; prior versions
+and decisions remain accessible, valid intent is retained as hints and **all**
+approvals are cleared. This screen never imports, merges duplicate games, edits
+canonical stats/memberships, activates provider cutover or changes model inputs.
+Synthetic verification does not establish live-provider coverage or production
+readiness; production credentials/budgets/worker/access/storage review remains a
+manual deployment step.
