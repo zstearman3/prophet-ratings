@@ -1209,8 +1209,8 @@ season through the same atomic date importer. Sports Reference past failures pre
 rankings; successful nonempty past coverage can release rankings while future
 coverage remains explicitly incomplete. CBBD never automatically enqueues rankings.
 
-Apply the additive `ScopeGameSyncDatesToProvider` migration before using these
-entry points. Completion now identifies season/date/provider/contract/semantic
+Apply the additive `ScopeGameSyncDatesToProvider` migration (`20261021130000`)
+before using these entry points. Completion now identifies season/date/provider/contract/semantic
 profile/adapter revision. Existing rows keep their attempts/status/error and are
 marked `legacy-unscoped`; they do not certify the current Sports Reference bridge
 or CBBD. The first current-scope run revisits them. Resume skips only matching
@@ -1278,3 +1278,101 @@ there is no new scheduled CBBD activation. Review production mappings, budgets,
 correction/lookahead cadence and capture storage before enabling it. Verification
 uses synthetic HTTP responses and disposable databases; no live source coverage,
 quota plan or production operational readiness is established by the test suite.
+
+## Offline CBBD identity reconciliation
+
+A retained, explicitly bounded manifest can be compared to a matching local season:
+
+```bash
+MANIFEST=/private/persistent/cbbd/run-UUID.json \
+  REPORT=/private/persistent/cbbd/review-1.json bundle exec rake cbbd:compare
+MANIFEST=/private/persistent/cbbd/run-UUID.json \
+  REPORT=/private/persistent/cbbd/review-1.json \
+  DECISIONS=/private/persistent/cbbd/decisions-1.json bundle exec rake cbbd:apply_mappings
+```
+
+Comparison is offline and read-only. It creates a mode-0600 report, refusing to
+overwrite an existing path. Keep all files private; trusted operator inputs are
+integrity-checked, not cryptographically authenticated. The manifest bounds select
+the season and inclusive Eastern observation window. Invalid/out-of-window source
+observations remain conflicts. Incomplete acquisition stays incomplete; unmatched
+means no conservative candidate, never proof that the local/source game is missing.
+
+The report separates source observation occurrences, distinct source game/team IDs,
+team occurrences, candidate status counts, orphan boxes and acquisition duplicate/
+conflict decisions. These denominators count retained selected normalized evidence,
+not every scheduled game or every saturated/failed response row. Acquisition evidence
+retains those other rows. Local duplicate groups in the window (including adjacent
+legacy days) retain each ID; duplicate versus doubleheader remains unresolved.
+
+Stable provider mappings precede labels. Bootstrap uses the union of exact canonical
+names and aliases and requires existing target-season memberships. Games retain all
+matching participant pairs within the season; different-date pairs are possible
+reschedules, not proven identity. Reversed non-neutral sides, legacy midnight date
+shifts and multiple candidates require review. A manual venue classification is
+retained as `manual_venue` evidence; by itself it does not escalate an otherwise
+clean, unique, ordered, same-date match beyond `proposed` or exclude it from read-only
+shadow comparisons. Existing manual venue values remain untouched. Every new mapping
+still requires an explicit reviewed decision. No fuzzy matching, membership creation,
+team creation or duplicate merging occurs.
+
+Write explicit decisions using IDs actually listed in the original report, e.g.:
+
+```json
+{
+  "fingerprint": "COPY_THE_REPORT_FINGERPRINT",
+  "reviewer": "operator-name",
+  "reason": "Checked retained schedule and participant evidence",
+  "choices": [
+    {"entity": "team", "external_id": "10", "local_id": 101, "action": "associate"},
+    {"entity": "team", "external_id": "20", "local_id": 102, "action": "associate"},
+    {"entity": "game", "external_id": "1", "local_id": 201, "action": "associate"}
+  ]
+}
+```
+
+IDs above are synthetic placeholders. Opaque source IDs are strings (including any
+leading zeros); local IDs are integers. Choices can approve a subset and their
+order does not change participant validation. Select at most one source game key
+per local game in a batch. A game needs stable existing or
+explicit selected team mappings consistent with its reviewed local participants.
+Existing external keys cannot be reparented or reactivated. To replace an active
+game key, explicitly choose `action: "supersede"` with
+`supersedes_external_id: "OLD_KEY"` and the **same** local game. The old key, its
+owner and supersession timestamp remain. This never establishes that two distinct
+local games are duplicates, nor authorizes a canonical source refresh.
+
+Apply validates the entire batch and exact artifact before any writes, then writes
+only external identities and one immutable `IdentityMappingDecision`. Errors roll
+back every choice and audit record. The deterministic fingerprint includes the
+whole replay/acquisition, algorithm version, season, global school/alias evidence,
+target-season memberships, candidate/window games and their raw/derived stored
+TeamGame attributes, and CBBD identities. New candidates, membership/alias edits,
+manual venue changes, source corrections and stored stat edits invalidate review.
+Unrelated games outside this read set do not. Fresh reports are required after
+changes; never edit a report to bypass its guard.
+
+Within the apply transaction, table locks briefly block local game/stat/identity
+and roster writes to prevent concurrent candidate insertion or review races. Locks
+have a fixed order and a three-second timeout; contention/deadlock rolls back with
+a retryable error. Retry unchanged files after contention; recompare after changed
+evidence. Identical recorded requests return the same audit without writes only
+while the complete post-apply fingerprint still matches. A later replacement or
+source/local edit makes even a previous successful request stale.
+
+Shadow comparisons include only single unambiguous mapped/proposed games and keep
+participant alignment explicit. They compare scores, status, date, venue and each
+normalized raw statistic; missing is never zero. Rebound/turnover disagreements
+against uncertified legacy semantics are `semantics` when both values are known;
+missing source/local values stay unresolved unless a specific defect is demonstrated.
+Invalid provider values or applicable field-specific normalization failures are
+`likely_provider_defect` (including invalid scores and impossible regulation/overtime
+minutes); unrelated field failures or nonfinal status do not establish provider
+fault. Local `canceled` status is compared as canonical `cancelled`. Independently
+inconsistent local component sums are
+`likely_local_defect`; other differences/missing evidence are `unresolved_evidence`.
+Those categories identify evidence to inspect, not automatic corrections or source
+supremacy. Field/game comparison counts are separate from mismatch counts. Exact
+parity is not required. No report, shadow or apply command writes Game, TeamGame,
+predictions, rating snapshots or ingestion observations; no importer is activated
+and model formulas/official-team-total semantics remain unchanged.

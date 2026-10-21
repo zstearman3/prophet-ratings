@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_21_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_21_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -289,6 +289,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_120000) do
     t.index ["priority", "scheduled_at"], name: "index_good_jobs_on_priority_scheduled_at_unfinished_unlocked", where: "((finished_at IS NULL) AND (locked_by_id IS NULL))"
     t.index ["queue_name", "scheduled_at"], name: "index_good_jobs_on_queue_name_and_scheduled_at", where: "(finished_at IS NULL)"
     t.index ["scheduled_at"], name: "index_good_jobs_on_scheduled_at", where: "(finished_at IS NULL)"
+  end
+
+  create_table "identity_mapping_decisions", force: :cascade do |t|
+    t.string "request_digest", null: false
+    t.string "comparison_fingerprint", null: false
+    t.string "post_apply_fingerprint", null: false
+    t.string "reviewer", null: false
+    t.text "reason", null: false
+    t.jsonb "request", null: false
+    t.jsonb "result", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["request_digest"], name: "index_identity_mapping_decisions_on_request_digest", unique: true
   end
 
   create_table "offseason_input_revisions", force: :cascade do |t|
