@@ -12,7 +12,7 @@ module Ingestion
 
       def call
         payloads = verified_payloads
-        RunNormalizer.new(selected_rows(payloads), ledger).call.merge(@saved.slice('run_id', 'bounds', 'maximum_requests'),
+        RunNormalizer.new(selected_rows(payloads), ledger).call.merge(@saved.slice('run_id', 'bounds', 'maximum_requests', 'retries'),
                                                                       'manifest' => @manifest)
       end
 

@@ -1,0 +1,84 @@
+<div class="p-6 space-y-4">
+  <%= link_to 'Season review runs', admin_cbbd_review_runs_path(season_id: @run.season_id) %>
+  <h1 class="text-2xl">CBBD review run <%= @run.id %> — <%= @run.season.year %></h1>
+  <p><%= @run.start_date %> through <%= @run.end_date %> inclusive Eastern dates. Status: <strong><%= @run.status %></strong></p>
+  <%= link_to 'Refresh status', admin_cbbd_review_run_path(@run) %>
+  <p><%= @run.failure %></p>
+  <p>Request ceiling: <%= @run.maximum_requests %>; retries per request: <%= @run.retries %>;
+    retained attempts: <%= @run.manifest.dig('acquisition', 'attempts') || 0 %>.
+    Coverage: <%= @run.manifest['finalized'] ? (@run.normalized_replay&.fetch('complete', false) ? 'Complete (may be valid empty)' : 'INCOMPLETE — retained subset only') : 'UNKNOWN — interrupted or unfinished; comparison disabled' %></p>
+  <details><summary>Retained acquisition evidence and quota</summary><%= cbbd_evidence(@run.manifest) %></details>
+  <% if @run.normalized_replay && @run.manifest['finalized'] %>
+    <%= button_to 'Refresh comparison from retained evidence', compare_admin_cbbd_review_run_path(@run), method: :post %>
+    <p>Refresh creates a new report version, keeps history and clears every approval. No HTTP or renormalization occurs. Save before navigating; unsaved choices are lost.</p>
+  <% end %>
+  <nav>Versions:
+    <% @run.comparison_summaries.each do |version| %>
+      <%= link_to "#{version.version}#{version.identity_mapping_decision_id ? ' (applied)' : ''}", admin_cbbd_review_run_path(@run, version: version.version) %>
+    <% end %>
+  </nav>
+  <% if @comparison %>
+    <h2 class="text-xl">Comparison version <%= @comparison.version %></h2>
+    <% editable = @comparison.id == @run.active_comparison_id && !@comparison.identity_mapping_decision_id %>
+    <p><%= editable ? 'Current draft: review candidates and explicitly approve.' : 'Read-only historical/applied version. Refresh remaining work for a new review.' %></p>
+    <h3>Source observations and denominators</h3><%= cbbd_evidence(@comparison.report['coverage']) %>
+    <p>Retained normalization versions:</p><%= cbbd_evidence(@comparison.replay.fetch('observations').map { |row| row.slice('format', 'semantic_profile', 'normalization_version') }.uniq) %>
+    <details><summary>Retained normalized run metadata</summary><%= cbbd_evidence(@comparison.replay.except('acquisition', 'manifest', 'observations')) %></details>
+    <details><summary>Local duplicate groups — IDs remain separate</summary><%= cbbd_evidence(@comparison.report['local_duplicates']) %></details>
+    <h3>Shadow evidence</h3><%= cbbd_evidence(@comparison.report['shadow'].except('mismatches')) %>
+    <p>Choose Shadow in the table filter to inspect paginated mismatch categories, fields, values and evidence.</p>
+    <%= form_with url: admin_cbbd_review_run_path(@run), method: :get do %>
+      <%= hidden_field_tag :version, @comparison.version %>
+      <%= select_tag :entity, options_for_select([['Teams', 'team'], ['Games', 'game'], ['Shadow', 'shadow']], @page.entity) %>
+      <%= select_tag :status, options_for_select(['', 'mapped', 'proposed', 'ambiguous', 'unmatched', 'conflicting', 'review_required', 'semantics', 'likely_provider_defect', 'likely_local_defect', 'unresolved_evidence'], params[:status]) %>
+      <%= label_tag :q, 'Search name or ID' %><%= search_field_tag :q, params[:q] %><%= submit_tag 'Filter' %>
+    <% end %>
+    <p><%= @page.matched %> matched / <%= @page.total %> total; page <%= @page.page %> of <%= @page.pages %> (50 rows per page).</p>
+    <% if @page.entity == 'shadow' %>
+      <table class="w-full"><thead><tr><th>Local game</th><th>Category / field</th><th>Source / local values and evidence</th></tr></thead><tbody>
+        <% @page.rows.each do |row| %>
+          <tr class="border-b align-top"><td><%= row['local_game_id'] %></td><td><%= row['category'] %> / <%= row['field'] %></td><td><%= cbbd_evidence(row) %></td></tr>
+        <% end %>
+      </tbody></table>
+    <% else %>
+    <%= form_with url: admin_cbbd_review_run_path(@run), method: :patch do %>
+      <%= cbbd_review_token(@comparison) %>
+      <% %w[entity status q page].each do |key| %><%= hidden_field_tag key, params[key] %><% end %>
+      <table class="w-full border-collapse"><thead><tr><th>Source / status</th><th>Candidate and evidence</th><th>Explicit review</th></tr></thead><tbody>
+        <% @page.rows.each_with_index do |row, index| %>
+          <% draft = @comparison.draft.fetch("#{@page.entity}:#{row['external_id']}", {}) %>
+          <% prefix = "review[rows][#{index}]" %>
+          <tr class="border-b align-top"><td class="p-2"><%= @page.entity %> <%= row['external_id'] %><br><%= row['status'] %><br><%= row['names']&.join(', ') %></td>
+            <td class="p-2"><%= row['rule'] %><details><summary>Source/local dates, participants, venue and matching evidence</summary><%= cbbd_evidence(row) %></details></td>
+            <td class="p-2">
+              <%= hidden_field_tag "#{prefix}[entity]", @page.entity %><%= hidden_field_tag "#{prefix}[external_id]", row['external_id'] %>
+              <%= select_tag "#{prefix}[local_id]", options_for_select(cbbd_target_options(row), draft['local_id']), include_blank: 'Choose candidate', disabled: !editable %>
+              <%= select_tag "#{prefix}[action]", options_for_select([['Associate', 'associate'], ['Explicitly supersede same-game key', 'supersede']], draft['action']), disabled: !editable %>
+              <%= text_field_tag "#{prefix}[supersedes_external_id]", draft['supersedes_external_id'], placeholder: 'Old key (supersede only)', disabled: !editable %>
+              <%= hidden_field_tag "#{prefix}[deferred]", '0' %><label><%= check_box_tag "#{prefix}[deferred]", '1', draft['deferred'], disabled: !editable %> Defer</label>
+              <%= hidden_field_tag "#{prefix}[selected]", '0' %><label><%= check_box_tag "#{prefix}[selected]", '1', draft['selected'], disabled: !editable || row['status'] == 'conflicting' %> Approve mapping</label>
+            </td></tr>
+        <% end %>
+      </tbody></table>
+      <% if editable %><%= submit_tag 'Save visible draft' %><%= button_tag 'Explicitly approve eligible visible proposals', name: 'review[bulk]', value: '1' %><% end %>
+    <% end %>
+    <% end %>
+    <nav>
+      <% if @page.page > 1 %><%= link_to 'Previous page', admin_cbbd_review_run_path(@run, **params.permit(:entity, :status, :q, :version).to_h.symbolize_keys, page: @page.page - 1) %><% end %>
+      <% if @page.page < @page.pages %><%= link_to 'Next page', admin_cbbd_review_run_path(@run, **params.permit(:entity, :status, :q, :version).to_h.symbolize_keys, page: @page.page + 1) %><% end %>
+    </nav>
+    <% if @comparison.identity_mapping_decision %>
+      <% decision = @comparison.identity_mapping_decision %>
+      <h3>Application history</h3><p><%= decision.reviewer %> at <%= decision.created_at %> — <%= decision.reason %></p>
+      <%= cbbd_evidence(decision.result) %>
+    <% elsif editable %>
+      <h3>Apply saved approvals (<%= @comparison.selected_choices.size %>)</h3><details><summary>All saved approved choices across pages</summary><%= cbbd_evidence(@comparison.selected_choices) %></details><p>Only saved approved rows apply. Deferred rows never apply. Any stale evidence rejects the whole batch. This writes identities and an immutable decision only.</p>
+      <%= form_with url: apply_admin_cbbd_review_run_path(@run), method: :post do %>
+        <%= cbbd_review_token(@comparison) %>
+        <%= label_tag 'review_reason', 'Review reason' %><%= text_area_tag 'review[reason]', nil, required: true %>
+        <label><%= check_box_tag 'review[confirm]', '1', false, required: true %> I explicitly confirm these saved identity mappings.</label>
+        <%= submit_tag 'Apply saved approvals atomically' %>
+      <% end %>
+    <% end %>
+  <% end %>
+</div>

@@ -1,0 +1,24 @@
+<div class="p-6 space-y-4">
+  <h1 class="text-2xl">CBBD identity review</h1>
+  <%= form_with url: admin_cbbd_review_runs_path, method: :get do %>
+    <%= label_tag :season_id, 'Ending-year season' %>
+    <%= select_tag :season_id, options_from_collection_for_select(@listing[:seasons], :id, :year, @listing[:season]&.id) %>
+    <%= submit_tag 'Show season' %>
+  <% end %>
+  <% if @listing[:season] %>
+    <p>Acquire one explicit inclusive Eastern date window. Requests cover both endpoints, partitions and retries. Credentials come only from the server. This screen writes identities only after explicit Apply.</p>
+    <%= form_with url: admin_cbbd_review_runs_path do %>
+      <%= hidden_field_tag :season_id, @listing[:season].id %>
+      <%= label_tag :start_date, 'Start date' %><%= date_field_tag :start_date, nil, required: true %>
+      <%= label_tag :end_date, 'End date' %><%= date_field_tag :end_date, nil, required: true %>
+      <%= label_tag :maximum_requests, 'Maximum requests (finite)' %><%= number_field_tag :maximum_requests, ENV['CBBD_MAX_REQUESTS'], min: 1, max: 10000, required: true %>
+      <%= label_tag :retries, 'Retries per request' %><%= number_field_tag :retries, ENV['CBBD_RETRIES'], min: 0, max: 5, required: true %>
+      <%= submit_tag 'Acquire bounded evidence' %>
+    <% end %>
+  <% end %>
+  <ul>
+    <% @listing[:runs].each do |run| %>
+      <li><%= link_to "Run #{run.id}: #{run.status}, #{run.start_date} through #{run.end_date}", admin_cbbd_review_run_path(run) %> — <%= run.created_at %></li>
+    <% end %>
+  </ul>
+</div>

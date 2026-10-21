@@ -29,6 +29,11 @@
 
 en:
   admin:
+    cbbd_review_runs:
+      queued: Bounded acquisition queued.
+      saved: Draft saved. Only explicitly approved rows can apply.
+      compared: Comparison refreshed from retained normalized evidence. Review approvals again.
+      applied: Identity mappings applied atomically.
     coaching_reviews:
       queued: "Coaching discovery queued. Refresh status to see progress."
       saved: "Coaching review saved. Ratings were not recalculated."
@@ -53,6 +58,11 @@ en:
         menu: "Review coaching"
         breadcrumb: "Review coaching"
         link: "Review coaching"
+      review_cbbd_identities:
+        title: CBBD identity review
+        menu: Review CBBD identities
+        breadcrumb: CBBD identities
+        link: Review CBBD identities
       review_recruiting:
         title: "Review recruiting"
         menu: "Review recruiting"

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_21_140000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_21_150000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -52,6 +52,50 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_140000) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["game_id"], name: "index_bookmaker_odds_on_game_id"
+  end
+
+  create_table "cbbd_review_captures", force: :cascade do |t|
+    t.bigint "cbbd_review_run_id", null: false
+    t.string "capture_id", null: false
+    t.binary "body", null: false
+    t.jsonb "metadata", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["cbbd_review_run_id", "capture_id"], name: "idx_on_cbbd_review_run_id_capture_id_29ffd9cbe6", unique: true
+    t.index ["cbbd_review_run_id"], name: "index_cbbd_review_captures_on_cbbd_review_run_id"
+  end
+
+  create_table "cbbd_review_comparisons", force: :cascade do |t|
+    t.bigint "cbbd_review_run_id", null: false
+    t.integer "version", null: false
+    t.jsonb "replay", null: false
+    t.jsonb "report", null: false
+    t.string "artifact_digest", null: false
+    t.jsonb "draft", default: {}, null: false
+    t.integer "draft_revision", default: 0, null: false
+    t.bigint "identity_mapping_decision_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["cbbd_review_run_id", "version"], name: "idx_on_cbbd_review_run_id_version_0c5d8e333d", unique: true
+    t.index ["cbbd_review_run_id"], name: "index_cbbd_review_comparisons_on_cbbd_review_run_id"
+    t.index ["identity_mapping_decision_id"], name: "index_cbbd_review_comparisons_on_identity_mapping_decision_id"
+  end
+
+  create_table "cbbd_review_runs", force: :cascade do |t|
+    t.bigint "season_id", null: false
+    t.date "start_date", null: false
+    t.date "end_date", null: false
+    t.integer "maximum_requests", null: false
+    t.integer "retries", null: false
+    t.string "status", default: "queued", null: false
+    t.string "failure"
+    t.jsonb "manifest", default: {}, null: false
+    t.jsonb "normalized_replay"
+    t.string "evidence_digest"
+    t.bigint "active_comparison_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["season_id"], name: "index_cbbd_review_runs_on_season_id"
   end
 
   create_table "coaching_changes", force: :cascade do |t|
@@ -712,6 +756,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_140000) do
   add_foreign_key "bet_recommendations", "predictions"
   add_foreign_key "bet_recommendations", "ratings_config_versions"
   add_foreign_key "bookmaker_odds", "games"
+  add_foreign_key "cbbd_review_captures", "cbbd_review_runs"
+  add_foreign_key "cbbd_review_comparisons", "cbbd_review_runs"
+  add_foreign_key "cbbd_review_comparisons", "identity_mapping_decisions"
+  add_foreign_key "cbbd_review_runs", "cbbd_review_comparisons", column: "active_comparison_id"
+  add_foreign_key "cbbd_review_runs", "seasons"
   add_foreign_key "coaching_changes", "teams"
   add_foreign_key "coaching_changes", "teams", column: "discovery_previous_team_id"
   add_foreign_key "coaching_changes", "teams", column: "discovery_team_id"
