@@ -68,6 +68,36 @@ RSpec.describe Ingestion::FutureScheduleRefresh do
     expect(result[:absent_ids]).to be_empty
   end
 
+  it 'imports only selected dates and checkpoints successful rows inside the import transaction' do
+    observed = []
+    callback = lambda do |day|
+      observed << [day[:date], Game.connection.transaction_open?]
+    end
+    result = described_class.new(season:, start_date: today, end_date: today + 2.days,
+                                 dates: [today, today + 2.days], on_day: callback).call
+    expect(result[:days].pluck(:date)).to eq([today, today + 2.days])
+    expect(observed).to eq([[today, true], [today + 2.days, true]])
+    expect(Ingestion::GamesIngestionService).not_to have_received(:new).with(date: today + 1.day, season:)
+  end
+
+  it 'rolls back imported games when the durable success checkpoint fails' do
+    allow(service).to receive(:call) do
+      create(:game, season:, start_time: Game.schedule_time_for(today))
+      { imported_rows: 1, games: [] }
+    end
+    callback = ->(day) { raise ActiveRecord::StatementInvalid, 'checkpoint failed' unless day[:error] }
+    subject = described_class.new(season:, start_date: today, end_date: today, on_day: callback)
+    allow(subject).to receive(:sleep)
+    expect(subject.call[:failed_dates]).to eq([today])
+    expect(Game.count).to eq(0)
+  end
+
+  it 'rejects empty or out of window selected dates' do
+    [[], [today + 3.days]].each do |dates|
+      expect { described_class.new(season:, start_date: today, end_date: today + 2.days, dates:) }.to raise_error(ArgumentError)
+    end
+  end
+
   context 'with the real canonical service and adapter' do
     let(:scraper) { instance_double(Scraper::GamesScraper) }
     let(:home) { create(:team, school: 'Projected Home') }

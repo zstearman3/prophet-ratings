@@ -533,6 +533,38 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_22_020000) do
     t.index ["team_id"], name: "index_recruiting_entries_on_team_id"
   end
 
+  create_table "schedule_deferrals", force: :cascade do |t|
+    t.bigint "season_id", null: false
+    t.bigint "requested_by_id", null: false
+    t.text "reason", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["requested_by_id"], name: "index_schedule_deferrals_on_requested_by_id"
+    t.index ["season_id"], name: "index_schedule_deferrals_on_season_id"
+  end
+
+  create_table "schedule_refresh_runs", force: :cascade do |t|
+    t.bigint "season_id", null: false
+    t.bigint "requested_by_id", null: false
+    t.bigint "retry_of_id"
+    t.string "provider", null: false
+    t.date "start_date", null: false
+    t.date "end_date", null: false
+    t.jsonb "requested_dates", default: [], null: false
+    t.integer "max_requests"
+    t.integer "retries"
+    t.string "status", default: "queued", null: false
+    t.jsonb "report", default: {}, null: false
+    t.text "error"
+    t.datetime "started_at"
+    t.datetime "finished_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["requested_by_id"], name: "index_schedule_refresh_runs_on_requested_by_id"
+    t.index ["retry_of_id"], name: "index_schedule_refresh_runs_on_retry_of_id"
+    t.index ["season_id"], name: "index_schedule_refresh_runs_on_season_id"
+  end
+
   create_table "seasons", force: :cascade do |t|
     t.integer "year", null: false
     t.date "start_date", null: false
@@ -848,6 +880,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_22_020000) do
   add_foreign_key "recruiting_batches", "seasons"
   add_foreign_key "recruiting_entries", "recruiting_batches"
   add_foreign_key "recruiting_entries", "teams"
+  add_foreign_key "schedule_deferrals", "seasons"
+  add_foreign_key "schedule_deferrals", "users", column: "requested_by_id"
+  add_foreign_key "schedule_refresh_runs", "schedule_refresh_runs", column: "retry_of_id"
+  add_foreign_key "schedule_refresh_runs", "seasons"
+  add_foreign_key "schedule_refresh_runs", "users", column: "requested_by_id"
   add_foreign_key "seasons", "ratings_config_versions", column: "preseason_revision_id"
   add_foreign_key "seasons", "ratings_config_versions", column: "selected_preseason_model_id"
   add_foreign_key "team_aliases", "teams"

@@ -6,6 +6,7 @@
     <%= submit_tag 'Show season' %>
   <% end %>
   <% if @listing[:season] %>
+    <%= link_to 'Return to schedule review', admin_schedule_refresh_runs_path(season_id: @listing[:season].id) %>
     <p>Acquire one explicit inclusive Eastern date window. Requests cover both endpoints, partitions and retries. Credentials come only from the server. This screen writes identities only after explicit Apply.</p>
     <%= form_with url: admin_cbbd_review_runs_path do %>
       <%= hidden_field_tag :season_id, @listing[:season].id %>

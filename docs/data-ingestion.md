@@ -1470,3 +1470,19 @@ canonical stats/memberships, activates provider cutover or changes model inputs.
 Synthetic verification does not establish live-provider coverage or production
 readiness; production credentials/budgets/worker/access/storage review remains a
 manual deployment step.
+
+### Retained admin schedule refresh runs
+
+The [bounded browser schedule workflow](offseason.md#bounded-browser-schedule-refresh)
+wraps the same canonical `FutureScheduleRefresh` importer. Its optional `dates:`
+subset shares one provider acquisition; `on_day:` checkpoints successful reports
+inside the date transaction and exhausted failure reports after rollback. Existing
+CLI/nightly callers retain their default full-window behavior/report shape.
+`ScheduleRefreshRun` retains safe allowlisted counts/IDs and committed date evidence,
+not raw payloads, private paths or exception messages. For exhausted canonical
+reconciliation failures, the optional checkpoint report includes newly retained
+rejection audit IDs; rolled-back game/observation IDs remain cleared. Default
+CLI/nightly reports keep their previous shape. Private filesystem CBBD
+capture prerequisites and operator retention duties above still apply. No live
+provider coverage, publication completeness or prediction accuracy is certified by
+a successful or empty acquisition.

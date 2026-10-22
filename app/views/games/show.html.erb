@@ -1,3 +1,7 @@
+<% if current_user&.admin? %>
+  <p><%= link_to 'Return to schedule review', admin_schedule_refresh_runs_path(season_id: @game.season_id) %>
+    <%= link_to 'Edit game', rails_admin.edit_path(model_name: 'game', id: @game.id) %></p>
+<% end %>
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
   <div class="py-6">
     <div class="flex flex-col justify-evenly">

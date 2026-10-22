@@ -1,0 +1,40 @@
+<section class="mx-auto max-w-5xl space-y-5 p-6">
+  <h1 class="text-2xl font-bold">Schedule refresh <%= @run.id %> · season <%= @run.season.year %></h1>
+  <%= link_to 'Return to schedule review', admin_schedule_refresh_runs_path(season_id: @run.season.id) %>
+  <%= link_to 'Return to offseason setup', admin_offseason_setup_path(season_id: @run.season.id) %>
+  <%= link_to 'Refresh status', admin_schedule_refresh_run_path(@run) %>
+  <p>Status: <strong><%= @run.status %></strong>. <%= @run.provider %>, <%= @run.start_date %>–<%= @run.end_date %> inclusive Eastern.</p>
+  <p>Requested by <%= @run.requested_by.email %> at <%= @run.created_at %>. Started <%= @run.started_at || 'not yet' %>; finished <%= @run.finished_at || 'not yet' %>.</p>
+  <% if @run.retry_of %><p>Retry of <%= link_to "run #{@run.retry_of_id}", admin_schedule_refresh_run_path(@run.retry_of_id) %>.</p><% end %>
+  <p><%= @run.cbbd? ? "Total request ceiling: #{@run.max_requests}; retries per request: #{@run.retries}." : 'Sports Reference: up to 3 additional attempts per failed date, waits 5/10/20 seconds.' %></p>
+  <p>Queued does not mean acquired. Successful or empty acquisition does not certify complete publication, reviewed reconciliation, or prediction readiness. No games are deleted on source absence.</p>
+  <% if @run.error %><p role="alert"><%= @run.error %></p><% end %>
+  <p>Failed or unattempted dates: <%= @run.pending_dates.join(', ').presence || 'none' %>.</p>
+  <% if ScheduleRefreshRun::TERMINAL.include?(@run.status) && @run.pending_dates.any? %>
+    <p>Explicit retry creates a new linked run for exactly these dates with a fresh budget at the original numeric limits. Review quota and runtime setup first. Expired dates require historical sync.</p>
+    <%= button_to 'Retry unfinished dates with new budget', retry_admin_schedule_refresh_run_path(@run), method: :post %>
+  <% end %>
+  <h2 class="text-xl">Committed date evidence</h2>
+  <% @run.report.fetch('days', []).each do |day| %>
+    <div class="rounded border p-3">
+      <p><%= day['date'] %>: <%= day['error'] ? 'failed (no committed imports)' : (day['valid_empty'] ? 'successful empty' : 'successful') %>; imported <%= day.fetch('imported_rows', 0) %>; changed <%= day.fetch('changed_rows', 0) %>. Counts: <%= day.fetch('counts', {}) %>. Outcomes: <%= day.fetch('outcomes', {}) %>.</p>
+      <% day.fetch('rejection_observation_ids', []).each do |id| %>
+        <% if @evidence[:observations][id] %>
+          <p><%= link_to "Review rejected observation #{id}", rails_admin.show_path(model_name: 'game_observation', id:) %>
+            · <%= @evidence[:observations][id].outcome %>. This retained audit identifies the source game and participants; domain writes were rolled back.</p>
+        <% else %>
+          <p>Rejected observation <%= id %> is unavailable or outside this run's provider/season scope.</p>
+        <% end %>
+      <% end %>
+      <% day.fetch('games', []).each do |game| %>
+        <p><%= game['outcome'] %>: <%= game['reason'].presence || 'Inspect private observation evidence for details' %>.
+          <% if @evidence[:games][game['game_id']] %><%= link_to "Game #{game['game_id']}", game_path(@evidence[:games][game['game_id']]) %><% end %>
+          <% game.fetch('possible_move_ids', []).each do |id| %> Possible move: <%= @evidence[:games][id] ? link_to("Game #{id}", game_path(@evidence[:games][id])) : id %>.<% end %>
+        </p>
+      <% end %>
+    </div>
+  <% end %>
+  <p>Absent from successful source dates (review only): <% @run.report.fetch('absent_ids', []).each do |id| %><%= @evidence[:games][id] ? link_to("Game #{id}", game_path(@evidence[:games][id])) : id %> <% end %></p>
+  <%= link_to 'Review CBBD identities', admin_cbbd_review_runs_path(season_id: @run.season.id) %>
+  <details><summary>Safe retained acquisition and outcome counts</summary><pre class="overflow-auto"><%= JSON.pretty_generate(@run.report) %></pre></details>
+</section>

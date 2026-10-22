@@ -5,7 +5,7 @@ module Ingestion
   class HistoricalSyncDay
     # Carries rejected evidence out of the date savepoint without preserving rolled-back foreign keys.
     class ReconciliationError < StandardError
-      attr_reader :rejections, :report
+      attr_reader :rejections, :report, :retained_observation_ids
 
       def initialize(result)
         reports = result.fetch(:games).select { |game| GameSyncProvider.held?(game) }
@@ -36,7 +36,7 @@ module Ingestion
       end
 
       def retain
-        rejections.each { |attributes| ::GameObservation.create!(attributes) }
+        @retained_observation_ids = rejections.map { |attributes| ::GameObservation.create!(attributes).id }
       end
     end
 
