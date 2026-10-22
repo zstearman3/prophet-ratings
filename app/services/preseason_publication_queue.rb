@@ -10,15 +10,11 @@ class PreseasonPublicationQueue
   end
 
   def call
-    Season.with_ratings_lock { queue }
+    enqueue if Season.with_ratings_lock { prepare_queue }
     publication.reload
   end
 
   private
-
-  def queue
-    enqueue if prepare_queue
-  end
 
   def prepare_queue
     publication.season.with_lock do

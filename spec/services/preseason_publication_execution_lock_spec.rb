@@ -58,4 +58,28 @@ RSpec.describe PreseasonPublicationExecution do
     expect([review.reload.status, observed]).to eq(['published', [false]])
     expect(other_connection_lock_available?).to be(true)
   end
+
+  it 'lets an immediate worker on another connection publish after its scheduling request releases the ratings lock' do
+    row
+    CoachingReview.create!(year: 2098, ready: true)
+    PreseasonPublication.select_model(season, model)
+    review = PreseasonPublication.review!(season, reviewer: admin, mode: 'initialize')
+    request_connection = ActiveRecord::Base.connection.select_value('SELECT pg_backend_pid()')
+    worker_connection = nil
+    allow(PublishPreseasonJob).to receive(:perform_later) do |publication_id|
+      worker_connection = Thread.new do
+        ActiveRecord::Base.connection_pool.with_connection do |connection|
+          pid = connection.select_value('SELECT pg_backend_pid()')
+          PublishPreseasonJob.perform_now(publication_id)
+          pid
+        end
+      end.value
+      true
+    end
+    PreseasonPublicationQueue.new(review, actor: admin, fingerprint: review.fingerprint, acknowledge: '1').call
+    expect(worker_connection).not_to eq(request_connection)
+    expect([review.reload.status, review.error_message]).to eq(['published', nil])
+    expect([PreseasonPrior.count, TeamRatingSnapshot.count]).to eq([1, 1])
+    expect(PublishPreseasonJob).to have_received(:perform_later).with(review.id).once
+  end
 end
