@@ -8,19 +8,24 @@ module Ingestion
     end
 
     def call
-      state = run.status
-      return if ScheduleRefreshRun::TERMINAL.include?(state)
-      return run.finish('incomplete', 'Worker interrupted. Explicitly retry unfinished dates with a new budget.') if state == 'running'
-
-      execute
-    rescue StandardError
-      run.reload.finish('failed', 'Refresh could not run. Check runtime credentials, private capture storage and limits; ' \
-                                  'expired dates require historical sync.')
+      case run.status
+      when *ScheduleRefreshRun::TERMINAL then nil
+      when 'running' then run.finish('incomplete', 'Worker interrupted. Explicitly retry unfinished dates with a new budget.')
+      else execute
+      end
+    rescue StandardError => error
+      record_failure(error)
     end
 
     private
 
     attr_reader :run
+
+    def record_failure(error)
+      Rails.logger.error { "Schedule refresh failed run_id=#{run.id} exception_class=#{error.class.name}" }
+      run.reload.finish('failed', 'Refresh could not run. Check runtime credentials, private capture storage and limits; ' \
+                                  'expired dates require historical sync.')
+    end
 
     def execute
       validate_pending

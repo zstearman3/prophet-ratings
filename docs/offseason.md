@@ -521,6 +521,23 @@ imports them. No automatic job retry renews a budget. If all dates committed bef
 interruption, there may be no unfinished dates; inspect retained evidence and start
 an explicit new bounded run only when needed.
 
+Each run permits one persisted retry child. Repeated or concurrent submissions
+return an error without another enqueue; the parent report links its existing
+retry. Continue from the unfinished leaf, including a child whose enqueue failed.
+Reports, successful dates and original limits remain unchanged along the chain;
+a separately requested full refresh starts a new root. Execution failures log
+only run ID and exception class, never source exception messages.
+
+Apply migration `20261022030000` before using this retry constraint. It replaces
+the parent index transactionally; existing duplicate retry history causes failure
+without deleting, merging or reassigning runs or removing the old index. Review
+any existing duplicates before rollout, using this read-only query:
+
+```sql
+SELECT retry_of_id, COUNT(*) FROM schedule_refresh_runs
+WHERE retry_of_id IS NOT NULL GROUP BY retry_of_id HAVING COUNT(*) > 1;
+```
+
 When no scheduled game has both stored team associations, record a reasoned
 schedule/prediction-readiness deferral. Requester, time and reason remain as history;
 this does not approve preseason inputs or activate anything. When usable schedules

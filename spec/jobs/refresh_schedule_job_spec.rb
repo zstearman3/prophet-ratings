@@ -25,7 +25,7 @@ RSpec.describe RefreshScheduleJob do
     interrupted_delivery
     expect(run.reload.status).to eq('incomplete')
     expect(run.pending_dates).to eq([(today + 1.day).to_s])
-    expect(run.build_retry(run.requested_by).requested_dates).to eq([(today + 1.day).to_s])
+    expect(run.create_retry!(run.requested_by).requested_dates).to eq([(today + 1.day).to_s])
     expect(Ingestion::GamesIngestionService).not_to have_received(:new)
   end
 

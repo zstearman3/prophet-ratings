@@ -81,6 +81,19 @@ RSpec.describe Ingestion::ScheduleRefreshExecution do
     expect(cbbd.report.to_json).not_to include('synthetic')
   end
 
+  it 'logs only the run ID and exception class when execution fails, never sensitive exception details' do
+    messages = []
+    allow(Rails.logger).to receive(:error) { |message = nil, &block| messages << (block ? block.call : message) }
+    allow(Ingestion::FutureScheduleRefresh).to receive(:new).and_raise(IOError, 'CBBD_API_KEY=secret-token /private/capture')
+    described_class.new(run).call
+    aggregate_failures do
+      expect(messages).to include("Schedule refresh failed run_id=#{run.id} exception_class=IOError")
+      expect(run.reload.status).to eq('failed')
+      expect(run.error).to include('Check runtime credentials')
+      expect([messages, run.error, run.report].to_json).not_to include('secret-token', '/private/capture')
+    end
+  end
+
   it 'fails aged queued windows before any source call' do
     run
     allow(Game).to receive(:current_schedule_date).and_return(today + 1.day)

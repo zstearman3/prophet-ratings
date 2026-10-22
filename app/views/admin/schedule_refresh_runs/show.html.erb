@@ -10,7 +10,10 @@
   <p>Queued does not mean acquired. Successful or empty acquisition does not certify complete publication, reviewed reconciliation, or prediction readiness. No games are deleted on source absence.</p>
   <% if @run.error %><p role="alert"><%= @run.error %></p><% end %>
   <p>Failed or unattempted dates: <%= @run.pending_dates.join(', ').presence || 'none' %>.</p>
-  <% if ScheduleRefreshRun::TERMINAL.include?(@run.status) && @run.pending_dates.any? %>
+  <% if @run.retry_run %>
+    <p>Existing retry: <%= link_to "run #{@run.retry_run.id} (#{@run.retry_run.status})", admin_schedule_refresh_run_path(@run.retry_run) %>.
+      Continue from this linked run; each parent grants one retry budget.</p>
+  <% elsif ScheduleRefreshRun::TERMINAL.include?(@run.status) && @run.pending_dates.any? %>
     <p>Explicit retry creates a new linked run for exactly these dates with a fresh budget at the original numeric limits. Review quota and runtime setup first. Expired dates require historical sync.</p>
     <%= button_to 'Retry unfinished dates with new budget', retry_admin_schedule_refresh_run_path(@run), method: :post %>
   <% end %>

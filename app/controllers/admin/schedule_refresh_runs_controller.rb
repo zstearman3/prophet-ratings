@@ -26,8 +26,7 @@ module Admin
 
     def retry
       @run = ScheduleRefreshRun.find(params.expect(:id))
-      @run = run.build_retry(current_user)
-      run.save!
+      @run = run.create_retry!(current_user)
       enqueue
     end
 

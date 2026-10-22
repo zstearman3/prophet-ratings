@@ -4,9 +4,12 @@
 class ScheduleRefreshRun < ApplicationRecord
   IDENTITY = %w[season_id requested_by_id retry_of_id provider start_date end_date requested_dates max_requests retries].freeze
   TERMINAL = %w[succeeded incomplete failed].freeze
+  RETRY_EXISTS = 'A retry already exists; open the linked retry run to continue unfinished work.'
   belongs_to :season
   belongs_to :requested_by, class_name: 'User'
-  belongs_to :retry_of, class_name: 'ScheduleRefreshRun', optional: true
+  belongs_to :retry_of, class_name: 'ScheduleRefreshRun', optional: true, inverse_of: :retry_run
+  has_one :retry_run, class_name: 'ScheduleRefreshRun', foreign_key: :retry_of_id, inverse_of: :retry_of,
+                      dependent: :restrict_with_exception
   validates :provider, inclusion: { in: %w[sports_reference cbbd] }
   validates :status, inclusion: { in: %w[queued running succeeded incomplete failed] }
   validates :max_requests, numericality: { only_integer: true, greater_than: 0 }, if: :cbbd?
@@ -51,14 +54,20 @@ class ScheduleRefreshRun < ApplicationRecord
     requested_dates - successful
   end
 
-  def build_retry(user)
-    with_lock do
-      raise ArgumentError, 'Retry requires a terminal run; refresh the running report first.' unless TERMINAL.include?(status)
-      raise ArgumentError, 'No failed or unattempted dates remain.' if pending_dates.empty?
+  def create_retry!(user)
+    child = create_retry(user)
+    raise ActiveRecord::RecordInvalid, child unless child.persisted?
 
-      self.class.new(season:, requested_by: user, retry_of: self, provider:, max_requests:, retries:,
-                     start_date: pending_dates.min, end_date: pending_dates.max, requested_dates: pending_dates)
+    child
+  end
+
+  def create_retry(user)
+    with_lock(requires_new: true) do
+      validate_retry
+      self.class.create(retry_attributes(user))
     end
+  rescue ActiveRecord::RecordNotUnique
+    raise ArgumentError, RETRY_EXISTS
   end
 
   def finish(state, message = nil)
@@ -66,6 +75,18 @@ class ScheduleRefreshRun < ApplicationRecord
   end
 
   private
+
+  def validate_retry
+    raise ArgumentError, RETRY_EXISTS if retry_run
+    raise ArgumentError, 'Retry requires a terminal run; refresh the running report first.' unless TERMINAL.include?(status)
+    raise ArgumentError, 'No failed or unattempted dates remain.' if pending_dates.empty?
+  end
+
+  def retry_attributes(user)
+    dates = pending_dates
+    { season:, requested_by: user, retry_of: self, provider:, max_requests:, retries:,
+      start_date: dates.min, end_date: dates.max, requested_dates: dates }
+  end
 
   def preserve_scope
     raise ActiveRecord::ReadOnlyRecord, 'Run scope is immutable' if IDENTITY.any? { |field| will_save_change_to_attribute?(field) }

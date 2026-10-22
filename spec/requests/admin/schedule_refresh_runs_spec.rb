@@ -69,6 +69,42 @@ RSpec.describe 'Admin schedule refresh' do
     expect(ScheduleRefreshRun.count).to eq(2)
   end
 
+  it 'enqueues only one child for repeated parent submissions and links the existing retry' do
+    user = create(:user, :admin)
+    sign_in user
+    run = ScheduleRefreshRun.create!(values[:refresh].merge(season:, requested_by: user, status: 'incomplete'))
+    newer = create(:season, year: 2028)
+    post retry_admin_schedule_refresh_run_path(run)
+    child = ScheduleRefreshRun.last
+    jobs = ActiveJob::Base.queue_adapter.enqueued_jobs.select { |job| job[:job] == RefreshScheduleJob }
+    post retry_admin_schedule_refresh_run_path(run), params: { season_id: newer.id }
+    aggregate_failures do
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.body).to include('already exists', "Season #{season.year}:")
+      expect(ScheduleRefreshRun.where(retry_of: run).pluck(:id)).to eq([child.id])
+      expect(ActiveJob::Base.queue_adapter.enqueued_jobs.select { |job| job[:job] == RefreshScheduleJob }).to eq(jobs)
+    end
+    get admin_schedule_refresh_run_path(run)
+    expect(response.body).to include(admin_schedule_refresh_run_path(child), 'Existing retry')
+    expect(response.body).not_to include('Retry unfinished dates with new budget')
+  end
+
+  it 'continues from the failed child after enqueue failure instead of creating a second parent budget' do
+    user = create(:user, :admin)
+    sign_in user
+    run = ScheduleRefreshRun.create!(values[:refresh].merge(season:, requested_by: user, status: 'incomplete'))
+    allow(RefreshScheduleJob).to receive(:perform_later).and_return(false)
+    post retry_admin_schedule_refresh_run_path(run)
+    child = ScheduleRefreshRun.last
+    expect(child.status).to eq('failed')
+    post retry_admin_schedule_refresh_run_path(run)
+    expect(response).to have_http_status(:unprocessable_content)
+    expect(ScheduleRefreshRun.where(retry_of: run).count).to eq(1)
+    post retry_admin_schedule_refresh_run_path(child)
+    expect(ScheduleRefreshRun.last.retry_of_id).to eq(child.id)
+    expect(ScheduleRefreshRun.count).to eq(3)
+  end
+
   it 'keeps the authoritative parent season on live and expired retry errors despite forged season parameters' do
     user = create(:user, :admin)
     sign_in user
