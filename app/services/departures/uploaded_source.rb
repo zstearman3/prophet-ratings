@@ -24,7 +24,7 @@ module Departures
     def bytes
       upload = attributes.fetch('html')
       self.class.validate_upload(upload)
-      original = upload.read(BatchAcquisition::MAX_UPLOAD + 1).b
+      original = upload.read(BatchAcquisition::MAX_UPLOAD + 1).to_s.b
       Contract.check!(original.present? && original.bytesize <= BatchAcquisition::MAX_UPLOAD,
                       'Saved HTML must contain bytes and be at most 5 MiB')
       original

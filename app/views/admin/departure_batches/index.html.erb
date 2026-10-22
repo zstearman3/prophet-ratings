@@ -7,7 +7,7 @@
   <% if @page[:season] %>
     <%= link_to 'Back to offseason setup', admin_offseason_setup_path(season_id: @page[:season].id) %>
     <h2 class="text-xl font-semibold">Saved batches for <%= @page[:season].year %></h2>
-    <% Array(@page[:batches]).each do |batch| %><p><%= link_to "Batch ##{batch.id}: #{batch.status} · #{batch.attempt&.status || 'prepared'}", admin_departure_batch_path(batch) %></p><% end %>
+    <% Array(@page[:batches]).each do |batch| %><p><%= link_to "Batch ##{batch.id}: #{batch.status} · #{batch['acquisition_status'] || 'prepared'}", admin_departure_batch_path(batch) %></p><% end %>
     <h2 class="text-xl font-semibold">Prepare a departure batch</h2>
     <%= render 'preparation', preparation: @page[:preparation], season: @page[:season], destination: admin_departure_batches_path, verb: :post %>
   <% else %><p>Prepare a target season first.</p><% end %>

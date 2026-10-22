@@ -1,28 +1,27 @@
 <%= form_with url: admin_departure_batch_path(@batch), scope: :review, method: :patch, data: { turbo: false }, class: 'space-y-4' do |form| %>
-  <%= form.hidden_field :review_key, value: @page[:review].review_key %>
+  <%= form.hidden_field :review_key, value: @page[:review_key] %>
   <p>Draft decisions are saved separately from approval. Numeric facts come from retained sources. Save a selected blank stint to add another stint; remove any existing stint with its checkbox.</p>
-  <% @batch.attempt.dataset.fetch('selections', []).each do |selection| %>
+  <% @page[:attempt].dataset.fetch('selections', []).each do |selection| %>
     <% key = selection.fetch('selection_key'); decision = @batch.decisions.find { |row| row['selection_key'] == key } || {} %>
     <fieldset class="border p-3 space-y-2"><legend>Pick <%= selection['overall_pick'] %> · Round <%= selection['round'] %> · <%= selection['player_name_source'] %></legend>
       <% if @page[:row_issues][key] %><p role="alert">Selection <%= key %>: <%= @page[:row_issues][key] %></p><% end %>
       <p><%= link_to 'Provider player identity', selection['player_source_url'] %> · <%= selection['affiliation_source'] %></p>
-      <p>Proposed exact team candidates: <%= Team.where(id: @page[:identity].candidates(selection['affiliation_source'], source: URI.parse(selection['draft_source_url']).host)).pluck(:school).join(', ').presence || 'Unresolved; review captured evidence' %></p>
+      <p>Proposed exact team candidates: <%= @page[:teams_by_id].values_at(*@page[:identity].candidates(selection['affiliation_source'], source: URI.parse(selection['draft_source_url']).host)).map(&:school).join(', ').presence || 'Unresolved; review captured evidence' %></p>
       <%= fields_for "review[rows][#{key}]" do |entry| %>
         <%= entry.label :status, 'Accounting category' %> <%= entry.select :status, Departures::Contract::STATUSES.map { |status| [status.humanize, status] }, { selected: decision['status'], include_blank: 'Unreviewed' } %>
         <div><%= entry.label :reason, 'Decision / participation reason' %><%= entry.text_field :reason, value: decision['reason'], class: 'block border w-full' %></div>
-        <div><%= entry.label :team_id, 'Known affected team (unknown production)' %><%= entry.collection_select :team_id, Team.order(:school), :id, :school, { selected: Team.find_by(school: decision['team_name_source'])&.id, include_blank: true } %></div>
+        <div><%= entry.label :team_id, 'Known affected team (unknown production)' %><%= entry.collection_select :team_id, @page[:teams], :id, :school, { selected: @page[:teams].find { |team| team.school == decision['team_name_source'] }&.id, include_blank: true } %></div>
         <p>Participation / player identity evidence:</p>
-        <% @batch.attempt.manifest.fetch('sources').each do |source| %>
+        <% @page[:attempt].manifest.fetch('sources').each do |source| %>
           <label><%= check_box_tag "review[rows][#{key}][evidence_source_ids][]", source['id'], decision.fetch('evidence_source_ids', []).include?(source['id']) %> <%= source['id'] %> (<%= source['type'] %>)</label>
         <% end %>
         <% (decision.fetch('stints', []) + [{}]).each_with_index do |stint, index| %>
           <div class="border p-2"><p>Prior-season stint <%= index + 1 %></p>
             <%= fields_for "review[rows][#{key}][stints][#{index}]" do |stint_form| %>
-              <% choices = @batch.attempt.dataset.fetch('production').flat_map { |table| table.fetch('players').map { |player| ["#{table['team_name_source']} · #{player['player_name_source']} · #{player['player_points']} points / #{table['team_points']} · #{player['player_minutes']} minutes · #{player['games']} games", "#{table['source_id']}|#{player['player_source_url']}"] } } %>
-              <%= stint_form.label :production_key, 'Captured school player' %><%= stint_form.select :production_key, choices, { selected: stint.present? ? "#{stint['source_id']}|#{stint['player_source_url']}" : nil, include_blank: true } %>
-              <%= stint_form.label :team_id, 'Existing team' %><%= stint_form.collection_select :team_id, Team.order(:school), :id, :school, { selected: stint['team_id'], include_blank: true } %>
+              <%= stint_form.label :production_key, 'Captured school player' %><%= stint_form.select :production_key, @page[:production_options], { selected: stint.present? ? "#{stint['source_id']}|#{stint['player_source_url']}" : nil, include_blank: true } %>
+              <%= stint_form.label :team_id, 'Existing team' %><%= stint_form.collection_select :team_id, @page[:teams], :id, :school, { selected: stint['team_id'], include_blank: true } %>
               <p>Identity evidence for this stint:</p>
-              <% @batch.attempt.manifest.fetch('sources').each do |source| %>
+              <% @page[:attempt].manifest.fetch('sources').each do |source| %>
                 <label><%= check_box_tag "review[rows][#{key}][stints][#{index}][identity_evidence_source_ids][]", source['id'], stint.fetch('identity_evidence_source_ids', []).include?(source['id']) %><%= source['id'] %></label>
               <% end %>
               <%= stint_form.check_box :remove %><%= stint_form.label :remove, 'Remove stint' %>

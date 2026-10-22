@@ -41,6 +41,43 @@ RSpec.describe Departures::BatchReview do
       capture_departures(batch)
     end
 
+    it 'replays retained evidence once for a report' do
+      review = described_class.new(batch)
+      allow(Departures::AnnualDataset).to receive(:new).and_call_original
+      expect(review.report.fetch('errors')).to eq([])
+      expect(Departures::AnnualDataset).to have_received(:new).once
+    end
+
+    it 'keeps a reused review fresh after new captures and preparation edits' do
+      review = described_class.new(batch)
+      old_dataset = review.dataset
+      old_key = review.review_key
+      capture_departures(batch)
+      expect(review.dataset).to eq(batch.attempt.dataset)
+      expect(review.dataset).not_to eq(old_dataset)
+      expect { review.save('review_key' => old_key, 'rows' => departure_rows(team)) }.to raise_error(ArgumentError, /changed/)
+      fields = departure_fields.merge('expected_picks' => '1 2')
+      Departures::BatchPreparation.new(batch).save(fields)
+      expect(review.report.fetch('errors')).to include('Preparation changed; request a new acquisition')
+      Departures::BatchPreparation.new(batch).save(departure_fields)
+      capture_departures(batch)
+      review.save('review_key' => review.review_key, 'rows' => departure_rows(team))
+      revision = review.publish({ 'review_key' => review.review_key, 'confirm' => '1' }, reviewer: 'admin@example.com')
+      expect(revision.dataset_hash).to eq(batch.attempt.dataset.fetch('dataset_revision'))
+    end
+
+    it 'replays again when saving and publishing after an earlier report' do
+      review = described_class.new(batch)
+      review.report
+      allow(Departures::AnnualDataset).to receive(:new).and_call_original
+      review.save('review_key' => review.review_key, 'rows' => departure_rows(team))
+      expect(Departures::AnnualDataset).to have_received(:new).once
+      allow(Departures::AnnualDataset).to receive(:new).and_call_original
+      revision = review.publish({ 'review_key' => review.review_key, 'confirm' => '1' }, reviewer: 'admin@example.com')
+      expect(revision.team_input(team.id)['loss_share']).to eq(0.25)
+      expect(Departures::AnnualDataset).to have_received(:new).at_least(:twice)
+    end
+
     it 'publishes hand-calculated production and verified zero with authenticated approval and no model writes' do
       save_departure_rows(batch, departure_rows(team))
       allow(HTTParty).to receive(:get).and_raise('Unexpected HTTP during retained evidence review')

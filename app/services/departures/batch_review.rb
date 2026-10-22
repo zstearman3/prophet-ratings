@@ -7,24 +7,24 @@ module Departures
       @batch = batch
     end
 
-    def dataset
-      attempt = batch.attempt
+    def dataset(attempt: batch.attempt)
       Contract.check!(attempt.present?, 'Acquire usable evidence before reviewing decisions')
       RetainedEvidence.new(attempt).verified_dataset(batch.plan)
     end
 
-    def report
-      facts = dataset
-      result = Preview.new(dataset: facts, review: draft_document).call
+    def report(attempt: batch.attempt)
+      facts = dataset(attempt:)
+      result = Preview.new(dataset: facts, review: draft_document(facts)).call
       result.merge('gaps' => CoverageGaps.new(facts, result, batch.season.team_seasons.pluck(:team_id)).call, 'errors' => [])
     rescue ArgumentError, KeyError => error
-      { 'selections' => batch.attempt&.dataset&.fetch('selections', []) || [], 'teams' => [],
+      { 'selections' => attempt&.dataset&.fetch('selections', []) || [], 'teams' => [],
         'gaps' => [], 'errors' => [error.message] }
     end
 
-    def review_key
-      Contract.digest([batch.attributes, batch.attempt&.attributes, Team.order(:id).pluck(:id, :school),
-                       TeamAlias.order(:id).map(&:attributes), profile_state, batch.latest_revision&.id])
+    def review_key(attempt: batch.attempt)
+      latest_id = OffseasonInputRevision.where(season_id: batch.season_id, kind: 'departures').maximum(:id)
+      Contract.digest([batch.attributes, attempt&.attributes, Team.order(:id).pluck(:id, :school),
+                       TeamAlias.order(:id).map(&:attributes), profile_state, latest_id])
     end
 
     def save(attributes)
@@ -46,8 +46,8 @@ module Departures
     end
 
     def document
-      draft_document.merge('reviewed_by' => batch.reviewed_by, 'reviewed_at' => batch.reviewed_at.iso8601(6),
-                           'partial_acknowledgement' => batch.acknowledgement)
+      draft_document(dataset).merge('reviewed_by' => batch.reviewed_by, 'reviewed_at' => batch.reviewed_at.iso8601(6),
+                                    'partial_acknowledgement' => batch.acknowledgement)
     end
 
     private
@@ -73,8 +73,8 @@ module Departures
       end
     end
 
-    def draft_document
-      { 'dataset_revision' => dataset.fetch('dataset_revision'), 'decisions' => batch.decisions,
+    def draft_document(facts)
+      { 'dataset_revision' => facts.fetch('dataset_revision'), 'decisions' => batch.decisions,
         'revision_id' => "departure-batch-#{batch.id}", 'decision' => 'approved',
         'reviewed_by' => 'Draft calculation only; not approved', 'reviewed_at' => batch.created_at.iso8601(6),
         'partial_acknowledgement' => batch.acknowledgement }

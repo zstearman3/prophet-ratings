@@ -11,16 +11,13 @@ module Admin
     def index
       season = params[:season_id].present? ? Season.find(params.expect(:season_id)) : Season.order(year: :desc).first
       page[:season] = season
-      page[:batches] = DepartureBatch.where(season:).order(id: :desc)
+      page[:batches] = Departures::BatchPage.listing(season)
       page[:preparation] = Departures::PreparationForm.defaults(season.year) if season
     end
 
     def show
       page[:preparation] ||= Departures::BatchPreparation.new(batch).form_attributes
-      page[:review] = Departures::BatchReview.new(batch)
-      page[:report] = page[:review].report
-      page[:identity] = Departures::TeamIdentity.new
-      page[:row_issues] = Departures::DecisionForm.new(batch.attempt&.dataset || {}).issues(batch.decisions)
+      @page = page.merge(Departures::BatchPage.new(batch).call)
     end
 
     def create
