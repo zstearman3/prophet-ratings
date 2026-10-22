@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_21_150000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_21_200000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -159,6 +159,41 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_150000) do
     t.string "sports_reference_slugs", default: [], null: false, array: true
     t.index ["name"], name: "index_conferences_on_name"
     t.index ["slug"], name: "index_conferences_on_slug"
+  end
+
+  create_table "departure_acquisitions", force: :cascade do |t|
+    t.bigint "departure_batch_id", null: false
+    t.bigint "predecessor_id"
+    t.string "status", default: "queued", null: false
+    t.jsonb "plan", default: {}, null: false
+    t.jsonb "manifest", default: {}, null: false
+    t.jsonb "dataset", default: {}, null: false
+    t.jsonb "evidence", default: {}, null: false
+    t.string "failure"
+    t.datetime "started_at"
+    t.datetime "finished_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["departure_batch_id"], name: "index_departure_acquisitions_on_departure_batch_id"
+    t.index ["predecessor_id"], name: "index_departure_acquisitions_on_predecessor_id"
+  end
+
+  create_table "departure_batches", force: :cascade do |t|
+    t.bigint "season_id", null: false
+    t.bigint "revision_id"
+    t.bigint "predecessor_id"
+    t.string "status", default: "draft", null: false
+    t.jsonb "plan", default: {}, null: false
+    t.jsonb "decisions", default: [], null: false
+    t.jsonb "acknowledgement", default: {}, null: false
+    t.string "correction_reason"
+    t.string "reviewed_by"
+    t.datetime "reviewed_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["predecessor_id"], name: "index_departure_batches_on_predecessor_id"
+    t.index ["revision_id"], name: "index_departure_batches_on_revision_id"
+    t.index ["season_id"], name: "index_departure_batches_on_season_id"
   end
 
   create_table "game_external_identities", force: :cascade do |t|
@@ -766,6 +801,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_150000) do
   add_foreign_key "coaching_changes", "teams", column: "discovery_team_id"
   add_foreign_key "coaching_changes", "teams", column: "previous_team_id"
   add_foreign_key "conference_external_identities", "conferences"
+  add_foreign_key "departure_acquisitions", "departure_acquisitions", column: "predecessor_id"
+  add_foreign_key "departure_acquisitions", "departure_batches"
+  add_foreign_key "departure_batches", "departure_batches", column: "predecessor_id"
+  add_foreign_key "departure_batches", "offseason_input_revisions", column: "revision_id"
+  add_foreign_key "departure_batches", "seasons"
   add_foreign_key "game_external_identities", "games"
   add_foreign_key "game_observations", "games"
   add_foreign_key "game_odds", "games"

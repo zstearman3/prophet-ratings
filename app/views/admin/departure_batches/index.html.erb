@@ -1,0 +1,14 @@
+<section class="mx-auto max-w-5xl space-y-5 pb-12">
+  <h1 class="text-3xl font-bold">Departure batches</h1>
+  <% if @page[:error] %><p role="alert"><%= @page[:error] %></p><% end %>
+  <%= form_with url: admin_departure_batches_path, method: :get do |form| %>
+    <%= form.label :season_id, 'Target season' %><%= form.collection_select :season_id, Season.order(year: :desc), :id, :year, selected: @page[:season]&.id %><%= form.submit 'View season' %>
+  <% end %>
+  <% if @page[:season] %>
+    <%= link_to 'Back to offseason setup', admin_offseason_setup_path(season_id: @page[:season].id) %>
+    <h2 class="text-xl font-semibold">Saved batches for <%= @page[:season].year %></h2>
+    <% Array(@page[:batches]).each do |batch| %><p><%= link_to "Batch ##{batch.id}: #{batch.status} · #{batch['acquisition_status'] || 'prepared'}", admin_departure_batch_path(batch) %></p><% end %>
+    <h2 class="text-xl font-semibold">Prepare a departure batch</h2>
+    <%= render 'preparation', preparation: @page[:preparation], season: @page[:season], destination: admin_departure_batches_path, verb: :post %>
+  <% else %><p>Prepare a target season first.</p><% end %>
+</section>

@@ -415,3 +415,10 @@ For CBBD use `season:prepare` and the review screen. Legacy `season:align_confer
 automatic bootstrap alignment and automatic activation alignment reject CBBD before
 Sports Reference HTTP. Explicit `ALIGN_CONFERENCES=false` preserves the existing
 manual bootstrap/activation path after review; CSV/manual reconciliation is separate.
+
+Departure review is available from the season's **Review departure batches** link.
+Prepare the target memberships first, then save source configuration, queue captures,
+review all selections and explicitly publish saved decisions. Inspect the actual
+partial-coverage gaps rather than treating unknown as zero. See
+[departures](departures.md#saved-admin-workflow) for recovery and correction steps.
+Model selection and rating initialization remain separate runbook operations.

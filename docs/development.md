@@ -414,3 +414,13 @@ in private database backups and need an operator retention/capacity policy.
 See `docs/data-ingestion.md` for interrupted acquisitions, versioned review,
 stale/idempotent apply and the manual production setup review. No live API call,
 import, rating backfill or production migration is required to verify the feature.
+
+### Departure review prerequisites
+
+Run `bin/migrate` for migration `20261021200000` before opening departure batches.
+The existing GoodJob worker performs queued acquisition; web-only startup leaves
+attempts queued. Raw HTML/metadata and prior attempts are retained in PostgreSQL,
+so include these private tables in database backup and capacity/retention planning.
+No new storage service or automatic retention deletion is configured. Uploaded HTML
+is limited to 5 MiB per source and configuration to 200 sources. Use isolated
+Compose project names/ports for agent migration work as described above.
