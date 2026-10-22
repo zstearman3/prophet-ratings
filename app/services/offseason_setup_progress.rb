@@ -49,9 +49,11 @@ class OffseasonSetupProgress
 
   def activation
     current = season.current? ? 'yes' : 'no'
+    review = season.offseason_readiness_reviews.order(:id).last
     Step.new(key: 'activation', label: 'Review readiness and activate season', status: 'manual',
-             last_result: "Current season: #{current}.",
-             next_action: 'Readiness review and activation remain separate operations; this dashboard does not activate seasons.')
+             last_result: "Current season: #{current}. Latest readiness review: #{review&.id || 'none'}; " \
+                          "retained actions: #{review&.results&.keys}.",
+             next_action: 'Review fresh evidence and retained decisions in readiness, then separately activate season or default model.')
   end
 
   # Summarizes season setup without writing missing records.

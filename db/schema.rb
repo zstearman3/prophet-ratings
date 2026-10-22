@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_22_030000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_22_040000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -409,6 +409,23 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_22_030000) do
     t.index ["season_id", "kind", "input_hash"], name: "index_offseason_revisions_identity", unique: true
     t.index ["season_id", "kind", "version"], name: "index_offseason_revisions_version", unique: true
     t.index ["season_id"], name: "index_offseason_input_revisions_on_season_id"
+  end
+
+  create_table "offseason_readiness_reviews", force: :cascade do |t|
+    t.bigint "season_id", null: false
+    t.bigint "ratings_config_version_id"
+    t.bigint "reviewer_id", null: false
+    t.string "fingerprint", null: false
+    t.jsonb "report", null: false
+    t.jsonb "acknowledgement", default: {}, null: false
+    t.jsonb "deferrals", default: {}, null: false
+    t.jsonb "results", default: {}, null: false
+    t.jsonb "attempts", default: [], null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["ratings_config_version_id"], name: "index_offseason_readiness_reviews_on_ratings_config_version_id"
+    t.index ["reviewer_id"], name: "index_offseason_readiness_reviews_on_reviewer_id"
+    t.index ["season_id"], name: "index_offseason_readiness_reviews_on_season_id"
   end
 
   create_table "predictions", force: :cascade do |t|
@@ -868,6 +885,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_22_030000) do
   add_foreign_key "game_sync_dates", "seasons"
   add_foreign_key "offseason_input_revisions", "offseason_input_revisions", column: "predecessor_id"
   add_foreign_key "offseason_input_revisions", "seasons"
+  add_foreign_key "offseason_readiness_reviews", "ratings_config_versions"
+  add_foreign_key "offseason_readiness_reviews", "seasons"
+  add_foreign_key "offseason_readiness_reviews", "users", column: "reviewer_id"
   add_foreign_key "predictions", "ratings_config_versions"
   add_foreign_key "predictions", "team_rating_snapshots", column: "away_team_snapshot_id"
   add_foreign_key "predictions", "team_rating_snapshots", column: "home_team_snapshot_id"

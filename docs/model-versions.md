@@ -204,3 +204,14 @@ when selecting a different model; initialization remains a same-model safe repea
 Choose an eligible unused published version so the season revision and included
 live/prior/snapshot coverage remain aligned for activation. Existing CLI calculation
 service contracts are unchanged.
+
+### Reviewed default activation
+
+The target-season **Readiness** screen retains operational evidence and offers a
+separate **Make model default** action showing the previous effective default and
+persisted selected model. Saving readiness, publishing preseason outputs and
+activating a season never change that default. Changes since review require fresh
+evidence before either activation action; each successful action result is retained.
+Explicit season/model job payloads are unchanged by switching. Jobs omitting a
+season ID retain their existing execution-time current-season behavior and need
+operator review in GoodJob. See [the retained readiness runbook](offseason.md#retained-readiness-and-explicit-activation).

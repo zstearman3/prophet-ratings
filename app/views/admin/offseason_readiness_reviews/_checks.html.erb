@@ -1,0 +1,27 @@
+<% season = @page[:season] %>
+<% fix_paths = {
+  'memberships' => rails_admin.review_memberships_path(model_name: 'season', id: season.id),
+  'model' => admin_preseason_publications_path(season_id: season.id),
+  'publication' => admin_preseason_publications_path(season_id: season.id),
+  'coaching' => admin_coaching_review_path(season.year),
+  'recruiting' => admin_recruiting_batches_path(season_id: season.id),
+  'departures' => admin_departure_batches_path(season_id: season.id),
+  'schedule' => admin_schedule_refresh_runs_path(season_id: season.id),
+  'venues' => admin_schedule_refresh_runs_path(season_id: season.id),
+  'predictions' => admin_prediction_evaluation_path(season_id: season.id, model_id: report['model_id']),
+  'operations' => admin_offseason_setup_path(season_id: season.id)
+} %>
+<% report.fetch('checks').each do |check| %>
+  <section class="rounded border p-4 space-y-2">
+    <h3 class="font-semibold"><%= check['label'] %> — <%= decisions&.key?(check['key']) ? 'deferred' : check['status'] %><%= ' (required)' if check['hard'] %></h3>
+    <pre class="whitespace-pre-wrap text-sm"><%= JSON.pretty_generate(check['evidence']) %></pre>
+    <%= link_to 'Review next action', fix_paths.fetch(check.fetch('key')), class: 'text-blue-700 underline' %>
+    <% if decisions&.key?(check['key']) %><p>Reason: <%= decisions[check['key']] %></p><% end %>
+  </section>
+<% end %>
+<h3 class="font-semibold">Captured and current input gaps</h3>
+<p>Unknown inputs are distinct from observed zero. Captured inputs remain the evidence applied to published outputs.</p>
+<pre class="whitespace-pre-wrap text-sm"><%= JSON.pretty_generate(report.fetch('gaps')) %></pre>
+
+<h3 class="font-semibold">Included participants, identity and publication evidence</h3>
+<pre class="whitespace-pre-wrap text-sm"><%= JSON.pretty_generate(report.fetch('teams')) %></pre>
