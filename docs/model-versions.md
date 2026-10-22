@@ -185,3 +185,22 @@ its down migration is intentionally irreversible. Roll back code while keeping
 wide storage. See the [precision contract](ratings.md#issued-win-probability-precision)
 for deterministic endpoints and floating-point limits. No activation or accuracy
 claim accompanies this bundle.
+
+### Season-specific publication selection
+
+The offseason preseason screen selects only persisted published model versions.
+Its season-specific selection and generation are independent of the global default
+and of retained input approvals. Preview, acknowledgement, job execution and result
+pages retain the selected model ID/name. Switching A → B → A invalidates A's old
+pending review. Initialization preserves selected-model captures; explicit revision
+uses fresh reviewed evidence and existing immutable-version eligibility rules.
+Neither operation authors model configuration, activates a model/season or silently
+regenerates saved forecasts. Use a newly published eligible version for corrections
+that cannot reuse existing captures; the existing CLI preview/revision commands
+remain available with their original contracts.
+
+After an explicit season revision, the admin workflow requires explicit revision
+when selecting a different model; initialization remains a same-model safe repeat.
+Choose an eligible unused published version so the season revision and included
+live/prior/snapshot coverage remain aligned for activation. Existing CLI calculation
+service contracts are unchanged.

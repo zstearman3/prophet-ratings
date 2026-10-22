@@ -1,0 +1,8 @@
+<% case value %>
+<% when Hash %>
+  <dl class="ml-4 border-l pl-3"><% value.each do |key, child| %><dt class="font-medium"><%= key.to_s.humanize %></dt><dd><%= render 'evidence', value: child %></dd><% end %></dl>
+<% when Array %>
+  <% if value.empty? %><p>None recorded</p><% else %><ul class="ml-4 list-disc"><% value.each do |child| %><li><%= render 'evidence', value: child %></li><% end %></ul><% end %>
+<% else %>
+  <span><%= value.nil? ? 'Unknown / not recorded' : value.to_s %></span>
+<% end %>

@@ -1,0 +1,45 @@
+<section class="mx-auto max-w-7xl space-y-6 pb-12">
+  <h1 class="text-3xl font-bold">Preseason review #<%= @page[:publication].id %> · Season <%= @page[:season].year %></h1>
+  <p>Model <strong><%= @page[:publication].ratings_config_version.name %></strong> (#<%= @page[:publication].ratings_config_version_id %>) · <%= @page[:publication].mode %> · selection <%= @page[:publication].report['selection_generation'] %></p>
+  <p><%= link_to 'Return to offseason dashboard', admin_offseason_setup_path(season_id: @page[:season].id), class: 'underline' %> · <%= link_to 'Models and reviews', admin_preseason_publications_path(season_id: @page[:season].id), class: 'underline' %></p>
+  <p role="status">Execution: <strong><%= @page[:publication].status %></strong>. Reviewed by admin #<%= @page[:publication].reviewer_id %> at <%= @page[:publication].created_at %>.</p>
+  <% [@page[:error], @page[:publication].error_message].compact.each do |error| %><p role="alert" class="bg-red-100 p-3"><%= error %></p><% end %>
+  <% if @page[:publication].status.in?(%w[queued running]) %>
+    <p>Refresh this page for status. GoodJob worker must be running. A running operation may hold the ratings lock. If a request stopped before enqueue finished and this review remains queued, use Requeue reviewed publication to send the same pinned review again; its original acknowledgement is retained. After an interrupted worker has stopped, use the retry below; the original pinned proposal is rechecked before any writes.</p>
+    <%= link_to 'Refresh execution status', admin_preseason_publication_path(@page[:publication], season_id: @page[:season].id), class: 'underline' %>
+  <% end %>
+  <p>Coverage: <%= @page[:publication].report.dig('coverage', 'included') %> included of <%= @page[:publication].report.dig('coverage', 'stored') %> stored team seasons. Missing before values are unknown. Proposed net = offense − defense; ranks use net descending, then team ID ascending.</p>
+  <h2 class="text-xl font-semibold">Missing evidence requiring acknowledgement</h2>
+  <% if @page[:publication].report['gaps'].empty? %><p>No permitted evidence gaps were identified. Zero values remain observed values, not missing evidence.</p><% end %>
+  <ul><% @page[:publication].report['gaps'].each do |gap| %><li><strong><%= gap['team_name'] %> · <%= gap['kind'] %>:</strong> <%= gap['reason'].humanize %></li><% end %></ul>
+  <% if @page[:publication].acknowledgement.present? %>
+    <p>Acknowledged by admin #<%= @page[:publication].acknowledgement['admin_id'] %> at <%= @page[:publication].acknowledgement['acknowledged_at'] %> for this exact season/model/input fingerprint. The gaps above remain retained after publication.</p>
+  <% end %>
+  <h2 class="text-xl font-semibold">Before and proposed after</h2>
+  <div class="overflow-x-auto"><table class="w-full text-left border-collapse"><thead><tr><th>Team</th><% %w[offense defense pace net rank].each do |stat| %><th><%= stat.humanize %> before → after</th><% end %><th>Rank movement</th></tr></thead><tbody>
+  <% @page[:publication].report['teams'].each do |entry| %><tr class="border-t"><td class="p-2"><%= entry['team_name'] %></td><% %w[offense defense pace net rank].each do |stat| %><td class="p-2"><%= entry['before'][stat] || 'Unknown' %> → <%= entry['after'][stat] %></td><% end %><td><%= entry['rank_change'] || 'Unknown' %></td></tr><% end %>
+  </tbody></table></div>
+  <h2 class="text-xl font-semibold">Largest rank movers</h2>
+  <ul><% @page[:publication].report['largest_movers'].each do |entry| %><li><%= entry['team_name'] %>: <%= entry['rank_change'] %> places</li><% end %></ul>
+  <% if @page[:publication].report['largest_movers'].empty? %><p>No stored before ranks to compare.</p><% end %>
+  <h2 class="text-xl font-semibold">Adjustment components and provenance</h2>
+  <% @page[:publication].report['teams'].each do |entry| %>
+    <details class="rounded border p-3"><summary><%= entry['team_name'] %> · <%= entry['reuses_capture'] ? "Reuses immutable capture ##{entry['capture_id']}" : 'Fresh proposed capture' %></summary>
+      <% if entry['reuses_capture'] %><p>Current mutable evidence is checked for freshness separately. Initialize preserves the captured values below. To apply corrections, select an eligible new immutable model and explicitly revise.</p><% end %>
+      <p>Previous-team history fallbacks: <%= entry['fallbacks'].presence&.join(', ') || 'None' %>. Captured baselines: <%= entry.dig('inputs', 'baselines') %>.</p>
+      <% { 'Offense / defense / pace / net deltas (unknown before stays unknown)' => entry['deltas'], 'Legacy adjustment components (missing is unknown)' => entry['legacy_components'], 'Reviewed efficiency and allocation' => entry['efficiency'], 'Coaching pace adjustment' => entry['coaching'], 'Captured source and revision provenance' => entry['inputs'] }.each do |label, evidence| %>
+        <h3 class="font-semibold"><%= label %></h3><%= render 'evidence', value: evidence %>
+      <% end %>
+    </details>
+  <% end %>
+  <% if @page[:publication].status == 'published' %>
+    <h2 class="text-xl font-semibold">Published outputs</h2><%= render 'evidence', value: @page[:publication].result %>
+  <% else %>
+    <p>Publication preserves history and saved forecasts. It does not activate the season, change the default model or regenerate forecasts. Stale reviews require a fresh preview; protected outputs require the scoped recovery runbook.</p>
+    <%= form_with url: publish_admin_preseason_publication_path(@page[:publication], season_id: @page[:season].id), data: { turbo: false } do |form| %>
+      <%= form.hidden_field :fingerprint, value: @page[:publication].fingerprint %>
+      <% if @page[:publication].report['gaps'].any? && @page[:publication].status != 'queued' %><div><%= form.check_box :acknowledge %><%= form.label :acknowledge, 'I acknowledge the displayed missing recruiting/departure evidence and its documented fallbacks for this exact reviewed proposal.' %></div><% end %>
+      <%= form.submit({ 'running' => 'Recover interrupted publication', 'queued' => 'Requeue reviewed publication' }.fetch(@page[:publication].status, 'Publish reviewed preseason ratings'), class: 'rounded border px-3 py-2') %>
+    <% end %>
+  <% end %>
+</section>

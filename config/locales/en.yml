@@ -29,6 +29,9 @@
 
 en:
   admin:
+    preseason_publications:
+      select_model:
+        selected: "Model selected. Input approvals are retained; review a new preview for this selection."
     cbbd_review_runs:
       queued: Bounded acquisition queued.
       saved: Draft saved. Only explicitly approved rows can apply.

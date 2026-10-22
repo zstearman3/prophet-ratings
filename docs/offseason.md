@@ -422,3 +422,55 @@ review all selections and explicitly publish saved decisions. Inspect the actual
 partial-coverage gaps rather than treating unknown as zero. See
 [departures](departures.md#saved-admin-workflow) for recovery and correction steps.
 Model selection and rating initialization remain separate runbook operations.
+
+### Admin preseason preview and publication
+
+From **Offseason setup → Preview and publish preseason ratings**, select the target
+season and an already-published model. The selection persists for that season;
+it does not activate the model or season and never erases recruiting/departure
+approvals. Changing models, including switching away and back, requires a fresh
+publication review. The dashboard certifies only a still-current successful review
+for that selection; legacy CLI outputs remain unverified by this workflow.
+
+Choose **Initialize / safe repeat** to retain existing captures for that model.
+Choose **Revise reviewed inputs** explicitly when publishing corrections, using an
+eligible already-published immutable version. After an explicit revision, changing
+models requires **Revise reviewed inputs** with an eligible unused published model;
+**Initialize / safe repeat** only repeats that same revision model. This keeps the
+season's revision and live/capture coverage aligned for activation. A reused
+capture's operands remain
+visible; current evidence is checked separately for staleness even on safe repeats.
+The preview shows coverage, history fallbacks, live and proposed ratings/net/rank,
+changes, components, source facts and revision identities. Creating a review stores
+only its report, never ratings, captures or snapshots.
+
+Read every missing-evidence gap. Unknown recruiting/departure inputs are not
+verified zero. Where the model permits fallback, check the explicit acknowledgement
+before publishing. The retained acknowledgement records the admin, time, exact gaps
+and season/model/input identity; it stays visible after publication. Coaching
+readiness and other hard validation failures cannot be acknowledged away.
+
+**Publish reviewed preseason ratings** queues a pinned review ID through GoodJob.
+Apply the migration and run the worker (`bin/dev` runs it locally). Refresh the
+review to see queued/running/published/failed status, error guidance, capture IDs,
+snapshot IDs and actual ranks. Queue and execution both recheck the proposal;
+changed inputs, dates, roster, model selection or protected outputs require a fresh
+preview or the existing scoped recovery procedure. Rating writes and the success
+record commit together under the shared ratings, season and applicable coaching
+locks. A competing operation returns a visible lock conflict; let it finish.
+
+If enqueue fails, the review reports failure and can be explicitly retried. If a
+request stops between recording queued state and creating its worker job, use
+**Requeue reviewed publication** on that queued review. It rechecks currentness and
+enqueues the same pinned ID while retaining the original acknowledgement/admin/time.
+Repeated queued submissions may create duplicate jobs; their serialized execution
+preserves capture/snapshot IDs and never repeats a committed success. If a
+worker stops while status says running, first confirm the old worker has stopped,
+then use **Recover interrupted publication** on that original review. The shared
+writer lock prevents overlap with a live operation, and recovery rechecks the
+original fingerprint. Duplicate successful deliveries preserve capture/snapshot
+identities. A changed reviewed proposal requires a new review; a correction to an
+already-used immutable version requires an eligible new version. Current seasons,
+completed games, later snapshots and changed live ratings remain protected. This
+workflow never deletes history, activates seasons, changes default models or
+regenerates forecasts.

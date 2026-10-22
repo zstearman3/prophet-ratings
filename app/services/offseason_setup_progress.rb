@@ -38,12 +38,7 @@ class OffseasonSetupProgress
   end
 
   def preseason
-    rows = season.team_seasons
-    initialized = rows.where.not(adj_offensive_efficiency: nil).where.not(adj_defensive_efficiency: nil).where.not(adj_pace: nil).count
-    revision = season.preseason_revision&.name || 'none selected'
-    result = "#{initialized} of #{rows.count} team seasons have stored adjusted ratings; preseason revision: #{revision}."
-    Step.new(key: 'preseason', label: 'Initialize and review preseason ratings', status: 'manual', last_result: result,
-             next_action: 'Preseason initialization remains in the runbook; this dashboard does not certify outputs.')
+    PreseasonPublicationProgress.new(season).call
   end
 
   def schedule

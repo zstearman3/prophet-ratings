@@ -232,3 +232,16 @@ must be included in private backups. The browser needs the migration and GoodJob
 worker; it needs no capture directory. File/CLI callers retain their existing
 contracts. Publication only selects reviewed input evidence; model selection,
 preseason calculation and activation remain separate operations.
+
+### Publication review versus input approval
+
+Input batch approvals remain independent of the selected preseason model. The
+admin preseason preview displays captured recruiting/departure revision facts and
+their retained input-review provenance, including previously acknowledged gaps.
+Publication requires its own acknowledgement for permitted missing evidence,
+scoped to the exact season/model/proposal. A zero contribution may reflect unknown
+evidence, a disabled component or a threshold; inspect the reason and coverage,
+not just the number. Observed zero remains distinct from unknown. Legacy local
+recruiting scores are never interpreted as provider class points. Changed current
+inputs invalidate a pending publication review even when initialization would reuse
+an immutable capture; applying those corrections requires explicit revision.
