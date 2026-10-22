@@ -1055,14 +1055,19 @@ for the operator's review/revision steps.
 
 ## Annual draft departures
 
-Draft departures use an explicit file-only acquisition layer, separate from game
-imports and ratings. See [Annual departure acquisition](departures.md) for
-`departures:acquire`, `departures:replay`, `departures:preview`, supported NBA results
-and official-school Sidearm tables, saved-source recovery, and the reviewed-file
-contract. Sources, response bytes/hashes, capture times, failures, full selection
-ledger and normalized totals are retained. Identity review is a separate immutable
-mapping revision; incomplete evidence never becomes a verified zero. These commands
-perform no database writes, data imports, scoring or scheduled scraping.
+New departure acquisition uses CBBD draft picks and regular/postseason player and
+team totals through the saved admin workflow. Private database attempts retain
+responses, retries, hashes, coverage and reviewed decisions; explicit approval
+publishes immutable input revisions and profile pointers. Missing evidence stays
+unknown, and acquisition never creates player/team identities or runs ratings.
+See [the saved admin workflow](departures.md#saved-admin-workflow) and
+[identity and scope review](departures.md#review-identities-scope-and-missingness).
+
+CLI acquisition is also CBBD-only. Offline replay/preview and the historical v1
+NBA/Sidearm HTML contracts remain supported without fetching HTML for new runs.
+See [CLI acquisition and offline replay](departures.md#cli-acquisition-and-offline-replay)
+and [retention and compatibility](departures.md#retention-and-compatibility) for
+source budgets, private backups and recovery requirements.
 
 ## Recruiting review
 
@@ -1084,12 +1089,15 @@ Follow the [2026-to-2027 bundle checklist](offseason-inputs.md)
 for the complete acquire → identity/participation review → input import → model
 preview sequence. Acquisition/parsing and loss arithmetic are automated; approval,
 source scope and ambiguous identities require operator evidence review. Recruiting
-captures and decisions are retained in database batches/revisions; retain departure
-capture files, approved decisions and coverage reports. Missing recruiting
-points or incomplete draft accounting remain unknown, including in approved partial
-inputs; never infer zero from source absence. Approve recruiting in the admin UI;
-departure import uses the decisions file and original replayable capture. Each
-publication validates its own reviewed evidence and guarded preview key.
+captures and departure responses/decisions are retained in private database
+batches and immutable revisions; back up that evidence. File callers retain their
+replayable captures and approved decisions separately. Missing recruiting points
+or incomplete draft accounting remain unknown, including in approved partial
+inputs; never infer zero from source absence. Approve both input kinds through
+their saved admin review workflows. Departure CLI/file replay and import remain
+available for compatible offline bundles. Each publication validates its own
+reviewed evidence and guarded preview key. See
+[the departure review workflow](departures.md#review-identities-scope-and-missingness).
 
 Input imports only write reviewed revisions and profile pointers. They do not
 publish/activate a season. Revised sources/reviews need immutable successors and

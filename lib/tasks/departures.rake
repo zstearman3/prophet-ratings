@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 namespace :departures do
-  desc 'Capture explicit annual draft/school/evidence sources into a new immutable directory'
+  desc 'Acquire bounded annual CBBD JSON into a new private immutable directory'
   task acquire: :environment do
     plan = JSON.parse(File.read(ENV.fetch('PLAN_PATH')))
     Departures::Contract.years!(plan)
@@ -9,10 +9,10 @@ namespace :departures do
     raise ArgumentError, 'OUTPUT_DIR already exists; use a successor capture directory' if File.exist?(directory)
 
     # Validate source configuration before any requests.
-    Departures::AnnualDataset.new(manifest: plan, directory:)
-    FileUtils.mkdir_p(directory)
-    capture = Departures::SourceCapture.new(directory:)
-    manifest = plan.merge('sources' => plan.fetch('sources').map { |source| capture.call(source) })
+    Departures::CbbdDataset.validate_plan(plan)
+    FileUtils.mkdir_p(directory, mode: 0o700)
+    checkpoint = Departures::FileCheckpoint.new(File.join(directory, 'manifest.partial.json'))
+    manifest = Departures::CbbdAcquisition.new(plan:, directory:, checkpoint:).call
     Departures::Contract.write(File.join(directory, 'manifest.json'), manifest)
     dataset = Departures::AnnualDataset.new(manifest:, directory:).call
     Departures::Contract.write(File.join(directory, 'dataset.json'), dataset)

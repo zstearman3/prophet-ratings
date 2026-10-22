@@ -9,9 +9,11 @@ module Departures
     end
 
     def call
-      plan = years.merge('expected_picks' => picks, 'sources' => sources)
-      AnnualDataset.new(manifest: plan, directory: '.')
-      plan
+      Contract.check!(attributes.fetch('sources', {}).empty?, 'New acquisition is CBBD-only; create a CBBD successor')
+      plan = years.merge(provider_fields)
+      CbbdDataset.validate_plan(plan)
+      Contract.years!(plan)
+      plan.merge('sources' => CbbdDataset.sources(plan))
     end
 
     def self.integer(value)
@@ -20,34 +22,27 @@ module Departures
       Integer(text, 10)
     end
 
-    def self.source(source, index)
-      fields = source.slice('type', 'url', 'team_name_source', 'scope_evidence').merge('id' => "source-#{index + 1}")
-      validate_school(fields) if fields['type'] == 'sidearm_totals'
-      fields
-    end
-
-    def self.validate_school(fields)
-      Contract.text!(fields['team_name_source'], 'school name')
-      Contract.text!(fields['scope_evidence'], 'final overall scope evidence')
-      fields['scope'] = Contract::SCOPE
-    end
-
     def self.defaults(target_year)
       year = target_year - 1
       { 'draft_year' => year, 'prior_season_year' => year, 'target_year' => target_year, 'expected_picks' => '',
-        'sources' => { '0' => { 'type' => 'nba_results', 'url' => "https://www.nba.com/news/#{year}-nba-draft-order" } } }
-    end
-
-    def self.add_source(preparation)
-      sources = preparation.fetch('sources', {})
-      count = sources.size
-      Contract.check!(count < BatchPreparation::MAX_SOURCES, 'At most 200 sources are supported')
-      sources["new-#{count}"] = { 'type' => 'sidearm_totals' }
+        'scope_evidence' => '', 'max_requests' => 15, 'retries' => 2, 'absent_postseason_team_ids' => '' }
     end
 
     private
 
     attr_reader :attributes, :season
+
+    def provider_fields
+      parser = self.class
+      { 'provider' => 'cbbd', 'schema' => CbbdDataset::VERSION, 'extraction_version' => CbbdDataset::EXTRACTION,
+        'expected_picks' => picks, 'scope_evidence' => attributes.fetch('scope_evidence'),
+        'max_requests' => parser.integer(attributes.fetch('max_requests')), 'retries' => parser.integer(attributes.fetch('retries')),
+        'absent_postseason_team_ids' => absent_postseason_ids }
+    end
+
+    def absent_postseason_ids
+      attributes.fetch('absent_postseason_team_ids', '').to_s.split(/[\s,]+/).map { |value| self.class.integer(value) }
+    end
 
     def years
       plan = %w[draft_year prior_season_year target_year].index_with { |key| self.class.integer(attributes.fetch(key)) }
@@ -62,12 +57,6 @@ module Departures
 
     def picks
       attributes.fetch('expected_picks').to_s.split(/[\s,]+/).map { |value| self.class.integer(value) }
-    end
-
-    def sources
-      rows = attributes.fetch('sources', {}).values.reject { |source| source['remove'] == '1' }
-      Contract.check!(rows.size <= BatchPreparation::MAX_SOURCES, "At most #{BatchPreparation::MAX_SOURCES} sources are supported")
-      rows.map.with_index { |source, index| self.class.source(source, index) }
     end
   end
 end

@@ -35,16 +35,29 @@ module Departures
     end
 
     def production_options
-      facts.fetch('production', []).flat_map { |table| self.class.table_options(table) }
+      production_tables.flat_map { |table| self.class.table_options(table) }
+    end
+
+    def production_tables
+      tables = facts.fetch('production', [])
+      return tables unless facts['provider'] == 'cbbd'
+
+      athletes = facts.fetch('selections').pluck('provider_athlete_id').compact
+      tables.filter_map { |table| self.class.drafted_players(table, athletes) }
+    end
+
+    public_class_method def self.drafted_players(table, athletes)
+      players = table.fetch('players').select { |player| athletes.include?(player['provider_athlete_id']) }
+      table.merge('players' => players) if players.any?
     end
 
     public_class_method def self.table_options(table)
-      denominator = table.fetch('team_points')
-      source_id = table.fetch('source_id')
+      denominator = table.fetch('team_points') || 'Unknown'
       table.fetch('players').map do |player|
         label = "#{table.fetch('team_name_source')} · #{player['player_name_source']} · " \
-                "#{player['player_points']} points / #{denominator} · #{player['player_minutes']} minutes · #{player['games']} games"
-        [label, "#{source_id}|#{player.fetch('player_source_url')}"]
+                "#{player['player_points'] || 'Unknown'} points / #{denominator} · " \
+                "#{player['player_minutes']} minutes · #{player['games']} games"
+        [label, PlayerIdentity.choice(table, player)]
       end
     end
   end

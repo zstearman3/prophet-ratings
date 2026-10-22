@@ -1060,6 +1060,14 @@ These initial experimental constants were fixed before historical outcome
 inspection; they imply no demonstrated accuracy gain. Existing authored bundles,
 legacy formulas, captures and published outputs are unchanged.
 
+New CBBD annual inputs retain typed athlete/team IDs and reconcile regular and
+postseason player/team totals separately before merging. Team game-clock minutes
+remain audit-only and are never used as player-minute denominators. Missing scope
+coverage stays unknown. Historical HTML/scoring captures retain their v1 contract;
+v2 captures explicitly retain provider/schema/extraction identity. See
+[the departure workflow](departures.md) for evidence and recovery requirements.
+The points-loss formula and Rails/Python boundary are unchanged.
+
 For complete reviewed all-selection accounting, L is the sum of eligible players'
 actual prior-season points divided by their common full-season team denominator.
 D = weight * max(-ceiling, -slope * L), in net points per 100 possessions.

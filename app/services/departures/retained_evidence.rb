@@ -44,17 +44,32 @@ module Departures
       { capture_dir: directory, dataset_path: File.join(directory, 'dataset.json'), review_path: File.join(directory, 'review.json') }
     end
 
+    def filename(id)
+      extension = source(id).fetch('snapshot_kind') == 'raw_json' ? 'json' : 'html'
+      "departure-source-#{attempt.id}.#{extension}"
+    end
+
     def bytes(source_id)
-      source = retained_source(source_id)
+      source = source(source_id)
       original = Base64.strict_decode64(attempt.evidence.fetch(source_id).fetch('snapshot_base64'))
       self.class.validate_bytes(source, original)
       original
+    end
+
+    def self.sources(manifest)
+      manifest.fetch('sources') + manifest.fetch('captures', [])
     end
 
     def self.validate_bytes(source, original)
       sha = source.fetch('snapshot_sha256')
       OffseasonInputs::DepartureBundle.validate_location(source.fetch('snapshot_location'), sha)
       Contract.check!(Digest::SHA256.hexdigest(original) == sha, 'Retained source hash mismatch')
+    end
+
+    def source(id)
+      source = self.class.sources(attempt.manifest).find { |entry| entry.fetch('id') == id }
+      Contract.check!(source.present?, 'Unknown retained source')
+      source
     end
 
     private
@@ -67,12 +82,6 @@ module Departures
       saved
     end
 
-    def retained_source(id)
-      source = attempt.manifest.fetch('sources').find { |entry| entry.fetch('id') == id }
-      Contract.check!(source.present?, 'Unknown retained source')
-      source
-    end
-
     def materialize
       Dir.mktmpdir('departure-evidence-') do |directory|
         write_sources(directory)
@@ -82,7 +91,7 @@ module Departures
     end
 
     def write_sources(directory)
-      attempt.manifest.fetch('sources').each do |source|
+      self.class.sources(attempt.manifest).each do |source|
         location = source['snapshot_location']
         Contract.write_bytes(File.join(directory, location), bytes(source.fetch('id'))) if location
       end

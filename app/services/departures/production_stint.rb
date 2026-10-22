@@ -33,18 +33,24 @@ module Departures
     attr_reader :stint, :dataset, :identity, :table
 
     def production_table
-      tables = dataset.fetch('production').select { |entry| entry['source_id'] == stint.fetch('source_id') }
+      tables = dataset.fetch('production').select { |entry| PlayerIdentity.production_key(entry) == PlayerIdentity.production_key(stint) }
       Contract.check!(tables.one?, 'Missing or ambiguous production source')
       tables.first
     end
 
     def candidates
+      return PlayerIdentity.team_candidates(table.fetch('provider_team_id')) if table['provider']
+
       source = dataset.fetch('sources').find { |entry| entry['id'] == table.fetch('source_id') }
       identity.candidates(table.fetch('team_name_source'), source: URI.parse(source.fetch('url')).host)
     end
 
     def player
-      players = table.fetch('players').select { |row| row['player_source_url'] == stint.fetch('player_source_url') }
+      players = table.fetch('players').select { |row| PlayerIdentity.key(row) == PlayerIdentity.key(stint) }
+      if table['provider']
+        Contract.check!(table.fetch('coverage_complete') && players.all? { |row| row.fetch('coverage_complete') },
+                        'Unknown incomplete full-season production')
+      end
       self.class.participant(players)
     end
   end

@@ -424,3 +424,11 @@ so include these private tables in database backup and capacity/retention planni
 No new storage service or automatic retention deletion is configured. Uploaded HTML
 is limited to 5 MiB per source and configuration to 200 sources. Use isolated
 Compose project names/ports for agent migration work as described above.
+
+### CBBD departure acquisition
+
+New departure batches require `CBBD_API_KEY` at worker runtime and use five
+bounded draft/player/team JSON requests. Retain private response attempts in
+backups; review/import/scoring replay retained evidence without HTTP. See
+[departures.md](departures.md) for shared budgets, interrupted-attempt recovery,
+strict missing-versus-zero semantics and historical HTML compatibility.

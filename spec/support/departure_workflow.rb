@@ -8,12 +8,30 @@ module DepartureWorkflow
                               'team_name_source' => 'Sample School', 'scope_evidence' => 'Verified final overall scope' } } }
   end
 
-  def capture_departures(batch)
-    allow(HTTParty).to receive(:get) do |url, **|
-      double(body: Rails.root.join('spec/fixtures/departures', url.include?('nba.com') ? 'draft.html' : 'school.html').read, code: 200)
+  # Seed immutable historical evidence; new application acquisitions are CBBD-only.
+  def legacy_departure_batch(season, fields = departure_fields)
+    sources = fields.fetch('sources').values.map.with_index do |source, index|
+      source.merge('id' => "source-#{index + 1}").tap do |entry|
+        entry['scope'] = Departures::Contract::SCOPE if entry['type'] == 'sidearm_totals'
+      end
     end
-    attempt = Departures::BatchPreparation.new(batch).acquire
-    AcquireDepartureBatchJob.perform_now(attempt.id)
+    plan = fields.slice('draft_year', 'prior_season_year', 'target_year').transform_values(&:to_i)
+                 .merge('expected_picks' => fields['expected_picks'].split.map(&:to_i), 'sources' => sources)
+    DepartureBatch.create!(season:, plan:)
+  end
+
+  def capture_departures(batch, body: nil, status: 200)
+    allow(HTTParty).to receive(:get) do |url, **|
+      double(body: body || Rails.root.join('spec/fixtures/departures', url.include?('nba.com') ? 'draft.html' : 'school.html').read,
+             code: status)
+    end
+    attempt = batch.acquisitions.create!(plan: batch.plan, predecessor: batch.attempt, status: 'running', started_at: Time.current)
+    Dir.mktmpdir do |directory|
+      sources = batch.plan.fetch('sources').map { |source| Departures::SourceCapture.new(directory:).call(source) }
+      evidence = sources.reduce({}) { |retained, source| retained.merge(Departures::BatchAcquisition.capture_bytes(source, directory)) }
+      attempt.update!(manifest: batch.plan.merge('sources' => sources), evidence:)
+    end
+    Departures::BatchAcquisition.new(attempt).finish
     attempt.reload
   end
 

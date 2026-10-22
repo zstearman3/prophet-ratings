@@ -11,16 +11,35 @@
       <p>Started <%= attempt.started_at %>; finished <%= attempt.finished_at %>; predecessor <%= attempt.predecessor_id %>. <%= attempt.failure %></p>
       <% attempt.manifest.fetch('sources', []).each do |source| %>
         <p><%= source['id'] %> · <%= link_to source['url'], source['url'] %> · HTTP <%= source['http_status'] %> · captured <%= source['captured_at'] %> · observed <%= source['observed_at'] %> · as of <%= source['source_as_of'] || source['source_as_of_reason'] %> · <%= source['failure'] %>
-          <% if source['snapshot_location'] %><%= link_to 'Download original HTML', source_admin_departure_batch_path(@batch, attempt_id: attempt.id, source_id: source['id']) %><% end %>
+          <% if source['snapshot_location'] %><%= link_to 'Download retained source', source_admin_departure_batch_path(@batch, attempt_id: attempt.id, source_id: source['id']) %><% end %>
         </p>
+      <% end %>
+      <% if attempt.manifest['captures'] %>
+        <details><summary>HTTP response ledger (<%= attempt.manifest['captures'].size %> requests including retries)</summary>
+          <% attempt.manifest['captures'].each do |capture| %>
+            <p><%= capture['id'] %> · <%= capture['request'] %> · HTTP <%= capture['http_status'] %> · <%= capture['outcome'] %> · captured <%= capture['captured_at'] %> · redacted <%= capture['sanitized'] %> · rate limits <%= capture['headers'] %>
+              <%= link_to 'Download retained response', source_admin_departure_batch_path(@batch, attempt_id: attempt.id, source_id: capture['id']) %>
+            </p>
+          <% end %>
+        </details>
       <% end %>
       <% Array(attempt['source_failures']).each do |failure| %><p role="alert"><%= failure['id'] %>: <%= failure['failure'] %></p><% end %>
     </section>
   <% end %>
+  <% if @batch.status == 'draft' && @page[:attempt]&.status == 'running' %>
+    <%= form_with url: acquire_admin_departure_batch_path(@batch), method: :post do |form| %>
+      <p>If the worker was interrupted, close this attempt and queue a new bounded successor. Earlier bytes remain retained. An active worker will be prevented from replacing the closed evidence.</p>
+      <%= form.check_box :close_interrupted, { required: true }, '1', '0' %><%= form.label :close_interrupted, 'I verified that this acquisition was interrupted' %>
+      <%= form.submit 'Close interrupted attempt and retry' %>
+    <% end %>
+  <% end %>
   <% editable = @batch.status == 'draft' && !@page[:attempt]&.status.in?(%w[queued running]) %>
-  <% if editable %>
+  <% if editable && @batch.plan['provider'] == 'cbbd' %>
     <details><summary>Edit preparation (clears decisions)</summary><%= render 'preparation', preparation: @page[:preparation], season: @batch.season, destination: admin_departure_batch_path(@batch), verb: :patch %></details>
     <%= button_to 'Queue acquisition', acquire_admin_departure_batch_path(@batch) %>
+  <% end %>
+  <% if editable && @batch.plan['provider'].nil? %>
+    <p>Historical HTML evidence is retained for offline review and correction. Create a new CBBD batch for fresh acquisition.</p>
     <% if @page[:attempt]&.terminal? %>
       <details><summary>Recover with saved HTML from permitted normal access</summary>
         <p>Upload unchanged original HTML, at most 5 MiB. Supply the actual original URL and capture metadata; never bypass access restrictions. This retains a successor and clears decisions.</p>
