@@ -1,0 +1,22 @@
+<section class="mx-auto max-w-6xl space-y-6 pb-12">
+  <h1 class="text-3xl font-bold">Preseason ratings · Season <%= @page[:season].year %></h1>
+  <%= link_to 'Return to offseason dashboard', admin_offseason_setup_path(season_id: @page[:season].id), class: 'underline' %>
+  <% if notice %><p role="status"><%= notice %></p><% end %>
+  <% if @page[:error] %><p role="alert" class="bg-red-100 p-3"><%= @page[:error] %></p><% end %>
+  <p>Selected model: <strong><%= @page[:season].selected_preseason_model&.name || 'None selected' %></strong> (#<%= @page[:season].selected_preseason_model_id || '—' %>). Selection <%= @page[:season].preseason_selection_generation %>. This selection does not change the default model.</p>
+  <%= form_with url: select_model_admin_preseason_publications_path(season_id: @page[:season].id), data: { turbo: false } do |form| %>
+    <%= form.label :model_id, 'Published model' %>
+    <%= form.collection_select :model_id, @page[:models], :id, :name, selected: @page[:season].selected_preseason_model_id %>
+    <%= form.submit 'Select model', class: 'rounded border px-3 py-2' %>
+  <% end %>
+  <p>Initialize reuses existing captures for the selected model. To apply corrected inputs, explicitly revise using an eligible already-published immutable version. After an explicit preseason revision, changing models requires explicit revise with an eligible unused published model. Initialize only repeats the same revision model. Protected in-season outputs cannot be overwritten here.</p>
+  <%= form_with url: admin_preseason_publications_path(season_id: @page[:season].id), data: { turbo: false } do |form| %>
+    <%= form.label :mode, 'Publication mode' %>
+    <%= form.select :mode, [['Initialize / safe repeat', 'initialize'], ['Revise reviewed inputs', 'revise']] %>
+    <%= form.submit 'Create read-only rating preview', class: 'rounded border px-3 py-2', disabled: @page[:season].selected_preseason_model_id.nil? %>
+  <% end %>
+  <h2 class="text-xl font-semibold">Retained reviews and operations</h2>
+  <ul><% @page[:publications].each do |publication| %>
+    <li><%= link_to "Review ##{publication.id} · #{publication.ratings_config_version.name} · #{publication.mode} · #{publication.status}", admin_preseason_publication_path(publication, season_id: @page[:season].id), class: 'underline' %></li>
+  <% end %></ul>
+</section>

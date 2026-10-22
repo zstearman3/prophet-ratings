@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_21_200000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_22_020000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -459,6 +459,27 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_200000) do
     t.index ["team_season_id"], name: "index_preseason_priors_on_team_season_id"
   end
 
+  create_table "preseason_publications", force: :cascade do |t|
+    t.bigint "season_id", null: false
+    t.bigint "ratings_config_version_id", null: false
+    t.bigint "reviewer_id", null: false
+    t.string "mode", null: false
+    t.string "status", default: "review", null: false
+    t.string "fingerprint", null: false
+    t.jsonb "report", null: false
+    t.jsonb "acknowledgement", default: {}, null: false
+    t.jsonb "result", default: {}, null: false
+    t.text "error_message"
+    t.datetime "queued_at"
+    t.datetime "started_at"
+    t.datetime "published_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["ratings_config_version_id"], name: "index_preseason_publications_on_ratings_config_version_id"
+    t.index ["reviewer_id"], name: "index_preseason_publications_on_reviewer_id"
+    t.index ["season_id"], name: "index_preseason_publications_on_season_id"
+  end
+
   create_table "ratings_config_versions", force: :cascade do |t|
     t.jsonb "config", null: false
     t.string "description"
@@ -550,8 +571,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_200000) do
     t.bigint "preseason_revision_id"
     t.jsonb "membership_proposal", default: {}, null: false
     t.jsonb "membership_corrections", default: [], null: false
+    t.bigint "selected_preseason_model_id"
+    t.integer "preseason_selection_generation", default: 0, null: false
     t.index ["current"], name: "index_seasons_on_current", unique: true, where: "(current IS TRUE)"
     t.index ["preseason_revision_id"], name: "index_seasons_on_preseason_revision_id"
+    t.index ["selected_preseason_model_id"], name: "index_seasons_on_selected_preseason_model_id"
     t.index ["year"], name: "index_seasons_on_year", unique: true
   end
 
@@ -817,11 +841,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_200000) do
   add_foreign_key "predictions", "team_rating_snapshots", column: "home_team_snapshot_id"
   add_foreign_key "preseason_priors", "ratings_config_versions"
   add_foreign_key "preseason_priors", "team_seasons"
+  add_foreign_key "preseason_publications", "ratings_config_versions"
+  add_foreign_key "preseason_publications", "seasons"
+  add_foreign_key "preseason_publications", "users", column: "reviewer_id"
   add_foreign_key "recruiting_batches", "offseason_input_revisions", column: "revision_id"
   add_foreign_key "recruiting_batches", "seasons"
   add_foreign_key "recruiting_entries", "recruiting_batches"
   add_foreign_key "recruiting_entries", "teams"
   add_foreign_key "seasons", "ratings_config_versions", column: "preseason_revision_id"
+  add_foreign_key "seasons", "ratings_config_versions", column: "selected_preseason_model_id"
   add_foreign_key "team_aliases", "teams"
   add_foreign_key "team_conferences", "conferences"
   add_foreign_key "team_conferences", "seasons", column: "end_season_id"

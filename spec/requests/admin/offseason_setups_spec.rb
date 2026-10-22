@@ -36,7 +36,7 @@ RSpec.describe 'Admin offseason setup' do
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include('Ending year 2027', "value=\"#{selected.id}\"", 'Review memberships, participation and dates',
-                                     'Review departure batches and coverage; model selection remains manual.',
+                                     'Review departure batches and coverage; select the model in preseason preview.',
                                      'Use the ending year: 2027 means the 2026–27 season.')
     document = response.parsed_body
     year_field = document.at_css('input[name="preparation[year]"]')

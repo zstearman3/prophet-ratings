@@ -9,9 +9,9 @@ class DepartureProgress
   end
 
   def call
-    OffseasonSetupProgress::Step.new(key: 'departures', label: 'Review departures and select model',
+    OffseasonSetupProgress::Step.new(key: 'departures', label: 'Review departures',
                                      status: current? ? 'complete' : 'needs_review', last_result: "#{approval_summary} #{batch_summary}",
-                                     next_action: 'Review departure batches and coverage; model selection remains manual.')
+                                     next_action: 'Review departure batches and coverage; select the model in preseason preview.')
   end
 
   private
