@@ -1,0 +1,40 @@
+<section class="mx-auto max-w-5xl space-y-5 p-6">
+  <h1 class="text-2xl font-bold">Refresh and review schedule</h1>
+  <% if @page[:error] %><p role="alert"><%= @page[:error] %></p><% end %>
+  <% if notice %><p role="status"><%= notice %></p><% end %>
+  <%= form_with url: admin_schedule_refresh_runs_path, method: :get do %>
+    <%= label_tag :season_id, 'Target ending-year season' %>
+    <%= select_tag :season_id, options_from_collection_for_select(@page[:seasons], :id, :year, @page[:season]&.id) %>
+    <%= submit_tag 'View season' %>
+  <% end %>
+  <% if @page[:season] %>
+    <%= link_to 'Return to offseason setup', admin_offseason_setup_path(season_id: @page[:season].id) %>
+    <p>Season <%= @page[:season].year %>: <%= @page[:season].start_date %> through <%= @page[:season].end_date %>.</p>
+    <p><%= @page[:readiness].summary %></p>
+    <p>Choose strict YYYY-MM-DD inclusive Eastern schedule dates, today or later inside this season. For expired dates use the historical sync runbook. Queued work requires a GoodJob worker. Successful acquisition, including empty dates, does not establish complete publication or prediction readiness.</p>
+    <%= form_with url: admin_schedule_refresh_runs_path, scope: :refresh, data: { turbo: false }, class: 'space-y-3' do |form| %>
+      <%= hidden_field_tag :season_id, @page[:season].id %>
+      <div><%= form.label :provider %><%= form.select :provider, [['Sports Reference', 'sports_reference'], ['CBBD', 'cbbd']], selected: @values['provider'] %></div>
+      <% %w[start_date end_date].each do |field| %>
+        <div><%= form.label field %><%= form.date_field field, value: @values[field], required: true %></div>
+      <% end %>
+      <p>Sports Reference: up to 3 additional attempts per failed date, with 5/10/20 second waits. CBBD: one total request budget covers the entire selected window, both endpoints, subdivisions and retries; no implicit new budget.</p>
+      <div><%= form.label :max_requests, 'CBBD total maximum requests' %><%= form.number_field :max_requests, value: @values['max_requests'], min: 1 %></div>
+      <div><%= form.label :retries, 'CBBD retries per request' %><%= form.number_field :retries, value: @values['retries'], min: 0, max: 5 %></div>
+      <p>CBBD requires server-side CBBD_API_KEY and a private writable CBBD_CAPTURE_DIRECTORY. These values never belong in this form.</p>
+      <%= form.submit 'Queue bounded refresh' %>
+    <% end %>
+    <h2 class="text-xl">Recent retained runs</h2>
+    <% @page[:runs].each do |run| %><p><%= link_to "Run #{run.id}: #{run.status} · #{run.provider} · #{run.start_date}–#{run.end_date}", admin_schedule_refresh_run_path(run) %></p><% end %>
+    <%= link_to 'Review CBBD identities', admin_cbbd_review_runs_path(season_id: @page[:season].id) %>
+    <% unless @page[:readiness].usable? %>
+      <h2 class="text-xl">Defer while no usable schedule is available</h2>
+      <p>Record why schedule and prediction readiness remain deferred. This does not approve model inputs or activate the season.</p>
+      <%= form_with url: defer_admin_schedule_refresh_runs_path do %>
+        <%= hidden_field_tag :season_id, @page[:season].id %>
+        <%= label_tag :reason, 'Reason' %><%= text_area_tag :reason, params[:reason], required: true, maxlength: 2000 %>
+        <%= submit_tag 'Record deferral' %>
+      <% end %>
+    <% end %>
+  <% end %>
+</section>

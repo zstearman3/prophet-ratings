@@ -10,13 +10,14 @@ module Ingestion
       @season = season
       @window = [start_date && HistoricalSyncWindow.parse_date(start_date), end_date && HistoricalSyncWindow.parse_date(end_date)]
       validate_window
-      @provider_run = GameSyncProvider.new(season:, dates: (self.start_date..self.end_date).to_a,
+      @options = options
+      @provider_run = GameSyncProvider.new(season:, dates: selected_dates,
                                            provider: options[:provider], options: options.fetch(:provider_options, {}))
     end
 
     def call
-      days = (start_date..end_date).map { |date| refresh_day(date) }
-      failed, @successful_days = days.partition { |day| day[:error] }
+      days = selected_dates.map { |date| refresh_day(date) }
+      failed, @options[:successful_days] = days.partition { |day| day[:error] }
       sync_report(days, failed.pluck(:date))
     end
 
@@ -24,9 +25,33 @@ module Ingestion
       day.fetch(:games, []).none? { |report| report.values_at(:scheduled, :game_id) == [true, nil] }
     end
 
+    def self.validate_selected_dates(window, dates)
+      return if dates.present? && dates.all? { |date| window.cover?(date) }
+
+      raise ArgumentError, 'Selected dates must be nonempty and within the refresh window.'
+    end
+
+    def self.checkpoint_references(error)
+      return {} unless error.is_a?(HistoricalSyncDay::ReconciliationError)
+
+      { rejection_observation_ids: error.retained_observation_ids }
+    end
+
     private
 
-    attr_reader :season, :successful_days, :provider_run
+    attr_reader :season, :provider_run
+
+    def successful_days
+      @options.fetch(:successful_days)
+    end
+
+    def selected_dates
+      window = start_date..end_date
+      dates = @options.fetch(:dates, window.to_a).map { |date| HistoricalSyncWindow.parse_date(date) }.uniq.sort
+      self.class.validate_selected_dates(window, dates)
+
+      dates
+    end
 
     def sync_report(days, failed_dates)
       { year: season.year, days:, absent_ids: absent_games, failed_dates:, retry_window: GameSyncRun.retry_window(failed_dates),
@@ -58,7 +83,7 @@ module Ingestion
 
     def refresh_day(date, attempt: 0)
       GamesIngestionService.with_date_lock(date) do
-        refresh_transaction(date).merge(date:)
+        refresh_transaction(date)
       end
     rescue StandardError => error
       HistoricalSyncDay.retain_rejection(error)
@@ -67,18 +92,29 @@ module Ingestion
 
     def refresh_transaction(date)
       Game.transaction(requires_new: true) do
-        result = provider_run.call(date)
+        result = provider_run.call(date).merge(date:)
         HistoricalSyncDay::ReconciliationError.validate(result)
 
+        @options[:on_day]&.call(result)
         result
       end
     end
 
     def retry_or_report(date, error, attempt)
-      return HistoricalSyncDay.failure_report(error).merge(date:) if provider_run.cbbd? || attempt >= MAX_RETRIES
+      if provider_run.cbbd? || attempt >= MAX_RETRIES
+        day = failure_report(date, error)
+        @options[:on_day]&.call(day)
+        return day
+      end
 
       wait_before_retry(attempt)
       refresh_day(date, attempt: attempt + 1)
+    end
+
+    def failure_report(date, error)
+      day = HistoricalSyncDay.failure_report(error).merge(date:)
+      day.merge!(self.class.checkpoint_references(error)) if @options[:on_day]
+      day
     end
 
     def wait_before_retry(attempt)

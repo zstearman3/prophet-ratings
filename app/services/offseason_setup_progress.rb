@@ -42,9 +42,9 @@ class OffseasonSetupProgress
   end
 
   def schedule
-    result = "#{season.games.count} games currently stored."
+    result = ScheduleReadiness.new(season).summary
     Step.new(key: 'schedule', label: 'Load and review schedule', status: 'manual', last_result: result,
-             next_action: 'Schedule import and reconciliation remain a manual runbook step.')
+             next_action: 'Refresh a bounded window, review reconciliation and reassess prediction readiness.')
   end
 
   def activation

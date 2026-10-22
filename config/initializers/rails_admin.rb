@@ -43,6 +43,23 @@ RailsAdmin.config do |config|
     end
   end
 
+  config.model 'GameObservation' do
+    show do
+      include_all_fields
+      field :schedule_review, :string do
+        label 'Schedule review'
+        formatted_value do
+          object = bindings[:object]
+          season = Season.find_by(year: object.normalized_payload['season_year'])
+          if season
+            view = bindings[:view]
+            view.link_to('Return to schedule review', view.main_app.admin_schedule_refresh_runs_path(season_id: season.id))
+          end
+        end
+      end
+    end
+  end
+
   config.model 'RatingsConfigVersion' do
     %i[predictions bet_recommendations team_rating_snapshots].each do |association|
       configure association do

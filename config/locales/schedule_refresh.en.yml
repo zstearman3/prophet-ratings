@@ -1,0 +1,4 @@
+en:
+  admin:
+    schedule_refresh_runs:
+      deferred: 'Schedule and prediction readiness deferred; review again when evidence is available.'

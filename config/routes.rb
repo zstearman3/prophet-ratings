@@ -6,6 +6,10 @@ Rails.application.routes.draw do
       post :select_model, on: :collection
       post :publish, on: :member
     end
+    resources :schedule_refresh_runs, only: %i[index create show] do
+      post :retry, on: :member
+      post :defer, on: :collection
+    end
     get 'offseason_setup', to: 'offseason_setups#show', as: :offseason_setup
     post 'offseason_setup', to: 'offseason_setups#create'
     resources :cbbd_review_runs, only: %i[index create show update] do

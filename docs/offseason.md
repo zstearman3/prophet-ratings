@@ -474,3 +474,73 @@ already-used immutable version requires an eligible new version. Current seasons
 completed games, later snapshots and changed live ratings remain protected. This
 workflow never deletes history, activates seasons, changes default models or
 regenerates forecasts.
+
+## Bounded browser schedule refresh
+
+Admins use **Offseason setup → Refresh and review schedule** for the selected
+ending-year season. Apply migration `20261022010000` with `bin/migrate` and run the
+GoodJob worker. GET pages only read stored state. Choose explicit provider and
+strict inclusive `YYYY-MM-DD` Eastern dates, today or later within that season.
+Expired dates belong to the historical sync runbook; queued dates that age into
+the past fail before acquisition. No activation, ratings or predictions are queued.
+
+A retained run records requester/time, provider, requested dates, fixed numeric
+limits, status and safe date/import/outcome evidence. Sports Reference permits
+three additional attempts per failed date (5/10/20 second waits). CBBD needs the
+worker's `CBBD_API_KEY` and a private persistent writable `CBBD_CAPTURE_DIRECTORY`
+(see data ingestion), plus an explicit positive total request ceiling and 0–5
+retries. Environment limits can populate the form; saved limits never change with
+the environment. Credentials and capture paths are never job arguments or retained
+browser reports. A run acquires one CBBD range/budget, including both endpoints,
+partitions and retries. This canonical importer uses filesystem captures, unlike
+the separate database-backed CBBD identity review acquisition screen.
+
+Reopen the retained report or use **Refresh status** after leaving the page.
+Queued is not acquired; succeeded, including recognized empty dates, establishes
+neither complete upstream publication nor reviewed/prediction-ready schedules.
+Review outcome counts, failed/pending dates, source absence and possible moves via
+the existing game/edit and CBBD identity review links. Links preserve the target
+season. Source absence never deletes games. Reports exclude source error messages,
+raw payloads and unknown reason text; use private ingestion evidence to diagnose
+those details. Failed dates link distinct recreated rejection-observation audits through
+existing admin evidence screens. Only matching provider, target year and requested
+dates link; each audit screen returns to that season's schedule review. Reports
+retain durable numeric audit references, never rolled-back observation/game IDs or
+raw participant/error text. Failed date imports roll back; successful date evidence commits
+atomically with domain changes.
+
+A live duplicate delivery leaves the run unchanged. After an interrupted worker
+releases its run lock, redelivery marks the prior running attempt incomplete without
+reacquiring, including GoodJob's interrupted-delivery callback before `perform`.
+Interrupted queued work becomes failed before acquisition, allowing explicit retry;
+terminal runs and live lock contention stay unchanged. Explicit **Retry unfinished dates with new budget** creates a linked
+run using only original failed/unattempted dates and original provider/limits;
+successful dates and the original report remain. Review quotas before granting this
+fresh budget. A sparse CBBD range can retrieve successful interior dates, but never
+imports them. No automatic job retry renews a budget. If all dates committed before
+interruption, there may be no unfinished dates; inspect retained evidence and start
+an explicit new bounded run only when needed.
+
+Each run permits one persisted retry child. Repeated or concurrent submissions
+return an error without another enqueue; the parent report links its existing
+retry. Continue from the unfinished leaf, including a child whose enqueue failed.
+Reports, successful dates and original limits remain unchanged along the chain;
+a separately requested full refresh starts a new root. Execution failures log
+only run ID and exception class, never source exception messages.
+
+Apply migration `20261022030000` before using this retry constraint. It replaces
+the parent index transactionally; existing duplicate retry history causes failure
+without deleting, merging or reassigning runs or removing the old index. Review
+any existing duplicates before rollout, using this read-only query:
+
+```sql
+SELECT retry_of_id, COUNT(*) FROM schedule_refresh_runs
+WHERE retry_of_id IS NOT NULL GROUP BY retry_of_id HAVING COUNT(*) > 1;
+```
+
+When no scheduled game has both stored team associations, record a reasoned
+schedule/prediction-readiness deferral. Requester, time and reason remain as history;
+this does not approve preseason inputs or activate anything. When usable schedules
+later appear, the dashboard retains the deferral and requires reassessment. Continue
+preparation and preseason work through their existing links while readiness remains
+unresolved.
