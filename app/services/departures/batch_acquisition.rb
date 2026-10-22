@@ -94,7 +94,7 @@ module Departures
 
     public_class_method def self.retained_bytes(manifest, directory, evidence)
       RetainedEvidence.sources(manifest).each_with_object(evidence) do |source, retained|
-        retained.merge!(capture_bytes(source, directory))
+        retained.merge!(capture_bytes(source, directory)) unless retained.key?(source.fetch('id'))
       end
     end
 

@@ -10,9 +10,10 @@ namespace :departures do
 
     # Validate source configuration before any requests.
     Departures::CbbdDataset.validate_plan(plan)
-    FileUtils.mkdir_p(directory, mode: 0o700)
     checkpoint = Departures::FileCheckpoint.new(File.join(directory, 'manifest.partial.json'))
-    manifest = Departures::CbbdAcquisition.new(plan:, directory:, checkpoint:).call
+    acquisition = Departures::CbbdAcquisition.new(plan:, directory:, checkpoint:)
+    FileUtils.mkdir_p(directory, mode: 0o700)
+    manifest = acquisition.call
     Departures::Contract.write(File.join(directory, 'manifest.json'), manifest)
     dataset = Departures::AnnualDataset.new(manifest:, directory:).call
     Departures::Contract.write(File.join(directory, 'dataset.json'), dataset)

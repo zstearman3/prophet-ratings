@@ -10,9 +10,11 @@ module Departures
     end
 
     def call(manifest)
-      Tempfile.create(['.departure-checkpoint-', '.json'], File.dirname(path)) do |file|
+      directory = File.dirname(path)
+      Tempfile.create(['.departure-checkpoint-', '.json'], directory) do |file|
         self.class.write(file, manifest)
         File.rename(file.path, path)
+        File.open(directory, File::RDONLY, &:fsync)
       end
     end
 

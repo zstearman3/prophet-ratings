@@ -103,4 +103,14 @@ RSpec.describe Departures::AnnualDataset do
     end)
     expect(Dir.children(capture_dir).grep(/departure-checkpoint/)).to be_empty
   end
+
+  it 'leaves no output directory or HTTP on a missing key and permits a corrected retry at the same path' do
+    allow(ENV).to receive(:fetch).with('CBBD_API_KEY', '').and_return('')
+    expect { invoke('acquire') }.to raise_error(ArgumentError, /CBBD_API_KEY/)
+    expect(File).not_to exist(capture_dir)
+    expect(Ingestion::Cbbd::HttpTransport).not_to have_received(:call)
+    allow(ENV).to receive(:fetch).with('CBBD_API_KEY', '').and_return('synthetic-key')
+    expect { invoke('acquire') }.to output(/dataset_revision/).to_stdout
+    expect(File.stat(capture_dir).mode & 0o777).to eq(0o700)
+  end
 end

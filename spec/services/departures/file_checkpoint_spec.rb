@@ -42,4 +42,45 @@ RSpec.describe Departures::FileCheckpoint do
       expect(Dir.children(directory)).to contain_exactly('manifest.partial.json', 'source.json')
     end
   end
+  it 'syncs the actual read-only parent directory after syncing and renaming the complete file' do
+    events = []
+    allow(described_class).to receive(:write).and_wrap_original do |write, *arguments|
+      write.call(*arguments)
+      events << :file_synced
+    end
+    allow(File).to receive(:rename).and_wrap_original do |rename, *arguments|
+      rename.call(*arguments)
+      events << :renamed
+    end
+    allow(File).to receive(:open).and_call_original
+    allow(File).to receive(:open).with(directory, File::RDONLY).and_wrap_original do |open, *arguments, &operation|
+      open.call(*arguments) do |handle|
+        allow(handle).to receive(:fsync).and_wrap_original do |sync|
+          result = sync.call
+          events << :directory_synced
+          result
+        end
+        operation.call(handle)
+      end
+    end
+    described_class.new(path).call(replacement)
+    expect(events).to eq(%i[file_synced renamed directory_synced])
+    expect(JSON.parse(File.read(path))).to eq(replacement)
+  end
+
+  it 'propagates directory sync failure while preserving the complete renamed checkpoint and cleanup' do
+    checkpoint = described_class.new(path)
+    checkpoint.call(original)
+    allow(File).to receive(:open).and_call_original
+    allow(File).to receive(:open).with(directory, File::RDONLY).and_wrap_original do |open, *arguments, &operation|
+      open.call(*arguments) do |handle|
+        allow(handle).to receive(:fsync).and_raise(Errno::EIO, 'Synthetic directory sync failure')
+        operation.call(handle)
+      end
+    end
+    expect { checkpoint.call(replacement) }.to raise_error(Errno::EIO)
+    expect(JSON.parse(File.read(path))).to eq(replacement)
+    expect(File.stat(path).mode & 0o777).to eq(0o600)
+    expect(Dir.children(directory)).to contain_exactly('manifest.partial.json', 'source.json')
+  end
 end
