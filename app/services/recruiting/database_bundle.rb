@@ -43,7 +43,7 @@ module Recruiting
     end
 
     def self.validate_rows(report)
-      fatal = report.fetch('rows').flat_map { |row| row.fetch('errors') + row.fetch('exclusions').grep(/Duplicate|Ambiguous/) }
+      fatal = report.fetch('rows').flat_map { |row| Row.review_errors(row) + row.fetch('exclusions').grep(/Duplicate|Ambiguous/) }
       raise ArgumentError, "Resolve recruiting conflicts: #{fatal.uniq.join('; ')}" if fatal.any?
     end
 

@@ -11,7 +11,7 @@ module Recruiting
 
     def call
       validate_season
-      %w[team_label provider_team_id team_id].each { |key| exclude_duplicates(key) }
+      review_rows
       payload = report
       payload.merge('mapping_revision' => Digest::SHA256.hexdigest(JSON.generate(payload)), 'review_status' => 'unreviewed')
     end
@@ -20,7 +20,7 @@ module Recruiting
       raw = row['raw']
       candidates = raw.is_a?(Hash) ? candidate_ids(raw['team_label']) : []
       row.merge('candidate_team_ids' => candidates, 'team_id' => unique_id(candidates),
-                'exclusions' => row.fetch('errors') + match_errors(candidates))
+                'exclusions' => Row.review_errors(row) + match_errors(candidates))
     end
 
     def self.unique_id(candidates)
@@ -52,6 +52,11 @@ module Recruiting
       raise ArgumentError, 'Preview requires the explicit matching target season' unless @season.year == target
     end
 
+    def review_rows
+      @matches.each { |row| row['warnings'] = Row.review_warnings(row) }
+      %w[team_label provider_team_id team_id].each { |key| exclude_duplicates(key) }
+    end
+
     def exclude_duplicates(key)
       matcher = self.class
       @matches.group_by { |row| matcher.identity(row, key) }.each do |identity, rows|
@@ -60,7 +65,7 @@ module Recruiting
     end
 
     def self.exclude_group(key, identity, rows)
-      return unless identity && rows.many?
+      return unless identity.present? && rows.many?
 
       rows.each { |row| row['exclusions'] |= ["Duplicate/conflicting #{key}: #{identity}; exclude every occurrence"] }
     end

@@ -79,6 +79,84 @@ RSpec.describe Recruiting::BatchReview do
     expect(publish.team_input(other.team_id)).to include('status' => 'unknown')
   end
 
+  context 'when the source has no external school identifier' do
+    before do
+      document['rows'].first['provider_team_id'] = nil
+      document['rows'].first['team_url'] = 'https://247sports.com/season/2026-basketball/commits/'
+    end
+
+    it 'publishes the approved internal assignment without inventing an external identifier' do
+      entry = batch.entries.sole
+      values = attributes.merge('rows' => { entry.id.to_s => { 'team_id' => other.team_id.to_s } })
+
+      result = review.publish(values, reviewer: 'reviewer@example.test')
+
+      expect(batch.reload.status).to eq('published')
+      expect(entry.reload.provider_team_id).to be_nil
+      expect(result.team_input(other.team_id)).to include('status' => 'verified_points', 'class_points' => '70.123456789123456789')
+      expect(result.payload.dig('review', 'approval', 'approved_by')).to eq('reviewer@example.test')
+      expect(result.team_input(other.team_id).dig('row', 'warnings')).to include(/247Sports.*identifier/)
+    end
+
+    it 'keeps the captured bytes, source validation history and dataset fingerprint unchanged' do
+      original = batch.attributes.slice('extract_bytes', 'snapshot_bytes', 'dataset_revision')
+      source = batch.entries.sole.attributes.slice('source_row', 'source_errors')
+
+      result = publish
+
+      expect(batch.reload.attributes.slice(*original.keys)).to eq(original)
+      expect(batch.entries.sole.attributes.slice(*source.keys)).to eq(source)
+      expect(result.payload.dig('dataset', 'rows', 0, 'errors')).to include('provider_team_id: preserve nonempty source identity')
+      expect(result.team_input(team.id).dig('row', 'raw', 'provider_team_id')).to be_nil
+    end
+
+    it 'still requires an internal assignment or an explicit exclusion' do
+      document['rows'].first['team_label'] = 'Unmatched College'
+
+      expect { publish }.to raise_error(ArgumentError, /Map or explicitly exclude/)
+      expect(batch.reload.status).to eq('ready')
+      expect(OffseasonInputRevision.count).to eq(0)
+    end
+
+    it 'allows explicit exclusion while keeping that school unknown' do
+      entry = batch.entries.sole
+      review.save(attributes.merge('rows' => { entry.id.to_s => { 'team_id' => 'excluded' } }))
+
+      result = publish
+
+      expect(batch.reload.status).to eq('published')
+      expect(result.team_input(other.team_id)).to include('status' => 'unknown', 'class_points' => nil)
+      expect(entry.reload.source_errors).to include('provider_team_id: preserve nonempty source identity')
+    end
+
+    it 'does not treat blank external identifiers for different internal teams as duplicate identities' do
+      document['rows'].first['provider_team_id'] = ''
+      document['rows'] << document['rows'].first.merge('team_label' => other.team.school, 'class_points' => '12.5')
+
+      result = publish
+
+      expect(result.team_input(team.id)).to include('status' => 'verified_points')
+      expect(result.team_input(other.team_id)).to include('status' => 'verified_points', 'class_points' => '12.5')
+    end
+
+    it 'still rejects different source rows mapped to the same internal team' do
+      document['rows'] << document['rows'].first.merge('team_label' => 'Other source school')
+      batch.entries.each { |entry| entry.update!(team:) }
+
+      expect { publish }.to raise_error(ArgumentError, /Duplicate.*team_id/)
+      expect(batch.reload.status).to eq('ready')
+    end
+
+    [{ 'class_points' => '-1' }, { 'team_label' => nil }, { 'team_url' => nil }, { 'provider_team_id' => 123 }].each do |invalid|
+      it "still rejects invalid source #{invalid.keys.first}" do
+        document['rows'].first.merge!(invalid)
+
+        expect { publish }.to raise_error(ArgumentError, /#{invalid.keys.first}/)
+        expect(OffseasonInputRevision.count).to eq(0)
+      end
+    end
+  end
+
   it 'rejects stale mappings and profile changes rather than approving a different preview' do
     stale = attributes
     batch.entries.sole.update!(team: other.team)
