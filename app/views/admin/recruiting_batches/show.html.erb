@@ -19,7 +19,8 @@
   <% if @report %>
     <p><%= @report.fetch('extracted_rows') %> source rows · <%= @report.fetch('eligible_rows') %> eligible mappings · <%= @report.fetch('omitted_stored_team_ids').size %> stored schools without eligible source coverage.</p>
     <p>Blank points mean unknown; 0 means a verified source zero. Omitted or excluded schools remain unknown. Class points are provider values, not the legacy recruiting score.</p>
-    <%= form_tag admin_recruiting_batch_path(@batch), method: :patch, id: 'recruiting-review-form', data: { turbo: false } do %>
+    <%# Save and publish use different URLs, so this form needs a session-wide CSRF token. %>
+    <%= form_tag admin_recruiting_batch_path(@batch), method: :patch, authenticity_token: form_authenticity_token, id: 'recruiting-review-form', data: { turbo: false } do %>
       <% ordered_rows = @report.fetch('rows').sort_by { |row| [row.fetch('exclusions').empty? ? 1 : 0, row.fetch('row_number')] } %>
       <% page_number = [[params[:page].to_i, 1].max, [(ordered_rows.size / 50.0).ceil, 1].max].min %>
       <% page_rows = ordered_rows.slice((page_number - 1) * 50, 50) || [] %>
@@ -42,7 +43,10 @@
                   <td class="p-2"><%= entry.class_points&.to_s('F') || 'Unknown' %></td>
                   <td class="p-2"><%= entry.average_rating&.to_s('F') || 'Unknown' %></td>
                   <td class="p-2"><%= entry.commit_count&.to_i || 'Unknown' %></td>
-                  <td class="p-2"><%= row.fetch('exclusions').presence&.join('; ') || 'Ready' %></td>
+                  <td class="p-2">
+                    <%= row.fetch('exclusions').presence&.join('; ') || 'Ready' %>
+                    <% row.fetch('warnings').each do |warning| %><p class="text-amber-800"><%= warning %></p><% end %>
+                  </td>
                 </tr>
               <% end %>
             </tbody>

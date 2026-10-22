@@ -102,6 +102,68 @@ RSpec.describe 'Admin recruiting dataset review', type: :request do
     expect(batch.reload.revision.team_input(alternative.id)).to include('status' => 'verified_points')
   end
 
+  it 'explains a missing external identifier and permits approval of the internal team assignment' do
+    document['rows'].first['provider_team_id'] = nil
+    values = review_values
+
+    expect(response.body).to include('247Sports did not provide a school identifier', 'Confirm the team assignment before approving')
+    expect(response.body).not_to include('provider_team_id: preserve nonempty source identity')
+
+    patch "#{batch_path}/publish", params: { review: values }
+
+    expect(response).to redirect_to(batch_path)
+    expect(batch.reload.status).to eq('published')
+    expect(batch.entries.sole.provider_team_id).to be_nil
+    expect(batch.revision.team_input(team.id)).to include('status' => 'verified_points')
+  end
+
+  context 'with CSRF protection enabled' do
+    around do |example|
+      previous = ActionController::Base.allow_forgery_protection
+      ActionController::Base.allow_forgery_protection = true
+      example.run
+    ensure
+      ActionController::Base.allow_forgery_protection = previous
+    end
+
+    it 'saves mappings and publishes using the authenticity tokens rendered in the review form' do
+      alternative = create(:team)
+      values = review_values
+      values[:rows][batch.entries.sole.id.to_s][:team_id] = alternative.id.to_s
+      form = response.parsed_body.at_css('#recruiting-review-form')
+      token = form.at_css('input[name="authenticity_token"]')['value']
+
+      patch form['action'], params: { authenticity_token: token, review: values }
+
+      expect(response).to redirect_to(batch_path)
+      expect(batch.entries.reload.sole.team_id).to eq(alternative.id)
+      expect(OffseasonInputRevision.count).to eq(0)
+
+      values = review_values
+      form = response.parsed_body.at_css('#recruiting-review-form')
+      token = form.at_css('input[name="authenticity_token"]')['value']
+      button = form.css('button').find { |entry| entry['formaction'] }
+
+      patch button['formaction'], params: { authenticity_token: token, review: values }
+
+      expect(response).to redirect_to(batch_path)
+      expect(batch.reload.status).to eq('published')
+      expect(batch.revision.team_input(alternative.id)).to include('status' => 'verified_points')
+    end
+
+    [nil, 'invalid-token'].each do |token|
+      it "rejects publication with #{token.nil? ? 'a missing' : 'an invalid'} authenticity token" do
+        values = review_values
+
+        patch "#{batch_path}/publish", params: { authenticity_token: token, review: values }
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(batch.reload.status).to eq('ready')
+        expect(OffseasonInputRevision.count).to eq(0)
+      end
+    end
+  end
+
   it 'shows unresolved errors and preserves submitted choices instead of publishing partial accidental mappings' do
     values = review_values
     values[:rows][batch.entries.sole.id.to_s][:team_id] = ''

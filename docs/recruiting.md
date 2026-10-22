@@ -39,9 +39,18 @@ exclusions. Fetch a new batch to apply new aliases or improved matching. The adm
 review table allows manual mappings or explicit exclusion, with 50 rows per page.
 Save changes before switching pages. Approval validates the entire batch.
 
+A missing external 247Sports school identifier is a warning, not a publication
+blocker. The reviewer must approve the internal team assignment or explicitly
+exclude the row. Approval uses that internal assignment; it never fabricates an
+external identifier. Blank identifiers do not count as duplicate identities.
+Original source bytes, identifiers and validation errors remain retained alongside
+the review warning and approval audit. This also applies to existing ready batches;
+reload the review page to use the updated rule without fetching again.
+
 Duplicate source identities or mapped teams, invalid numeric values, unresolved
-rows, modified source evidence and stale previews block publication. Manual
-exclusions do not bypass fatal source errors. Approval prepares missing target
+rows, missing school names or source URLs, malformed identifiers, modified source
+evidence and stale previews block publication. Manual exclusions do not bypass
+these fatal source errors. Approval prepares missing target
 TeamSeasons and retains the signed-in reviewer and approval time automatically.
 
 ## Publication and recovery

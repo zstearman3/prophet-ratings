@@ -36,8 +36,9 @@ class RecruitingEntry < ApplicationRecord
   end
 
   def exclusions
-    return source_errors + ['Excluded by manual review'] if excluded?
+    errors = Recruiting::Row.review_errors('raw' => source_row, 'errors' => source_errors)
+    return errors + ['Excluded by manual review'] if excluded?
 
-    source_errors + (team_id ? [] : ['Choose a team or explicitly exclude this row'])
+    errors + (team_id ? [] : ['Choose a team or explicitly exclude this row'])
   end
 end

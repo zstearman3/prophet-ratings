@@ -3,6 +3,9 @@
 module Recruiting
   # Auditable normalization; invalid supplied data remains an exclusion, never missing evidence.
   class Row
+    MISSING_PROVIDER_ID_ERROR = 'provider_team_id: preserve nonempty source identity'
+    MISSING_PROVIDER_ID_WARNING = '247Sports did not provide a school identifier. Confirm the team assignment before approving.'
+
     def initialize(raw, number)
       @raw = raw
       @number = number
@@ -27,6 +30,30 @@ module Recruiting
 
     def errors
       identity_errors + Extract::NUMERIC_FIELDS.filter_map { |key| self.class.numeric_error(key, @raw[key]) }
+    end
+
+    # Retain original validation evidence; an approved internal mapping can resolve a missing external ID.
+    def self.review_errors(row)
+      source_errors = row.fetch('errors')
+      return source_errors unless missing_provider_id?(row['raw'])
+
+      source_errors - [MISSING_PROVIDER_ID_ERROR]
+    end
+
+    def self.review_warnings(row)
+      return [] if review_errors(row) == row.fetch('errors')
+
+      [MISSING_PROVIDER_ID_WARNING]
+    end
+
+    def self.missing_provider_id?(raw)
+      return false unless raw.is_a?(Hash)
+
+      identity = raw['provider_team_id']
+      case identity
+      when NilClass, String then identity.blank?
+      else false
+      end
     end
 
     def self.numeric_error(key, value)
