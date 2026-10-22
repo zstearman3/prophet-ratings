@@ -49,7 +49,7 @@ module Departures
     def validate_totals
       return if stints.empty?
 
-      denominators = stints.map { |stint| stint.slice('source_id', 'team_points', 'team_minutes') }.uniq
+      denominators = stints.map { |stint| stint.slice('source_id', 'production_key', 'team_points', 'team_minutes') }.uniq
       Contract.check!(denominators.one?, 'Conflicting team denominators')
       Contract.check!(points <= denominator, 'Drafted points exceed team points')
     end

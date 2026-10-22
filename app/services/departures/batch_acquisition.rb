@@ -11,10 +11,10 @@ module Departures
     end
 
     def call
-      return if attempt.reload.terminal?
-      return fail_attempt('Interrupted acquisition; start a new attempt.') if attempt.status == 'running'
+      return unless claim
 
-      acquire_sources
+      capture_sources
+      finish
     rescue StandardError => error
       fail_attempt(error.message)
     end
@@ -29,8 +29,11 @@ module Departures
     end
 
     def finish
-      dataset = RetainedEvidence.new(attempt).dataset
-      attempt.update!(dataset:, status: self.class.result_status(dataset), finished_at: Time.current)
+      attempt.with_lock do
+        require_running
+        dataset = RetainedEvidence.new(attempt).dataset
+        attempt.update!(dataset:, status: self.class.result_status(dataset), finished_at: Time.current)
+      end
     end
 
     def self.result_status(dataset)
@@ -43,13 +46,18 @@ module Departures
 
     attr_reader :attempt, :batch
 
-    def acquire_sources
-      start
-      Dir.mktmpdir('departure-capture-') { |directory| capture_sources(directory) }
-      finish
+    def claim
+      attempt.with_lock do
+        next false unless attempt.status == 'queued'
+
+        Contract.check!(attempt.plan['provider'] == 'cbbd', 'Legacy HTML acquisition is read-only; create a CBBD successor')
+        start
+        true
+      end
     end
 
     def validate_recovery
+      Contract.check!(!attempt.plan.key?('provider'), 'CBBD recovery requires a new bounded acquisition; JSON upload is not supported')
       attempt.reload
       batch.require_editable
       Contract.check!(attempt.id == batch.attempt.id, 'Recover the latest attempt')
@@ -62,18 +70,36 @@ module Departures
     end
 
     def fail_attempt(message)
-      attempt.reload
-      attempt.update!(status: 'failed', failure: message, finished_at: Time.current) unless attempt.terminal?
+      attempt.with_lock do
+        attempt.update!(status: 'failed', failure: message, finished_at: Time.current) unless attempt.terminal?
+      end
     end
 
-    def capture_sources(directory)
-      attempt.plan.fetch('sources').each { |source| capture(source, directory) }
+    def capture_sources
+      Dir.mktmpdir('departure-capture-') do |directory|
+        CbbdAcquisition.new(plan: attempt.plan, directory:, checkpoint: capture_checkpoint(directory)).call
+      end
     end
 
-    def capture(source, directory)
-      captured = SourceCapture.new(directory:).call(source)
-      evidence = attempt.evidence.merge(self.class.capture_bytes(captured, directory))
-      attempt.update!(manifest: replacement_manifest(source['id'], captured), evidence:)
+    def capture_checkpoint(directory)
+      ->(manifest) { retain_manifest(manifest, directory) }
+    end
+
+    def retain_manifest(manifest, directory)
+      attempt.with_lock do
+        require_running
+        attempt.update!(manifest:, evidence: self.class.retained_bytes(manifest, directory, attempt.evidence))
+      end
+    end
+
+    public_class_method def self.retained_bytes(manifest, directory, evidence)
+      RetainedEvidence.sources(manifest).each_with_object(evidence) do |source, retained|
+        retained.merge!(capture_bytes(source, directory)) unless retained.key?(source.fetch('id'))
+      end
+    end
+
+    def require_running
+      Contract.check!(attempt.status == 'running', 'Acquisition closed; checkpoint rejected')
     end
 
     public_class_method def self.capture_bytes(source, directory)
@@ -91,15 +117,9 @@ module Departures
 
     def recovery_attributes(attributes)
       id = attributes.fetch('source_id')
-      replacement, evidence = UploadedSource.new(recovery_source(id), attributes).call
+      replacement, evidence = UploadedSource.new(RetainedEvidence.new(attempt).source(id), attributes).call
       { plan: attempt.plan, manifest: replacement_manifest(id, replacement), evidence: attempt.evidence.merge(id => evidence),
         predecessor: attempt, status: 'running', started_at: Time.current }
-    end
-
-    def recovery_source(id)
-      source = attempt.manifest.fetch('sources').find { |entry| entry['id'] == id }
-      Contract.check!(source.present?, 'Unknown recovery source')
-      source
     end
 
     def replacement_manifest(id, replacement)

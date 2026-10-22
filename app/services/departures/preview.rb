@@ -20,12 +20,18 @@ module Departures
 
     def self.globally_unknown?(row)
       status = row.fetch('status')
-      Contract::RESOLVED.exclude?(status) && (status != 'unknown_production' || row.fetch('candidate_team_ids', []).size != 1)
+      Contract::RESOLVED.exclude?(status) && (status != 'unknown_production' || !known_production_teams?(row))
+    end
+
+    def self.known_production_teams?(row)
+      ids = row.fetch('candidate_team_ids', [])
+      # V2 candidates are all exact mappings; v1 multiple candidates are ambiguous aliases.
+      row['provider'] == 'cbbd' ? ids.any? : ids.one?
     end
 
     def self.validate_player_stints(rows)
       stints = rows.flat_map { |row| row.fetch('stints') }
-      keys = stints.map { |stint| [stint.fetch('source_id'), stint.fetch('player_source_url')] }
+      keys = stints.map { |stint| [PlayerIdentity.production_key(stint), PlayerIdentity.key(stint)] }
       Contract.unique!(keys, 'school player identities')
     end
 
@@ -34,7 +40,7 @@ module Departures
     attr_reader :dataset, :review, :identity
 
     def validate_dataset
-      Contract.check!(dataset.fetch('schema') == Contract::VERSION, 'Invalid dataset contract')
+      PlayerIdentity.validate_contract(dataset)
       Contract.check!(dataset.fetch('dataset_revision') == Contract.digest(dataset.except('dataset_revision')), 'Invalid dataset hash')
     end
 

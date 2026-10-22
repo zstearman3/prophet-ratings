@@ -15,7 +15,7 @@ module Departures
 
       validate_decision
       stints = production_stints
-      self.class.validate_stints(stints, decision)
+      validate_production(stints)
       selection.merge(decision.slice('status', 'reason', 'evidence_source_ids', 'team_name_source', 'team_source'),
                       'candidate_team_ids' => unresolved_candidates, 'stints' => stints)
     end
@@ -47,7 +47,60 @@ module Departures
       decision.fetch('stints', []).map { |stint| ProductionStint.new(stint:, dataset:, identity:).call }
     end
 
+    def validate_production(stints)
+      self.class.validate_stints(stints, decision)
+      validate_provider(stints) if dataset['provider']
+    end
+
+    def validate_provider(stints)
+      validator = self.class
+      validator.validate_exclusion(decision.fetch('status'))
+      return unless decision['status'] == 'eligible_prior_season'
+
+      validate_provider_stints(stints)
+    end
+
+    def validate_provider_stints(stints)
+      key = PlayerIdentity.key(selection)
+      self.class.validate_athlete(stints, key)
+      expected = provider_tables(key).pluck('production_key').sort
+      Contract.check!(stints.pluck('production_key').sort == expected, 'Review all evidenced athlete team stints')
+    end
+
+    def provider_tables(key)
+      dataset.fetch('production').select { |table| self.class.athlete_table?(table, key) }
+    end
+
+    public_class_method def self.validate_exclusion(status)
+      return unless Contract::RESOLVED.include?(status) && status != 'eligible_prior_season'
+
+      raise ArgumentError, 'CBBD absence/affiliation does not prove an exclusion; keep participation unknown'
+    end
+
+    public_class_method def self.validate_athlete(stints, key)
+      Contract.check!(stints.all? { |stint| PlayerIdentity.key(stint) == key }, 'Wrong provider athlete for draft selection')
+    end
+
+    public_class_method def self.athlete_table?(table, key)
+      table.fetch('players').any? { |player| PlayerIdentity.key(player) == key }
+    end
+
+    def provider_candidates
+      return [] unless selection['provider_athlete_id']
+
+      tables = provider_tables(PlayerIdentity.key(selection))
+      return [] if tables.empty?
+
+      self.class.mapped_candidates((tables.pluck('provider_team_id') + [selection['provider_team_id']]).compact.uniq)
+    end
+
+    public_class_method def self.mapped_candidates(provider_ids)
+      candidates = provider_ids.map { |id| PlayerIdentity.team_candidates(id) }
+      candidates.all?(&:one?) ? candidates.flatten.uniq.sort : []
+    end
+
     def unresolved_candidates
+      return provider_candidates if dataset['provider']
       return [] unless decision['team_name_source']
 
       identity.candidates(decision.fetch('team_name_source'), source: decision.fetch('team_source'))

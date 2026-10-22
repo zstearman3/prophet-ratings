@@ -52,7 +52,7 @@ module OffseasonInputs
     end
 
     def evidence(dataset)
-      dataset.fetch('sources').to_h do |source|
+      Departures::RetainedEvidence.sources(dataset).to_h do |source|
         [source.fetch('id'), { 'snapshot_base64' => retained_snapshot(source) }]
       end
     end
@@ -67,7 +67,8 @@ module OffseasonInputs
     end
 
     public_class_method def self.validate_location(location, sha)
-      Departures::Contract.check!(location.eql?("#{sha}.html") && sha.match?(/\A[a-f0-9]{64}\z/), 'Invalid snapshot location')
+      Departures::Contract.check!(["#{sha}.html", "#{sha}.json"].include?(location) && sha.match?(/\A[a-f0-9]{64}\z/),
+                                  'Invalid snapshot location')
     end
 
     def retained_bytes(location, sha)

@@ -23,10 +23,14 @@ module ProphetRatings
 
       payload = revision.payload
       provenance = revision.attributes.slice('id', 'version', 'input_hash', 'dataset_hash', 'review_hash', 'season_id')
-      payload.fetch('dataset').slice('draft_year', 'prior_season_year', 'target_year', 'expected_picks', 'failures', 'sources').merge(
-        payload.fetch('report').slice('selections'), 'review' => payload.fetch('review'),
-                                                     'revision' => provenance
-      )
+      captured_dataset(payload).merge(payload.fetch('report').slice('selections'), 'review' => payload.fetch('review'),
+                                                                                   'revision' => provenance)
+    end
+
+    def self.captured_dataset(payload)
+      dataset = payload.fetch('dataset')
+      discriminator = dataset['schema'] == Departures::CbbdDataset::VERSION ? %w[schema extraction_version provider] : []
+      dataset.slice(*discriminator, 'draft_year', 'prior_season_year', 'target_year', 'expected_picks', 'failures', 'sources')
     end
 
     def validate_review
@@ -36,16 +40,63 @@ module ProphetRatings
     end
 
     def validated_rows
+      validate_contract
+      validate_review
+      validate_provider_rows
+      @evidence.fetch('selections').tap { |rows| self.class.validate_rows(rows, @evidence.fetch('draft_year')) }
+    end
+
+    def validate_contract
       Departures::Contract.years!(@evidence)
       Departures::Contract.check!(@evidence.fetch('target_year') == @target_year, 'Departure target year mismatch')
-      validate_review
-      @evidence.fetch('selections').tap { |rows| self.class.validate_rows(rows, @evidence.fetch('draft_year')) }
+      Departures::PlayerIdentity.validate_contract(@evidence)
+    end
+
+    def validate_provider_rows
+      rows = @evidence.fetch('selections')
+      validator = self.class
+      if @evidence['schema'] == Departures::CbbdDataset::VERSION
+        rows.each { |row| validator.validate_provider_selection(row) }
+      else
+        validator.validate_legacy_rows(rows)
+      end
+    end
+
+    def self.validate_legacy_rows(rows)
+      Departures::Contract.check!(rows.none? { |row| provider_row?(row) }, 'Provider identity requires v2 contract')
+    end
+
+    def self.provider_row?(row)
+      row.key?('provider') || row.fetch('stints').any? { |stint| stint.key?('provider') }
+    end
+
+    def self.validate_provider_selection(row)
+      Departures::Contract.check!(row['provider'] == 'cbbd', 'Require CBBD selection identity')
+      stints = row.fetch('stints')
+      return if stints.empty?
+
+      validate_provider_stints(stints, Departures::PlayerIdentity.key(row))
+    end
+
+    def self.validate_provider_stints(stints, key)
+      Departures::ReviewedSelection.validate_athlete(stints, key)
+      stints.each { |stint| validate_provider_stint(stint) }
+    end
+
+    def self.validate_provider_stint(stint)
+      id = Departures::Contract.integer!(stint.fetch('provider_team_id'), 'CBBD team ID', minimum: 1)
+      valid = stint['provider'] == 'cbbd' && stint['production_key'] == "cbbd/team/#{id}" && stint['coverage_complete'] == true
+      Departures::Contract.check!(valid, 'Incomplete or invalid CBBD production identity')
+    end
+
+    def self.contribution_keys(row)
+      row.fetch('stints').map { |stint| Departures::PlayerIdentity.key(stint) }.uniq
     end
 
     def self.validate_duplicates(rows)
       Departures::Contract.unique!(rows.pluck('selection_key'), 'draft selections')
       Departures::Preview.validate_player_stints(rows)
-      Departures::Contract.unique!(rows.flat_map { |row| row.fetch('stints').pluck('player_source_url').uniq }, 'player contributions')
+      Departures::Contract.unique!(rows.flat_map { |row| contribution_keys(row) }, 'player contributions')
     end
 
     def self.validate_rows(rows, year)

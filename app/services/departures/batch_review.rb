@@ -24,7 +24,7 @@ module Departures
     def review_key(attempt: batch.attempt)
       latest_id = OffseasonInputRevision.where(season_id: batch.season_id, kind: 'departures').maximum(:id)
       Contract.digest([batch.attributes, attempt&.attributes, Team.order(:id).pluck(:id, :school),
-                       TeamAlias.order(:id).map(&:attributes), profile_state, latest_id])
+                       TeamAlias.order(:id).map(&:attributes), TeamExternalIdentity.order(:id).map(&:attributes), profile_state, latest_id])
     end
 
     def save(attributes)
@@ -54,12 +54,20 @@ module Departures
 
     attr_reader :batch
 
-    def guarded(&)
+    def guarded
       Season.with_ratings_lock do
         batch.season.with_lock do
-          batch.with_lock(&)
+          batch.with_lock do
+            self.class.lock_provider_mappings if batch.plan['provider'] == 'cbbd'
+            yield
+          end
         end
       end
+    end
+
+    public_class_method def self.lock_provider_mappings
+      # Pin both present and absent mappings through review and publication.
+      TeamExternalIdentity.connection.execute('LOCK TABLE team_external_identities IN SHARE MODE')
     end
 
     def validate_draft(attributes)

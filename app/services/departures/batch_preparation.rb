@@ -3,8 +3,6 @@
 module Departures
   # Saves ordinary preparation fields and opens explicit acquisition/correction successors.
   class BatchPreparation
-    MAX_SOURCES = 200
-
     def initialize(batch)
       @batch = batch
     end
@@ -24,8 +22,11 @@ module Departures
       end
     end
 
-    def acquire
-      batch.with_lock { queue_attempt }
+    def acquire(attributes = {})
+      batch.with_lock do
+        close_interrupted if attributes['close_interrupted'] == '1'
+        queue_attempt
+      end
     end
 
     def correct(reason)
@@ -39,20 +40,33 @@ module Departures
     end
 
     def self.form_attributes(plan)
-      plan.merge('expected_picks' => plan.fetch('expected_picks', []).join(' '),
-                 'sources' => plan.fetch('sources', []).index_by { |source| source.fetch('id') })
+      plan.except('sources').merge('expected_picks' => plan.fetch('expected_picks', []).join(' '),
+                                   'absent_postseason_team_ids' => plan.fetch('absent_postseason_team_ids', []).join(' '))
     end
 
     private
 
     attr_reader :batch
 
+    def close_interrupted
+      current = batch.attempt
+      Contract.check!(batch.status == 'draft' && current&.status == 'running', 'Only a running draft attempt can be closed')
+      current.with_lock do
+        current.update!(status: 'failed', failure: 'Operator confirmed interrupted acquisition; retained bytes preserved',
+                        finished_at: Time.current)
+      end
+    end
+
     def queue_attempt
       batch.require_editable
-      plan = PreparationForm.new(form_attributes, batch.season).call
-      attempt = batch.acquisitions.create!(plan:, predecessor: batch.attempt)
+      require_provider
+      attempt = batch.acquisitions.create!(plan: PreparationForm.new(form_attributes, batch.season).call, predecessor: batch.attempt)
       batch.update!(decisions: [], acknowledgement: {})
       attempt
+    end
+
+    def require_provider
+      Contract.check!(batch.plan['provider'] == 'cbbd', 'Legacy HTML acquisition is read-only; create a CBBD successor')
     end
 
     def correction_draft(reason)

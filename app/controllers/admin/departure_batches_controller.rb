@@ -23,7 +23,6 @@ module Admin
     def create
       page[:season] = Season.find(params.expect(:season_id))
       page[:preparation] = params.require(:preparation).to_unsafe_h
-      return render :index if add_source?
 
       batch = Departures::BatchPreparation.create(page[:season], page[:preparation])
       redirect_to admin_departure_batch_path(batch), notice: I18n.t('admin.departure_batches.prepared')
@@ -37,7 +36,7 @@ module Admin
     end
 
     def acquire
-      attempt = Departures::BatchPreparation.new(batch).acquire
+      attempt = Departures::BatchPreparation.new(batch).acquire(params.permit(:close_interrupted).to_h)
       AcquireDepartureBatchJob.perform_later(attempt.id)
       redirect_to admin_departure_batch_path(batch), notice: I18n.t('admin.departure_batches.queued')
     end
@@ -60,8 +59,9 @@ module Admin
 
     def source
       attempt = batch.acquisitions.find(params.expect(:attempt_id))
-      bytes = Departures::RetainedEvidence.new(attempt).bytes(params.expect(:source_id))
-      send_data bytes, type: 'text/plain', disposition: 'attachment', filename: "departure-source-#{attempt.id}.html"
+      id = params.expect(:source_id)
+      bytes = Departures::RetainedEvidence.new(attempt).bytes(id)
+      send_data bytes, type: 'text/plain', disposition: 'attachment', filename: Departures::RetainedEvidence.new(attempt).filename(id)
     end
 
     private
@@ -74,13 +74,6 @@ module Admin
 
     def load_batch
       @batch = DepartureBatch.find(params.expect(:id))
-    end
-
-    def add_source?
-      return false unless params[:add_source] == '1'
-
-      Departures::PreparationForm.add_source(page[:preparation])
-      true
     end
 
     def review_error(error)
@@ -97,7 +90,6 @@ module Admin
 
     def update_preparation
       page[:preparation] = params.require(:preparation).to_unsafe_h
-      return render(:show) if add_source? && show
 
       Departures::BatchPreparation.new(batch).save(page[:preparation])
       redirect_to admin_departure_batch_path(batch), notice: I18n.t('admin.departure_batches.saved')

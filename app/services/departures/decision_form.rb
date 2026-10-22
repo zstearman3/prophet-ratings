@@ -71,16 +71,20 @@ module Departures
     public_class_method def self.stint_identity(table, player, id)
       team_id = Integer(id, 10)
       Contract.check!(Team.exists?(team_id), 'Choose an existing team')
+      if table['provider']
+        return table.slice('provider', 'production_key', 'provider_team_id').merge(
+          player.slice('provider_athlete_id'), 'team_id' => team_id
+        )
+      end
       { 'source_id' => table.fetch('source_id'), 'player_source_url' => player.fetch('player_source_url'), 'team_id' => team_id }
     end
 
     def production_choices
-      dataset.fetch('production').flat_map { |table| self.class.table_choices(table) }.to_h
+      @production_choices ||= dataset.fetch('production').flat_map { |table| self.class.table_choices(table) }.to_h.freeze
     end
 
     public_class_method def self.table_choices(table)
-      id = table.fetch('source_id')
-      table.fetch('players').map { |player| ["#{id}|#{player.fetch('player_source_url')}", [table, player]] }
+      table.fetch('players').map { |player| [PlayerIdentity.choice(table, player), [table, player]] }
     end
 
     def evidence_ids(values)

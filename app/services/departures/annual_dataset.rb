@@ -7,10 +7,17 @@ module Departures
       @manifest = manifest
       @directory = directory
       Contract.years!(manifest)
-      validate_sources
+      PlayerIdentity.validate_contract(manifest)
+      validate_sources unless manifest['schema'] == CbbdDataset::VERSION
     end
 
     def call
+      return CbbdDataset.new(manifest:, directory:).call if manifest['schema'] == CbbdDataset::VERSION
+
+      legacy_dataset
+    end
+
+    def legacy_dataset
       parser = self.class
       parsed = snapshots.map(&:call)
       dataset = attributes.merge('selections' => parser.selections(parsed), 'production' => parser.production(parsed),
