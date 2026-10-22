@@ -1,7 +1,7 @@
 <% nav_link_class = "flex min-h-[52px] items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-prophet-indigo focus:outline-none focus-visible:ring-2 focus-visible:ring-prophet-indigo md:min-h-0 md:px-2 md:py-2" %>
 <% active_link_class = "bg-purple-50 md:bg-transparent text-prophet-indigo" %>
 <% nav_link_aria = ->(active) { active ? { current: "page" } : {} } %>
-<nav class="border-b border-gray-200 bg-[#F1F5F9]" aria-label="Main navigation" data-controller="navbar" data-navbar-state-value="false" data-action="keydown.esc->navbar#close pointerdown->navbar#blurAlreadyFocusedControl:capture">
+<nav class="relative z-40 border-b border-gray-200 bg-[#F1F5F9]" aria-label="Main navigation" data-controller="navbar" data-navbar-state-value="false" data-action="keydown.esc->navbar#close pointerdown->navbar#blurAlreadyFocusedControl:capture">
   <div class="max-w-screen-xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between">
     <a href="<%= root_path %>" class="flex items-center rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-prophet-indigo focus-visible:ring-offset-2" aria-label="Prophet Ratings home">
       <%= image_tag('Retro Prophet Logo.png', alt: 'Retro Prophet Logo', class: 'h-10 w-auto') %>
