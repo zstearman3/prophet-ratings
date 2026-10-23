@@ -12,8 +12,9 @@ create review records or fetch source data. Membership and input reviews remain
 independent actions. A changed membership/date or recruiting source/mapping can
 make only that evidence step require review again while its historical approval
 remains available. Coaching readiness follows the existing review's stored ready
-flag and pending candidates. Later preseason, schedule and activation steps are
-shown as manual/runbook work; the dashboard does not certify or execute them.
+flag and pending candidates. Later steps link to preseason publication, bounded
+schedule review and retained readiness with separate activation actions; the
+dashboard itself does not certify or execute them.
 
 On the dashboard, enter the season's **ending year** (2027 means 2026–27). The
 UI accepts 2–9999. Blank start/end dates preserve dates on an existing season,
@@ -234,13 +235,22 @@ for code checks; imports and manual rehearsals need an intentional target datase
 
 ## 6. Activate explicitly
 
-After completing the review:
+Open the target season's **Review readiness and explicit activation** link on the
+Offseason setup dashboard. Inspect required checks and optional work, acknowledge
+input gaps, record any deferral reasons and save the review. Use **Activate season**
+and **Make model default** as separate deliberate actions, reviewing the displayed
+previous/target IDs. Refresh and save another review when evidence or either flag
+changes. See [retained readiness](#retained-readiness-and-explicit-activation) for
+freshness, rollback, audit and revisit rules.
+
+The existing CLI remains available for deliberate operational use:
+
 
 ```bash
 bin/rails season:activate YEAR=2027 ALIGN_CONFERENCES=false
 ```
 
-After UI approval, use `ALIGN_CONFERENCES=false` to preserve the reviewed decisions
+When using CLI after UI approval, use `ALIGN_CONFERENCES=false` to preserve the reviewed decisions
 rather than rerunning automatic source alignment. Without that flag, activation
 reruns CLI alignment. Both paths preserve local coverage checks. Reviewed mode enforces roster,
 date, alias and finite core-input coverage with positive pace. Legacy mode requires
@@ -248,7 +258,8 @@ a TeamSeason for every stored team and non-null core values. Failure leaves the
 previous current season intact; reactivation is a no-op.
 
 Season activation and the model default are separate. If changing the default for
-future jobs, follow the [model rollout safeguards](model-versions.md) and explicitly run:
+future jobs, prefer the separate readiness action after the [model rollout safeguards](model-versions.md),
+or explicitly use the existing CLI:
 
 ```bash
 bin/rails ratings_config_version:activate MODEL_VERSION=<stored-name>
@@ -544,3 +555,61 @@ this does not approve preseason inputs or activate anything. When usable schedul
 later appear, the dashboard retains the deferral and requires reassessment. Continue
 preparation and preseason work through their existing links while readiness remains
 unresolved.
+
+## Retained readiness and explicit activation
+
+Apply migration `20261022040000` using `bin/migrate` before opening this screen.
+From **Admin → Offseason setup → target season → Review readiness and explicit
+activation**, inspect the fresh selected-model report. Membership/date/alias
+review, a persisted valid selected model, finite core outputs with matching
+applied captures and preopening snapshots/ranks, and applicable coaching readiness
+are required for either switch. Existing legacy participation approval without
+retained membership choices requires another membership review. No model formula
+or configuration default changes with this feature.
+
+Optional recruiting/departure approvals, current and captured input gaps, schedule,
+venue, prediction coverage and latest operation results remain visible. Missing
+inputs are unknown, including when their contract uses a zero fallback; observed
+zero is distinct. Acknowledge the exact displayed gap set. Leave optional work
+open or enter a bounded deferral reason; required checks cannot be deferred.
+Absent schedule leaves prediction readiness open/deferred and does not prevent
+otherwise valid season preparation. Follow the season-scoped repair links and
+return through that season's dashboard to readiness.
+
+Save a review to retain the displayed report, reviewer/time, fingerprint,
+acknowledgement and deferral reasons. This changes no current/default flags.
+Then deliberately use **Activate season** or **Make model default** as separate
+actions, inspecting each displayed previous/target ID. Season activation reuses
+stored membership choices and the existing season activation API. Neither action
+runs source alignment, calculations, imports or job enqueueing. Activating the
+season leaves the default model unchanged. Model activation affects future work
+that resolves the default, independently from season selection/publication.
+
+Any reviewed change requires refreshing readiness and saving a fresh review,
+including the first successful switch before requesting the second switch. Changed
+aliases, dates, roster, profiles, gaps, outputs, model-selection generation,
+current/default IDs or relevant later operations invalidate pending actions.
+The ratings advisory lock, target-season lock, ordered model locks and annual
+coaching locks coordinate existing participating writers; arbitrary SQL and
+writers outside these existing locking contracts are not globally serialized.
+Operators should avoid concurrent manual input edits during activation.
+
+Successful switch and result persist in the same transaction; result-save failure
+rolls back the switch. A failed attempt is saved after rollback and includes the
+actual flags and next-step error. If that failure record cannot be saved, the
+request raises an error and retention must be checked. A recorded successful action
+replays its original outcome without switching back after another operator changes
+flags. The retained review and fresh evidence show actual current/default state
+separately. Keep these private audit tables in database backups; no history deletion
+or new storage service is configured.
+
+After activation, reopen retained readiness to inspect the original unknowns and
+fresh schedule, venue, prediction and operation evidence. Use schedule/game review,
+model analysis and GoodJob links to investigate later failures. Operational readiness
+does not certify model accuracy, complete predictions or launch readiness.
+
+Jobs explicitly serialized with season and model IDs stay pinned across both
+switches. Existing scheduler/sync callsites pass season IDs. Legacy/manual queued
+jobs without a season ID still resolve the current season at execution; inspect
+and deliberately handle those jobs in GoodJob before switching. No queue payload
+is rewritten or retroactively pinned. CLI activation retains its existing semantics.

@@ -88,6 +88,26 @@ RSpec.describe 'layouts/_navbar' do
     expect(document.at_css('nav')['data-action']).to include('keydown.esc->navbar#close')
   end
 
+  it 'keeps the selected season and model on the readiness Model analysis navigation link' do
+    season = build_stubbed(:season)
+    assign(:page, { season:, report: { 'model_id' => 123 } })
+    allow(view).to receive_messages(user_signed_in?: true, current_user: build_stubbed(:user, :admin),
+                                    controller_path: 'admin/offseason_readiness_reviews')
+    render partial: 'layouts/navbar'
+
+    link = Nokogiri::HTML(rendered).at_xpath('//a[text()="Model analysis"]')
+    expect(link['href']).to eq(admin_prediction_evaluation_path(season_id: season.id, model_id: 123))
+  end
+
+  it 'preserves the ordinary Model analysis destination outside readiness even when a page has season context' do
+    assign(:page, { season: build_stubbed(:season), report: { 'model_id' => 123 } })
+    allow(view).to receive_messages(user_signed_in?: true, current_user: build_stubbed(:user, :admin),
+                                    controller_path: 'admin/prediction_evaluations')
+    render partial: 'layouts/navbar'
+
+    expect(Nokogiri::HTML(rendered).at_xpath('//a[text()="Model analysis"]')['href']).to eq(admin_prediction_evaluation_path)
+  end
+
   it 'omits admin destinations for signed-in non-admins' do
     allow(view).to receive_messages(user_signed_in?: true, current_user: build_stubbed(:user))
 

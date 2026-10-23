@@ -54,6 +54,7 @@ class Season < ApplicationRecord
   validate :only_one_current_season, if: :current?
 
   belongs_to :selected_preseason_model, class_name: 'RatingsConfigVersion', optional: true
+  has_many :offseason_readiness_reviews, dependent: :restrict_with_exception
   has_many :preseason_publications, dependent: :restrict_with_exception
 
   belongs_to :preseason_revision, class_name: 'RatingsConfigVersion', optional: true

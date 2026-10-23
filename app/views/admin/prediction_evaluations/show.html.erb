@@ -1,5 +1,11 @@
 <section class="space-y-6 pb-12">
   <h1 class="text-3xl font-bold">Prediction evaluation</h1>
+  <% if @page[:season] %>
+    <nav class="flex gap-3">
+      <%= link_to 'Return to season dashboard', admin_offseason_setup_path(season_id: @page[:season].id), class: 'text-blue-700 underline' %>
+      <%= link_to 'Review season readiness', admin_offseason_readiness_reviews_path(season_id: @page[:season].id), class: 'text-blue-700 underline' %>
+    </nav>
+  <% end %>
   <p>Errors are predicted minus actual: positive means overprediction. Pace is possessions per 40 minutes; scores include overtime.</p>
   <%= form_tag admin_prediction_evaluation_path, method: :get, data: { turbo: false }, class: 'flex flex-wrap gap-4 items-end' do %>
     <div><%= label_tag :season_id, 'Season' %><br><%= select_tag :season_id, options_from_collection_for_select(@page[:seasons], :id, :year, @page[:season]&.id) %></div>

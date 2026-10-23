@@ -21,7 +21,7 @@ RSpec.describe OffseasonSetupProgress do
                steps.last.next_action, steps.find { |step| step.key == 'departures' }.next_action]
     expect(results).to eq(['Discovery queued; 0 pending candidates.',
                            'No participation approval is stored. No reviewed roster is stored.',
-                           'Readiness review and activation remain separate operations; this dashboard does not activate seasons.',
+                           'Review fresh evidence and retained decisions in readiness, then separately activate season or default model.',
                            'Review departure batches and coverage; select the model in preseason preview.'])
   end
 

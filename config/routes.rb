@@ -2,6 +2,10 @@
 
 Rails.application.routes.draw do
   namespace :admin do
+    resources :offseason_readiness_reviews, only: %i[index create show] do
+      post :activate_season, on: :member
+      post :activate_model, on: :member
+    end
     resources :preseason_publications, only: %i[index create show] do
       post :select_model, on: :collection
       post :publish, on: :member
