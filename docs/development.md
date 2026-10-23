@@ -260,6 +260,16 @@ The suite reports 15 pre-existing pending examples (mostly generated placeholder
 plus unsupported double-header ingestion). Rails Admin's bundled SCSS emits Sass
 deprecation warnings, with a regression spec covering stylesheet compilation.
 
+The CBBD membership dropdown has focused browser-interaction logic checked with
+Node's built-in test runner in the existing image (no host Node required):
+
+```bash
+COMPOSE_PROJECT_NAME=prophet-cbbd-js-check bin/compose run --rm --no-deps -T web node --test spec/javascript/cbbd_membership_matches_test.js
+```
+
+This starts no database or application services. The Ruby request specs also
+verify preselected matches, compact option markup, overrides and saved mappings.
+
 ## Dependencies and optional tools
 
 After editing `Gemfile`:

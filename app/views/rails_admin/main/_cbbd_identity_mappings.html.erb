@@ -1,0 +1,25 @@
+<% mappings = SeasonCbbdIdentityMapping.rows(proposal) %>
+<% if mappings.values.any?(&:any?) %>
+  <%= javascript_include_tag 'cbbd_membership_matches', defer: true %>
+  <h3>Review CBBD school and conference matches</h3>
+  <p>Unique exact school names or aliases and conference names or abbreviations are selected automatically.
+    Change any proposed selection before saving. Blank or ambiguous matches need your decision.
+    Saving remembers CBBD identities and rebuilds this draft; it does not approve memberships or publish ratings.</p>
+  <%= form_tag rails_admin.review_memberships_path(model_name: 'season', id: @object.id, operation: 'map_cbbd_identities'), method: :post, id: 'cbbd-identity-mapping-form', data: { turbo: false } do %>
+    <%= hidden_field_tag 'mapping[proposal_key]', SeasonMembershipProposal.digest(proposal) %>
+    <% options = { 'teams' => Team.order(:school).pluck(:school, :id), 'conferences' => Conference.order(:name).pluck(:name, :id) } %>
+    <% mappings.each do |kind, rows| %>
+      <template id="cbbd-<%= kind %>-options"><%= options_for_select([['Choose match', '']] + options.fetch(kind)) %></template>
+      <% unresolved, matched = rows.partition { |row| row[:local_id].nil? } %>
+      <h4><%= kind.humanize %></h4>
+      <%= render partial: 'cbbd_identity_rows', locals: { rows: unresolved, kind: kind, options: options.fetch(kind) } %>
+      <% if matched.any? %>
+        <details>
+          <summary><%= matched.size %> exact <%= kind %> matches selected (expand to review or override)</summary>
+          <%= render partial: 'cbbd_identity_rows', locals: { rows: matched, kind: kind, options: options.fetch(kind) } %>
+        </details>
+      <% end %>
+    <% end %>
+    <%= button_tag 'Save CBBD identity matches and refresh proposals', name: nil, class: 'btn btn-secondary' %>
+  <% end %>
+<% end %>

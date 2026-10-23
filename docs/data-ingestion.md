@@ -1408,8 +1408,10 @@ use invented school/conference labels and IDs against this documented envelope;
 they are contract fixtures, not copied or asserted live domain data.
 
 See [CBBD reviewed preparation](offseason.md#cbbd-reviewed-season-memberships) for
-exact-ID mapping, manual metadata setup, coverage attestation and target-only history
-rules. Review, mapping, correction and proposal publication hold the existing ratings
+reviewed exact-name/alias defaults, durable provider-ID mapping, manual metadata
+setup, coverage attestation and target-only history rules. Unique defaults remain
+draft selections until explicitly saved; the canonical game importer still requires
+exact saved CBBD IDs. Review, mapping, correction and proposal publication hold the existing ratings
 advisory lock and bounded transaction table locks: `seasons`, then
 `team_external_identities`, then `conference_external_identities`, in SHARE ROW
 EXCLUSIVE mode with a three-second timeout. Locks precede the season row lock and

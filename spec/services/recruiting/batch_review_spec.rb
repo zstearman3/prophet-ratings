@@ -167,6 +167,61 @@ RSpec.describe Recruiting::BatchReview do
     expect(OffseasonInputRevision.count).to eq(0)
   end
 
+  context 'with an unlinked, unranked source entry' do
+    before do
+      document['rows'].first.merge!('team_label' => nil, 'provider_team_id' => nil, 'team_url' => nil,
+                                    'rank' => '0', 'class_points' => nil)
+    end
+
+    it 'allows explicit exclusion without changing the original evidence or assigning points' do
+      entry = batch.entries.sole
+      original = entry.attributes.slice('source_row', 'source_errors')
+      review.save(attributes.merge('rows' => { entry.id.to_s => { 'team_id' => 'excluded' } }))
+
+      result = publish
+
+      expect(result.team_input(other.team_id)).to include('status' => 'unknown', 'class_points' => nil)
+      expect(entry.reload.attributes.slice(*original.keys)).to eq(original)
+      expect(result.payload.dig('review', 'rows', 0, 'exclusions')).to eq(['Excluded by manual review'])
+    end
+
+    it 'still rejects assigning the unranked entry to a team' do
+      entry = batch.entries.sole
+      review.save(attributes.merge('rows' => { entry.id.to_s => { 'team_id' => team.id.to_s } }))
+
+      expect { publish }.to raise_error(ArgumentError, /rank: requires positive integer/)
+    end
+
+    it 'also allows exclusion when a new capture preserves the plain-text school name and points' do
+      document['rows'].first.merge!('team_label' => 'Virginia State', 'class_points' => '23.16')
+      entry = batch.entries.sole
+      review.save(attributes.merge('rows' => { entry.id.to_s => { 'team_id' => 'excluded' } }))
+
+      result = publish
+
+      expect(result.team_input(other.team_id)).to include('status' => 'unknown', 'class_points' => nil)
+      expect(result.payload.dig('review', 'rows', 0, 'raw')).to include('team_label' => 'Virginia State', 'class_points' => '23.16')
+    end
+
+    [{ 'provider_team_id' => 123 }, { 'rank' => '0.5' }, { 'team_url' => 'https://247sports.com/college/test/' }].each do |invalid|
+      it "does not extend the exclusion exception to #{invalid}" do
+        document['rows'].first.merge!(invalid)
+        entry = batch.entries.sole
+        review.save(attributes.merge('rows' => { entry.id.to_s => { 'team_id' => 'excluded' } }))
+
+        expect { publish }.to raise_error(ArgumentError, /Resolve recruiting conflicts/)
+      end
+    end
+
+    it 'still rejects invalid numeric values on an excluded unranked entry' do
+      document['rows'].first['class_points'] = '-1'
+      entry = batch.entries.sole
+      review.save(attributes.merge('rows' => { entry.id.to_s => { 'team_id' => 'excluded' } }))
+
+      expect { publish }.to raise_error(ArgumentError, /class_points: requires finite nonnegative decimal/)
+    end
+  end
+
   it 'saves a page of known rows while leaving other decisions unchanged' do
     document['rows'] << document['rows'].first.merge('team_label' => 'Other source', 'provider_team_id' => 'other-source')
     entries = batch.entries.order(:row_number).to_a

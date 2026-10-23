@@ -39,6 +39,22 @@ RSpec.describe Recruiting::Acquisition do
     expect(artifact.extract.fetch('coverage_note')).to include('2 pages captured, 2 rows')
   end
 
+  it 'retains plain-text schools and points on unlinked unranked entries' do
+    page = Nokogiri::HTML(html)
+    node = page.at_css('.rankings-page__list-item')
+    node.at_css('.team').content = ' Virginia State '
+    node.at_css('.rank-column .primary').content = '0'
+    node.at_css('.points').content = '23.16'
+    capture = page.to_html
+
+    fetch_page(capture)
+
+    expect(source.rows.first).to include('team_label' => 'Virginia State', 'raw_team_label' => ' Virginia State ',
+                                         'rank' => '0', 'class_points' => '23.16', 'provider_team_id' => nil, 'team_url' => nil)
+    expect(Base64.strict_decode64(source.pages.first.fetch('html_base64'))).to eq(capture)
+    expect(artifact.extract.fetch('html_parser_version')).to eq(2)
+  end
+
   it 'fetches the actual advertised next URL and stops at the explicit page limit' do
     allow(HTTParty).to receive(:get).with(url, anything).and_return(double(code: 200, body: html))
     allow(HTTParty).to receive(:get).with(second_url, anything).and_return(double(code: 200, body: second_html))

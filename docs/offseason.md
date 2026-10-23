@@ -390,20 +390,30 @@ previous proposal. Raw sanitized response captures remain private immutable file
 the proposal retains their hashes and request provenance. Keep those files with
 the operator's evidence, outside the public web root and version control.
 
-CBBD matches only stored `TeamExternalIdentity` and
-`ConferenceExternalIdentity` records with provider `cbbd` and the exact opaque
-source ID (`id`, never `sourceId`). Names, abbreviations, aliases and Sports
-Reference slugs are display metadata. Map unmatched conference IDs explicitly on
-the review screen; mappings cannot be reparented, and do not modify canonical
-conference IDs/slugs or Sports Reference aliases. Saving mappings rebuilds the
-retained source without fetching. Changed local identities require a fresh fetch.
+Stored `TeamExternalIdentity` and `ConferenceExternalIdentity` mappings with provider
+`cbbd` and the exact opaque source ID (`id`, never `sourceId`) remain authoritative.
+For first-time mappings, the review preselects a unique exact school name or any
+stored TeamAlias, and a unique exact conference name or abbreviation. Matching
+ignores surrounding whitespace and case; it does not use fuzzy similarity or
+Sports Reference slugs. Ambiguous candidates and multiple source school IDs
+resolving to one local school require a decision.
+
+Under **Review CBBD school and conference matches**, unresolved rows appear first
+and exact matches are collapsed with their selections already filled in. Review or
+override those selections, then click **Save CBBD identity matches and refresh
+proposals** once to save the selected batch. Blank rows remain unmapped. This saves
+provider identities only and rebuilds from retained evidence without fetching;
+it does not approve memberships, change team metadata or publish ratings. Full
+roster approval requires saved identity mappings. Existing mappings cannot be
+reparented by this form. Changed local identities or aliases invalidate stale
+submissions; refresh and review again.
 
 For missing/unprepared schools, manually create or complete the Team in RailsAdmin
-using an explicitly supplied valid URL and verified required metadata, add a
-TeamAlias and target-year TeamSeason, and associate the exact CBBD school ID via
-TeamExternalIdentity. Then fetch again. The directory does not provide all required
-school/venue metadata; the Sports Reference school-import buttons are unavailable
-for CBBD. A TeamAlias helps local coverage but never establishes CBBD identity.
+using an explicitly supplied valid URL and verified required metadata, and add a
+TeamAlias and target-year TeamSeason. Then refresh and save its reviewed CBBD match.
+The directory does not provide all required school/venue metadata; the Sports
+Reference school-import buttons are unavailable for CBBD. An alias proposes a
+match; a saved provider identity is still required for game ingestion.
 
 A nonempty directory and matching echoed season do **not** prove complete D1
 population coverage or announced future realignment: open-ended upstream membership

@@ -47,6 +47,76 @@ RSpec.describe 'RailsAdmin CBBD membership preparation', type: :request do
     team
   end
 
+  it 'preselects exact aliases and conferences and saves an operator override without approving the roster' do
+    team = create(:team, school: 'Canonical U')
+    create(:team_alias, team:, value: 'Synthetic U', source: 'manual')
+    create(:team_season, team:, season:)
+    conference.update!(name: 'Synthetic Conference')
+    override = create(:conference)
+    refresh
+    get path
+    school_select = response.parsed_body.at_css('select[name="mapping[teams][001]"]')
+    conference_select = response.parsed_body.at_css('select[name="mapping[conferences][10]"]')
+    expect(school_select&.at_css('option[selected]')&.[]('value')).to eq(team.id.to_s)
+    expect(conference_select&.at_css('option[selected]')&.[]('value')).to eq(conference.id.to_s)
+    expect([TeamExternalIdentity.count, ConferenceExternalIdentity.count]).to eq([0, 0])
+    post path, params: { operation: 'map_cbbd_identities', mapping: { proposal_key:, teams: { '001' => team.id },
+                                                                      conferences: { '10' => override.id } } }
+    expect(response).to redirect_to(path)
+    expect(TeamExternalIdentity.find_by!(provider: 'cbbd', external_id: '001').team).to eq(team)
+    expect(ConferenceExternalIdentity.find_by!(provider: 'cbbd', external_id: '10').conference).to eq(override)
+    expect(season.reload.membership_proposal['rows'].sole['choice']).to eq(override.id.to_s)
+    expect([TeamConference.count, season.participation_review]).to eq([0, {}])
+  end
+
+  it 'requires saving proposed identities before full roster approval' do
+    team = create(:team, school: 'Synthetic U')
+    create(:team_alias, team:, value: team.school)
+    create(:team_season, team:, season:)
+    conference.update!(name: 'Synthetic Conference')
+    refresh
+    post path, params: { operation: 'approve', review: { proposal_key:, start_date: season.start_date.iso8601,
+                                                         end_date: season.end_date.iso8601, confirm_source_coverage: '1',
+                                                         teams: { team.id => { choice: conference.id } } } }
+    expect(response).to have_http_status(:unprocessable_content)
+    expect(response.body).to include('Save CBBD identity matches')
+    expect(season.reload.participation_review).to eq({})
+  end
+
+  it 'shares override choices instead of repeating every school option for every exact match' do
+    team = create(:team, school: 'Synthetic U')
+    others = create_list(:team, 3)
+    create(:team_alias, team:, value: team.school)
+    create(:team_season, team:, season:)
+    conference.update!(name: 'Synthetic Conference')
+    refresh
+    get path
+    select = response.parsed_body.at_css('select[name="mapping[teams][001]"]')
+    expect(select.css('option').size).to eq(2)
+    expect(select.at_css('option[selected]')['value']).to eq(team.id.to_s)
+    choices = response.parsed_body.at_css('template#cbbd-teams-options')
+    expect(choices.css('option').pluck('value')).to include(*others.map { |other| other.id.to_s })
+  end
+
+  it 'approves a roster after accepting the preselected identity matches' do
+    team = create(:team, school: 'Synthetic U')
+    create(:team_alias, team:, value: team.school)
+    create(:team_season, team:, season:)
+    conference.update!(name: 'Synthetic Conference')
+    refresh
+    post path, params: { operation: 'map_cbbd_identities', mapping: { proposal_key:, teams: { '001' => team.id },
+                                                                      conferences: { '10' => conference.id } } }
+    expect(response).to redirect_to(path)
+    get path
+    expect(response.parsed_body.at_css('#cbbd-identity-mapping-form')).to be_nil
+    review = { proposal_key:, start_date: season.start_date.iso8601, end_date: season.end_date.iso8601,
+               confirm_source_coverage: '1', teams: { team.id => { choice: conference.id } } }
+    post path, params: { operation: 'approve', review: }
+    expect(response).to redirect_to(path)
+    expect(team.conference_for(season)).to eq(conference)
+    expect(season.reload.participation_review['teams']).to include(hash_including('team_id' => team.id, 'status' => 'included'))
+  end
+
   it 'supports explicit manual school setup, retained conference mapping and reviewed approval without SR' do
     refresh
     get path
