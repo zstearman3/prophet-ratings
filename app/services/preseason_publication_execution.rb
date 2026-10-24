@@ -4,6 +4,7 @@
 class PreseasonPublicationExecution
   def initialize(publication)
     @publication = publication
+    @reviewed_revisions = ProphetRatings::ReviewedInputRevisions.new
   end
 
   def call
@@ -14,10 +15,10 @@ class PreseasonPublicationExecution
 
   private
 
-  attr_reader :publication
+  attr_reader :publication, :reviewed_revisions
 
   def execute
-    return if publication.reload.status == 'published'
+    return unless publication.reload.status.in?(%w[queued running])
 
     start
     apply
@@ -40,14 +41,14 @@ class PreseasonPublicationExecution
   end
 
   def publish
-    apply_reviewed(publication.verify_current)
-    publication.update!(status: 'published', published_at: Time.current, result: publication.output_identity)
+    apply_reviewed(publication.verify_current(reviewed_revisions:))
+    publication.update!(status: 'published', published_at: Time.current, result: publication.output_identity(reviewed_revisions:))
   end
 
   def apply_reviewed(report)
     mode = publication.mode
     service = PreseasonPublicationPreview.new(publication.season, ratings_config_version: publication.ratings_config_version,
-                                                                  mode:).calculation
+                                                                  mode:, reviewed_revisions:).calculation
     mode == 'revise' ? service.call(preview_key: report.fetch('preview_key')) : service.call
   end
 

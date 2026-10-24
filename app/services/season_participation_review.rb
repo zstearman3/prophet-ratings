@@ -51,7 +51,8 @@ class SeasonParticipationReview
 
   def self.revision_covered?(row, version, snapshots)
     version_id = version.id
-    row.ratings_config_version_id == version_id && row.preseason_prior&.ratings_config_version_id == version_id &&
+    prior_version_id = PreseasonPrior.where(id: row.preseason_prior_id).pick(:ratings_config_version_id)
+    row.ratings_config_version_id == version_id && prior_version_id == version_id &&
       snapshots.exists?(team_id: row.team_id)
   end
 

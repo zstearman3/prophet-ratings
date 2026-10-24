@@ -5,15 +5,21 @@ module Departures
   class BatchPage
     def initialize(batch)
       @batch = batch
-      @attempt = batch.attempt
       @teams = Team.includes(:team_aliases).order(:school, :id).to_a
     end
 
     def call
+      return legacy_review unless DraftTeamReview.applicable?(batch)
+
+      batch.status == 'published' ? published_page : draft_team_page
+    end
+
+    def legacy_review
       review = BatchReview.new(batch)
       { attempt:, history:, report: review.report(attempt:), review_key: review.review_key(attempt:),
         identity: TeamIdentity.new(teams:), teams:, teams_by_id: teams.index_by(&:id),
-        row_issues: DecisionForm.new(facts).issues(batch.decisions), production_options: production_options }
+        row_issues: DecisionForm.new(facts).issues(batch.decisions), production_options: production_options,
+        coverage: coverage_report, capture_only: CapturePreparation.capture_only?(batch.plan) }
     end
 
     def self.listing(season)
@@ -23,7 +29,28 @@ module Departures
 
     private
 
-    attr_reader :batch, :attempt, :teams
+    attr_reader :batch, :teams
+
+    def attempt
+      @attempt ||= batch.attempt
+    end
+
+    def published_page
+      { attempt: nil, history:, draft_team_review: PublishedReview.new(batch).call, teams_by_id: teams.index_by(&:id) }
+    end
+
+    def draft_team_page
+      report = if attempt&.terminal? && attempt.manifest.present?
+                 DraftTeamReview.new(batch, attempt:).report
+               else
+                 {}
+               end
+      { attempt:, history:, draft_team_review: report, teams_by_id: teams.index_by(&:id) }
+    end
+
+    def coverage_report
+      CoverageReview.new(batch).report(attempt:) if batch.plan['provider'] == 'cbbd' && attempt&.terminal?
+    end
 
     def facts
       attempt&.dataset || {}

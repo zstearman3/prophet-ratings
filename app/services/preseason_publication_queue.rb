@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# The exact displayed proposal is checked again before scheduling a pinned operation.
+# Scheduling checks the saved review; the worker revalidates all evidence before writing.
 class PreseasonPublicationQueue
   def initialize(publication, actor:, fingerprint:, acknowledge:)
     @publication = publication
@@ -11,14 +11,21 @@ class PreseasonPublicationQueue
 
   def call
     enqueue if Season.with_ratings_lock { prepare_queue }
-    publication.reload
+    PreseasonPublicationPage.summary(PreseasonPublication.all).find(publication.id)
   end
 
   private
 
   def prepare_queue
     publication.season.with_lock do
-      publication.with_lock { prepare_transition }
+      with_publication_lock { prepare_transition }
+    end
+  end
+
+  def with_publication_lock
+    PreseasonPublication.transaction do
+      @publication = PreseasonPublicationPage.summary(PreseasonPublication.all).lock.find(publication.id)
+      yield
     end
   end
 
@@ -32,9 +39,10 @@ class PreseasonPublicationQueue
   end
 
   def record_queue
-    validate_acknowledgement
+    already_queued = publication.queued_at
+    validate_acknowledgement unless already_queued
     publication.update!(status: 'queued', queued_at: Time.current, error_message: nil,
-                        acknowledgement: acknowledgement)
+                        acknowledgement: already_queued ? publication.acknowledgement : acknowledgement)
   end
 
   attr_reader :publication, :actor, :fingerprint, :acknowledge
@@ -42,7 +50,11 @@ class PreseasonPublicationQueue
   def validate_identity
     raise ArgumentError, 'Preview identity is missing or differs; reload this review.' unless fingerprint == publication.fingerprint
 
-    publication.verify_current
+    unless publication.status.in?(%w[review queued running failed])
+      raise ArgumentError, 'The preview must finish successfully before publication.'
+    end
+
+    publication.validate_selection
   end
 
   def validate_acknowledgement
@@ -65,7 +77,7 @@ class PreseasonPublicationQueue
 
     raise ActiveJob::EnqueueError, 'The worker job was not enqueued.'
   rescue StandardError => error
-    publication.with_lock do
+    with_publication_lock do
       if publication.status == 'queued'
         publication.update!(status: 'failed',
                             error_message: "Could not enqueue publication: #{error.message}. Retry this review after checking the worker.")

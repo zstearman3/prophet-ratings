@@ -1,35 +1,35 @@
-<%= form_with url: admin_departure_batch_path(@batch), scope: :review, method: :patch, data: { turbo: false }, class: 'space-y-4' do |form| %>
+<%= form_with url: admin_departure_batch_path(@batch), scope: :review, method: :patch, data: { turbo: false }, class: 'space-y-6' do |form| %>
   <%= form.hidden_field :review_key, value: @page[:review_key] %>
-  <p>Draft decisions are saved separately from approval. Numeric facts come from retained sources. Save a selected blank stint to add another stint; remove any existing stint with its checkbox.</p>
+  <p>Choose an accounting category for each player, explain your decision and select the saved evidence that supports it. For an eligible college player, select every prior-season school stint and its existing team. Save a selected blank stint to add another. Saving decisions does not publish them.</p>
   <% @page[:attempt].dataset.fetch('selections', []).each do |selection| %>
     <% key = selection.fetch('selection_key'); decision = @batch.decisions.find { |row| row['selection_key'] == key } || {} %>
-    <fieldset class="border p-3 space-y-2"><legend>Pick <%= selection['overall_pick'] %> · Round <%= selection['round'] %> · <%= selection['player_name_source'] %></legend>
-      <% if @page[:row_issues][key] %><p role="alert">Selection <%= key %>: <%= @page[:row_issues][key] %></p><% end %>
+    <fieldset class="min-w-0 rounded border p-4 space-y-4"><legend class="px-2 font-semibold">Pick <%= selection['overall_pick'] %> · Round <%= selection['round'] %> · <%= selection['player_name_source'] %></legend>
+      <% if @page[:row_issues][key] %><p role="alert" class="rounded bg-red-100 p-3">Selection <%= key %>: <%= @page[:row_issues][key] %></p><% end %>
       <% if selection['provider'] == 'cbbd' %>
         <p>CBBD athlete ID: <%= selection['provider_athlete_id'] || 'Unknown' %> · CBBD team ID: <%= selection['provider_team_id'] || 'Unknown' %> · <%= selection['affiliation_source'] %></p>
         <p>Existing mapped team: <%= @page[:teams_by_id].values_at(*Departures::PlayerIdentity.team_candidates(selection['provider_team_id'])).compact.map(&:school).join(', ').presence || 'Unresolved; review CBBD team mappings before approval' %></p>
-        <p><%= link_to 'Review CBBD team mappings', admin_cbbd_review_runs_path(season_id: @batch.season_id) %></p>
+        <p><%= link_to 'Review CBBD team mappings', admin_cbbd_review_runs_path(season_id: @batch.season_id), class: 'text-blue-700 underline' %></p>
         <p>Null identity, affiliation and absent stat rows do not prove no-college status or nonparticipation. Keep unsupported exclusions unknown and acknowledge the displayed gaps.</p>
       <% else %>
-        <p><%= link_to 'Provider player identity', selection['player_source_url'] %> · <%= selection['affiliation_source'] %></p>
+        <p><%= link_to 'Provider player identity', selection['player_source_url'], class: 'text-blue-700 underline' %> · <%= selection['affiliation_source'] %></p>
         <p>Proposed exact team candidates: <%= @page[:teams_by_id].values_at(*@page[:identity].candidates(selection['affiliation_source'], source: URI.parse(selection['draft_source_url']).host)).map(&:school).join(', ').presence || 'Unresolved; review captured evidence' %></p>
       <% end %>
       <%= fields_for "review[rows][#{key}]" do |entry| %>
-        <%= entry.label :status, 'Accounting category' %> <%= entry.select :status, Departures::Contract::STATUSES.map { |status| [status.humanize, status] }, { selected: decision['status'], include_blank: 'Unreviewed' } %>
-        <div><%= entry.label :reason, 'Decision / participation reason' %><%= entry.text_field :reason, value: decision['reason'], class: 'block border w-full' %></div>
-        <div><%= entry.label :team_id, 'Known affected team (unknown production)' %><%= entry.collection_select :team_id, @page[:teams], :id, :school, { selected: @page[:teams].find { |team| team.school == decision['team_name_source'] }&.id, include_blank: true } %></div>
+        <%= entry.label :status, 'Accounting category' %> <%= entry.select :status, Departures::Contract::STATUSES.map { |status| [status.humanize, status] }, { selected: decision['status'], include_blank: 'Choose a category' }, class: 'mt-1 block w-full rounded border p-2' %>
+        <div><%= entry.label :reason, 'Decision / participation reason' %><%= entry.text_field :reason, value: decision['reason'], class: 'mt-1 block w-full rounded border p-2' %></div>
+        <div><%= entry.label :team_id, 'Known affected team (unknown production)' %><%= entry.collection_select :team_id, @page[:teams], :id, :school, { selected: @page[:teams].find { |team| team.school == decision['team_name_source'] }&.id, include_blank: 'Choose a team' }, class: 'mt-1 block w-full rounded border p-2' %></div>
         <p>Participation / player identity evidence:</p>
         <% @page[:attempt].manifest.fetch('sources').each do |source| %>
-          <label><%= check_box_tag "review[rows][#{key}][evidence_source_ids][]", source['id'], decision.fetch('evidence_source_ids', []).include?(source['id']) %> <%= source['id'] %> (<%= source['type'] %>)</label>
+          <label class="mr-3 inline-flex items-center gap-2 py-1"><%= check_box_tag "review[rows][#{key}][evidence_source_ids][]", source['id'], decision.fetch('evidence_source_ids', []).include?(source['id']) %> <%= departure_source_label(source) %></label>
         <% end %>
         <% (decision.fetch('stints', []) + [{}]).each_with_index do |stint, index| %>
-          <div class="border p-2"><p>Prior-season stint <%= index + 1 %></p>
+          <div class="rounded border bg-gray-50 p-4 space-y-3"><p>Prior-season stint <%= index + 1 %></p>
             <%= fields_for "review[rows][#{key}][stints][#{index}]" do |stint_form| %>
-              <%= stint_form.label :production_key, 'Captured school player' %><%= stint_form.select :production_key, @page[:production_options], { selected: stint.present? ? Departures::PlayerIdentity.choice(stint, stint) : nil, include_blank: true } %>
-              <%= stint_form.label :team_id, 'Existing team' %><%= stint_form.collection_select :team_id, @page[:teams], :id, :school, { selected: stint['team_id'], include_blank: true } %>
+              <%= stint_form.label :production_key, 'Captured school player' %><%= stint_form.select :production_key, @page[:production_options], { selected: stint.present? ? Departures::PlayerIdentity.choice(stint, stint) : nil, include_blank: 'Choose captured player and school' }, class: 'mt-1 block w-full rounded border p-2' %>
+              <%= stint_form.label :team_id, 'Existing team' %><%= stint_form.collection_select :team_id, @page[:teams], :id, :school, { selected: stint['team_id'], include_blank: 'Choose a team' }, class: 'mt-1 block w-full rounded border p-2' %>
               <p>Identity evidence for this stint:</p>
               <% @page[:attempt].manifest.fetch('sources').each do |source| %>
-                <label><%= check_box_tag "review[rows][#{key}][stints][#{index}][identity_evidence_source_ids][]", source['id'], stint.fetch('identity_evidence_source_ids', []).include?(source['id']) %><%= source['id'] %></label>
+                <label class="mr-3 inline-flex items-center gap-2 py-1"><%= check_box_tag "review[rows][#{key}][stints][#{index}][identity_evidence_source_ids][]", source['id'], stint.fetch('identity_evidence_source_ids', []).include?(source['id']) %> <%= departure_source_label(source) %></label>
               <% end %>
               <%= stint_form.check_box :remove %><%= stint_form.label :remove, 'Remove stint' %>
             <% end %>
@@ -38,5 +38,5 @@
       <% end %>
     </fieldset>
   <% end %>
-  <%= form.submit 'Save decisions', class: 'border p-2' %>
+  <%= form.submit 'Save decisions', class: 'rounded bg-prophet-indigo px-4 py-2 font-medium text-white hover:bg-prophet-indigo/80' %>
 <% end %>

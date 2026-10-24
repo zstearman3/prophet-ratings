@@ -17,7 +17,7 @@ module Admin
     end
 
     def create
-      @values = params.expect(refresh: %i[provider start_date end_date max_requests retries]).to_h
+      @values = params.expect(refresh: %i[provider start_date end_date max_requests retries mode rescan]).to_h
       @run = ScheduleRefreshRun.new(values.merge(season: Season.find(params.expect(:season_id)), requested_by: current_user))
       validate_policy
       run.save!
@@ -65,8 +65,19 @@ module Admin
 
     def load_listing
       @page = ScheduleRefreshRun.listing(run&.season_id || params[:season_id])
-      @values = values || { 'provider' => ENV.fetch('GAME_SYNC_PROVIDER', 'sports_reference'),
-                            'max_requests' => ENV.fetch('CBBD_MAX_REQUESTS', nil), 'retries' => ENV.fetch('CBBD_RETRIES', nil) }
+      @values = values || default_window.merge('provider' => ENV.fetch('GAME_SYNC_PROVIDER', 'sports_reference'),
+                                               'max_requests' => ENV.fetch('CBBD_MAX_REQUESTS', nil),
+                                               'retries' => ENV.fetch('CBBD_RETRIES', nil))
+    end
+
+    def default_window
+      season = page[:season]
+      return {} unless season
+
+      historical = season.end_date < Game.current_schedule_date
+      first = historical ? season.start_date : [season.start_date, Game.current_schedule_date].max
+      { 'mode' => historical ? 'historical' : 'upcoming', 'rescan' => false,
+        'start_date' => first.iso8601, 'end_date' => [first + 6.days, season.end_date].min.iso8601 }
     end
 
     def invalid_submission(error)

@@ -166,6 +166,19 @@ default resume skipping matching completed dates. CBBD uses one explicit run bud
 and does not automatically retry incomplete operations; see provider configuration below. The shared date lock prevents concurrent
 ingestion across sync/refresh/daily/team callers.
 
+The admin **Refresh and review schedule → Historical games** flow uses the same
+`GameSyncRun` service in an ID-only background job, retaining sanitized per-date
+progress atomically with imported games and completion checkpoints. It resumes
+completed checkpoints by default; **Reimport completed dates too** explicitly
+rescans them. It does not run ratings or force protected source corrections.
+For this admin historical CBBD path, each game is isolated in a savepoint:
+expected reconciliation failures preserve a rejected audit while valid games
+commit. A date with held games remains failed and retryable, with honest committed
+counts; retries recognize already imported games. A database/runtime failure or
+failure to persist the date report still rolls back that date transaction.
+CLI historical sync, Sports Reference, and upcoming refresh retain their existing
+whole-date failure behavior.
+
 This job is used by `season:sync_games` and the explicit legacy all-season
 `import:games` task, not bootstrap or deployment. Prefer small, explicit windows to
 adopt checkpoints on old databases. See [Offseason Operations](offseason.md) for
@@ -356,7 +369,9 @@ and append-only history are unchanged; historical audit rows are not rewritten.
 Statuses are `scheduled`, `live`, `final`, `postponed`, `cancelled`, `unknown`.
 Only `final` plus literal completion confirmation and retained evidence can
 finalize. Missing required statistics yield `incomplete`; unmatched participants,
-season membership or a required stable result ID yield `unmatched`. Rejections distinguish
+season membership or a required stable result ID ordinarily yield `unmatched`;
+the CBBD name-only opponent exception below retains schedule results without
+creating ratings inputs. Rejections distinguish
 `invalid`, `ambiguous`, `conflict`, `stale`, and `superseded`. Missing statistics
 are never zero-filled. Counts accept nonnegative integers or digit strings up to
 the database integer limit; blanks/null remain unknown. Each side's
@@ -379,6 +394,20 @@ superseded sources cannot write. Supplied team IDs require an existing exact
 `TeamExternalIdentity`; there is no fallback to labels for unmapped IDs. Label
 bootstrap requires a unique `Team.matching_school_or_alias` result and existing
 TeamSeason for both distinct participants. No teams/memberships are created.
+
+CBBD may retain a name-only opponent when at least one participant resolves to a
+stored season membership and the other has no eligible local team match. A known
+local team with an unreviewed external ID, an ambiguous alias, or an identity/name
+conflict remains held. The unmatched side has its source name on `Game` and no
+`TeamGame`; the tracked side retains its existing membership and observed raw
+counts. A source-confirmed final with unequal valid scores is `final_unmatched`,
+visible in schedules and overall W–L but excluded from every ratings/statistical
+cohort requiring strict finals. Missing box fields remain unknown. Supplied
+inconsistent statistics are still rejected; no missing opponent totals are
+invented. These results report final-box coverage as `not_applicable`, never
+`complete` merely because a schedule result was stored. Existing linked sides
+cannot be silently removed or replaced, and accepted source corrections retain
+normal freshness/provenance checks. Repeats reuse the stable game identity.
 Bootstrap considers unique source URLs and same-date participants, including
 legacy date encoding; multiple/cross-season candidates are held. Bootstrap and
 source transaction advisory locks persist through the outermost commit; existing
@@ -402,8 +431,8 @@ Changed projections report `outcome: projected`; repeats report `unchanged`, bot
 with `projected: true`, `accepted: false`, `applied: true`, the matched `game_id`,
 and reason `missing_stable_game_identity_projection`. Accepted provenance is not
 replaced. A later compatible stable-ID observation reuses the projected Game.
-Other missing-ID statuses and unresolved opponents remain audit-only review
-candidates, without creating results or `final_unmatched` Games. Existing
+Other missing-ID statuses and unresolved opponents outside the explicit CBBD
+name-only exception remain audit-only review candidates. Existing
 `final_unmatched` records keep their status/local IDs and may promote when a
 stable candidate, both memberships and a complete confirmed box resolve.
 Unresolved refreshes preserve existing records/associations. No partial participant
@@ -1056,12 +1085,15 @@ for the operator's review/revision steps.
 ## Annual draft departures
 
 New departure acquisition uses CBBD draft picks and regular/postseason player and
-team totals through the saved admin workflow. Private database attempts retain
-responses, retries, hashes, coverage and reviewed decisions; explicit approval
-publishes immutable input revisions and profile pointers. Missing evidence stays
-unknown, and acquisition never creates player/team identities or runs ratings.
-See [the saved admin workflow](departures.md#saved-admin-workflow) and
-[identity and scope review](departures.md#review-identities-scope-and-missingness).
+team totals through the saved admin workflow. Fetching derives years and retains
+raw responses. The operator confirms drafted players and college team matches in
+one review, then publishes; the app derives production and postseason absence
+from successful captured responses. Players without a matching prior-season
+TeamSeason are skipped, while missing stats for a matched college remain team-local
+unknown. Publication creates a versioned offline successor with frozen scope and
+retained evidence. Failed responses never establish zero production. See
+[annual departure review](departures.md) for the scope assumptions and compatibility
+with earlier manually reviewed evidence. No game import or rating job is triggered.
 
 CLI acquisition is also CBBD-only. Offline replay/preview and the historical v1
 NBA/Sidearm HTML contracts remain supported without fetching HTML for new runs.

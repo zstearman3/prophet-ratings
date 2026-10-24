@@ -10,7 +10,10 @@ RSpec.describe 'Admin preseason publication' do
   let(:model) { RatingsConfigVersion.publish! }
   let!(:row) { create(:team_season, season:) }
 
-  before { allow(PublishPreseasonJob).to receive(:perform_later).and_return(true) }
+  before do
+    allow(PublishPreseasonJob).to receive(:perform_later).and_return(true)
+    allow(PreviewPreseasonJob).to receive(:perform_later).and_return(true)
+  end
 
   it 'restricts all review actions to administrators' do
     get admin_preseason_publications_path(season_id: season.id)
@@ -38,6 +41,10 @@ RSpec.describe 'Admin preseason publication' do
     PreseasonPublication.select_model(season, model)
     post admin_preseason_publications_path(season_id: season.id), params: { mode: 'initialize' }
     follow_redirect!
+    expect(response.body).to include('preview_queued', 'Retry pinned preview')
+    expect(response.body).not_to include('Publish reviewed preseason ratings')
+    PreviewPreseasonJob.perform_now(PreseasonPublication.last.id)
+    get admin_preseason_publication_path(PreseasonPublication.last, season_id: season.id)
     expect(response).to have_http_status(:ok)
     expect(response.body).to include('Unknown', 'Legacy adjustment components', 'Captured source and revision provenance',
                                      'Largest rank movers', 'Missing returning minutes fraction', model.name, row.team.school)
@@ -48,13 +55,41 @@ RSpec.describe 'Admin preseason publication' do
     PreseasonPublicationExecution.new(review).call
     get admin_preseason_publication_path(review, season_id: season.id)
     expect(response.body).to include('Published outputs', "Acknowledged by admin ##{admin.id}", 'Missing returning minutes fraction')
+    table = response.parsed_body.at_css('#published-preseason-ratings')
+    expect(table).to be_present
+    snapshot = TeamRatingSnapshot.find(review.reload.result.fetch('snapshot_ids').first)
+    expect(PreseasonPublicationPage.outputs(review).first).not_to have_attribute(:stats)
+    expected = [review.result.fetch('ranks').to_h.fetch(row.team_id).to_s, row.team.school,
+                format('%.2f', snapshot.rating), format('%.2f', snapshot.adj_offensive_efficiency),
+                format('%.2f', snapshot.adj_defensive_efficiency), format('%.1f', snapshot.adj_pace)]
+    expect(table.css('tbody tr').map { |entry| entry.css('td').map { |cell| cell.text.strip } }).to eq([expected])
+    row.update!(rating: 999, adj_offensive_efficiency: 999)
+    get admin_preseason_publication_path(review, season_id: season.id)
+    expect(response.parsed_body.at_css('#published-preseason-ratings').css('tbody td').map { |cell| cell.text.strip }).to eq(expected)
+    expect(response.body).to include('Publication completed', '1 saved team ratings')
     expect(season.reload).not_to be_current
+  end
+
+  it 'orders the proposal by proposed rank and formats the ratings for comparison' do
+    stronger = create(:team_season, season:)
+    create(:team_offseason_profile, team_season: row, manual_adjustment: -2)
+    create(:team_offseason_profile, team_season: stronger, manual_adjustment: 2)
+    sign_in admin
+    PreseasonPublication.select_model(season, model)
+    review = PreseasonPublication.review!(season, reviewer: admin, mode: 'initialize')
+    PreviewPreseasonJob.perform_now(review.id)
+    get admin_preseason_publication_path(review, season_id: season.id)
+    entries = response.parsed_body.css('#proposed-preseason-ratings tbody tr')
+    expect(entries.map { |entry| entry.at_css('td').text }).to eq([stronger.team.school, row.team.school])
+    expect(entries.first.css('td')[1].text).to match(/→ \d+\.\d{2}\z/)
   end
 
   it 'returns validation guidance and prevents cross-season review access' do
     sign_in admin
     PreseasonPublication.select_model(season, model)
     review = PreseasonPublication.review!(season, reviewer: admin, mode: 'initialize')
+    PreviewPreseasonJob.perform_now(review.id)
+    review.reload
     post publish_admin_preseason_publication_path(review, season_id: season.id),
          params: { fingerprint: review.fingerprint, acknowledge: '0' }
     expect(response).to have_http_status(:unprocessable_content)
@@ -68,6 +103,8 @@ RSpec.describe 'Admin preseason publication' do
     sign_in admin
     PreseasonPublication.select_model(season, model)
     review = PreseasonPublication.review!(season, reviewer: admin, mode: 'initialize')
+    PreviewPreseasonJob.perform_now(review.id)
+    review.reload
     path = publish_admin_preseason_publication_path(review, season_id: season.id)
     post path, params: { fingerprint: review.fingerprint, acknowledge: '1' }
     acknowledgement = review.reload.acknowledgement
@@ -76,5 +113,18 @@ RSpec.describe 'Admin preseason publication' do
     expect(review.reload.acknowledgement).to eq(acknowledgement)
     follow_redirect!
     expect(response.body).to include('Requeue reviewed publication')
+  end
+
+  it 'returns authenticated lightweight status without calculating or exposing evidence' do
+    sign_in admin
+    PreseasonPublication.select_model(season, model)
+    review = PreseasonPublication.review!(season, reviewer: admin, mode: 'initialize')
+    get progress_admin_preseason_publication_path(review, season_id: season.id), as: :json
+    expect(response).to have_http_status(:ok)
+    expect(response.parsed_body.keys).to match_array(%w[status updated_at])
+    expect(response.parsed_body['status']).to eq('preview_queued')
+    other = create(:season, year: 2028)
+    get progress_admin_preseason_publication_path(review, season_id: other.id), as: :json
+    expect(response).to have_http_status(:not_found)
   end
 end

@@ -3,9 +3,10 @@
 module ProphetRatings
   # Capture current approved profile pointers under the caller's season transaction/lock.
   class ReviewedEfficiencyInputs
-    def initialize(team_season)
+    def initialize(team_season, revisions: ReviewedInputRevisions.new)
       @team_season = team_season
-      @profile = team_season.team_offseason_profile
+      @revisions = revisions
+      @profile = revisions.bind(team_season.team_offseason_profile)
     end
 
     def capture(inputs, config)
@@ -31,17 +32,17 @@ module ProphetRatings
       return unless revision
 
       serializer = self.class
-      serializer.validate_revision(revision)
+      @revisions.validate(revision)
       revision.team_input(@team_season.team_id).merge('revision' => serializer.revision_identity(revision),
-                                                      'review' => revision.payload.fetch('review'))
+                                                      'review' => ReviewedInputRevisions.approval(revision.payload.fetch('review')))
     end
 
     def departures
       revision = @profile&.departure_revision
       return unless revision
 
-      self.class.validate_revision(revision)
-      DepartureContributionEvidence.capture(revision)
+      @revisions.validate(revision)
+      @revisions.departures(revision)
     end
 
     public_class_method def self.validate_revision(revision)

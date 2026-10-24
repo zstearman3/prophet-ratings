@@ -2,10 +2,11 @@
 
 module ProphetRatings
   class PreseasonRatingsCalculator
-    def initialize(season = Season.current, ratings_config_version: nil)
+    def initialize(season = Season.current, ratings_config_version: nil, reviewed_revisions: ReviewedInputRevisions.new)
       @ratings_config_version = RatingsConfigVersion.resolve(ratings_config_version)
       @config = @ratings_config_version.settings
       @season = season
+      @reviewed_revisions = reviewed_revisions
     end
 
     def call
@@ -19,18 +20,23 @@ module ProphetRatings
     end
 
     def captured_prior(team_season, version)
-      PreseasonPrior.find_by(team_season:, ratings_config_version: version) || begin
-        inputs = preview_inputs(team_season)
-        PreseasonPrior.create!(team_season:, ratings_config_version: version, inputs:,
-                               outputs: PreseasonPriorFormula.new(inputs, version.config).call)
-      end
+      PreseasonPrior.select(:id, :team_season_id, :ratings_config_version_id, :outputs)
+                    .find_by(team_season:, ratings_config_version: version) || begin
+                      inputs = preview_inputs(team_season)
+                      PreseasonPrior.create!(team_season:, ratings_config_version: version, inputs:,
+                                             outputs: PreseasonPriorFormula.new(inputs, version.config).call)
+                    end
     end
 
     def preview_inputs(team_season)
       inputs = base_inputs(team_season)
       return inputs unless @config.dig(:preseason, :efficiency_adjustment)
 
-      ReviewedEfficiencyInputs.new(team_season).capture(inputs, @config)
+      ReviewedEfficiencyInputs.new(team_season, revisions: @reviewed_revisions).capture(inputs, @config)
+    end
+
+    def validate_profile(team_season)
+      @reviewed_revisions.bind(team_season.team_offseason_profile)&.validate_revision_evidence
     end
 
     def base_inputs(team_season)
@@ -63,7 +69,7 @@ module ProphetRatings
         profile: serializer.source_identity(profile),
         previous_values: serializer.previous_values(previous),
         baselines: PreseasonPriorFormula::STATS.index_with { |stat| average_for_stat(stat, previous_season) },
-        profile_values: serializer.normalized_profile(profile)
+        profile_values: PreseasonRatingsCalculator.normalized_profile(profile)
       }
     end
 

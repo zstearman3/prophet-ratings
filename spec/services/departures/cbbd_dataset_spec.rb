@@ -164,4 +164,87 @@ RSpec.describe Departures::CbbdDataset do
       expect(facts.fetch('production').first['team_points']).to eq(2000)
     end
   end
+  it 'preserves the exact strict extraction fixture identity' do
+    expect(dataset.fetch('dataset_revision')).to eq('dd436e179df0327c07c3e4b46c77e1e51447f119224fd93a73acb6ad7fc8d28a')
+  end
+
+  context 'with the reported team totals extraction' do
+    let(:plan) { super().merge('extraction_version' => 'cbbd-draft-season-totals-v2') }
+
+    [[398, 1598, -2, 498], [402, 1602, 2, 502]].each do |reported, subtotal, difference, annual_player_points|
+      it "retains independent totals and warns for roster subtotal difference #{difference}" do
+        regular_players.first['points'] = reported
+        facts = dataset
+        table = facts.fetch('production').first
+        expect(facts.fetch('failures')).to be_empty
+        expect(table).to include('team_points' => 2000, 'coverage_complete' => true)
+        expect(table.fetch('players').first.fetch('player_points')).to eq(annual_player_points)
+        expect(facts.fetch('production_warnings')).to eq(
+          [{ 'provider_team_id' => 20, 'team_name_source' => 'Sample School', 'scope' => 'regular',
+             'team_points' => 1600, 'known_player_points_subtotal' => subtotal, 'all_player_points_known' => true,
+             'difference' => difference, 'reason' => 'player_team_points_mismatch' }]
+        )
+        expect(table.dig('scope_rows', 'regular', 'raw_team_row', 'teamStats', 'points', 'total')).to eq(1600)
+      end
+    end
+
+    it 'reports every discrepant team and scope without canceling differences across scopes' do
+      regular_players.first['points'] = 402
+      post_players.first['points'] = 98
+      rows[1] << player(30, 60, 2).merge('teamId' => 30)
+      rows[3] << team(65, 2).merge('teamId' => 30)
+      warnings = dataset.fetch('production_warnings')
+      expect(warnings.map { |row| row.values_at('provider_team_id', 'scope', 'difference') })
+        .to contain_exactly([20, 'regular', 2], [20, 'postseason', -2], [30, 'regular', -5])
+    end
+
+    it 'retains unknown points as incomplete despite a known subtotal warning' do
+      regular_players.first['points'] = 1700
+      regular_players[1]['points'] = nil
+      facts = dataset
+      expect(facts.fetch('failures')).to be_empty
+      expect(facts.fetch('production').first).to include('team_points' => 2000, 'coverage_complete' => false)
+      expect(facts.fetch('production_warnings').first).to include('known_player_points_subtotal' => 1700,
+                                                                  'all_player_points_known' => false, 'difference' => 100)
+    end
+
+    it 'does not infer a discrepancy or complete production from an unknown subtotal remainder' do
+      regular_players.first['points'] = nil
+      facts = dataset
+      expect(facts.fetch('production_warnings')).to eq([])
+      expect(facts.fetch('production').first).to include('team_points' => 2000, 'coverage_complete' => false)
+    end
+
+    it 'keeps missing player scopes incomplete without fabricating participation' do
+      post_players.pop
+      expect(dataset.fetch('production').first.fetch('players').last.fetch('coverage_complete')).to be(false)
+    end
+
+    [['negative points', 'points', -1], ['fractional points', 'points', 400.5], ['wrong season', 'season', 2024],
+     ['negative games', 'games', -1], ['negative minutes', 'minutes', -1],
+     ['conflicting label', 'team', 'Other School']].each do |label, key, value|
+      it "keeps #{label} a hard normalization failure" do
+        regular_players.first[key] = value
+        facts = dataset
+        expect(facts.fetch('failures')).not_to be_empty
+        expect(facts.fetch('production')).to eq([])
+      end
+    end
+
+    it 'keeps duplicate athlete/team rows a hard failure' do
+      regular_players << regular_players.first.deep_dup
+      expect(dataset.fetch('failures').pluck('failure').join).to include('Duplicate')
+    end
+
+    it 'keeps duplicate independent team rows a hard failure' do
+      rows[3] << rows[3].first.deep_dup
+      expect(dataset.fetch('failures').pluck('failure').join).to include('Duplicate')
+    end
+
+    it 'rejects nonfinite numeric points before deriving warnings' do
+      regular_players.first['points'] = Float::INFINITY
+      parsed = described_class.sources(plan).zip(rows).map { |source, payload| source.merge('rows' => payload) }
+      expect { Departures::CbbdProduction.new(parsed:, settings: plan).call }.to raise_error(ArgumentError, /points/)
+    end
+  end
 end

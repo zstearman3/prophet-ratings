@@ -11,12 +11,15 @@ class OffseasonReadiness
 
   def initialize(season)
     @season = season
+    @reviewed_revisions = ProphetRatings::ReviewedInputRevisions.new
   end
 
   def call
     season.reload
-    report = identity.merge('checks' => checks, 'gaps' => publication.gaps, 'teams' => publication.team_evidence).as_json
-    report.merge('fingerprint' => OffseasonReadinessEvidence.new(season).fingerprint(report))
+    @evidence = OffseasonReadinessEvidence.new(season, reviewed_revisions: @reviewed_revisions)
+    gaps = publication.gaps
+    report = identity.merge('checks' => checks, 'gaps' => gaps, 'teams' => publication.team_evidence).as_json
+    report.merge('fingerprint' => evidence.fingerprint(report))
   end
 
   def self.from_step(step)
@@ -27,7 +30,7 @@ class OffseasonReadiness
 
   private
 
-  attr_reader :season
+  attr_reader :season, :evidence
 
   def identity
     { 'season_id' => season.id, 'year' => season.year, 'dates' => [season.start_date, season.end_date],
@@ -40,7 +43,7 @@ class OffseasonReadiness
   end
 
   def publication
-    @publication ||= OffseasonReadinessPublication.new(season, model)
+    @publication ||= OffseasonReadinessPublication.new(season, model, reviewed_revisions: @reviewed_revisions)
   end
 
   def checks
@@ -88,7 +91,7 @@ class OffseasonReadiness
 
   def operational_checks
     schedule = ScheduleReadiness.new(season)
-    operations = OffseasonReadinessEvidence.new(season)
+    operations = evidence
     [OffseasonReadiness.check('schedule', schedule.usable? ? 'pass' : 'open', schedule.summary), venue_check, prediction_check,
      OffseasonReadiness.check('operations', operations.operation_status, operations.operation_summary)]
   end

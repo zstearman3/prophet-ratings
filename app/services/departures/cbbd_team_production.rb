@@ -3,17 +3,17 @@
 module Departures
   # Combines independently reconciled disjoint scopes for one exact provider team.
   class CbbdTeamProduction
-    def initialize(team_id:, entries:, absent_scopes:, evidence:)
+    def initialize(team_id:, entries:, absent_scopes:, evidence:, optional_player_scopes: [])
       @team_id = team_id
       @entries = entries
-      @absent_scopes = absent_scopes.reject { |scope| entries[scope] }
-      @evidence = evidence
+      @scope_policy = { absent: absent_scopes.reject { |scope| entries[scope] },
+                        optional_players: optional_player_scopes, evidence: }
     end
 
     def call
       validate_labels
       identity.merge(totals, 'players' => combined_players, 'coverage_complete' => complete?,
-                             'scope' => Contract::SCOPE, 'scope_evidence' => @evidence, 'scope_rows' => entries)
+                             'scope' => Contract::SCOPE, 'scope_evidence' => @scope_policy.fetch(:evidence), 'scope_rows' => entries)
     end
 
     private
@@ -42,7 +42,7 @@ module Departures
     end
 
     def team_points
-      covered = entries.all? { |scope, entry| entry ? entry.key?('team_points') : @absent_scopes.include?(scope) }
+      covered = entries.all? { |scope, entry| entry ? entry.key?('team_points') : @scope_policy.fetch(:absent).include?(scope) }
       CbbdValues.sum_whole(present, 'team_points') if covered
     end
 
@@ -55,7 +55,7 @@ module Departures
     end
 
     def complete?
-      entries.all? { |scope, entry| entry ? entry.fetch('complete') : @absent_scopes.include?(scope) }
+      entries.all? { |scope, entry| entry ? entry.fetch('complete') : @scope_policy.fetch(:absent).include?(scope) }
     end
 
     def combined_players
@@ -77,7 +77,8 @@ module Departures
     end
 
     def player_complete?(lineage)
-      complete? && (CbbdDataset::SCOPES - lineage.keys - @absent_scopes).empty?
+      complete? && (CbbdDataset::SCOPES - lineage.keys - @scope_policy.fetch(:absent) - @scope_policy.fetch(:optional_players)).empty? &&
+        lineage.values.all? { |player| player['player_points'].is_a?(Integer) }
     end
 
     public_class_method def self.player_totals(stints)

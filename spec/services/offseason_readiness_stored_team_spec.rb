@@ -14,7 +14,8 @@ RSpec.describe OffseasonReadinessStoredTeam do
   it 'retains all captured gaps and unaffected team gaps when one current source cannot be verified' do
     allow(calculator).to receive(:preview_inputs).and_call_original
     allow(calculator).to receive(:preview_inputs).with(first_row).and_raise(ArgumentError, 'Current source unavailable')
-    allow(ProphetRatings::PreseasonRatingsCalculator).to receive(:new).with(season, ratings_config_version: model).and_return(calculator)
+    allow(ProphetRatings::PreseasonRatingsCalculator).to receive(:new)
+      .with(season, ratings_config_version: model, reviewed_revisions: anything).and_return(calculator)
     gaps = OffseasonReadinessPublication.new(season, model).gaps
     expect(gaps.select { |gap| gap['source'] == 'captured' }.pluck('team_id', 'kind')).to contain_exactly(
       [first_row.team_id, 'recruiting'], [first_row.team_id, 'departures'],

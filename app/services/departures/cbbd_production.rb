@@ -24,7 +24,7 @@ module Departures
     def scope_tables(scope)
       normalizer = self.class
       players, teams = normalizer.index_rows(rows("player-#{scope}"), rows("team-#{scope}"), scope)
-      normalizer.build_tables(scope, [players, teams], settings.fetch('prior_season_year'))
+      normalizer.build_tables(scope, [players, teams], settings)
     end
 
     public_class_method def self.index_rows(players, teams, scope)
@@ -33,11 +33,16 @@ module Departures
       [players.group_by(&key), teams.index_by(&key)]
     end
 
-    public_class_method def self.build_tables(scope, grouped, season)
+    public_class_method def self.build_tables(scope, grouped, settings)
       players, teams = grouped
       (players.keys | teams.keys).index_with do |team_id|
-        CbbdTeamScope.new(team: teams[team_id], players: players.fetch(team_id, []), scope:, season:).call
+        CbbdTeamScope.new(team: teams[team_id], players: players.fetch(team_id, []), scope:, settings:).call
       end
+    end
+
+    public_class_method def self.warnings(production)
+      scopes = production.flat_map { |table| table.fetch('scope_rows').values.compact }
+      scopes.flat_map { |scope| scope.fetch('production_warnings', []) }
     end
 
     public_class_method def self.team_id(row)
@@ -51,11 +56,16 @@ module Departures
 
     def combine(team_id, scopes)
       CbbdTeamProduction.new(team_id:, entries: scopes.transform_values { |tables| tables[team_id] },
-                             absent_scopes: absent_scopes(team_id), evidence: settings.fetch('scope_evidence')).call
+                             absent_scopes: absent_scopes(team_id), evidence: settings.fetch('scope_evidence'),
+                             optional_player_scopes: optional_player_scopes(team_id)).call
+    end
+
+    def optional_player_scopes(team_id)
+      CbbdDataset.optional_postseason_players?(settings) ? absent_scopes(team_id) : []
     end
 
     def absent_scopes(team_id)
-      return [] unless settings.fetch('absent_postseason_team_ids', []).include?(team_id)
+      return [] unless CbbdDataset.automatic?(settings) || settings.fetch('absent_postseason_team_ids', []).include?(team_id)
       return [] unless parsed.values_at('player-postseason', 'team-postseason').all? { |source| source['failure'].blank? }
 
       ['postseason']

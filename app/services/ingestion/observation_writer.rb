@@ -23,7 +23,8 @@ module Ingestion
 
     def identical?
       return false unless game.persisted? && changes.empty?
-      return false if observation.final? && !game.final?
+
+      return false if observation.final? && game.status != (resolution.untracked? ? 'final_unmatched' : 'final')
 
       GameObservation::SIDES.all? { |label| identical_side?(label) }
     end
@@ -31,7 +32,7 @@ module Ingestion
     def call
       game.update!(attributes)
       GameObservation::SIDES.each_with_index { |label, index| write_side(label, index) }
-      finalize if observation.strict_final?
+      finalize if observation.strict_final? || (resolution.untracked? && observation.final?)
       game
     end
 
@@ -46,16 +47,20 @@ module Ingestion
 
     def finalize
       GameObservation::SIDES.each { |label| game.association(:"#{label}_team_game").reset }
+      return ObservationUntrackedResult.new(observation, game).call if resolution.untracked?
+
       game.finalize
     end
 
     def identical_side?(label)
       side = game.public_send("#{label}_team_game")
+      return side.blank? unless resolution.memberships[GameObservation::SIDES.index(label)]
+
       side && raw_stats(label).all? { |key, value| side.public_send(key) == value }
     end
 
     def raw_stats(label)
-      observation.strict_final? ? data[label][:stats] : {}
+      observation.strict_final? || (resolution.untracked? && observation.final?) ? data[label][:stats] : {}
     end
 
     def start_time
@@ -92,6 +97,8 @@ module Ingestion
 
     def write_side(label, index)
       membership, opponent = resolution.memberships.values_at(index, 1 - index)
+      return unless membership
+
       side = TeamGame.find_or_initialize_by(game:, home: label == :home)
       attrs = { team: membership.team, team_season: membership, opponent_team_season: opponent }
       side.update!(attrs.merge(raw_stats(label)))

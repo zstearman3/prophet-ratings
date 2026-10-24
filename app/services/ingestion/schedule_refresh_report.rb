@@ -4,7 +4,7 @@ module Ingestion
   # Deliberately excludes raw payloads, source errors, URLs, paths and credentials.
   class ScheduleRefreshReport
     REASONS = %w[missing_stable_game_identity_projection canonical_values_unchanged unknown_source_freshness
-                 unmatched_team ambiguous_team invalid_source_identity possible_reschedule date_rolled_back
+                 unmatched_team ambiguous_team invalid_source_identity possible_reschedule date_rolled_back game_rolled_back
                  multiple_or_cross_season_candidates ambiguous_stored_participant ambiguous_participant unmatched_participant
                  participant_or_orientation_conflict invalid_season_context missing_stable_game_identity missing_team_season
                  unmapped_external_team_identity schedule_projection_requires_pending_game missing_schedule_document_url
@@ -38,7 +38,7 @@ module Ingestion
       return value if FLAGS.include?(key) && [true, false].include?(value)
       return number(value) if NUMBERS.include?(key)
       return identifier(value) if IDS.include?(key)
-      return safe_text(key, value) if %w[date error outcome reason].include?(key)
+      return safe_text(key, value) if %w[date error outcome reason status].include?(key)
 
       nested(key, value)
     end
@@ -72,7 +72,7 @@ module Ingestion
     end
 
     def self.safe_text(key, value)
-      { 'date' => date(value),
+      { 'date' => date(value), 'status' => %w[skipped completed failed].include?(value) ? value : nil,
         'error' => value && 'Source acquisition or reconciliation failed; inspect private evidence and identity review.',
         'outcome' => OUTCOMES.include?(value) ? value : nil, 'reason' => reason(value) }[key]
     end
@@ -98,7 +98,7 @@ module Ingestion
     end
 
     def self.counts(value)
-      value.slice(*(NUMBERS + OUTCOMES + %w[complete missing invalid not_final unknown])).select do |_key, entry|
+      value.slice(*(NUMBERS + OUTCOMES + %w[complete missing invalid not_final not_applicable unknown])).select do |_key, entry|
         entry.is_a?(Integer) || [true, false].include?(entry)
       end
     end

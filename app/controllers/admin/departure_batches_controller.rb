@@ -5,7 +5,7 @@ module Admin
   class DepartureBatchesController < ApplicationController
     before_action :authenticate_user!
     before_action :require_admin
-    before_action :load_batch, except: %i[index create]
+    before_action(except: %i[index create]) { @batch = DepartureBatch.find(params.expect(:id)) }
     rescue_from ArgumentError, KeyError, ActiveRecord::RecordInvalid, Season::OperationInProgress, with: :review_error
 
     def index
@@ -17,13 +17,15 @@ module Admin
 
     def show
       page[:preparation] ||= Departures::BatchPreparation.new(batch).form_attributes
-      @page = page.merge(Departures::BatchPage.new(batch).call)
+      presenter = Departures::BatchPage.new(batch)
+      @page = page.merge(page.key?(:coverage_fields) ? presenter.legacy_review : presenter.call)
     end
 
     def create
       page[:season] = Season.find(params.expect(:season_id))
-      page[:preparation] = params.require(:preparation).to_unsafe_h
+      return create_capture if params[:capture]
 
+      page[:preparation] = params.require(:preparation).to_unsafe_h
       batch = Departures::BatchPreparation.create(page[:season], page[:preparation])
       redirect_to admin_departure_batch_path(batch), notice: I18n.t('admin.departure_batches.prepared')
     end
@@ -36,9 +38,20 @@ module Admin
     end
 
     def acquire
-      attempt = Departures::BatchPreparation.new(batch).acquire(params.permit(:close_interrupted).to_h)
+      preparation = if params[:capture_only] == '1' || Departures::CapturePreparation.capture_only?(batch.plan)
+                      Departures::CapturePreparation
+                    else
+                      Departures::BatchPreparation
+                    end
+      attempt = preparation.new(batch).acquire(params.permit(:close_interrupted).to_h)
       AcquireDepartureBatchJob.perform_later(attempt.id)
       redirect_to admin_departure_batch_path(batch), notice: I18n.t('admin.departure_batches.queued')
+    end
+
+    def coverage
+      page[:coverage_fields] = params.require(:coverage).to_unsafe_h
+      Departures::CoverageReview.new(batch).save(page[:coverage_fields], reviewer: current_user.email)
+      redirect_to admin_departure_batch_path(batch), notice: I18n.t('admin.departure_batches.coverage_saved')
     end
 
     def recover
@@ -47,7 +60,8 @@ module Admin
     end
 
     def publish
-      Departures::BatchReview.new(batch).publish(params.require(:review).to_unsafe_h, reviewer: current_user.email)
+      service, form_key = params[:draft_review] ? [Departures::DraftTeamReview, :draft_review] : [Departures::BatchReview, :review]
+      service.new(batch).publish(params.require(form_key).to_unsafe_h, reviewer: current_user.email)
       redirect_to admin_departure_batch_path(batch), notice: I18n.t('admin.departure_batches.published')
     end
 
@@ -72,10 +86,6 @@ module Admin
       head :not_found unless current_user.admin?
     end
 
-    def load_batch
-      @batch = DepartureBatch.find(params.expect(:id))
-    end
-
     def review_error(error)
       page[:error] = error.message
       return render plain: page[:error], status: :unprocessable_content unless batch || page[:season]
@@ -86,6 +96,13 @@ module Admin
 
     def page
       @page ||= { batches: [], error: nil }
+    end
+
+    def create_capture
+      page[:capture] = params.require(:capture).to_unsafe_h
+      batch = Departures::CapturePreparation.create(page[:season], page[:capture])
+      AcquireDepartureBatchJob.perform_later(batch.attempt.id)
+      redirect_to admin_departure_batch_path(batch), notice: I18n.t('admin.departure_batches.queued')
     end
 
     def update_preparation

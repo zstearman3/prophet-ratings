@@ -23,8 +23,8 @@ class PreseasonPublicationTeam
   attr_reader :entry, :row
 
   def capture_identity
-    prior = PreseasonPrior.find_by(team_season: row, ratings_config_version: @model)
-    { 'capture_id' => prior&.id, 'reuses_capture' => @mode == 'initialize' && prior.present? }
+    prior_id = PreseasonPrior.where(team_season: row, ratings_config_version: @model).pick(:id)
+    { 'capture_id' => prior_id, 'reuses_capture' => @mode == 'initialize' && prior_id.present? }
   end
 
   def inputs

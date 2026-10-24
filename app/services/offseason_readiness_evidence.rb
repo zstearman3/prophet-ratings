@@ -2,20 +2,21 @@
 
 # Stored state participating in this review, excluding review records themselves.
 class OffseasonReadinessEvidence
-  def initialize(season)
+  def initialize(season, reviewed_revisions: ProphetRatings::ReviewedInputRevisions.new)
     @season = season
     @model = season.selected_preseason_model
+    @reviewed_revisions = reviewed_revisions
   end
 
   def fingerprint(report)
     serializer = self.class
     evidence = { report:, season: season.attributes, teams: serializer.records(Team.all), aliases: serializer.records(TeamAlias.all),
                  memberships: serializer.records(TeamConference.all), ratings: rating_evidence, operational: operational_evidence }
-    Digest::SHA256.hexdigest(ProphetRatings::PreseasonRevision.canonical_json(evidence.as_json).to_json)
+    Departures::Contract.digest(evidence.as_json)
   end
 
   def operations
-    [PreseasonPublication, ScheduleRefreshRun, RecruitingBatch, DepartureBatch].filter_map do |type|
+    @operations ||= [PreseasonPublication, ScheduleRefreshRun, RecruitingBatch, DepartureBatch].filter_map do |type|
       OffseasonReadinessEvidence.latest_operation(type, season)
     end + departure_acquisition
   end
@@ -32,21 +33,22 @@ class OffseasonReadinessEvidence
   private
 
   public_class_method def self.latest_operation(type, season)
-    row = type.where(season:).order(:id).last
+    fields = %w[id status source_status error error_message failure_message reviewed_by reviewed_at updated_at] & type.column_names
+    row = type.where(season:).select(*fields).order(:id).last
     return unless row
 
-    row.attributes.slice('id', 'status', 'source_status', 'error', 'error_message', 'failure_message',
-                         'reviewed_by', 'reviewed_at', 'updated_at').merge('operation' => type.name)
+    row.attributes.merge('operation' => type.name)
   end
 
   attr_reader :season
 
   public_class_method def self.records(relation)
-    relation.order(:id).map(&:attributes)
+    PreseasonPublicationFreshness.row_hashes(relation)
   end
 
   def departure_acquisition
-    acquisition = DepartureAcquisition.where(departure_batch: DepartureBatch.where(season:)).order(:id).last
+    acquisition = DepartureAcquisition.where(departure_batch: DepartureBatch.where(season:))
+                                      .select(:id, :status, :failure, :updated_at).order(:id).last
     return [] unless acquisition
 
     [acquisition.attributes.slice('id', 'status', 'failure', 'updated_at').merge('operation' => 'DepartureAcquisition')]
@@ -77,8 +79,9 @@ class OffseasonReadinessEvidence
   end
 
   def read_current_inputs
-    calculator = ProphetRatings::PreseasonRatingsCalculator.new(season, ratings_config_version: @model)
-    season.rating_team_seasons.order(:team_id).map { |row| calculator.preview_inputs(row) }
+    calculator = ProphetRatings::PreseasonRatingsCalculator.new(season, ratings_config_version: @model,
+                                                                        reviewed_revisions: @reviewed_revisions)
+    season.rating_team_seasons.order(:team_id).map { |row| Departures::Contract.digest(calculator.preview_inputs(row).as_json) }
   end
 
   def coaching

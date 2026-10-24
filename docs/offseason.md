@@ -438,9 +438,11 @@ Sports Reference HTTP. Explicit `ALIGN_CONFERENCES=false` preserves the existing
 manual bootstrap/activation path after review; CSV/manual reconciliation is separate.
 
 Departure review is available from the season's **Review departure batches** link.
-Prepare the target memberships first, then save source configuration, queue captures,
-review all selections and explicitly publish saved decisions. Inspect the actual
-partial-coverage gaps rather than treating unknown as zero. See
+Prepare the target memberships first, then select **Fetch draft and college stats**.
+Years are derived from the target season. Confirm the displayed drafted players
+and their college teams, then publish. Production is calculated automatically;
+players without a matching prior-season team are skipped. Missing stats for a
+matched college remain visible and affect only that team's estimate. See
 [departures](departures.md#saved-admin-workflow) for recovery and correction steps.
 Model selection and rating initialization remain separate runbook operations.
 
@@ -451,7 +453,17 @@ season and an already-published model. The selection persists for that season;
 it does not activate the model or season and never erases recruiting/departure
 approvals. Changing models, including switching away and back, requires a fresh
 publication review. The dashboard certifies only a still-current successful review
-for that selection; legacy CLI outputs remain unverified by this workflow.
+for that selection using a conservative database dependency stamp saved after publication.
+Preseason progress checks never recalculate ratings or load raw input revisions. The stamp
+tracks current/previous season rows, all team identities and aliases, profile
+values/revision pointers, and applicable coaching facts/source seasons. Revisions and
+captures retain their immutable identities.
+Unrelated edits to those rows can require a fresh review. Older saved publications
+without a dependency stamp remain readable but show `needs_review`, as do legacy CLI
+outputs unverified by this workflow. Previously saved pending reviews may require a
+fresh preview after the compact evidence/report update; retain the old review for its
+audit history. Full-size memory verification covers new compact reviews, not execution
+of historical reviews containing duplicated raw source bodies.
 
 Choose **Initialize / safe repeat** to retain existing captures for that model.
 Choose **Revise reviewed inputs** explicitly when publishing corrections, using an
@@ -462,8 +474,15 @@ season's revision and live/capture coverage aligned for activation. A reused
 capture's operands remain
 visible; current evidence is checked separately for staleness even on safe repeats.
 The preview shows coverage, history fallbacks, live and proposed ratings/net/rank,
-changes, components, source facts and revision identities. Creating a review stores
-only its report, never ratings, captures or snapshots.
+changes, components, source facts and revision identities. **Create read-only rating
+preview** stores a request pinned to the model and selection generation, then queues
+`PreviewPreseasonJob`. The HTTP request performs no rating calculations. GoodJob
+builds and saves the compact report in the background; preview status is
+`preview_queued`, `preview_running`, `review`, or `preview_failed`. No Publish button
+appears until the review is ready. Creating a preview never writes ratings, captures
+or snapshots. Changing model selection while the request is queued fails that pinned
+request rather than silently adopting a new selection. Retry a failed/interrupted
+preview only after the old worker stops, or create a fresh preview after selection changes.
 
 Read every missing-evidence gap. Unknown recruiting/departure inputs are not
 verified zero. Where the model permits fallback, check the explicit acknowledgement
@@ -472,9 +491,16 @@ and season/model/input identity; it stays visible after publication. Coaching
 readiness and other hard validation failures cannot be acknowledged away.
 
 **Publish reviewed preseason ratings** queues a pinned review ID through GoodJob.
-Apply the migration and run the worker (`bin/dev` runs it locally). Refresh the
-review to see queued/running/published/failed status, error guidance, capture IDs,
-snapshot IDs and actual ranks. Queue and execution both recheck the proposal;
+Run the worker (`bin/dev` runs it locally); restart web and worker after updating this
+workflow. No new schema migration is required. The review shows
+queued/running/published/failed status and error guidance. Published results show
+named teams, saved ranks, net rating, offense, defense and pace from this publication’s
+snapshots, without loading their large provenance payloads. The original proposal
+and adjustment details remain expandable below the results; input-capture and
+snapshot IDs remain retained in the publication record. Active review pages poll a metadata-only endpoint every
+five seconds while visible, for at most ten minutes; manual refresh remains available.
+Scheduling checks the saved fingerprint, status, pinned model selection and required
+acknowledgement. The worker rechecks the full proposal before any writes;
 changed inputs, dates, roster, model selection or protected outputs require a fresh
 preview or the existing scoped recovery procedure. Rating writes and the success
 record commit together under the shared ratings, season and applicable coaching
@@ -482,8 +508,10 @@ locks. A competing operation returns a visible lock conflict; let it finish.
 
 If enqueue fails, the review reports failure and can be explicitly retried. If a
 request stops between recording queued state and creating its worker job, use
-**Requeue reviewed publication** on that queued review. It rechecks currentness and
-enqueues the same pinned ID while retaining the original acknowledgement/admin/time.
+**Requeue reviewed publication** on that queued review. It checks the pinned selection and
+enqueues the same ID while retaining the original acknowledgement/admin/time; the worker
+rechecks current evidence. Recovery after failed or interrupted publication also preserves
+that original acknowledgement.
 Repeated queued submissions may create duplicate jobs; their serialized execution
 preserves capture/snapshot IDs and never repeats a committed success. If a
 worker stops while status says running, first confirm the old worker has stopped,
@@ -499,15 +527,37 @@ regenerates forecasts.
 ## Bounded browser schedule refresh
 
 Admins use **Offseason setup → Refresh and review schedule** for the selected
-ending-year season. Apply migration `20261022010000` with `bin/migrate` and run the
-GoodJob worker. GET pages only read stored state. Choose explicit provider and
-strict inclusive `YYYY-MM-DD` Eastern dates, today or later within that season.
-Expired dates belong to the historical sync runbook; queued dates that age into
-the past fail before acquisition. No activation, ratings or predictions are queued.
+ending-year season. Apply migrations through `20261024010000` with `bin/migrate`
+and restart web and the GoodJob worker. GET pages only read stored state.
+Choose **Upcoming schedule** for today or later, or **Historical games** for dates
+through yesterday. Both require ordered inclusive Eastern dates inside the selected
+season. Completed seasons default to a historical import of the first week.
+Upcoming jobs that age into the past still fail before acquisition; create a
+historical import instead. No activation, ratings or predictions are queued.
+
+Historical imports use the same provider-scoped `GameSyncDate` checkpoints as
+`season:sync_games`. By default they skip completed dates; explicitly select
+**Reimport completed dates too** to rescan them (including after a production
+restore). Rescanning uses the existing reconciliation rules, not a forced overwrite
+of protected data. The saved mode/rescan choice is immutable and retained on
+retries. Each successful date's safe report and completion checkpoint commit with
+its imported games; interruption preserves completed progress. The results table
+distinguishes skipped dates, empty dates, imports and failures. A retry imports
+only the parent run's unfinished dates with a new explicit request budget.
+
+Historical CBBD imports retain valid games even if another game on the same date
+needs review. Each held game is rolled back independently and keeps its audit;
+the date remains incomplete, and its results show how many rows were committed.
+Unexpected database/runtime errors still roll back the date. Retrying an
+incomplete date recognizes the valid games already stored without duplicating them.
+Games against name-only opponents stay visible, with no fabricated opponent
+membership. Completed name-only games use `final_unmatched` and do not enter
+ratings calculations. Inconsistent supplied scoring totals remain held for review.
 
 A retained run records requester/time, provider, requested dates, fixed numeric
 limits, status and safe date/import/outcome evidence. Sports Reference permits
-three additional attempts per failed date (5/10/20 second waits). CBBD needs the
+three additional attempts for upcoming dates (5/10/20 second waits), or five for
+historical dates (5/10/20/40/80 seconds). CBBD needs the
 worker's `CBBD_API_KEY` and a private persistent writable `CBBD_CAPTURE_DIRECTORY`
 (see data ingestion), plus an explicit positive total request ceiling and 0–5
 retries. Environment limits can populate the form; saved limits never change with
@@ -519,6 +569,9 @@ the separate database-backed CBBD identity review acquisition screen.
 Reopen the retained report or use **Refresh status** after leaving the page.
 Queued is not acquired; succeeded, including recognized empty dates, establishes
 neither complete upstream publication nor reviewed/prediction-ready schedules.
+The report distinguishes CBBD retrieval failures from per-date reconciliation failures,
+shows rejected-game counts and scoped source matchup names, and links their retained
+observations without exposing raw source errors.
 Review outcome counts, failed/pending dates, source absence and possible moves via
 the existing game/edit and CBBD identity review links. Links preserve the target
 season. Source absence never deletes games. Reports exclude source error messages,
@@ -585,6 +638,19 @@ open or enter a bounded deferral reason; required checks cannot be deferred.
 Absent schedule leaves prediction readiness open/deferred and does not prevent
 otherwise valid season preparation. Follow the season-scoped repair links and
 return through that season's dashboard to readiness.
+
+Readiness projects operation summaries and hashes fingerprint-only database rows
+in PostgreSQL instead of copying retained source bodies into the web request.
+Captured inputs are checked one team at a time. Current-input checks share one
+request-local revision cache, which verifies each full revision before retaining
+only its compact operands and unchanged source identity. These checks run before
+departure replay so the largest source loads do not overlap. Departure readiness still replays and verifies its
+retained source evidence one source at a time, without retaining those source
+bodies or annual revisions in the request query cache. It compares the reconstructed dataset against the saved JSON in
+PostgreSQL, avoiding a second parsed copy in Ruby. Approval, pointer, provenance
+and stale-review checks remain enforced. Reviews saved with an older fingerprint
+format require a fresh review before activation. No rating formulas or published
+captures are changed.
 
 Save a review to retain the displayed report, reviewer/time, fingerprint,
 acknowledgement and deferral reasons. This changes no current/default flags.

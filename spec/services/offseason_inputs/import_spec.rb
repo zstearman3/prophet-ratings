@@ -44,6 +44,47 @@ RSpec.describe OffseasonInputs::Import do
                                                               'manual_adjustment').values).to all(be_nil)
   end
 
+  def loaded_revision_count(&)
+    count = 0
+    subscriber = lambda do |event|
+      count += event.payload.fetch(:record_count) if event.payload[:class_name] == 'OffseasonInputRevision'
+    end
+    ActiveSupport::Notifications.subscribed(subscriber, 'instantiation.active_record', &)
+    count
+  end
+
+  it 'shares the published evidence across teams instead of loading a full revision per profile' do
+    create_list(:team_season, 6, season:)
+
+    expect(loaded_revision_count { apply }).to eq(0)
+    expect(TeamOffseasonProfile.where(recruiting_revision: OffseasonInputRevision.last).count).to eq(8)
+  end
+
+  it 'loads existing departure evidence once when publishing a recruiting successor' do
+    create_list(:team_season, 6, season:)
+    apply
+    original = OffseasonInputRevision.last
+    review = { 'decision' => 'approved', 'reviewed_by' => 'Reviewer', 'reviewed_at' => '2026-10-13T12:00:00Z' }
+    evidence = { 'kind' => 'departures', 'dataset_hash' => 'a' * 64, 'review' => review,
+                 'review_hash' => Departures::Contract.digest(review),
+                 'team_inputs' => season.team_seasons.to_h { |membership| [membership.team_id.to_s, {}] } }
+    departure = OffseasonInputRevision.create!(season:, kind: 'departures', version: 'departures-1', reason: 'Reviewed evidence',
+                                               dataset_hash: evidence.fetch('dataset_hash'), review_hash: evidence.fetch('review_hash'),
+                                               input_hash: Departures::Contract.digest(evidence), payload: evidence)
+    TeamOffseasonProfile.find_each { |profile| profile.update!(departure_revision: departure) }
+    batch.update!(reviewed_at: '2026-10-14T12:00:00Z')
+    changed = Recruiting::DatabaseBundle.new(batch, season).call
+    successor = publication.merge(version: 'reviewed-2', input_hash: Departures::Contract.digest(changed),
+                                  predecessor_id: original.id, reason: 'Second evidence approval')
+    next_importer = described_class.new(season:, kind: 'recruiting', paths:, publication: successor)
+    preview_key = next_importer.preview.fetch('preview_key')
+
+    # Predecessor lookups and the two shared associations stay bounded as teams increase.
+    expect(loaded_revision_count { next_importer.call(preview_key:) }).to be <= 4
+    expect(TeamOffseasonProfile.distinct.pluck(:departure_revision_id)).to eq([departure.id])
+    expect(TeamOffseasonProfile.distinct.pluck(:recruiting_revision_id)).to eq([OffseasonInputRevision.last.id])
+  end
+
   it 'distinguishes reviewed explicit zero from unknown missing points' do
     document['rows'].first['class_points'] = 0
     expect(payload.dig('team_inputs', membership.team_id.to_s, 'status')).to eq('verified_zero')
