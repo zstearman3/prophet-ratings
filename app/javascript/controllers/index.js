@@ -18,3 +18,6 @@ application.register("betting-sort", BettingSortController)
 
 import ForecastProvenanceController from "./forecast_provenance_controller"
 application.register("forecast-provenance", ForecastProvenanceController)
+
+import PreseasonProgressController from "./preseason_progress_controller"
+application.register("preseason-progress", PreseasonProgressController)

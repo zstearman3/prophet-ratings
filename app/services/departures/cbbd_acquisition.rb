@@ -6,9 +6,13 @@ module Departures
     def initialize(plan:, directory:, **options)
       @directory = directory
       @checkpoint = options.delete(:checkpoint) || ->(_) {}
-      @manifest = plan.merge('sources' => CbbdDataset.sources(plan).map { |source| source.merge('failure' => 'Not acquired') },
-                             'captures' => [])
+      @manifest = self.class.initial_manifest(plan)
       @client = client_for(options)
+    end
+
+    def self.initial_manifest(plan)
+      CapturePreparation.validate_acquisition_plan(plan)
+      plan.merge('sources' => CbbdDataset.sources(plan).map { |source| source.merge('failure' => 'Not acquired') }, 'captures' => [])
     end
 
     def call
@@ -37,7 +41,6 @@ module Departures
 
     def client_for(options)
       plan = manifest
-      CbbdDataset.validate_plan(plan)
       key = options.delete(:api_key) { ENV.fetch('CBBD_API_KEY', '') }
       Ingestion::Cbbd::Client.new(store: self, api_key: key, max_requests: plan.fetch('max_requests'),
                                   retries: plan.fetch('retries'), **options)

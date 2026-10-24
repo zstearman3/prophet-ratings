@@ -1,0 +1,80 @@
+<% review = @page[:draft_team_review]; attempt = @page[:attempt]; editable = @batch.status == 'draft' %>
+<section class="mx-auto max-w-6xl space-y-6 pb-12">
+  <header class="space-y-3">
+    <h1 class="text-3xl font-bold">Departure batch #<%= @batch.id %> · Target <%= @batch.season.year %></h1>
+    <p><%= link_to 'Back to offseason setup', admin_offseason_setup_path(season_id: @batch.season_id), class: 'text-blue-700 underline' %> · <%= link_to 'All departure batches', admin_departure_batches_path(season_id: @batch.season_id), class: 'text-blue-700 underline' %> · <%= link_to 'Refresh status', admin_departure_batch_path(@batch), class: 'text-blue-700 underline' %></p>
+    <% if notice %><p role="status" class="rounded bg-green-100 p-3"><%= notice %></p><% end %>
+    <% if @page[:error] %><p role="alert" class="rounded bg-red-100 p-3"><%= @page[:error] %></p><% end %>
+    <p><%= @batch.season.year - 1 %> NBA draft · college season ending <%= @batch.season.year - 1 %></p>
+    <% if @batch.predecessor_id %><p>Correction of <%= link_to "batch ##{@batch.predecessor_id}", admin_departure_batch_path(@batch.predecessor_id), class: 'text-blue-700 underline' %>: <%= @batch.correction_reason %></p><% end %>
+  </header>
+  <% if @batch.status == 'published' %>
+    <p class="rounded bg-green-100 p-4 font-medium">Published inputs · revision #<%= @batch.revision_id %>. These inputs will be used by the preseason ratings calculation.</p>
+  <% elsif attempt&.status.in?(%w[queued running]) %>
+    <div class="rounded border p-5 space-y-2"><h2 class="text-xl font-semibold"><%= departure_stage(@batch, attempt) %></h2><p>Fetching draft results and college stats. Refresh status to check progress.</p></div>
+  <% elsif attempt&.failure.present? %>
+    <div role="alert" class="rounded bg-red-100 p-4"><h2 class="font-semibold">Fetch failed</h2><p><%= attempt.failure %></p></div>
+  <% end %>
+  <% review.fetch('errors', []).each do |error| %><p role="alert" class="rounded bg-red-100 p-4"><%= error %></p><% end %>
+  <% if review.fetch('players', []).any? %>
+    <section data-draft-team-review class="rounded border p-5 space-y-4" aria-labelledby="draft-team-heading">
+      <h2 id="draft-team-heading" class="text-2xl font-semibold">Confirm draft results and college teams</h2>
+      <p>Review who was drafted and the college teams they played for. Points are calculated from CBBD automatically. Players without a matching prior-season team are skipped.</p>
+      <p class="text-sm"><%= link_to 'Correct a college team mapping', admin_cbbd_review_runs_path(season_id: @batch.season_id), class: 'text-blue-700 underline' %>, then return and refresh this review.</p>
+      <div class="overflow-x-auto rounded border"><table class="w-full text-left text-sm">
+        <thead class="bg-gray-100"><tr><th class="p-3">Pick</th><th class="p-3">Drafted player</th><th class="p-3">College team</th><th class="p-3">Player points</th><th class="p-3">Result</th></tr></thead>
+        <tbody class="divide-y">
+          <% review.fetch('players').each do |player| %>
+            <% colleges = player.fetch('college_teams'); colleges = [{}] if colleges.empty? %>
+            <% colleges.each do |college| %>
+              <% result = college.presence || player %>
+              <tr data-draft-status="<%= result['status'] %>">
+                <td class="p-3 align-top"><%= player['overall_pick'] %></td>
+                <td class="p-3 align-top"><strong><%= player['player_name_source'] %></strong><% if player['match_method'] == 'exact_name_within_college' %><p class="mt-1 text-xs text-gray-600">Matched by name within the college</p><% end %></td>
+                <td class="p-3 align-top"><%= college['team_name'].presence || college['team_name_source'].presence || player['affiliation_source'].presence || 'No matched college' %></td>
+                <td class="p-3 align-top"><%= college['player_points'].nil? ? '—' : college['player_points'] %></td>
+                <td class="p-3 align-top"><span class="font-medium"><%= departure_player_status(result) %></span><p class="mt-1 max-w-xs text-xs text-gray-600"><%= result['reason'] %></p></td>
+              </tr>
+            <% end %>
+          <% end %>
+        </tbody>
+      </table></div>
+    </section>
+    <% impacts = review.fetch('teams', []).select { |row| row['known_points_subtotal'].to_i.positive? || row['loss_share'].nil? } %>
+    <section class="rounded border p-5 space-y-3">
+      <h2 class="text-xl font-semibold">Calculated lost production</h2>
+      <p>Drafted players' points divided by their team's reported season total. Publishing saves these inputs; it does not run ratings.</p>
+      <% if impacts.any? %>
+        <div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead class="bg-gray-100"><tr><th class="p-3">Team</th><th class="p-3">Drafted-player points</th><th class="p-3">Team points</th><th class="p-3">Share lost</th></tr></thead><tbody class="divide-y">
+          <% impacts.each do |row| %><tr><td class="p-3"><%= @page[:teams_by_id].fetch(row['team_id']).school %></td><td class="p-3"><%= row['known_points_subtotal'] %></td><td class="p-3"><%= row['team_points'] || '—' %></td><td class="p-3"><%= row['loss_share'].nil? ? 'Unknown — missing stats' : number_to_percentage(row['loss_share'] * 100, precision: 1) %></td></tr><% end %>
+        </tbody></table></div>
+      <% else %><p>No calculated lost points for the matched teams.</p><% end %>
+      <%= render 'production_warnings', warnings: review.fetch('production_warnings', []) %>
+    </section>
+    <% if editable && review.fetch('errors', []).empty? %>
+      <%= form_with url: publish_admin_departure_batch_path(@batch), scope: :draft_review, method: :patch, data: { turbo: false }, class: 'rounded border p-5 space-y-4' do |form| %>
+        <%= form.hidden_field :review_key, value: review.fetch('review_key') %>
+        <label class="flex items-start gap-2"><%= form.check_box :confirm, { required: true, class: 'mt-1 rounded border' } %><span>I confirm these draft results and college team matches.</span></label>
+        <%= form.submit 'Publish departure inputs', class: 'rounded bg-prophet-indigo px-4 py-2 font-medium text-white hover:bg-prophet-indigo/80' %>
+      <% end %>
+    <% end %>
+  <% end %>
+  <% if editable %>
+    <details class="rounded border p-4"><summary class="cursor-pointer font-medium">Fetch recovery</summary><div class="mt-4 space-y-3">
+      <% if attempt&.status == 'running' %>
+        <%= form_with url: acquire_admin_departure_batch_path(@batch), method: :post, data: { turbo: false }, class: 'space-y-3' do |form| %>
+          <%= form.hidden_field :capture_only, value: '1' %><p>Use this only after verifying that the worker was interrupted.</p>
+          <%= form.check_box :close_interrupted, { required: true }, '1', '0' %><%= form.label :close_interrupted, 'I verified that this acquisition was interrupted' %>
+          <%= form.submit 'Close interrupted attempt and retry', class: 'rounded border px-4 py-2' %>
+        <% end %>
+      <% elsif !attempt&.status.in?(%w[queued running]) %>
+        <%= button_to 'Fetch sources again', acquire_admin_departure_batch_path(@batch), params: { capture_only: '1' }, class: 'rounded border px-4 py-2 font-medium hover:bg-gray-100' %>
+        <p class="text-sm text-gray-600">Fetch again only to get updated CBBD data. Your saved responses can already be reviewed without another request.</p>
+      <% end %>
+    </div></details>
+  <% end %>
+  <%= render 'evidence' %>
+  <% unless editable %>
+    <%= form_with url: correct_admin_departure_batch_path(@batch), method: :post, data: { turbo: false }, class: 'rounded border p-4 space-y-3' do |form| %><%= form.label :reason, 'Correction reason' %><%= form.text_field :reason, required: true, class: 'block w-full rounded border p-2' %><%= form.submit 'Start correction with retained evidence', class: 'rounded bg-prophet-indigo px-4 py-2 text-white' %><% end %>
+  <% end %>
+</section>

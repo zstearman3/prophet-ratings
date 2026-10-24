@@ -2,10 +2,11 @@
 
 module ProphetRatings
   class PreseasonInitializer
-    def initialize(season, ratings_config_version: nil)
+    def initialize(season, ratings_config_version: nil, reviewed_revisions: ReviewedInputRevisions.new)
       @ratings_config_version = RatingsConfigVersion.resolve(ratings_config_version)
       @config = @ratings_config_version.settings
       @season = season
+      @reviewed_revisions = reviewed_revisions
     end
 
     def call
@@ -25,15 +26,16 @@ module ProphetRatings
     end
 
     def captured_report
-      calculator = PreseasonRatingsCalculator.new(@season, ratings_config_version: @ratings_config_version)
+      calculator = PreseasonRatingsCalculator.new(@season, ratings_config_version: @ratings_config_version,
+                                                           reviewed_revisions: @reviewed_revisions)
       teams = @season.rating_team_seasons.order(:team_id).map { |row| reported_team(row, calculator) }
       { season_id: @season.id, model_version: @ratings_config_version.name, teams: }
     end
 
     def reported_team(row, calculator)
-      prior = PreseasonPrior.find_by(team_season: row, ratings_config_version: @ratings_config_version)
-      inputs = prior ? prior.inputs : calculator.preview_inputs(row).as_json
-      PreseasonReportBuilder.new(row, inputs, @ratings_config_version.config, prior: row.preseason_prior).call
+      prior = PreseasonPrior.uncached { PreseasonPrior.find_by(team_season: row, ratings_config_version: @ratings_config_version) }
+      inputs = prior ? ReviewedInputRevisions.compact_inputs(prior.inputs) : calculator.preview_inputs(row).as_json
+      PreseasonReportBuilder.new(row, inputs, @ratings_config_version.config, prior: PreseasonReportBuilder.prior_for_report(row)).call
     end
 
     private :captured_report, :reported_team
@@ -62,7 +64,7 @@ module ProphetRatings
 
     private
 
-    attr_reader :season, :ratings_config_version
+    attr_reader :season, :ratings_config_version, :reviewed_revisions
 
     def validate_publication
       publication_date = @season.start_date - 1.day
@@ -130,7 +132,8 @@ module ProphetRatings
     end
 
     def initialize_ratings
-      ProphetRatings::PreseasonRatingsCalculator.new(@season, ratings_config_version: @ratings_config_version).call
+      ProphetRatings::PreseasonRatingsCalculator.new(@season, ratings_config_version: @ratings_config_version,
+                                                              reviewed_revisions: @reviewed_revisions).call
 
       @season.rating_team_seasons.find_each do |team_season|
         team_season.update!(reset_attributes(team_season).merge(self.class.prior_ratings(team_season)))

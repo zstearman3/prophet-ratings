@@ -47,7 +47,8 @@ module Ingestion
     def participant_match?(candidate)
       values = candidate.attributes.values_at('home_team_name', 'away_team_name')
       ids = TeamGame.where(game: candidate).pluck(:team_id).sort
-      ids == @resolution.teams.map(&:id).sort || values == @resolution.incoming_names || projection_alias_match?(values)
+      matched_ids = @resolution.memberships.all? && ids == @resolution.teams.map(&:id).sort
+      matched_ids || values == @resolution.incoming_names || projection_alias_match?(values)
     end
   end
 end

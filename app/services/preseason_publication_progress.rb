@@ -5,7 +5,8 @@ class PreseasonPublicationProgress
   def initialize(season)
     @season = season
     @model = season.selected_preseason_model
-    @publication = season.preseason_publications.where(ratings_config_version: @model).order(id: :desc).first if @model
+    scope = season.preseason_publications.where(ratings_config_version: @model)
+    @publication = PreseasonPublicationPage.summary(scope).order(id: :desc).first if @model
   end
 
   def call
@@ -27,7 +28,8 @@ class PreseasonPublicationProgress
   end
 
   def published_status
-    publication.result['fingerprint'] == publication.current_report['fingerprint'] ? 'complete' : 'needs_review'
+    saved = publication.result['freshness']
+    saved.present? && saved == PreseasonPublicationFreshness.new(season, ratings_config_version: model).call ? 'complete' : 'needs_review'
   rescue ArgumentError, ActiveRecord::RecordInvalid
     'needs_review'
   end

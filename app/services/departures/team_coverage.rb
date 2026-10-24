@@ -36,7 +36,8 @@ module Departures
 
     def known?
       complete && rows.none? do |row|
-        Contract::RESOLVED.exclude?(row.fetch('status')) && row.fetch('candidate_team_ids', []).include?(team_id)
+        row.fetch('unknown_team_ids', []).include?(team_id) ||
+          (Contract::RESOLVED.exclude?(row.fetch('status')) && row.fetch('candidate_team_ids', []).include?(team_id))
       end
     end
 

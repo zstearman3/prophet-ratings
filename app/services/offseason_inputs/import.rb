@@ -3,7 +3,7 @@
 module OffseasonInputs
   # Explicit, preview-bound publication of evidence only. No ratings or forecasts are touched.
   class Import
-    POINTERS = { 'recruiting' => 'recruiting_revision_id', 'departures' => 'departure_revision_id' }.freeze
+    REVISION_ASSOCIATIONS = { 'recruiting' => :recruiting_revision, 'departures' => :departure_revision }.freeze
 
     def initialize(season:, kind:, paths:, publication:)
       @season = season
@@ -39,9 +39,9 @@ module OffseasonInputs
         'profile' => membership.team_offseason_profile&.attributes }
     end
 
-    def self.update_profile(membership, pointer, revision)
+    def self.update_profile(membership, association, revision)
       profile = membership.team_offseason_profile || membership.build_team_offseason_profile
-      profile.update!(pointer => revision.id)
+      profile.update!(association => revision)
     end
 
     private
@@ -115,8 +115,10 @@ module OffseasonInputs
 
     def link_profiles(revision)
       writer = self.class
-      pointer = POINTERS.fetch(@kind)
-      @season.team_seasons.order(:team_id).each { |membership| writer.update_profile(membership, pointer, revision) }
+      association = REVISION_ASSOCIATIONS.fetch(@kind)
+      # Validation reads retained payloads; share them instead of deserializing a copy per team.
+      memberships = @season.team_seasons.includes(team_offseason_profile: REVISION_ASSOCIATIONS.values).order(:team_id)
+      memberships.each { |membership| writer.update_profile(membership, association, revision) }
     end
 
     def create_revision(payload, input_hash)

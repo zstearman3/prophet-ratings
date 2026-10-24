@@ -6,19 +6,31 @@ require 'tmpdir'
 module Departures
   # Replays private database bytes through the unchanged file contracts in a temporary directory.
   class RetainedEvidence
-    def initialize(attempt)
+    def initialize(attempt, comparison: :memory)
       @attempt = attempt
+      @comparison = comparison
     end
 
     def dataset
       materialize { |directory| AnnualDataset.new(manifest: attempt.manifest, directory:).call }
     end
 
+    def captured_sources
+      materialize { |directory| CapturedSources.new(attempt, directory).call }
+    end
+
+    def acquisition_result
+      return reviewed_result unless CapturePreparation.capture_only?(attempt.plan)
+
+      complete = captured_sources.none? { |source| source['failure'] }
+      { dataset: {}, status: complete ? 'completed' : 'incomplete' }
+    end
+
     def verified_dataset(plan)
-      saved = retained_dataset
+      matches = dataset_comparison
       Contract.check!(attempt.plan == plan, 'Preparation changed; request a new acquisition')
       replay = dataset
-      Contract.check!(replay == saved, 'Retained departure dataset differs from replay')
+      Contract.check!(matches.call(replay), 'Retained departure dataset differs from replay')
       replay
     end
 
@@ -51,9 +63,12 @@ module Departures
 
     def bytes(source_id)
       source = source(source_id)
-      original = Base64.strict_decode64(attempt.evidence.fetch(source_id).fetch('snapshot_base64'))
-      self.class.validate_bytes(source, original)
-      original
+      encoded = if @comparison == :persisted
+                  RetainedEvidence.persisted_source(attempt.id, source_id)
+                else
+                  attempt.evidence.fetch(source_id).fetch('snapshot_base64')
+                end
+      self.class.validate_bytes(source, Base64.strict_decode64(encoded))
     end
 
     def self.sources(manifest)
@@ -64,6 +79,7 @@ module Departures
       sha = source.fetch('snapshot_sha256')
       OffseasonInputs::DepartureBundle.validate_location(source.fetch('snapshot_location'), sha)
       Contract.check!(Digest::SHA256.hexdigest(original) == sha, 'Retained source hash mismatch')
+      original
     end
 
     def source(id)
@@ -76,10 +92,34 @@ module Departures
 
     attr_reader :attempt
 
-    def retained_dataset
+    def reviewed_result
+      facts = dataset
+      { dataset: facts, status: BatchAcquisition.result_status(facts) }
+    end
+
+    def dataset_comparison
+      return self.class.persisted_comparison(attempt) if @comparison == :persisted
+
       saved = attempt.dataset
       Contract.check!(attempt.terminal? && saved.present?, 'Acquire usable evidence before reviewing decisions')
-      saved
+      ->(replay) { replay == saved }
+    end
+
+    # Readiness uses a fresh persisted acquisition. Keep its saved JSON in PostgreSQL while fully replaying the raw sources.
+    public_class_method def self.persisted_comparison(attempt)
+      scope = DepartureAcquisition.where(id: attempt.id)
+      Contract.check!(attempt.persisted? && attempt.terminal? &&
+                      scope.where("jsonb_typeof(dataset) = 'object'").where.not(dataset: {}).exists?,
+                      'Acquire usable evidence before reviewing decisions')
+      ->(replay) { DepartureAcquisition.uncached { scope.exists?(dataset: replay) } }
+    end
+
+    public_class_method def self.persisted_source(attempt_id, source_id)
+      encoded = DepartureAcquisition.uncached do
+        DepartureAcquisition.where(id: attempt_id).pick(Arel.sql("jsonb_extract_path_text(evidence, ?, 'snapshot_base64')", source_id))
+      end
+      Contract.check!(encoded.is_a?(String), 'Missing retained source bytes')
+      encoded
     end
 
     def materialize

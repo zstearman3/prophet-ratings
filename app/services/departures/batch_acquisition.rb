@@ -31,8 +31,7 @@ module Departures
     def finish
       attempt.with_lock do
         require_running
-        dataset = RetainedEvidence.new(attempt).dataset
-        attempt.update!(dataset:, status: self.class.result_status(dataset), finished_at: Time.current)
+        attempt.update!(**RetainedEvidence.new(attempt).acquisition_result, finished_at: Time.current)
       end
     end
 

@@ -25,8 +25,8 @@ class SeasonMembershipAdminAction
     case attributes['operation']
     when 'refresh', 'refresh_previous'
       refresh(attributes)
-    when 'map_conferences'
-      map_conferences(attributes)
+    when 'map_conferences', 'map_cbbd_identities'
+      map_identities(attributes)
     when 'save_school'
       save_school(attributes)
     when 'approve', 'correct_memberships'
@@ -42,9 +42,15 @@ class SeasonMembershipAdminAction
     nil
   end
 
-  def map_conferences(attributes)
-    SeasonConferenceMapping.new(season).call(attributes.fetch('mapping', {}))
-    'mapped'
+  def map_identities(attributes)
+    mapping = attributes.fetch('mapping', {})
+    if attributes['operation'] == 'map_cbbd_identities'
+      SeasonCbbdIdentityMapping.new(season).call(mapping)
+      'identities_mapped'
+    else
+      SeasonConferenceMapping.new(season).call(mapping)
+      'mapped'
+    end
   end
 
   def save_school(attributes)

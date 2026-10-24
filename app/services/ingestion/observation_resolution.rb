@@ -28,6 +28,10 @@ module Ingestion
       self
     end
 
+    def untracked?
+      memberships.any?(&:nil?)
+    end
+
     def game
       source_identity&.game || ObservationGameLookup.new(self).call
     end
@@ -40,7 +44,7 @@ module Ingestion
     end
 
     def lock_keys
-      ["game-bootstrap:#{season.id}:#{data[:schedule_date]}:#{teams.map(&:id).sort.join(':')}",
+      ["game-bootstrap:#{season.id}:#{data[:schedule_date]}:#{teams.compact.map(&:id).sort.join(':')}",
        "game-source:#{data[:provider]}:#{data[:external_game_id]}"]
     end
 
@@ -60,20 +64,23 @@ module Ingestion
     def validate_game(game)
       hold('conflict', 'game_season_conflict') unless game.season_id == season.id
       hold('superseded', 'superseded_game_identity') if source_identity&.reload&.superseded?
-      GameObservation::SIDES.zip(teams).each { |label, team| self.class.validate_side(game, label, team) }
+      GameObservation::SIDES.each_with_index do |label, index|
+        ObservationParticipantIdentity.new(self, game, label).validate
+        self.class.validate_side(game, label, teams[index]&.id)
+      end
     end
 
-    def self.validate_side(game, label, team)
+    def self.validate_side(game, label, team_id)
       current = game.public_send("#{label}_team_game")
-      return validate_stored_name(game.public_send("#{label}_team_name"), team) unless current
+      return validate_stored_name(game.public_send("#{label}_team_name"), team_id) unless current
 
-      raise Held.new('conflict', 'participant_or_orientation_conflict') if current.team_id != team.id
+      raise Held.new('conflict', 'participant_or_orientation_conflict') if current.team_id != team_id
     end
 
-    def self.validate_stored_name(name, team)
+    def self.validate_stored_name(name, team_id)
       candidates = Team.matching_school_or_alias(name).to_a
       raise Held.new('ambiguous', 'ambiguous_stored_participant', participants: [name]) if candidates.size > 1
-      return if candidates.empty? || candidates.first.id == team.id
+      return if candidates.empty? || candidates.map(&:id).include?(team_id)
 
       raise Held.new('conflict', 'participant_or_orientation_conflict')
     end
@@ -97,30 +104,15 @@ module Ingestion
     end
 
     def resolve_participants
-      @teams = GameObservation::SIDES.map { |label| resolve_team(data.fetch(label)) }
+      @teams = GameObservation::SIDES.map { |label| ObservationTeamResolution.new(self, data.fetch(label)).call }
       hold('conflict', 'participants_must_differ') if teams.first == teams.last
-      @memberships = teams.map { |team| TeamSeason.find_by(team:, season:) }
-    end
-
-    def resolve_team(side)
-      name = side[:name]
-      candidates = Team.matching_school_or_alias(name).to_a
-      external_id = side[:external_team_id]
-      return mapped_team(external_id, candidates, name) if external_id
-
-      self.class.unique_team(candidates, name)
+      @memberships = teams.map { |team| TeamSeason.find_by(team:, season:) if team }
     end
 
     def validate_memberships
-      hold('unmatched', 'missing_team_season') if memberships.any?(&:nil?)
-    end
+      return if memberships.all? || (data[:provider] == 'cbbd' && memberships.any?)
 
-    def mapped_team(external_id, candidates, name)
-      team = TeamExternalIdentity.find_by(provider: data[:provider], external_id:)&.team
-      raise Held.new('unmatched', 'unmapped_external_team_identity', participants: [name]) unless team
-
-      hold('conflict', 'participant_label_identity_conflict') if candidates.any? { |candidate| candidate != team }
-      team
+      hold('unmatched', 'missing_team_season')
     end
 
     def hold(outcome, reason)

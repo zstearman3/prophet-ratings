@@ -57,8 +57,14 @@ module Admin
       @review_error = message
       return render plain: message, status: :unprocessable_content unless batch
 
-      show unless action_name == 'show'
+      reload_review
       render :show, status: :unprocessable_content
+    end
+
+    def reload_review
+      # Rolled-back approval attributes must not enter the retry form's review key.
+      batch.reload
+      show unless action_name == 'show'
     end
   end
 end

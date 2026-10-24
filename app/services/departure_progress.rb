@@ -2,9 +2,11 @@
 
 # Approval and the latest attempt remain separate, including failures after publication.
 class DepartureProgress
+  REVIEW_PAYLOAD_SQL = "jsonb_build_object('team_inputs', payload->'team_inputs', 'report', payload->'report') AS payload"
+
   def initialize(season)
     @season = season
-    @revision = OffseasonInputRevision.where(season:, kind: 'departures').order(:id).last
+    @revision = OffseasonInputRevision.where(season:, kind: 'departures').select(:id, Arel.sql(REVIEW_PAYLOAD_SQL)).order(:id).last
     @batch = DepartureBatch.where(season:).order(:id).last
   end
 
@@ -25,7 +27,8 @@ class DepartureProgress
   def batch_summary
     return 'No departure preparation is stored.' unless batch
 
-    "Latest departure batch ##{batch.id}: #{batch.status}; acquisition #{batch.attempt&.status || 'not requested'}."
+    acquisition_status = batch.acquisitions.order(id: :desc).pick(:status) || 'not requested'
+    "Latest departure batch ##{batch.id}: #{batch.status}; acquisition #{acquisition_status}."
   end
 
   def current?
@@ -44,7 +47,10 @@ class DepartureProgress
   end
 
   def report_current?
-    report = Departures::BatchReview.new(batch).report
+    report = DepartureAcquisition.uncached do
+      attempt = batch.acquisitions.select(*(DepartureAcquisition.column_names - %w[dataset evidence])).order(:id).last
+      Departures::BatchReview.new(batch, comparison: :persisted).report(attempt:)
+    end
     report.fetch('errors').empty? && report.except('gaps', 'errors',
                                                    'reviewed_revision') == revision.payload.fetch('report').except('reviewed_revision')
   end

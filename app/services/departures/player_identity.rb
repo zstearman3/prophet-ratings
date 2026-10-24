@@ -19,8 +19,13 @@ module Departures
       "#{production_key(table)}|#{key(player)}"
     end
 
-    def self.team_candidates(provider_id)
+    def self.team_candidates(provider_id, dataset: {})
       return [] unless provider_id
+      if CbbdDataset.automatic?(dataset)
+        return dataset.fetch('team_matches').select do |entry|
+          entry['provider_team_id'] == provider_id && entry['prior_team_season_id'].present?
+        end.pluck('team_id').uniq
+      end
 
       TeamExternalIdentity.where(provider: 'cbbd', external_id: provider_id.to_s).order(:team_id).pluck(:team_id).uniq
     end
@@ -28,7 +33,7 @@ module Departures
     def self.validate_contract(dataset)
       schema = dataset['schema']
       if schema == CbbdDataset::VERSION
-        Contract.check!(dataset.values_at('provider', 'extraction_version') == ['cbbd', CbbdDataset::EXTRACTION],
+        Contract.check!(dataset['provider'] == 'cbbd' && CbbdDataset.supported_extraction?(dataset['extraction_version']),
                         'Invalid CBBD dataset contract')
       else
         Contract.check!([nil, Contract::VERSION].include?(schema) && !dataset.key?('provider'), 'Invalid dataset contract')

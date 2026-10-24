@@ -8,3 +8,6 @@
 Rails.application.config.filter_parameters += %i[
   passw secret token _key crypt salt certificate otp ssn
 ]
+
+# Retained ingestion and ratings bodies can be tens of MB; avoid duplicating them in request and SQL logs.
+Rails.application.config.filter_parameters << /\A(?:evidence|dataset|payload|inputs|report|stats|result)\z/

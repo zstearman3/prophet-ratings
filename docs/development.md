@@ -59,6 +59,19 @@ containers; logs remain available after a crash. An exit code of 137 can indicat
 an out-of-memory kill; confirm `OOMKilled` in the container's Docker inspect state
 before changing memory limits. The Seasons and model-version admin pages omit
 large history associations to avoid loading entire ratings archives into memory.
+Readiness summaries select scalar operation fields, hash evidence rows inside
+PostgreSQL, and inspect captured inputs one team at a time. Profile memory with
+the full local dataset and request query caching enabled; small fixtures alone
+do not establish that a page fits its container limit. Development Server-Timing
+headers are opt-in (`RAILS_SERVER_TIMING=true` in `.env.docker`, then recreate
+web): Rails retains complete notification payloads, including large SQL bind
+objects, until each response finishes. Leave this unset for full-data offseason
+rehearsals; normal request/SQL logs remain available.
+Retained `evidence`, `dataset`, `payload`, `inputs`, `report`, `stats`, and `result`
+bodies are filtered from request and
+SQL-bind logs to avoid duplicating large JSON values during publication. SQL
+operations and ordinary diagnostics remain visible; use the admin source downloads
+to inspect retained evidence. Restart web and worker after changing log filters.
 
 ### Bounded local ratings replays
 
@@ -259,6 +272,16 @@ application-code scan.
 The suite reports 15 pre-existing pending examples (mostly generated placeholders
 plus unsupported double-header ingestion). Rails Admin's bundled SCSS emits Sass
 deprecation warnings, with a regression spec covering stylesheet compilation.
+
+The CBBD membership dropdown has focused browser-interaction logic checked with
+Node's built-in test runner in the existing image (no host Node required):
+
+```bash
+COMPOSE_PROJECT_NAME=prophet-cbbd-js-check bin/compose run --rm --no-deps -T web node --test spec/javascript/cbbd_membership_matches_test.js
+```
+
+This starts no database or application services. The Ruby request specs also
+verify preselected matches, compact option markup, overrides and saved mappings.
 
 ## Dependencies and optional tools
 

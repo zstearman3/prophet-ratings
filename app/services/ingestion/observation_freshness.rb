@@ -3,16 +3,17 @@
 module Ingestion
   # Capture time never establishes source ordering. Completed values need actual upstream evidence.
   class ObservationFreshness
-    def initialize(observation, game)
+    def initialize(observation, game, resolution: nil)
       @observation = observation
       @game = game
+      @resolution = resolution
     end
 
     def validate
       return validate_pending_revision unless @game.completed?
 
-      hold('conflict', 'completed_game_cannot_downgrade') unless @observation.strict_final?
-      return if @game.final_unmatched?
+      validate_completed_status
+      return if @game.final_unmatched? && unmatched_promotion?
 
       validate_provenance
       validate_order
@@ -26,6 +27,20 @@ module Ingestion
     end
 
     private
+
+    def validate_completed_status
+      confirmed = @observation.strict_final? || (@game.final_unmatched? && @observation.final?)
+      hold('conflict', 'completed_game_cannot_downgrade') unless confirmed
+    end
+
+    def unmatched_promotion?
+      return true unless prior
+      return false unless @resolution&.memberships&.all?
+
+      keys = %w[provider semantic_profile external_game_id schedule_date start_time source_status source_completed duration_minutes home
+                away venue]
+      prior.normalized_payload.slice(*keys) == @observation.data.as_json.slice(*keys)
+    end
 
     def validate_pending_revision
       return if authority.empty?

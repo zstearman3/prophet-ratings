@@ -106,4 +106,15 @@ RSpec.describe ProphetRatings::PreseasonReportBuilder do
   ensure
     ActiveSupport::Notifications.unsubscribe(subscriber) if subscriber
   end
+
+  it 'hashes each team independently while binding every operand and preserving JSON key ordering' do
+    report = { 'season_id' => 7, 'teams' => [{ 'team_id' => 1, 'inputs' => { 'pace' => 68.3, 'offense' => 100 } }] }
+    allow(report).to receive(:as_json).and_raise('Do not copy the entire report tree')
+    original = described_class.fingerprint(report)
+    reordered = { 'teams' => [{ 'inputs' => { 'offense' => 100, 'pace' => 68.3 }, 'team_id' => 1 }], 'season_id' => 7 }
+    expect(described_class.fingerprint(reordered)).to eq(original)
+    reordered['teams'][0]['inputs']['pace'] = 69
+    expect(described_class.fingerprint(reordered)).not_to eq(original)
+    expect(original).to match(/\A[a-f0-9]{64}\z/)
+  end
 end

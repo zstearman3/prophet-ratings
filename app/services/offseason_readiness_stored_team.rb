@@ -22,11 +22,19 @@ class OffseasonReadinessStoredTeam
     { 'team_id' => row.team_id, 'team_name' => team.school, 'aliases' => team.team_aliases.order(:id).pluck(:value),
       'team_season_id' => row.id, 'live_model_id' => row.ratings_config_version_id, 'live_rank' => row.overall_rank,
       'capture_id' => prior&.id, 'capture_model_id' => prior&.ratings_config_version_id, 'capture_outputs' => prior&.outputs,
-      'snapshot' => snapshot&.attributes&.except('stats'), 'snapshot_rank' => snapshot&.overall_rank }
+      'snapshot' => snapshot&.attributes&.except('stats', 'readiness_capture_matches'), 'snapshot_rank' => snapshot&.overall_rank }
   end
 
   def gaps(calculator)
     captured_gaps + current_gaps(calculator)
+  end
+
+  def self.with_prior(row, scope)
+    association = row.association(:preseason_prior)
+    association.target = PreseasonPrior.uncached { scope.find_by(id: row.preseason_prior_id) }
+    yield
+  ensure
+    association&.reset
   end
 
   private
@@ -65,10 +73,16 @@ class OffseasonReadinessStoredTeam
   end
 
   def provenance_problem
+    return projected_provenance_problem if snapshot.has_attribute?(:readiness_capture_matches)
+
     evidence = snapshot.stats['preseason_prior']
     return if evidence && evidence['id'] == prior.id && evidence['inputs'] == prior.inputs && evidence['outputs'] == prior.outputs
 
     problem('snapshot capture identity/values differ.')
+  end
+
+  def projected_provenance_problem
+    problem('snapshot capture identity/values differ.') unless snapshot[:readiness_capture_matches] == true
   end
 
   def core_problem

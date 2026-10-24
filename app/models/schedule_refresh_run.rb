@@ -2,7 +2,7 @@
 
 # Retains bounded acquisition intent and committed per-date import evidence.
 class ScheduleRefreshRun < ApplicationRecord
-  IDENTITY = %w[season_id requested_by_id retry_of_id provider start_date end_date requested_dates max_requests retries].freeze
+  IDENTITY = %w[season_id requested_by_id retry_of_id provider start_date end_date requested_dates max_requests retries mode rescan].freeze
   TERMINAL = %w[succeeded incomplete failed].freeze
   RETRY_EXISTS = 'A retry already exists; open the linked retry run to continue unfinished work.'
   belongs_to :season
@@ -10,6 +10,8 @@ class ScheduleRefreshRun < ApplicationRecord
   belongs_to :retry_of, class_name: 'ScheduleRefreshRun', optional: true, inverse_of: :retry_run
   has_one :retry_run, class_name: 'ScheduleRefreshRun', foreign_key: :retry_of_id, inverse_of: :retry_of,
                       dependent: :restrict_with_exception
+  validates :mode, inclusion: { in: %w[upcoming historical] }
+  validates :rescan, inclusion: { in: [true, false] }
   validates :provider, inclusion: { in: %w[sports_reference cbbd] }
   validates :status, inclusion: { in: %w[queued running succeeded incomplete failed] }
   validates :max_requests, numericality: { only_integer: true, greater_than: 0 }, if: :cbbd?
@@ -43,6 +45,10 @@ class ScheduleRefreshRun < ApplicationRecord
 
   def self.day_game_ids(day)
     day.fetch('games', []).flat_map { |game| [game['game_id'], *game.fetch('possible_move_ids', [])] }.compact
+  end
+
+  def historical?
+    mode == 'historical'
   end
 
   def cbbd?
@@ -84,7 +90,7 @@ class ScheduleRefreshRun < ApplicationRecord
 
   def retry_attributes(user)
     dates = pending_dates
-    { season:, requested_by: user, retry_of: self, provider:, max_requests:, retries:,
+    { season:, requested_by: user, retry_of: self, provider:, max_requests:, retries:, mode:, rescan:,
       start_date: dates.min, end_date: dates.max, requested_dates: dates }
   end
 
@@ -98,7 +104,12 @@ class ScheduleRefreshRun < ApplicationRecord
     self.requested_dates = requested_dates.presence || (first..last).map(&:iso8601)
     validate_dates(first, last)
   rescue ArgumentError, TypeError
-    errors.add(:base, 'Use ordered ISO dates today or later inside the target season; use historical sync for expired dates.')
+    message = if historical?
+                'Use ordered ISO dates inside the target season, no later than yesterday.'
+              else
+                'Use ordered ISO dates today or later inside the target season; use historical sync for expired dates.'
+              end
+    errors.add(:base, message)
   end
 
   def validate_dates(first, last)
@@ -110,7 +121,7 @@ class ScheduleRefreshRun < ApplicationRecord
   def dates_inside?(window)
     requested_dates.all? do |value|
       date = Ingestion::HistoricalSyncWindow.parse_date(value)
-      window.cover?(date) && date >= Game.current_schedule_date
+      window.cover?(date) && (historical? ? date < Game.current_schedule_date : date >= Game.current_schedule_date)
     end
   end
 end

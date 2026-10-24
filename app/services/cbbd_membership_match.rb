@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-# Display names and aliases cannot establish a provider identity.
+# Saved provider IDs win; unique exact labels propose overridable first-time matches.
 class CbbdMembershipMatch
-  attr_reader :team, :conference, :suggestions
+  attr_reader :suggestions
 
   def self.resolve(rows)
     matches = rows.map { |row| new(row) }
@@ -17,30 +17,73 @@ class CbbdMembershipMatch
 
   def initialize(row)
     @row = row
-    @team = TeamExternalIdentity.find_by(provider: 'cbbd', external_id: row.fetch(:team_external_id))&.team
-    @conference = ConferenceExternalIdentity.find_by(provider: 'cbbd', external_id: row.fetch(:conference_external_id))&.conference
+    @identities = saved_identities
+    @candidates = { teams: team_candidates, conferences: conference_candidates }
     @suggestions = identity_issues
   end
 
-  def teams
-    [team].compact
+  def teams = @candidates.fetch(:teams)
+  def conferences = @candidates.fetch(:conferences)
+  def team = (teams.first if teams.one?)
+  def conference = (conferences.first if conferences.one?)
+
+  def pending_team
+    return if @identities[:team]
+
+    { external_id: @row.fetch(:team_external_id), name: @row.fetch(:team_name), local_id: team&.id }
+  end
+
+  def pending_conference
+    return if @identities[:conference]
+
+    { external_id: @row.fetch(:conference_external_id), name: @row.fetch(:conference_name), local_id: conference&.id }
   end
 
   def reject_duplicate
     suggestions << "Multiple source IDs map to local school #{team.school}; resolve identities manually."
-    @team = nil
+    @candidates[:teams] = []
   end
 
   private
 
   def identity_issues
-    issues = []
-    unless team
-      issues << "Unmatched CBBD school #{@row.fetch(:team_name)} (#{@row.fetch(:team_external_id)}); manual identity/setup required."
-    end
-    unless conference
-      issues << "Unmatched CBBD conference #{@row.fetch(:conference_name)} (#{@row.fetch(:conference_external_id)}); map explicitly."
-    end
-    issues
+    matcher = self.class
+    [matcher.match_issue(teams, "school #{@row.fetch(:team_name)} (#{@row.fetch(:team_external_id)})"),
+     matcher.match_issue(conferences, "conference #{@row.fetch(:conference_name)} (#{@row.fetch(:conference_external_id)})")].compact
+  end
+
+  public_class_method def self.match_issue(candidates, label)
+    return if candidates.one?
+
+    status = candidates.empty? ? 'Unmatched' : 'Ambiguous'
+    "#{status} CBBD #{label}; choose a match or complete local setup."
+  end
+
+  def saved_identities
+    { team: TeamExternalIdentity.find_by(provider: 'cbbd', external_id: @row.fetch(:team_external_id)),
+      conference: ConferenceExternalIdentity.find_by(provider: 'cbbd', external_id: @row.fetch(:conference_external_id)) }
+  end
+
+  def team_candidates
+    identity = @identities[:team]
+    return [identity.team] if identity
+
+    Team.matching_school_or_alias(@row.fetch(:team_name)).to_a
+  end
+
+  def conference_candidates
+    identity = @identities[:conference]
+    return [identity.conference] if identity
+
+    exact_conferences
+  end
+
+  def exact_conferences
+    name = @row.fetch(:conference_name).strip.downcase
+    abbreviation = @row.fetch(:conference_abbreviation, '').to_s.strip.downcase
+    names = Conference.where('LOWER(TRIM(name)) = ?', name)
+    return names.to_a if abbreviation.blank?
+
+    names.or(Conference.where('LOWER(TRIM(abbreviation)) = ?', abbreviation)).to_a
   end
 end

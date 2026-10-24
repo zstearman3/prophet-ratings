@@ -12,7 +12,10 @@ module Ingestion
 
     def call
       run = provider_run
-      summarize(@dates.map { |date| HistoricalSyncDay.new(season: @season, date:, resume:, provider_run: run).call }).merge(run.summary)
+      summarize(@dates.map do |date|
+        HistoricalSyncDay.new(season: @season, date:, resume:, provider_run: run, on_day: @options[:on_day],
+                              allow_partial: @options[:allow_partial]).call
+      end).merge(run.summary)
     rescue StandardError => error
       raise provider_failure(error)
     end
@@ -41,7 +44,8 @@ module Ingestion
 
     def provider_run
       completed = resume ? GameSyncDate.where(season: @season, status: 'completed', **@policy.scope).pluck(:schedule_date) : []
-      GameSyncProvider.new(season: @season, dates: @dates - completed, provider: @policy.provider, options: @policy.options)
+      GameSyncProvider.new(season: @season, dates: @dates - completed, provider: @policy.provider, options: @policy.options,
+                           allow_partial: @options[:allow_partial])
     end
 
     def retry_window(failures)

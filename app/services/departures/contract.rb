@@ -53,11 +53,11 @@ module Departures
     end
 
     def self.digest(value)
-      Digest::SHA256.hexdigest(JSON.generate(canonical(value)))
+      CanonicalDigest.new.call(value)
     end
 
     def self.write(path, value)
-      bytes = "#{JSON.pretty_generate(canonical(value))}\n"
+      bytes = JSON.pretty_generate(value, sort_keys: true) << "\n"
       write_bytes(path, bytes)
     end
 

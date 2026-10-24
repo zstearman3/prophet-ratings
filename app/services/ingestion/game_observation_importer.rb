@@ -43,6 +43,7 @@ module Ingestion
       observation.validate
       @season ||= Season.find_by(year: data[:season_year])
       @resolution = ObservationResolution.new(observation, @season).resolve
+      ObservationUntrackedResult.new(observation, Game.new).validate if resolution.untracked? && observation.final?
     end
 
     def lock_game
@@ -66,7 +67,7 @@ module Ingestion
     end
 
     def validate_update
-      ObservationFreshness.new(observation, game).validate
+      ObservationFreshness.new(observation, game, resolution:).validate
       observation.validate_duration if observation.strict_final?
     end
 
@@ -89,6 +90,8 @@ module Ingestion
 
     def outcome
       status = data[:source_status]
+      return status if resolution.untracked? && observation.final?
+
       status == 'final' && !observation.strict_final? ? 'incomplete' : status
     end
 

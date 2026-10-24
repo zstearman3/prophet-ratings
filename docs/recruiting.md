@@ -53,6 +53,19 @@ evidence and stale previews block publication. Manual exclusions do not bypass
 these fatal source errors. Approval prepares missing target
 TeamSeasons and retains the signed-in reviewer and approval time automatically.
 
+The exception is an explicitly excluded, unlinked entry displayed at rank zero:
+247 sometimes lists these with a plain-text school name and no school URL or ID.
+The parser preserves that text and displayed points on new captures. Existing
+ready batches can also exclude these entries without refetching. Their original
+source values and validation errors stay in the approval evidence; they contribute
+no team inputs. Other invalid numeric values and duplicate identities still block
+publication, even on excluded rows. An unranked entry cannot be mapped and imported.
+
+Failed approval keeps the batch unpublished and rolls back that submission's
+mapping changes. The error page preserves submitted choices and refreshes its
+review token from stored data, so **Save mappings** can retain those choices for
+another attempt. A genuinely stale page still requires reloading.
+
 ## Publication and recovery
 
 `Recruiting::DatabaseBundle` validates retained captures against normalized rows,

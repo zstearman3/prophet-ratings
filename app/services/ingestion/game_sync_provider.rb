@@ -16,8 +16,8 @@ module Ingestion
     HELD = %w[invalid ambiguous conflict unmatched incomplete stale superseded protected].freeze
     attr_reader :dates
 
-    def initialize(season:, dates:, provider: nil, options: {})
-      @season = season
+    def initialize(season:, dates:, provider: nil, options: {}, allow_partial: nil)
+      @settings = { season:, allow_partial: }
       @dates = dates.map { |date| HistoricalSyncWindow.parse_date(date) }.uniq.sort
       @policy = GameSyncPolicy.new(provider, options)
       validate_dates
@@ -31,7 +31,7 @@ module Ingestion
 
     def call(date)
       raise ArgumentError, 'Date outside prepared sync run' unless dates.include?(date)
-      return GameSyncResult.new(GamesIngestionService.new(date:, season: @season).call).call unless cbbd?
+      return GameSyncResult.new(GamesIngestionService.new(date:, season: season).call).call unless cbbd?
       raise Incomplete, summary.merge(failed_dates: dates) unless acquisition['complete']
 
       import_date(date)
@@ -53,19 +53,27 @@ module Ingestion
 
     private
 
+    def season = @settings.fetch(:season)
+
     def ignored_observations
       requested = dates.map(&:iso8601)
       acquisition.fetch('observations').count { |row| requested.exclude?(row['schedule_date']) }
     end
 
     def validate_dates
-      bounds = @season.start_date..@season.end_date
+      bounds = season.start_date..season.end_date
       raise ArgumentError, 'Sync dates outside target season' unless dates.all? { |date| bounds.cover?(date) }
     end
 
     def import_date(date)
-      games = date_rows(date).map { |row| Cbbd::ImportObservation.new(row, @season).call }
+      games = date_rows(date).map { |row| import_observation(row) }
       GameSyncResult.new(imported_rows: games.count { |game| game[:applied] }, games:).call
+    end
+
+    def import_observation(row)
+      return HistoricalSyncObservation.new(row, season).call if @settings[:allow_partial]
+
+      Cbbd::ImportObservation.new(row, season).call
     end
 
     def date_rows(date)
@@ -82,7 +90,7 @@ module Ingestion
     def acquire
       return { 'complete' => true, 'observations' => [], 'acquisition' => { 'complete' => true, 'attempts' => 0 } } if dates.empty?
 
-      result = Cbbd::Adapter.new(season: @season.year, start_date: dates.min, end_date: dates.max, **@policy.options).call
+      result = Cbbd::Adapter.new(season: season.year, start_date: dates.min, end_date: dates.max, **@policy.options).call
       validate_observations(result)
       result
     end
@@ -90,7 +98,7 @@ module Ingestion
     def validate_observations(result)
       valid = result.fetch('observations').all? do |row|
         row.values_at('provider', 'format', 'semantic_profile', 'normalization_version', 'season') ==
-          ['cbbd', scope[:contract_version], scope[:semantic_profile], CanonicalObservation::NORMALIZATION_VERSION, @season.year] &&
+          ['cbbd', scope[:contract_version], scope[:semantic_profile], CanonicalObservation::NORMALIZATION_VERSION, season.year] &&
           (dates.min..dates.max).cover?(HistoricalSyncWindow.parse_date(row['schedule_date']))
       end
       result['complete'] = result['complete'] == true && result.dig('acquisition', 'complete') == true && valid

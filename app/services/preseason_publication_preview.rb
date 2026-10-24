@@ -2,10 +2,11 @@
 
 # Decorates existing immutable calculations; current evidence is separate from reused capture evidence.
 class PreseasonPublicationPreview
-  def initialize(season, ratings_config_version:, mode:)
+  def initialize(season, ratings_config_version:, mode:, reviewed_revisions: ProphetRatings::ReviewedInputRevisions.new)
     @season = season
     @model = ratings_config_version
     @mode = mode
+    @reviewed_revisions = reviewed_revisions
     raise ArgumentError, 'Choose initialize or revise.' unless mode.in?(%w[initialize revise])
   end
 
@@ -20,7 +21,33 @@ class PreseasonPublicationPreview
 
   def calculation
     service = mode == 'revise' ? ProphetRatings::PreseasonRevision : ProphetRatings::PreseasonInitializer
-    service.new(season, ratings_config_version: model)
+    service.new(season, ratings_config_version: model, reviewed_revisions: @reviewed_revisions)
+  end
+
+  # Saved pages need provenance and component results, not every replay operand for every team.
+  def self.presentation(report)
+    return report unless report['teams']
+
+    teams = report.fetch('teams').map { |entry| presentation_team(entry) }
+    report.merge('teams' => teams, 'largest_movers' => largest_movers(teams))
+  end
+
+  def self.presentation_team(entry)
+    inputs = entry.fetch('inputs')
+    facts = inputs.slice('contract', 'team_id', 'target_year', 'baselines', 'baseline_sources', 'previous_values',
+                         'profile_values', 'coaching')
+    facts.merge!(presentation_sources(inputs), presentation_revisions(inputs))
+    entry.except('profile_before', 'profile_after', 'outputs_before', 'outputs_after').merge('inputs' => facts)
+  end
+
+  def self.presentation_revisions(inputs)
+    { 'reviewed_recruiting' => inputs['reviewed_recruiting']&.slice('revision', 'review', 'status', 'class_points', 'units', 'row'),
+      'reviewed_departures' => inputs['reviewed_departures']&.slice('revision', 'review') }
+      .transform_values { |evidence| ProphetRatings::ReviewedInputRevisions.compact_evidence(evidence) }
+  end
+
+  def self.presentation_sources(inputs)
+    %w[previous_season previous_team_season profile].index_with { |key| inputs[key]&.slice('id', 'updated_at') }
   end
 
   private
@@ -42,7 +69,7 @@ class PreseasonPublicationPreview
   end
 
   def build_report
-    report = calculation.preview.deep_stringify_keys.merge(report_identity)
+    report = calculation.preview.deep_stringify_keys!.merge(report_identity)
     teams = decorated_teams(report.fetch('teams'))
     report.merge!('teams' => teams, 'gaps' => teams.flat_map { |entry| PreseasonPublicationGaps.new(entry).call },
                   'largest_movers' => self.class.largest_movers(teams))
@@ -80,11 +107,19 @@ class PreseasonPublicationPreview
     CoachingReview.find_by(year: season.year)&.attributes if model.settings.dig(:preseason, :coaching)
   end
 
+  def current_input_hashes(calculator)
+    season.rating_team_seasons.order(:team_id).map do |row|
+      Departures::Contract.digest(calculator.preview_inputs(row).as_json)
+    end
+  end
+
   def fingerprint(report)
-    calculator = ProphetRatings::PreseasonRatingsCalculator.new(season, ratings_config_version: model)
-    evidence = { report:, model: model.config, coaching_review: coaching_review_identity, season: season.attributes.except('updated_at'),
+    calculator = ProphetRatings::PreseasonRatingsCalculator.new(season, ratings_config_version: model,
+                                                                        reviewed_revisions: @reviewed_revisions)
+    evidence = { report: ProphetRatings::PreseasonReportBuilder.fingerprint(report), model: model.config,
+                 coaching_review: coaching_review_identity, season: season.attributes.except('updated_at'),
                  roster: season.team_seasons.order(:id).map(&:attributes),
-                 current_inputs: season.rating_team_seasons.order(:team_id).map { |row| calculator.preview_inputs(row).as_json } }
-    Digest::SHA256.hexdigest(ProphetRatings::PreseasonRevision.canonical_json(evidence.as_json).to_json)
+                 current_inputs: current_input_hashes(calculator) }
+    Departures::Contract.digest(evidence.as_json)
   end
 end

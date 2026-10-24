@@ -1,0 +1,16 @@
+<% if rows.any? %>
+  <table class="table table-striped">
+    <thead><tr><th>CBBD name</th><th>Match to existing <%= kind == 'teams' ? 'school' : 'conference' %></th></tr></thead>
+    <tbody>
+      <% rows.each do |row| %>
+        <% selected = params.dig(:mapping, kind, row.fetch(:external_id)) || row[:local_id] %>
+        <% choices = selected.present? ? options.select { |_, id| id.to_s == selected.to_s } : options %>
+        <% deferred = selected.present? ? "cbbd-#{kind}-options" : nil %>
+        <tr>
+          <td><%= row.fetch(:name) %></td>
+          <td><%= select_tag "mapping[#{kind}][#{row.fetch(:external_id)}]", options_for_select(choices, selected), include_blank: 'Choose match', data: { cbbd_options: deferred }, aria: { label: "Match CBBD #{kind.singularize} #{row.fetch(:name)} (#{row.fetch(:external_id)})" } %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% end %>

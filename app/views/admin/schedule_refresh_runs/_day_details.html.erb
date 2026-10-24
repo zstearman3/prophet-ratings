@@ -1,0 +1,27 @@
+<% if day['status'] == 'skipped' %>
+  <p>Completed previously; no new requests.</p>
+<% else %>
+  <% if day['error'] %><p class="mb-2 rounded bg-red-100 p-2"><%= schedule_day_problem(day) %></p><% end %>
+  <% if day.fetch('outcomes', {}).any? %><p class="mb-2 font-medium"><%= schedule_outcome_summary(day) %></p><% end %>
+  <details class="space-y-3">
+    <summary class="cursor-pointer text-blue-700 underline">Review date</summary>
+    <% if day['valid_empty'] %><p>The source returned no games for this date.</p><% end %>
+    <% day.fetch('rejection_observation_ids', []).each do |id| %>
+      <% if @evidence[:observations][id] %>
+        <p class="font-medium"><%= schedule_observation_matchup(@evidence[:observations][id]) %></p>
+        <p><%= link_to "Review rejected observation #{id}", rails_admin.show_path(model_name: 'game_observation', id:), class: 'text-blue-700 underline' %>
+          · <%= @evidence[:observations][id].outcome %>. Review the source game and participants; this rejected game was not imported.</p>
+      <% else %>
+        <p>Rejected observation <%= id %> is unavailable or outside this run's provider/season scope.</p>
+      <% end %>
+    <% end %>
+    <% day.fetch('games', []).each do |game| %>
+      <p><%= game['outcome'] %>: <%= game['reason'].presence || 'Inspect private observation evidence for details' %>.
+        <% if @evidence[:games][game['game_id']] %><%= link_to "Game #{game['game_id']}", game_path(@evidence[:games][game['game_id']]), class: 'text-blue-700 underline' %><% end %>
+        <% game.fetch('possible_move_ids', []).each do |id| %> Possible move: <%= @evidence[:games][id] ? link_to("Game #{id}", game_path(@evidence[:games][id]), class: 'text-blue-700 underline') : id %>.<% end %>
+      </p>
+    <% end %>
+    <% if day.fetch('games', []).empty? && !day['error'] && !day['valid_empty'] %><p>No individual game details were retained for this date.</p><% end %>
+    <% if day.fetch('outcomes', {}).any? %><p>Outcomes: <%= day['outcomes'].map { |outcome, count| "#{outcome.humanize}: #{count}" }.join(' · ') %>.</p><% end %>
+  </details>
+<% end %>

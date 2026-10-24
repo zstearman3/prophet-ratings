@@ -1,0 +1,28 @@
+<section aria-labelledby="published-preseason-heading" class="space-y-3">
+  <h2 id="published-preseason-heading" class="text-xl font-semibold">Published outputs</h2>
+  <p role="status"><strong>Publication completed</strong> at <%= @page[:publication].published_at %>.</p>
+  <p><%= @page[:published_outputs].size %> saved team ratings using <strong><%= @page[:publication].ratings_config_version.name %></strong>. These are this publication's saved ratings; later live ratings do not change this table.</p>
+  <p>Net rating = offense − defense, in points per 100 possessions. Higher net is better; lower defensive efficiency is better. Pace is possessions per game. Display values are rounded.</p>
+  <% ranks = @page[:publication].result.fetch('ranks', []).to_h %>
+  <div class="overflow-x-auto">
+    <table id="published-preseason-ratings" class="w-full text-left border-collapse">
+      <thead class="bg-gray-100"><tr>
+        <th scope="col" class="p-2">Rank</th><th scope="col" class="p-2">Team</th>
+        <th scope="col" class="p-2 text-right">Net rating</th><th scope="col" class="p-2 text-right">Offense</th>
+        <th scope="col" class="p-2 text-right">Defense</th><th scope="col" class="p-2 text-right">Pace</th>
+      </tr></thead>
+      <tbody>
+        <% @page[:published_outputs].each do |snapshot| %>
+          <tr class="border-t">
+            <td class="p-2"><%= ranks.fetch(snapshot.team_id, 'Unknown') %></td>
+            <td class="p-2 font-semibold"><%= snapshot.team.school %></td>
+            <td class="p-2 text-right"><%= number_with_precision(snapshot.rating, precision: 2) %></td>
+            <td class="p-2 text-right"><%= number_with_precision(snapshot.adj_offensive_efficiency, precision: 2) %></td>
+            <td class="p-2 text-right"><%= number_with_precision(snapshot.adj_defensive_efficiency, precision: 2) %></td>
+            <td class="p-2 text-right"><%= number_with_precision(snapshot.adj_pace, precision: 1) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+</section>

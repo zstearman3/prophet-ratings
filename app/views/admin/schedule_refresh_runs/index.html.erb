@@ -1,40 +1,115 @@
-<section class="mx-auto max-w-5xl space-y-5 p-6">
-  <h1 class="text-2xl font-bold">Refresh and review schedule</h1>
-  <% if @page[:error] %><p role="alert"><%= @page[:error] %></p><% end %>
-  <% if notice %><p role="status"><%= notice %></p><% end %>
-  <%= form_with url: admin_schedule_refresh_runs_path, method: :get do %>
-    <%= label_tag :season_id, 'Target ending-year season' %>
-    <%= select_tag :season_id, options_from_collection_for_select(@page[:seasons], :id, :year, @page[:season]&.id) %>
-    <%= submit_tag 'View season' %>
-  <% end %>
+<section class="mx-auto max-w-5xl space-y-8 pb-12">
+  <header class="space-y-3">
+    <h1 class="text-3xl font-bold">Refresh and review schedule</h1>
+    <p>Import past games or refresh upcoming matchups, then review what changed for each date.</p>
+    <% if @page[:error] %><p role="alert" class="rounded bg-red-100 p-3"><%= @page[:error] %></p><% end %>
+    <% if notice %><p role="status" class="rounded bg-green-100 p-3"><%= notice %></p><% end %>
+    <%= form_with url: admin_schedule_refresh_runs_path, method: :get, class: 'flex flex-wrap items-end gap-3' do |form| %>
+      <div>
+        <%= form.label :season_id, 'Target season', class: 'block font-medium' %>
+        <%= form.collection_select :season_id, @page[:seasons], :id, :year, { selected: @page[:season]&.id }, class: 'mt-1 rounded border p-2' %>
+      </div>
+      <%= form.submit 'View season', class: 'rounded border px-4 py-2 font-medium hover:bg-gray-100' %>
+    <% end %>
+    <% if @page[:season] %><%= link_to 'Return to offseason setup', admin_offseason_setup_path(season_id: @page[:season].id), class: 'text-blue-700 underline' %><% end %>
+  </header>
   <% if @page[:season] %>
-    <%= link_to 'Return to offseason setup', admin_offseason_setup_path(season_id: @page[:season].id) %>
-    <p>Season <%= @page[:season].year %>: <%= @page[:season].start_date %> through <%= @page[:season].end_date %>.</p>
-    <p><%= @page[:readiness].summary %></p>
-    <p>Choose strict YYYY-MM-DD inclusive Eastern schedule dates, today or later inside this season. For expired dates use the historical sync runbook. Queued work requires a GoodJob worker. Successful acquisition, including empty dates, does not establish complete publication or prediction readiness.</p>
-    <%= form_with url: admin_schedule_refresh_runs_path, scope: :refresh, data: { turbo: false }, class: 'space-y-3' do |form| %>
-      <%= hidden_field_tag :season_id, @page[:season].id %>
-      <div><%= form.label :provider %><%= form.select :provider, [['Sports Reference', 'sports_reference'], ['CBBD', 'cbbd']], selected: @values['provider'] %></div>
-      <% %w[start_date end_date].each do |field| %>
-        <div><%= form.label field %><%= form.date_field field, value: @values[field], required: true %></div>
-      <% end %>
-      <p>Sports Reference: up to 3 additional attempts per failed date, with 5/10/20 second waits. CBBD: one total request budget covers the entire selected window, both endpoints, subdivisions and retries; no implicit new budget.</p>
-      <div><%= form.label :max_requests, 'CBBD total maximum requests' %><%= form.number_field :max_requests, value: @values['max_requests'], min: 1 %></div>
-      <div><%= form.label :retries, 'CBBD retries per request' %><%= form.number_field :retries, value: @values['retries'], min: 0, max: 5 %></div>
-      <p>CBBD requires server-side CBBD_API_KEY and a private writable CBBD_CAPTURE_DIRECTORY. These values never belong in this form.</p>
-      <%= form.submit 'Queue bounded refresh' %>
-    <% end %>
-    <h2 class="text-xl">Recent retained runs</h2>
-    <% @page[:runs].each do |run| %><p><%= link_to "Run #{run.id}: #{run.status} · #{run.provider} · #{run.start_date}–#{run.end_date}", admin_schedule_refresh_run_path(run) %></p><% end %>
-    <%= link_to 'Review CBBD identities', admin_cbbd_review_runs_path(season_id: @page[:season].id) %>
-    <% unless @page[:readiness].usable? %>
-      <h2 class="text-xl">Defer while no usable schedule is available</h2>
-      <p>Record why schedule and prediction readiness remain deferred. This does not approve model inputs or activate the season.</p>
-      <%= form_with url: defer_admin_schedule_refresh_runs_path do %>
+    <section class="rounded border bg-gray-50 p-5 space-y-2">
+      <h2 class="text-xl font-semibold">Season <%= @page[:season].year %>: <%= @page[:season].start_date %> through <%= @page[:season].end_date %></h2>
+      <p><%= @page[:readiness].summary %></p>
+      <p class="text-sm text-gray-600">Importing games does not by itself establish complete publication or prediction readiness. Review the results before continuing offseason setup.</p>
+    </section>
+    <section class="rounded border p-5 space-y-4">
+      <h2 class="text-xl font-semibold">1. Choose what to import</h2>
+      <%= form_with url: admin_schedule_refresh_runs_path, scope: :refresh, data: { turbo: false }, class: 'space-y-5' do |form| %>
         <%= hidden_field_tag :season_id, @page[:season].id %>
-        <%= label_tag :reason, 'Reason' %><%= text_area_tag :reason, params[:reason], required: true, maxlength: 2000 %>
-        <%= submit_tag 'Record deferral' %>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <div>
+            <%= form.label :mode, 'Import type', class: 'block font-medium' %>
+            <%= form.select :mode, [['Upcoming schedule', 'upcoming'], ['Historical games', 'historical']], { selected: @values['mode'] }, class: 'mt-1 block w-full rounded border p-2', aria: { describedby: 'schedule-mode-help' } %>
+          </div>
+          <div>
+            <%= form.label :provider, 'Data source', class: 'block font-medium' %>
+            <%= form.select :provider, [['Sports Reference', 'sports_reference'], ['CBBD', 'cbbd']], { selected: @values['provider'] }, class: 'mt-1 block w-full rounded border p-2' %>
+          </div>
+        </div>
+        <p id="schedule-mode-help" class="text-sm text-gray-600">Historical games imports dates before today. Upcoming schedule refreshes today and future dates. Both use inclusive Eastern dates inside the selected season.</p>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <% { 'start_date' => 'From', 'end_date' => 'Through (inclusive)' }.each do |field, label| %>
+            <div>
+              <%= form.label field, label, class: 'block font-medium' %>
+              <%= form.date_field field, value: @values[field], min: @page[:season].start_date, max: @page[:season].end_date, required: true, class: 'mt-1 block w-full rounded border p-2' %>
+            </div>
+          <% end %>
+        </div>
+        <fieldset class="rounded border bg-gray-50 p-4 space-y-2">
+          <legend class="px-1 font-medium">Historical imports</legend>
+          <p class="text-sm text-gray-600">By default, resume unfinished dates and skip dates this source has already imported successfully.</p>
+          <div class="flex items-start gap-2">
+            <%= form.check_box :rescan, { checked: ActiveModel::Type::Boolean.new.cast(@values['rescan']), class: 'mt-1' } %>
+            <%= form.label :rescan, 'Reimport completed dates too', class: 'font-medium' %>
+          </div>
+          <p class="text-sm text-gray-600">Use this to refresh existing historical games, including after restoring a production database. This option applies only to historical imports and uses the same request budget.</p>
+        </fieldset>
+        <fieldset class="rounded border p-4 space-y-3">
+          <legend class="px-1 font-medium">CBBD request limits</legend>
+          <p class="text-sm text-gray-600">Required when CBBD is selected. One total budget covers the entire date range, both endpoints, subdivisions, and retries. These fields are ignored for Sports Reference.</p>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <div>
+              <%= form.label :max_requests, 'Total maximum requests', class: 'block font-medium' %>
+              <%= form.number_field :max_requests, value: @values['max_requests'], min: 1, class: 'mt-1 block w-full rounded border p-2' %>
+            </div>
+            <div>
+              <%= form.label :retries, 'Retries per request (0–5)', class: 'block font-medium' %>
+              <%= form.number_field :retries, value: @values['retries'], min: 0, max: 5, class: 'mt-1 block w-full rounded border p-2' %>
+            </div>
+          </div>
+        </fieldset>
+        <%= form.submit 'Queue import', class: 'rounded bg-prophet-indigo px-4 py-2 font-medium text-white' %>
+        <p class="text-sm text-gray-600">The import runs in the background. Open its results to check progress and retry unfinished dates if needed. Ratings are not recalculated by this import.</p>
       <% end %>
+    </section>
+    <section class="space-y-3">
+      <h2 class="text-xl font-semibold">2. Review recent runs</h2>
+      <% if @page[:runs].empty? %>
+        <p class="rounded border bg-gray-50 p-4">No imports have been queued for this season. Choose a date range above to get started.</p>
+      <% else %>
+        <div class="overflow-x-auto rounded border">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-100 text-left"><tr><th class="p-3">Run</th><th class="p-3">Type</th><th class="p-3">Dates</th><th class="p-3">Source</th><th class="p-3">Status</th></tr></thead>
+            <tbody>
+              <% @page[:runs].each do |run| %>
+                <tr class="border-t">
+                  <td class="p-3"><%= link_to "Run #{run.id}", admin_schedule_refresh_run_path(run), class: 'text-blue-700 underline' %></td>
+                  <td class="p-3"><%= run.historical? ? 'Historical games' : 'Upcoming schedule' %></td>
+                  <td class="p-3 whitespace-nowrap"><%= run.start_date %> – <%= run.end_date %></td>
+                  <td class="p-3"><%= run.cbbd? ? 'CBBD' : 'Sports Reference' %></td>
+                  <td class="p-3"><%= run.status.humanize %></td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      <% end %>
+      <%= link_to 'Review CBBD identities', admin_cbbd_review_runs_path(season_id: @page[:season].id), class: 'text-blue-700 underline' %>
+    </section>
+    <% unless @page[:readiness].usable? %>
+      <details class="rounded border p-5 space-y-3">
+        <summary class="cursor-pointer font-semibold">Defer while no usable schedule is available</summary>
+        <p>Record why schedule and prediction readiness remain deferred. This does not approve model inputs or activate the season.</p>
+        <%= form_with url: defer_admin_schedule_refresh_runs_path, class: 'space-y-3' do %>
+          <%= hidden_field_tag :season_id, @page[:season].id %>
+          <div><%= label_tag :reason, 'Reason', class: 'block font-medium' %><%= text_area_tag :reason, params[:reason], required: true, maxlength: 2000, rows: 3, class: 'mt-1 block w-full rounded border p-2' %></div>
+          <%= submit_tag 'Record deferral', class: 'rounded border px-4 py-2 font-medium hover:bg-gray-100' %>
+        <% end %>
+      </details>
     <% end %>
+    <details class="rounded border p-5 space-y-3 text-sm text-gray-600">
+      <summary class="cursor-pointer font-medium">Worker setup and source retry policy</summary>
+      <p>Queued work requires a GoodJob worker. CBBD requires server-side CBBD_API_KEY and a private writable CBBD_CAPTURE_DIRECTORY. These values never belong in this form.</p>
+      <p>Sports Reference: upcoming refreshes allow 3 retries (5/10/20 seconds); historical imports allow 5 retries (5/10/20/40/80 seconds). CBBD retries share the total request budget; there is no implicit new budget.</p>
+    </details>
+  <% else %>
+    <p class="rounded border p-4">Prepare a target season before importing games.</p>
   <% end %>
 </section>

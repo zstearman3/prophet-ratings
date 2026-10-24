@@ -7,11 +7,17 @@ RSpec.describe PreseasonPublication do
   let(:model) { RatingsConfigVersion.publish! }
   let(:admin) { create(:user, :admin) }
   let!(:row) { create(:team_season, season:) }
-  let(:review) { described_class.review!(season, reviewer: admin, mode: 'initialize') }
+  let(:review) { build_review(season, reviewer: admin, mode: 'initialize') }
 
   before do
     allow(PublishPreseasonJob).to receive(:perform_later).and_return(true)
     described_class.select_model(season, model)
+  end
+
+  def build_review(target, reviewer:, mode:)
+    publication = described_class.review!(target, reviewer:, mode:)
+    PreviewPreseasonJob.perform_now(publication.id)
+    publication.reload
   end
 
   def queue(publication = review, acknowledge: '1', fingerprint: publication.fingerprint)
@@ -54,7 +60,7 @@ RSpec.describe PreseasonPublication do
   end
 
   %i[profile roster dates].each do |change|
-    it "rejects changed #{change} at queue and execution without rating writes" do
+    it "rejects changed #{change} in the worker without rating writes" do
       queue
       case change
       when :profile then create(:team_offseason_profile, team_season: row, manual_adjustment: 2)
@@ -62,8 +68,8 @@ RSpec.describe PreseasonPublication do
       when :dates then season.update!(start_date: season.start_date + 1.day)
       end
       review.update!(status: 'review')
-      expect { queue }.to raise_error(ArgumentError, /stale/)
-      review.update!(status: 'queued')
+      queue
+      expect(review.reload.status).to eq('queued')
       execute
       expect(review.reload.status).to eq('failed')
       expect(review.error_message).to include('stale')
@@ -79,10 +85,10 @@ RSpec.describe PreseasonPublication do
     expect(initial['ranks']).to eq([[row.team_id, 1]])
     execute
     expect(review.reload.result).to eq(initial)
-    repeated = described_class.review!(season.reload, reviewer: admin, mode: 'initialize')
+    repeated = build_review(season.reload, reviewer: admin, mode: 'initialize')
     queue(repeated)
     execute(repeated)
-    expect(repeated.reload.result.except('fingerprint')).to eq(initial.except('fingerprint'))
+    expect(repeated.reload.result.except('fingerprint', 'freshness')).to eq(initial.except('fingerprint', 'freshness'))
     expect([row.reload.adj_offensive_efficiency, row.adj_defensive_efficiency, row.adj_pace]).to eq([105.5, 105.5, 69.5])
   end
 
@@ -157,6 +163,23 @@ RSpec.describe PreseasonPublication do
     expect(review.reload.status).to eq('published')
   end
 
+  it 'invalidates dashboard completion after an alias is removed or a new team needs roster review' do
+    alias_record = create(:team_alias, team: row.team, value: row.team.school)
+    queue
+    execute
+    expect(PreseasonPublicationProgress.new(season.reload).call.status).to eq('complete')
+    alias_record.destroy!
+    expect(PreseasonPublicationProgress.new(season.reload).call.status).to eq('needs_review')
+  end
+
+  it 'invalidates dashboard completion when a new team lacks a target-season roster decision' do
+    queue
+    execute
+    expect(PreseasonPublicationProgress.new(season.reload).call.status).to eq('complete')
+    create(:team)
+    expect(PreseasonPublicationProgress.new(season.reload).call.status).to eq('needs_review')
+  end
+
   it 'publishes explicit new-model revisions while preserving original captures and snapshots' do
     queue
     execute
@@ -164,7 +187,7 @@ RSpec.describe PreseasonPublication do
     create(:team_offseason_profile, team_season: row, manual_adjustment: 2)
     corrected = create(:ratings_config_version)
     described_class.select_model(season, corrected)
-    revision = described_class.review!(season, reviewer: admin, mode: 'revise')
+    revision = build_review(season, reviewer: admin, mode: 'revise')
     queue(revision)
     execute(revision)
     expect(revision.reload.status).to eq('published')
@@ -201,7 +224,7 @@ RSpec.describe PreseasonPublication do
     PreseasonPublicationQueue.new(review, actor: retrying_admin, fingerprint: review.fingerprint, acknowledge: '0').call
     expect(PublishPreseasonJob).to have_received(:perform_later).with(review.id).twice
     expect(review.reload.acknowledgement).to eq(original_ack)
-    expect(review).to have_received(:verify_current).once
+    expect(review).not_to have_received(:verify_current)
     PublishPreseasonJob.perform_now(review.id)
     outputs = review.reload.result
     PublishPreseasonJob.perform_now(review.id)
@@ -212,15 +235,15 @@ RSpec.describe PreseasonPublication do
   it 'guards queued and worker initialization if another model was explicitly revised after preview' do
     other = create(:ratings_config_version)
     described_class.select_model(season, other)
-    pending = described_class.review!(season, reviewer: admin, mode: 'initialize')
+    pending = build_review(season, reviewer: admin, mode: 'initialize')
     queue(pending)
     described_class.select_model(season, model)
-    revision = described_class.review!(season, reviewer: admin, mode: 'revise')
+    revision = build_review(season, reviewer: admin, mode: 'revise')
     queue(revision)
     execute(revision)
     original = row.reload.attributes
     described_class.select_model(season, other)
-    expect { queue(pending) }.to raise_error(ArgumentError, /explicit.*revise/i)
+    expect { queue(pending) }.to raise_error(ArgumentError, /stale/i)
     execute(pending)
     expect([pending.reload.status, pending.error_message]).to match(['failed', /explicit.*revise/i])
     expect(row.reload.attributes).to eq(original)
@@ -230,7 +253,7 @@ RSpec.describe PreseasonPublication do
 
   context 'with an explicit revision' do
     before do
-      revision = described_class.review!(season, reviewer: admin, mode: 'revise')
+      revision = build_review(season, reviewer: admin, mode: 'revise')
       queue(revision)
       execute(revision)
     end
@@ -239,11 +262,11 @@ RSpec.describe PreseasonPublication do
       previous = [row.reload.attributes, PreseasonPrior.order(:id).map(&:attributes), TeamRatingSnapshot.order(:id).map(&:attributes)]
       other = create(:ratings_config_version)
       described_class.select_model(season, other)
-      expect { described_class.review!(season, reviewer: admin, mode: 'initialize') }
-        .to raise_error(ArgumentError, /explicit.*revise/i)
+      blocked = build_review(season, reviewer: admin, mode: 'initialize')
+      expect([blocked.status, blocked.error_message]).to match(['preview_failed', /explicit.*revise/i])
       expect([row.reload.attributes, PreseasonPrior.order(:id).map(&:attributes), TeamRatingSnapshot.order(:id).map(&:attributes)])
         .to eq(previous)
-      corrected = described_class.review!(season, reviewer: admin, mode: 'revise')
+      corrected = build_review(season, reviewer: admin, mode: 'revise')
       queue(corrected)
       execute(corrected)
       expect([corrected.reload.status, season.reload.preseason_revision_id]).to eq(['published', other.id])
@@ -284,13 +307,13 @@ RSpec.describe PreseasonPublication do
     it 'enforces readiness on capture reuse at queue and execution' do
       queue
       execute
-      repeated = described_class.review!(season.reload, reviewer: admin, mode: 'initialize')
+      repeated = build_review(season.reload, reviewer: admin, mode: 'initialize')
       expect(repeated.report['teams'].first['reuses_capture']).to be(true)
       queue(repeated)
       CoachingReview.find_by!(year: season.year).update!(ready: false)
       repeated.update!(status: 'review')
-      expect { queue(repeated) }.to raise_error(ArgumentError, /not ready/)
-      repeated.update!(status: 'queued')
+      queue(repeated)
+      expect(repeated.reload.status).to eq('queued')
       execute(repeated)
       expect(repeated.reload.error_message).to include('not ready')
       expect(PreseasonPrior.count).to eq(1)

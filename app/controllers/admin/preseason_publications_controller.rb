@@ -10,7 +10,8 @@ module Admin
 
     def index
       page[:models] = RatingsConfigVersion.order(created_at: :desc)
-      page[:publications] = page[:season].preseason_publications.order(id: :desc)
+      page[:publications] = page[:season].preseason_publications.select(:id, :season_id, :ratings_config_version_id, :mode, :status)
+                                         .includes(:ratings_config_version).order(id: :desc)
     end
 
     def select_model
@@ -21,7 +22,21 @@ module Admin
     end
 
     def show
-      page[:publication] = page[:season].preseason_publications.find(params.expect(:id))
+      page[:publication] = PreseasonPublicationPage.review(page[:season].preseason_publications).find(params.expect(:id))
+      page[:report] = PreseasonPublicationPreview.presentation(page[:publication].report)
+      page[:published_outputs] = PreseasonPublicationPage.outputs(page[:publication]) if page[:publication].status == 'published'
+    end
+
+    def progress
+      publication = page[:season].preseason_publications.select(:id, :status, :updated_at).find(params.expect(:id))
+      render json: { status: publication.status, updated_at: publication.updated_at.iso8601(6) }
+    end
+
+    def retry_preview
+      show
+      publication = page[:publication]
+      PreseasonPublicationPreviewQueue.new(publication).call
+      redirect_to admin_preseason_publication_path(publication, season_id: page[:season].id)
     end
 
     def create
@@ -31,11 +46,12 @@ module Admin
     end
 
     def publish
-      show
+      season = page[:season]
+      page[:publication] = PreseasonPublicationPage.summary(season.preseason_publications).find(params.expect(:id))
       publication = page.fetch(:publication)
       PreseasonPublicationQueue.new(publication, actor: current_user, fingerprint: params[:fingerprint],
                                                  acknowledge: params[:acknowledge]).call
-      redirect_to admin_preseason_publication_path(publication, season_id: page[:season].id)
+      redirect_to admin_preseason_publication_path(publication, season_id: season.id)
     end
 
     private
@@ -51,7 +67,7 @@ module Admin
     def review_error(error)
       page[:error] = error.message
       template = page[:publication] ? :show : :index
-      index if template == :index
+      public_send(template)
       render template, status: :unprocessable_content
     end
   end

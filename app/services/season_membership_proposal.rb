@@ -128,6 +128,12 @@ class SeasonMembershipProposal
   end
 
   def reviewed(submission)
+    proposal = reviewed_snapshot(submission)
+    self.class.validate_target_year(proposal, submission)
+    proposal
+  end
+
+  def reviewed_snapshot(submission)
     proposal = season.membership_proposal
     raise ArgumentError, 'Refresh proposals before approval.' if proposal.blank?
 
@@ -157,11 +163,9 @@ class SeasonMembershipProposal
   def validate_snapshot(proposal, submission)
     validator = self.class
     raise ArgumentError, 'Proposal changed; reload and review again.' unless submission.fetch('proposal_key') == validator.digest(proposal)
-    unless proposal.fetch('fingerprint') == fingerprint
-      raise ArgumentError, 'Local roster, dates or memberships changed; refresh and review again.'
-    end
+    return if proposal.fetch('fingerprint') == fingerprint
 
-    validator.validate_target_year(proposal, submission)
+    raise ArgumentError, 'Local roster, dates or memberships changed; refresh and review again.'
   end
 
   def proposed_rows(matches)

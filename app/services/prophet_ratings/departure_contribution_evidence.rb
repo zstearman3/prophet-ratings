@@ -23,14 +23,50 @@ module ProphetRatings
 
       payload = revision.payload
       provenance = revision.attributes.slice('id', 'version', 'input_hash', 'dataset_hash', 'review_hash', 'season_id')
-      captured_dataset(payload).merge(payload.fetch('report').slice('selections'), 'review' => payload.fetch('review'),
-                                                                                   'revision' => provenance)
+      captured_dataset(payload).merge('selections' => compact_selections(payload.fetch('report').fetch('selections')),
+                                      'review' => ReviewedInputRevisions.approval(payload.fetch('review')), 'revision' => provenance)
     end
 
     def self.captured_dataset(payload)
       dataset = payload.fetch('dataset')
       discriminator = dataset['schema'] == Departures::CbbdDataset::VERSION ? %w[schema extraction_version provider] : []
-      dataset.slice(*discriminator, 'draft_year', 'prior_season_year', 'target_year', 'expected_picks', 'failures', 'sources')
+      captured = dataset.slice(*discriminator, 'draft_year', 'prior_season_year', 'target_year', 'expected_picks', 'failures',
+                               'production_warnings')
+      captured.merge(automatic_scope(dataset), 'sources' => source_references(dataset))
+    end
+
+    def self.compact(evidence)
+      return unless evidence
+
+      ReviewedInputRevisions.compact_evidence(evidence).merge('sources' => source_references(evidence),
+                                                              'selections' => compact_selections(evidence.fetch('selections')))
+    end
+
+    def self.source_references(dataset)
+      dataset.fetch('sources').map { |source| source.except('rows') }
+    end
+
+    # Replay consumes complete selection accounting; raw provider rosters remain in the hashed revision.
+    def self.compact_selections(rows)
+      rows.map { |row| compact_selection(row) }
+    end
+
+    def self.compact_selection(row)
+      row.merge('stints' => row.fetch('stints').map { |stint| compact_stint(stint) })
+    end
+
+    def self.compact_stint(stint)
+      result = stint.except('raw_player_row', 'raw_team_row')
+      scopes = stint['scope_rows']
+      return result unless scopes
+
+      result.merge('scope_rows' => scopes.transform_values do |scope|
+        scope&.except('players', 'raw_player_row', 'raw_team_row')
+      end)
+    end
+
+    def self.automatic_scope(dataset)
+      Departures::CbbdDataset.automatic?(dataset) ? dataset.slice('team_matches', 'draft_policy', 'scope_evidence') : {}
     end
 
     def validate_review
@@ -111,7 +147,7 @@ module ProphetRatings
     end
 
     def self.selection_team_ids(row)
-      row.fetch('candidate_team_ids', []) + row.fetch('stints').pluck('team_id')
+      row.fetch('candidate_team_ids', []) + row.fetch('unknown_team_ids', []) + row.fetch('stints').pluck('team_id')
     end
 
     def self.validate_production(rows)
