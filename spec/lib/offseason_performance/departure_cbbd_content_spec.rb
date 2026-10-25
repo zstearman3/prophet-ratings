@@ -5,8 +5,35 @@ require Rails.root.join('script/performance/content')
 require Rails.root.join('script/performance/departure_cbbd_content')
 require Rails.root.join('script/performance/runner')
 require Rails.root.join('script/performance/phase_queue')
+require Rails.root.join('script/performance/telemetry')
 
 RSpec.describe OffseasonPerformance::DepartureCbbdContent do
+  def track_source_archives
+    archives = []
+    allow(Departures::SourceNormalizer).to receive(:new).and_wrap_original do |constructor, *arguments|
+      paths = Dir.glob(File.join(Dir.tmpdir, 'departure-benchmark-*', '**', '*'))
+      archives << paths.count { |path| File.file?(path) }
+      constructor.call(*arguments)
+    end
+    archives
+  end
+
+  def retained_legacy_fixture(season)
+    original = nil
+    expected = nil
+    Dir.mktmpdir do |directory|
+      storage = { directory:, evidence: {} }
+      content = OffseasonPerformance::Content.new(scale: 1)
+      sources = content.each_source.map { |source, html| OffseasonPerformance::EvidenceFixture.retain_source(source, html, storage) }
+      manifest = OffseasonPerformance::Content.plan.merge('sources' => sources)
+      expected = Departures::AnnualDataset.new(manifest:, directory:).call
+      batch = DepartureBatch.create!(season:, plan: manifest)
+      original = batch.acquisitions.create!(plan: manifest, manifest:, evidence: storage.fetch(:evidence), dataset: expected,
+                                            status: 'completed')
+    end
+    [original, expected]
+  end
+
   it 'retains the original benchmark default scenarios and makes normalization explicitly opt-in' do
     options = OffseasonPerformance::RunOptions.parse(%w[--scenario departure_normalization --scale 2])
     expect(options).to include(scenario: 'departure_normalization', scale: 2)
@@ -93,6 +120,20 @@ RSpec.describe OffseasonPerformance::DepartureCbbdContent do
       expect(OffseasonPerformance::DepartureNormalizationDriver).to have_received(:call)
     end
 
+    it 'retains the scalar job arguments in the result returned by execute' do
+      require Rails.root.join('script/performance/driver')
+      scenario = OffseasonPerformance::Scenario.new('departure_normalization', 'legacy', fixture)
+      driver = OffseasonPerformance::Driver.allocate
+      driver.instance_variable_set(:@scenario, scenario)
+      job = OffseasonPerformance::LegacyDepartureNormalizationJob.new(37)
+      allow(OffseasonPerformance::DepartureNormalizationDriver).to receive(:enqueue).with(scenario).and_return(job)
+      allow(OffseasonPerformance::DepartureNormalizationDriver).to receive(:wait).with(job.job_id).and_return('terminal' => 'performed')
+      allow(OffseasonPerformance::DepartureNormalizationDriver).to receive(:read_normalization)
+        .with('legacy').and_return('status' => 'completed')
+      allow(OffseasonPerformance::DepartureNormalizationDriver).to receive(:verify)
+      expect(driver.execute({}).fetch('job_arguments')).to eq([37])
+    end
+
     it 'rejects incomplete phases and erroneous terminal outputs' do
       require Rails.root.join('script/performance/driver')
       results = [{ 'scenario' => 'departure_normalization', 'phase' => 'legacy', 'failures' => [] }]
@@ -125,6 +166,29 @@ RSpec.describe OffseasonPerformance::DepartureCbbdContent do
       expect(Departures::RetainedEvidence.new(attempt).verified_dataset(attempt.plan).fetch('production').size).to eq(3)
     end
 
+    it 'clones the exact legacy manifest without constructing or serializing its Ruby tree' do
+      season = create(:season, year: 2026)
+      manifest = OffseasonPerformance::Content.plan.merge('sources' => [{ 'id' => 'retained', 'facts' => [nil, false, 1.25] }])
+      batch = DepartureBatch.create!(season:, plan: manifest)
+      original = batch.acquisitions.create!(plan: manifest, manifest:, status: 'completed')
+      calls = []
+      successor = nil
+      trace = TracePoint.new(:call) do |event|
+        calls << event.method_id if event.self.is_a?(ActiveRecord::Type::Json) && %i[serialize deserialize].include?(event.method_id)
+      end
+      trace.enable { successor = OffseasonPerformance::LegacyDepartureNormalizationJob.attempt(original.id) }
+      expect(calls).to eq([])
+      expect(successor).to have_attributes(manifest:, plan: manifest.except('sources'), status: 'running',
+                                           departure_batch_id: batch.id, evidence: {}, dataset: {})
+      expect(original.reload).to have_attributes(manifest:, status: 'completed')
+      expect(successor.id).not_to eq(original.id)
+      expect(successor.created_at).to be_present
+    end
+
+    it 'rejects a missing original acquisition rather than fabricating a benchmark attempt' do
+      expect { OffseasonPerformance::LegacyDepartureNormalizationJob.attempt(-1) }.to raise_error(ActiveRecord::RecordNotFound)
+    end
+
     it 'executes the exact-corpus adapter and matches file replay on a small correctness fixture' do
       require Rails.root.join('script/performance/evidence_fixture')
       stub_const('OffseasonPerformance::Content::TEAMS', 3)
@@ -132,25 +196,23 @@ RSpec.describe OffseasonPerformance::DepartureCbbdContent do
       allow(ENV).to receive(:fetch).and_call_original
       allow(ENV).to receive(:fetch).with('BENCHMARK_SCALE').and_return('1')
       season = create(:season, year: 2026)
-      original = nil
-      expected = nil
-      Dir.mktmpdir do |directory|
-        storage = { directory:, evidence: {} }
-        content = OffseasonPerformance::Content.new(scale: 1)
-        sources = content.each_source.map { |source, html| OffseasonPerformance::EvidenceFixture.retain_source(source, html, storage) }
-        manifest = OffseasonPerformance::Content.plan.merge('sources' => sources)
-        expected = Departures::AnnualDataset.new(manifest:, directory:).call
-        batch = DepartureBatch.create!(season:, plan: manifest)
-        original = batch.acquisitions.create!(plan: manifest, manifest:, evidence: storage.fetch(:evidence), dataset: expected,
-                                              status: 'completed')
-      end
+      original, expected = retained_legacy_fixture(season)
       retained = nil
       allow(File).to receive(:write).and_call_original
       allow(File).to receive(:write).with('/benchmark/departure-normalization-legacy.json', anything) do |_path, bytes|
         retained = JSON.parse(bytes)
         bytes.bytesize
       end
+      archives = track_source_archives
+      metrics = { 'sql_count' => 0, 'sql_ms' => 0.0, 'cache_hits' => 0 }
+      memory = { 'current_bytes' => 1024, 'peak_bytes' => 2048, 'rss_bytes' => 1024, 'cpu_usec' => 0,
+                 'peak_method' => 'synthetic_spec_snapshot' }
+      allow(OffseasonPerformance::Telemetry).to receive_messages(memory:, context: metrics)
       OffseasonPerformance::LegacyDepartureNormalizationJob.perform_now(original.id)
+      expect(archives.max).to be <= 1
+      expect(metrics.fetch('stages').pluck('stage'))
+        .to eq(%w[clone_begin clone_complete captures_complete dataset_complete checkpoint_complete])
+      expect(metrics.fetch('stages')).to all(include(memory))
       expect(retained).to include('status' => 'completed', 'source_count' => 4, 'player_observations' => 45,
                                   'dataset_revision' => expected.fetch('dataset_revision'))
       expect(OffseasonPerformance::LegacyDepartureNormalizationJob.new(original.id).arguments).to eq([original.id])

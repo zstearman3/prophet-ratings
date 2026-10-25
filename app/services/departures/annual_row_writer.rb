@@ -6,13 +6,13 @@ module Departures
     def initialize(record, sources)
       @record = record
       @sources = sources
-      @settings = record.header
     end
 
     def call
       record.with_lock do
         next if record.status == 'completed'
 
+        @settings = record.header
         populate
         complete
       end

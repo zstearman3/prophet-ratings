@@ -553,7 +553,13 @@ SourceSnapshot adapter, persists normalized records, and streams the complete
 logical dataset digest. Both the exact original digest and processed school/player
 observation cardinalities must match the original fixture (8,030/120,450 at 1×;
 16,060/240,900 at 2×). This offline adapter does not enable HTML network acquisition
-or rewrite existing historical attempts.
+or rewrite existing historical attempts. The benchmark clones the persisted
+legacy manifest inside PostgreSQL and loads a fresh acquisition, preserving its
+exact metadata while avoiding a Ruby JSON roundtrip solely to create the measured
+attempt. Raw source tempfiles are removed after each observation is retained;
+normalized source batches remain fixed at 250. Scalar legacy worker stage counters
+mark cloning, capture completion, annual dataset completion and the final
+checkpoint; these diagnostics neither force GC nor change query caching.
 
 `cbbd` separately measures normal acquisition/checkpoints, PostgreSQL cursor source
 normalization and annual team combination for five nonempty JSON responses:
@@ -575,3 +581,31 @@ PostgreSQL database bytes. Existing whole-container peak/current/RSS, elapsed,
 SQL/GC, Docker/runtime versions, host contention and database counters remain in
 the run artifacts. Synchronous review/publication performance is outside this
 scenario; it must not be inferred from normalization results.
+
+### Resumed departure normalization evidence (2026-10-25)
+
+The final source-matched pair is
+`tmp/departure-ticket/resume-measured-normalization-{1x,2x}.json`, owners
+`offseason-fcfc20afdc68ce9a` / `offseason-d27299acc1f11b95`. All 1,077 source
+hashes match between scales. Both full-corpus legacy jobs and separate five-response
+CBBD jobs reached performed terminals with normal query caching; original legacy
+counts and replay digests matched exactly.
+
+| Worker whole-container peak | 1x bytes | 2x bytes | Growth bytes |
+| --- | ---: | ---: | ---: |
+| Legacy | 319,356,928 | 433,881,088 | 114,524,160 |
+| CBBD | 231,456,768 | 231,694,336 | 237,568 |
+
+Legacy still fails AC2: 2x exceeds 400 MiB and growth exceeds 50 MiB. CBBD passes.
+At 2x, the legacy cumulative peak was 404,918,272 bytes at checkpoint completion,
+then 433,881,088 after terminal accounting/output; the latter remains the acceptance
+measurement. Stage timing identifies an interval, not an individual allocation.
+No GC forcing, cache disabling, smaller corpus, batch change or cap increase was
+used. PostgreSQL peaks were separately 1,586,356,224/2,770,911,232 bytes with no
+OOM in the completed pair. Existing local stacks remained running.
+
+A preceding fixture-only attempt lost its database to OOM; an unchanged retry
+produced this completed pair. Another fixture-only run was intentionally interrupted
+before the final correctness fix. Neither supplies worker acceptance evidence.
+See [the implementation handoff](departure-capture-handoff.md) for exact commands,
+source provenance, intermediate attempts, remaining failure and verification gates.

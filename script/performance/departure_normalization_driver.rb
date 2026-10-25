@@ -8,7 +8,7 @@ module OffseasonPerformance
       result['worker'] = wait(job.job_id)
       result['normalization'] = read_normalization(scenario.phase)
       verify(result.fetch('normalization'), scenario)
-      result.merge('job_arguments' => job.arguments)
+      result.merge!('job_arguments' => job.arguments)
     end
 
     def self.read_normalization(phase)

@@ -241,7 +241,9 @@ retaining an Active Record object for every annual output row in a transaction
 or association cache. A source is usable only after its normalization completes. Interrupted work
 cannot certify complete coverage or zero production; explicit retry replaces
 incomplete rows without renewing an acquisition's request budget. Duplicate
-athlete/team identities across batches remain failures.
+athlete/team identities across batches remain failures. Capture-only coverage
+readers retain normalization failures and expose rows only from completed sources;
+failed postseason parsing cannot become evidence of absent participation.
 
 Annual derivations are keyed separately by the frozen manifest/extraction policy.
 They process one provider team at a time with the existing reconciliation and
@@ -263,6 +265,8 @@ rows; the additive migration must run before new acquisitions. Source bodies are
 private evidence, not disposable cache entries. Database deletion constraints and
 immutable models preserve acquisition provenance.
 
-This bounds acquisition/source/annual normalization memory. Synchronous review,
+Row transfer batches are bounded, but the full legacy normalization benchmark
+still exceeds its 400 MiB peak and 50 MiB growth budgets at 2x; see
+`docs/departure-capture-handoff.md` for final source-matched evidence. Synchronous review,
 file export and publication still expand logical datasets; their peak-memory
 redesign belongs to offseason performance ticket05.

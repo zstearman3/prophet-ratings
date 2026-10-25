@@ -1,21 +1,44 @@
 # frozen_string_literal: true
 
+require_relative 'telemetry'
+
 module OffseasonPerformance
   # The measured worker consumes the exact original Content corpus, retaining all observations.
   class LegacyDepartureNormalizationJob < HeavyJob
+    CLONE_SQL = <<~SQL.squish.freeze
+      INSERT INTO departure_acquisitions (departure_batch_id, manifest, plan, status, created_at, updated_at)
+      SELECT departure_batch_id, manifest, manifest - 'sources', 'running', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+      FROM departure_acquisitions WHERE id = $1
+      RETURNING id
+    SQL
+
     def perform(original_id)
+      Telemetry.stage('clone_begin')
       attempt = self.class.attempt(original_id)
+      Telemetry.stage('clone_complete')
+      normalize(attempt)
+    end
+
+    def normalize(attempt)
       LegacyDepartureSources.new(attempt).call
+      Telemetry.stage('captures_complete')
       record = Departures::StoredDataset.new(attempt).call
+      Telemetry.stage('dataset_complete')
+      self.class.finish(attempt, record)
+    end
+
+    def self.finish(attempt, record)
       attempt.update!(dataset: Departures::StoredDataset.reference(record), status: 'completed', finished_at: Time.current)
+      Telemetry.stage('checkpoint_complete')
       DepartureNormalizationResult.new(attempt, record).write('legacy')
     end
 
     def self.attempt(id)
-      original = DepartureAcquisition.select(:id, :departure_batch_id, :manifest).find(id)
-      attributes = original.attributes.slice('departure_batch_id', 'manifest')
-                           .merge('plan' => original.manifest.except('sources'), 'status' => 'running')
-      DepartureAcquisition.create!(attributes)
+      bind = ActiveRecord::Relation::QueryAttribute.new('original_id', id, DepartureAcquisition.type_for_attribute('id'))
+      result = DepartureAcquisition.connection.exec_query(CLONE_SQL, 'Clone benchmark departure manifest', [bind])
+      raise ActiveRecord::RecordNotFound, 'Missing original benchmark departure acquisition' if result.empty?
+
+      DepartureAcquisition.find(result.first.fetch('id'))
     end
   end
 

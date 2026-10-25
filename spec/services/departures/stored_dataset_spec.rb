@@ -58,6 +58,38 @@ RSpec.describe Departures::StoredDataset do
     Departures::DatasetStream.new(record).expand
   end
 
+  it 'uses the header reloaded under the annual lock rather than a stale settings tree' do
+    attempt = stored_attempt
+    storage = described_class.new(attempt)
+    sources = storage.parsed_sources
+    record = storage.normalization(sources.transform_values(&:id))
+    writer = Departures::AnnualRowWriter.new(record, sources)
+    header = record.header.merge('sources' => record.header.fetch('sources') + [{ 'id' => 'missing', 'failure' => 'Retained failure' }])
+    DepartureDatasetNormalization.find(record.id).update!(header:)
+    writer.call
+    expect(record.rows.where(kind: 'failures').pluck(:fact)).to include('id' => 'missing', 'failure' => 'Retained failure')
+  end
+
+  it 'streams canonical nested header bytes in bounded chunks without changing scalar semantics' do
+    header = { 'sources' => Array.new(3000) { { 'z' => [nil, false, -0.0, 1.25e-30, 1e30], 'a' => "雪\n\"" } },
+               'empty' => [{}, []] }
+    record = described_class.new(stored_attempt).call
+    record.header = header
+    output = +''
+    chunks = []
+    sink = Object.new
+    sink.define_singleton_method(:<<) do |bytes|
+      chunks << bytes.bytesize
+      output << bytes
+      self
+    end
+    Departures::DatasetStream.new(record).write(sink)
+    facts = Departures::DatasetStream::KINDS.first(3).index_with { |kind| record.rows.where(kind:).order(:ordinal).pluck(:fact) }
+    expected = header.merge(facts)
+    expect(output).to eq(JSON.generate(expected, sort_keys: true))
+    expect(chunks.max).to be < 65_536
+  end
+
   it 'preserves the full logical dataset and digest while storing shared bytes once' do
     attempt = stored_attempt
     legacy = Departures::AnnualDataset.new(manifest: attempt.manifest, directory:).call
@@ -272,6 +304,28 @@ RSpec.describe Departures::StoredDataset do
     expect(sources.values).to all(be_frozen)
     expect(sources.values.map(&:status)).to all(eq('completed'))
     expect(expanded(attempt)).to eq(Departures::AnnualDataset.new(manifest: attempt.manifest, directory:).call)
+  end
+
+  context 'with failed capture-only source normalization' do
+    %w[malformed-routing duplicate-player].each do |failure|
+      it "keeps #{failure} failures explicit without inferring absent postseason participation" do
+        plan.replace(plan.except('expected_picks', 'scope_evidence').merge('schema' => Departures::CapturePreparation::VERSION,
+                                                                           'extraction_version' => Departures::CbbdDataset::EXTRACTION))
+        failure == 'malformed-routing' ? rows[2].first.delete('teamId') : rows[2] << rows[2].first.deep_dup
+        rows[4] = []
+        attempt = stored_attempt
+        models = [Team, TeamSeason, TeamExternalIdentity, TeamOffseasonProfile, TeamRatingSnapshot, OffseasonInputRevision]
+        counts = models.map(&:count)
+        reader = Departures::RetainedEvidence.new(attempt)
+        expect(reader.acquisition_result.fetch(:status)).to eq('incomplete')
+        source = reader.captured_sources.find { |entry| entry['id'] == 'player-postseason' }
+        expect(source).to include('failure' => be_present, 'rows' => [])
+        report = Departures::CoverageEvidence.new(attempt).call
+        expect(report.fetch('sources').find { |entry| entry['id'] == 'player-postseason' }.fetch('failure')).to eq(source.fetch('failure'))
+        expect(report.fetch('no_postseason_teams')).to eq([])
+        expect(models.map(&:count)).to eq(counts)
+      end
+    end
   end
 
   context 'with malformed source routing identities' do

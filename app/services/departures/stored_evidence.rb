@@ -10,12 +10,19 @@ module Departures
     def captured_sources
       normalized = StoredDataset.new(attempt).parsed_sources
       attempt.manifest.fetch('sources').map do |source|
-        source.merge('rows' => self.class.rows(normalized[source['id']]))
+        self.class.source_result(source, normalized[source['id']])
       end
     end
 
+    def self.source_result(source, normalization)
+      result = source.merge('rows' => rows(normalization))
+      return result unless normalization && normalization.status != 'completed'
+
+      result.merge('failure' => normalization.failure.presence || 'Source normalization is not complete')
+    end
+
     def self.rows(source)
-      source ? source.rows.order(:ordinal).pluck(:fact) : []
+      source&.status == 'completed' ? source.rows.order(:ordinal).pluck(:fact) : []
     end
 
     def acquisition_result

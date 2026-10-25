@@ -3,6 +3,18 @@
 module Departures
   # Canonical ordered JSON without assembling the annual production array in Ruby.
   class DatasetStream
+    # JSON's streaming API writes bounded buffers; callers use the append interface.
+    JsonOutput = Struct.new(:output) do
+      def write(bytes)
+        output << bytes
+        bytes.bytesize
+      end
+
+      def flush
+        self
+      end
+    end
+
     KINDS = %w[selections production failures production_warnings].freeze
 
     def initialize(record)
@@ -47,7 +59,7 @@ module Departures
       if kinds.include?(key)
         write_rows(output, key)
       else
-        output << JSON.generate(@record.header.fetch(key), sort_keys: true)
+        JSON::State.new(sort_keys: true).generate(@record.header.fetch(key), JsonOutput.new(output))
       end
     end
 

@@ -7,16 +7,16 @@ module OffseasonPerformance
       @attempt = attempt
       @sources = attempt.manifest.fetch('sources').index_by { |source| source.fetch('id') }
       @references = {}
-      @directory = nil
     end
 
     def call
-      Dir.mktmpdir('departure-benchmark-') { |directory| normalize(directory) }
+      normalize
       @attempt.update!(evidence: { 'storage_version' => Departures::CaptureStore::VERSION, 'observations' => @references })
+      # Discard save mutation snapshots before annual normalization deserializes its own metadata header.
+      @attempt.reload
     end
 
-    def normalize(directory)
-      @directory = directory
+    def normalize
       content = Content.new(scale: Integer(ENV.fetch('BENCHMARK_SCALE')))
       content.each_source { |source, bytes| retain(source.fetch('id'), bytes) }
     end
@@ -24,14 +24,16 @@ module OffseasonPerformance
     def retain(id, bytes)
       source = @sources.fetch(id)
       Departures::RetainedEvidence.validate_bytes(source, bytes)
-      Departures::Contract.write_bytes(File.join(@directory, source.fetch('snapshot_location')), bytes)
-      capture(source)
+      capture(source, bytes)
       Departures::SourceNormalizer.new(source, bytes, @attempt.plan).call
     end
 
-    def capture(source)
-      evidence = Departures::CaptureStore.new(@attempt).retain({ 'sources' => [source] }, @directory)
-      @references.merge!(evidence.fetch('observations'))
+    def capture(source, bytes)
+      Dir.mktmpdir('departure-benchmark-') do |directory|
+        Departures::Contract.write_bytes(File.join(directory, source.fetch('snapshot_location')), bytes)
+        evidence = Departures::CaptureStore.new(@attempt).retain({ 'sources' => [source] }, directory)
+        @references.merge!(evidence.fetch('observations'))
+      end
     end
   end
 
