@@ -1,0 +1,18 @@
+<section class="mx-auto max-w-3xl space-y-6 pb-12">
+  <h1 class="text-3xl font-bold">Confirm reviewed result</h1>
+  <p><%= schedule_observation_matchup(page[:observation]) %> · <%= page[:observation].normalized_payload['schedule_date'] %></p>
+  <p class="text-xl font-semibold">Selected result: <%= page[:selected].dig(:home, :score) %>–<%= page[:selected].dig(:away, :score) %>.</p>
+  <% winning_side = page[:selected].dig(:home, :score) > page[:selected].dig(:away, :score) ? 'Home' : 'Away' %>
+  <p><%= winning_side %> team wins.</p>
+  <% if %i[home away].any? { |label| page[:selected].dig(label, :score) != page[:evidence].payload.dig(label, :score) } %>
+    <p role="alert" class="rounded bg-yellow-100 p-3">This changes the reported result. Original score: <%= page[:evidence].payload.dig(:home, :score) %>–<%= page[:evidence].payload.dig(:away, :score) %>.</p>
+  <% end %>
+  <p>Approval imports this result with the selected point totals. Original shooting counts and source evidence remain unchanged, including any scoring mismatch. Eligible games enter ratings using these selected points; name-only opponents remain outside ratings.</p>
+  <p>Your identity, approval time, and selected values will be recorded automatically as Approved by admin.</p>
+  <%= form_with url: admin_schedule_refresh_run_game_scoring_review_path(page[:run], page[:observation]), method: :patch do %>
+    <% page[:choices].each do |label, total| %><%= hidden_field_tag "choices[#{label}]", total %><% end %>
+    <%= hidden_field_tag :confirmed, '1' %>
+    <%= submit_tag 'Approve and import selected result', class: 'rounded bg-prophet-indigo px-4 py-2 text-white' %>
+  <% end %>
+  <%= link_to 'Change selection', admin_schedule_refresh_run_game_scoring_review_path(page[:run], page[:observation]), class: 'text-blue-700 underline' %>
+</section>

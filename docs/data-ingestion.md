@@ -484,6 +484,43 @@ source row has no safely matched local Game, absence conclusions are suppressed
 for its entire date. Fully reconciled dates and recognized empty dates still
 report genuine absences; ambiguity/conflicts still fail and roll back the date.
 
+## Explicit historical CBBD scoring review
+
+Migration `20261024020000` adds immutable `GameScoringReview` decisions and links
+accepted/replayed observations to them. Restart web and worker after migrating
+through the normal isolated/local workflow. The admin entry point is the rejected
+observation's **Resolve scoring discrepancy** action within a historical schedule
+refresh run. GET and the result preview never import. Final submission requires
+admin authentication, a scoped retained rejection, choices drawn from supplied
+totals, and explicit confirmation; **Approved by admin** and audit identity/time
+are automatic, with no typed reason.
+
+Only complete confirmed CBBD finals with disagreements between game score, box
+points, or scoring-component arithmetic qualify. Original non-scoring metadata,
+period/mirror conflicts, missing/invalid counts, impossible attempts, duration,
+participant and identity conflicts remain held. All supplied shooting counts are
+preserved. The selected total becomes Game score and TeamGame points; an immutable,
+exact-input scoring exception permits finalization and rates from those points.
+See [ratings.md](ratings.md#explicitly-reviewed-scoring-discrepancies) for the
+resulting statistical assumption. Existing completed games cannot be overwritten
+through this initial review workflow.
+
+The original raw/normalized observation is unchanged. The decision, accepted import,
+game, identities and derived stats commit atomically under existing date/source
+locks; failure rolls them all back. A review links the original observation/run,
+approving user/time, automatic reason, choices, resolved participant IDs and exact
+approved normalized values. The accepted observation is distinguished by its
+review foreign key and `admin_reviewed_scoring` reason prefix.
+
+Meaningful normalized source facts are fingerprinted without capture time/IDs or
+raw JSON ordering. An unchanged-source retry reuses the recorded selection before
+the original scoring validation hold. Changed source facts, participant mappings,
+superseded identities or stored box values cannot reuse it. Changed reviewed
+completed results remain visible holds for further investigation. Original run
+reports retain historical failure evidence; a retry with its own request budget
+recomputes date completion without duplicating games. No backfill, activation or
+model publication is triggered.
+
 ## Provider-scoped external identities
 
 `TeamExternalIdentity` and `GameExternalIdentity` attach durable provider keys to

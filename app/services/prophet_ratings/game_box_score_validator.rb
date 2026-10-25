@@ -13,8 +13,9 @@ module ProphetRatings
       rebounds: { offensive_rebounds: 1, defensive_rebounds: 1 }
     }.freeze
 
-    def initialize(game, label)
+    def initialize(game, label, scoring_review: nil)
       @game = game
+      @scoring_review = scoring_review
       @label = label
       @side = game.public_send("#{label}_team_game")
     end
@@ -62,6 +63,8 @@ module ProphetRatings
 
     def validate_components
       COMPONENTS.each do |field, components|
+        next if field == :points && @scoring_review&.matches_game?(@game)
+
         total = component_total(components)
         reject("#{field} does not equal component total") unless @side.public_send(field) == total
       end

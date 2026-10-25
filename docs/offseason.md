@@ -554,6 +554,27 @@ Games against name-only opponents stay visible, with no fabricated opponent
 membership. Completed name-only games use `final_unmatched` and do not enter
 ratings calculations. Inconsistent supplied scoring totals remain held for review.
 
+For eligible historical CBBD scoring discrepancies, open **Review date → Resolve
+scoring discrepancy**. Compare reported game/box points with the supplied shooting
+arithmetic and box counts. The reported final score is selected by default. Choose
+a trusted supplied total for each affected team, review the resulting score, then
+**Approve and import selected result**. No written reason is required: the app
+records **Approved by admin**, the reviewer, time, and exact choices automatically.
+A choice that changes the reported score is flagged before confirmation.
+
+The selected total becomes the stored game score and team points; eligible games
+enter ratings with those points even when unchanged shooting counts do not add
+up. Name-only opponents retain `final_unmatched` and remain outside ratings.
+The original observation stays unchanged, with an immutable review and linked
+accepted import recording the exception. Other invalid/missing stats or identity
+conflicts remain blocking; this action cannot overwrite a completed game.
+
+Approval imports one game. The original run keeps its historical failure evidence
+and displays the resolved game/review. Use **Retry unfinished dates with new
+budget** to recompute date completion. Identical source facts reuse the saved
+choice without duplicate games; changed source facts or stored game inputs remain
+held rather than silently reusing an approval. No ratings backfill is queued.
+
 A retained run records requester/time, provider, requested dates, fixed numeric
 limits, status and safe date/import/outcome evidence. Sports Reference permits
 three additional attempts for upcoming dates (5/10/20 second waits), or five for

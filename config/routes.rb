@@ -15,6 +15,9 @@ Rails.application.routes.draw do
     resources :schedule_refresh_runs, only: %i[index create show] do
       post :retry, on: :member
       post :defer, on: :collection
+      resources :game_scoring_reviews, only: %i[show update] do
+        post :preview, on: :member
+      end
     end
     get 'offseason_setup', to: 'offseason_setups#show', as: :offseason_setup
     post 'offseason_setup', to: 'offseason_setups#create'

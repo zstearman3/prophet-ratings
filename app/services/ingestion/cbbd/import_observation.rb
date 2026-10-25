@@ -12,12 +12,10 @@ module Ingestion
       end
 
       def call
-        observation = GameObservation.new(payload)
-        reasons = ImportValidation.new(row).reasons
-        return ObservationAudit.new(observation, nil).retain('invalid', reasons.join('; ')).merge(final_box: 'invalid') if reasons.any?
+        reviewed = ScoringReviewReplay.new(row, @season).call
+        return reviewed.merge(final_box: result_coverage(reviewed)) if reviewed
 
-        report = GameObservationImporter.new(observation:, season: @season).call
-        report.merge(final_box: result_coverage(report))
+        canonical_import
       end
 
       def payload
@@ -33,6 +31,15 @@ module Ingestion
       private
 
       attr_reader :row
+
+      def canonical_import
+        observation = GameObservation.new(payload)
+        reasons = ImportValidation.new(row).reasons
+        return ObservationAudit.new(observation, nil).retain('invalid', reasons.join('; ')).merge(final_box: 'invalid') if reasons.any?
+
+        report = GameObservationImporter.new(observation:, season: @season).call
+        report.merge(final_box: result_coverage(report))
+      end
 
       def metadata
         { contract_version: row['format'], semantic_profile: row['semantic_profile'], provider: row['provider'],

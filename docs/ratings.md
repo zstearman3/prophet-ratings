@@ -138,6 +138,25 @@ and home-court learning continue to require strict `Game.final` inputs. Raw or
 stale derived values on unmatched results cannot enter those cohorts. No model
 formula, solver contract or configuration hash changes.
 
+### Explicitly reviewed scoring discrepancies
+
+A historical CBBD scoring review can explicitly accept the reported team point
+total even when supplied 2PM, 3PM, and FTM imply a different total. The reported
+final score is the default; an admin may select another supplied scoring total
+only through the explicit result preview and confirmation. Stored game scores and
+TeamGame points use the selected value. Points-based efficiency, true shooting,
+results and later evaluations/ratings use those stored points; shooting-derived
+statistics continue using the supplied shooting counts. These relationships can
+therefore disagree intentionally. No missing basket or player attribution is
+inferred, and formula coefficients and the solver boundary stay unchanged.
+
+The exception requires an immutable GameScoringReview linked to original retained
+source evidence and the accepted import. The reviewed source facts, participant
+identities, selected totals and unchanged counts are persisted. Finalization only
+waives the points/component identity while all stored reviewed inputs still match;
+other validation remains strict. Name-only opponents stay outside strict-final
+ratings inputs. Existing rating snapshots are not recalculated by approval.
+
 ### Undefined rates
 
 Game stat formulas return null when their required inputs are missing/nonfinite
