@@ -4,6 +4,14 @@ module Departures
   # PostgreSQL parses once; the cursor transfers at most 250 original JSON objects per fetch.
   class JsonRows
     BATCH_SIZE = 250
+    CURSOR_SQL = <<~SQL.squish.freeze
+      DECLARE departure_json_rows NO SCROLL CURSOR FOR
+      WITH input AS MATERIALIZED (SELECT BODY_LITERAL::json AS body)
+      SELECT json_typeof(body) AS envelope, element.value::text AS original
+      FROM input LEFT JOIN LATERAL json_array_elements(
+        CASE WHEN json_typeof(body) = 'array' THEN body ELSE '[]'::json END
+      ) AS element(value) ON true
+    SQL
 
     def initialize(bytes)
       @bytes = bytes
@@ -30,14 +38,8 @@ module Departures
 
     def read(connection, &)
       json = connection.quote(@bytes.dup.force_encoding(Encoding::UTF_8))
-      connection.execute(<<~SQL.squish)
-        DECLARE departure_json_rows NO SCROLL CURSOR FOR
-        WITH input AS MATERIALIZED (SELECT #{json}::json AS body)
-        SELECT json_typeof(body) AS envelope, element.value::text AS original
-        FROM input LEFT JOIN LATERAL json_array_elements(
-          CASE WHEN json_typeof(body) = 'array' THEN body ELSE '[]'::json END
-        ) AS element(value) ON true
-      SQL
+      # Compact only static SQL; block substitution preserves quoted capture bytes.
+      connection.execute(CURSOR_SQL.sub('BODY_LITERAL') { json })
       opened = true
       fetch(connection, &)
     ensure

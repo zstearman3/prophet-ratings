@@ -150,13 +150,19 @@ RSpec.describe Departures::StoredDataset do
       expect(expanded(attempt)).to eq(Departures::AnnualDataset.new(manifest: attempt.manifest, directory:).call)
     end
   end
-  it 'preserves negative zero and exponent-valued raw JSON facts through PostgreSQL storage' do
+  it 'preserves whitespace, escaping and numeric semantics through storage and canonical replay' do
+    name = "Alpha  \u00a0\u00a0\u3000\u3000\"quoted\" \\ BODY_LITERAL \\1 \\&; %<json>s {{json}} \#{json}"
+    picks.first['name'] = regular_players.first['name'] = name
     regular_players.first['minutes'] = -0.0
     regular_players.first['annotation'] = { 'tiny' => 1.25e-30, 'large' => 1e30 }
     attempt = stored_attempt
     original = Departures::AnnualDataset.new(manifest: attempt.manifest, directory:).call
-    expect(expanded(attempt)).to eq(original)
-    expect(expanded(attempt).fetch('dataset_revision')).to eq(original.fetch('dataset_revision'))
+    record = described_class.new(attempt).call
+    source = DepartureSourceNormalization.find(record.source_normalization_ids.fetch('player-regular'))
+    expect(source.rows.order(:ordinal).first.fact).to eq(regular_players.first)
+    expect(Departures::RetainedEvidence.new(attempt).bytes('player-regular')).to eq(JSON.generate(regular_players).b)
+    expect(Departures::DatasetStream.new(record).expand).to eq(original)
+    expect(record.dataset_revision).to eq(original.fetch('dataset_revision'))
   end
 
   %w[cbbd-draft-season-totals-v3 cbbd-draft-season-totals-v4].each do |version|
@@ -217,6 +223,30 @@ RSpec.describe Departures::StoredDataset do
     expect(complete.status).to eq('completed')
     expect(complete.row_count).to eq(501)
     expect(complete.rows.count).to eq(501)
+  end
+
+  it 'isolates a batch SQL failure while retaining provenance and keeping the outer transaction usable', :aggregate_failures do
+    attempt = stored_attempt
+    source = attempt.manifest.fetch('sources').find { |entry| entry['id'] == 'player-regular' }
+    reader = Departures::RetainedEvidence.new(attempt)
+    bytes = reader.bytes('player-regular')
+    evidence = attempt.evidence.deep_dup
+    record = DepartureSourceNormalization.create!(identity: 'writer-sql-failure', contract: source,
+                                                  departure_source_capture: Departures::CaptureStore.capture(bytes))
+    ApplicationRecord.transaction(requires_new: true) do
+      expect do
+        Departures::SourceRowWriter.new(record, source).call do |writer|
+          writer.append([regular_players.first])
+          writer.append([player(2**63, 1, 1)])
+        end
+      end.not_to raise_error
+      expect(record.reload).to have_attributes(status: 'failed', failure: include('out of range'))
+      expect(record.rows.count).to eq(0)
+      expect(ApplicationRecord.connection.select_value('SELECT 1')).to eq(1)
+      expect(attempt.reload.evidence).to eq(evidence)
+      expect(reader.bytes('player-regular')).to eq(bytes)
+    end
+    expect(record.reload.status).to eq('failed')
   end
 
   it 'retains immutable acquisition provenance and reuses references in correction successors' do

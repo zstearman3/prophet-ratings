@@ -245,6 +245,13 @@ athlete/team identities across batches remain failures. Capture-only coverage
 readers retain normalization failures and expose rows only from completed sources;
 failed postseason parsing cannot become evidence of absent participation.
 
+Pre-release development normalizations created before the quoted-JSON whitespace
+fix can contain squished string facts under the same `departure-source-rows-v1`
+identity. Completed rows are reused, so this fix neither repairs nor detects those
+self-consistent old facts; digest checks still reject later row corruption.
+Verification of the fix uses fresh disposable databases. Storage is unreleased;
+there is no parser-version bump or automatic rewrite of existing evidence.
+
 Annual derivations are keyed separately by the frozen manifest/extraction policy.
 They process one provider team at a time with the existing reconciliation and
 production rules. Capture-only attempts do not freeze strict reconciliation for a

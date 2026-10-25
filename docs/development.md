@@ -492,7 +492,8 @@ import, rating backfill or production migration is required to verify the featur
 
 ### Departure review prerequisites
 
-Run `bin/migrate` for migration `20261021200000` before opening departure batches.
+Run `bin/migrate` for migrations `20261021200000` and `20261025040000` before
+opening departure batches or acquiring new captures.
 The existing GoodJob worker performs queued acquisition; web-only startup leaves
 attempts queued. Raw HTML/metadata and prior attempts are retained in PostgreSQL,
 so include these private tables in database backup and capacity/retention planning.
@@ -574,9 +575,10 @@ or when explicitly requested. When both scales are required, run them
 sequentially. Full baseline runs require an explicitly scoped refresh or audit.
 The benchmark owns its disposable services and never stops the development stack.
 
-Departure capture storage's additive migration introduces immutable PostgreSQL
-body/observation rows and normalized evidence tables. Include all of them in
-backups; do not clean these tables as if they were job caches. New browser
+Run `bin/migrate` to apply departure capture storage migration `20261025040000`
+before new browser acquisitions. This additive migration introduces immutable
+PostgreSQL body/observation rows and normalized evidence tables. Include all of
+them in backups; do not clean these tables as if they were job caches. New browser
 acquisitions require the migrated schema and PostgreSQL's native JSON functions;
 no new Ruby/Python dependency or historical conversion step is required. Existing
 file/manual captures retain the legacy contract. The opt-in

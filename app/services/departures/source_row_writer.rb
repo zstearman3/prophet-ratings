@@ -12,7 +12,7 @@ module Departures
     end
 
     def call
-      record.with_lock { write { yield self } }
+      record.with_lock(requires_new: true) { write { yield self } }
     rescue ArgumentError, KeyError, ActiveRecord::StatementInvalid => error
       record.reload.update!(status: 'failed', failure: error.message)
     end
