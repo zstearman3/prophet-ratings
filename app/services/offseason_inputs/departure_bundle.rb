@@ -39,11 +39,20 @@ module OffseasonInputs
     end
 
     def replay
+      @paths[:departure_attempt_id] ? database_replay : file_replay
+    end
+
+    def file_replay
       directory = @paths.fetch(:capture_dir)
       manifest = JSON.parse(File.read(File.join(directory, 'manifest.json')))
       dataset = Departures::AnnualDataset.new(manifest:, directory:).call
       validate_replay(dataset)
       dataset
+    end
+
+    def database_replay
+      attempt = DepartureAcquisition.find(@paths.fetch(:departure_attempt_id))
+      Departures::RetainedEvidence.new(attempt).verified_dataset(attempt.plan)
     end
 
     def validate_replay(dataset)
@@ -52,6 +61,8 @@ module OffseasonInputs
     end
 
     def evidence(dataset)
+      return DepartureAcquisition.find(@paths.fetch(:departure_attempt_id)).evidence if @paths[:departure_attempt_id]
+
       Departures::RetainedEvidence.sources(dataset).to_h do |source|
         [source.fetch('id'), { 'snapshot_base64' => retained_snapshot(source) }]
       end

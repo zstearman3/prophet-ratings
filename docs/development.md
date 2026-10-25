@@ -521,3 +521,12 @@ relevant scenario at 1×; use 2× for data-growth or memory-scaling investigatio
 or when explicitly requested. When both scales are required, run them
 sequentially. Full baseline runs require an explicitly scoped refresh or audit.
 The benchmark owns its disposable services and never stops the development stack.
+
+Departure capture storage's additive migration introduces immutable PostgreSQL
+body/observation rows and normalized evidence tables. Include all of them in
+backups; do not clean these tables as if they were job caches. New browser
+acquisitions require the migrated schema and PostgreSQL's native JSON functions;
+no new Ruby/Python dependency or historical conversion step is required. Existing
+file/manual captures retain the legacy contract. The opt-in
+`departure_normalization` performance scenario measures source processing only;
+ordinary verification still uses targeted specs and both hook suites.

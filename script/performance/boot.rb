@@ -46,3 +46,7 @@ end
 require_relative 'solver_job'
 
 require_relative 'mixed_jobs'
+
+require_relative 'departure_cbbd_content'
+require_relative 'departure_sources'
+require_relative 'departure_normalization'

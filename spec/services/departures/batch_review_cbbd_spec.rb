@@ -137,13 +137,11 @@ RSpec.describe Departures::BatchReview do
     attempt = capture
     review = described_class.new(batch)
     review.save('review_key' => review.review_key, 'rows' => rows)
-    evidence = attempt.evidence
-    evidence['capture-1']['snapshot_base64'] = Base64.strict_encode64('changed')
-    # Simulate corrupt bytes at the retained-storage boundary.
-    attempt.evidence = evidence
+    observation = DepartureCaptureObservation.find(attempt.evidence.fetch('observations').fetch('capture-1'))
+    corrupt_departure_capture(observation.departure_source_capture_id, 'changed')
     allow(batch).to receive(:attempt).and_return(attempt)
     expect { review.publish({ 'review_key' => review.review_key, 'confirm' => '1' }, reviewer: 'admin') }
-      .to raise_error(ArgumentError, /hash/)
+      .to raise_error(ArgumentError, /hash|identity mismatch/)
     expect(OffseasonInputRevision.count).to eq(0)
   end
 

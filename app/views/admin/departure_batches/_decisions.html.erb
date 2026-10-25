@@ -1,7 +1,7 @@
 <%= form_with url: admin_departure_batch_path(@batch), scope: :review, method: :patch, data: { turbo: false }, class: 'space-y-6' do |form| %>
   <%= form.hidden_field :review_key, value: @page[:review_key] %>
   <p>Choose an accounting category for each player, explain your decision and select the saved evidence that supports it. For an eligible college player, select every prior-season school stint and its existing team. Save a selected blank stint to add another. Saving decisions does not publish them.</p>
-  <% @page[:attempt].dataset.fetch('selections', []).each do |selection| %>
+  <% @page.fetch(:dataset).fetch('selections', []).each do |selection| %>
     <% key = selection.fetch('selection_key'); decision = @batch.decisions.find { |row| row['selection_key'] == key } || {} %>
     <fieldset class="min-w-0 rounded border p-4 space-y-4"><legend class="px-2 font-semibold">Pick <%= selection['overall_pick'] %> · Round <%= selection['round'] %> · <%= selection['player_name_source'] %></legend>
       <% if @page[:row_issues][key] %><p role="alert" class="rounded bg-red-100 p-3">Selection <%= key %>: <%= @page[:row_issues][key] %></p><% end %>

@@ -5,7 +5,7 @@ module OffseasonPerformance
   class Scenario
     GETS = %w[dashboard readiness departures preseason cbbd].freeze
     QUEUES = %w[preview publish schedule].freeze
-    NAMES = (GETS + %w[status compare] + QUEUES + %w[solver mixed]).freeze
+    NAMES = (GETS + %w[status compare] + QUEUES + %w[solver mixed departure_normalization]).freeze
     MARKERS = { 'dashboard' => 'Offseason', 'readiness' => 'Offseason readiness', 'departures' => 'Pick 60',
                 'preseason' => 'proposed-preseason-ratings', 'cbbd' => 'CBBD' }.freeze
     attr_reader :name, :phase, :fixture

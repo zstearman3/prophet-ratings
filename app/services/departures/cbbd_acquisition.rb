@@ -43,7 +43,7 @@ module Departures
       plan = manifest
       key = options.delete(:api_key) { ENV.fetch('CBBD_API_KEY', '') }
       Ingestion::Cbbd::Client.new(store: self, api_key: key, max_requests: plan.fetch('max_requests'),
-                                  retries: plan.fetch('retries'), **options)
+                                  retries: plan.fetch('retries'), metadata_only: options.delete(:metadata_only) { false }, **options)
     end
 
     def retain_capture(entry, captures)
