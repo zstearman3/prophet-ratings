@@ -1517,8 +1517,23 @@ normalizer retains all captures and the original ledger but cannot compare/apply
 Failed, finalized acquisitions with retained normalized subsets can be compared
 with a prominent incomplete warning; replay never upgrades their original result.
 
-**Refresh comparison from retained evidence** verifies digests and creates an exact
-immutable report/replay version using the originally stored normalized evidence.
+**Refresh comparison from retained evidence** queues `CompareCbbdReviewJob` on the
+serial heavy pool and returns immediately. Only the run ID and stored evidence
+digest/active-comparison/draft-revision/applied-decision identities enter the queue;
+the request does not load normalized replay. The worker verifies those identities
+inside the existing run lock before creating an exact immutable report/replay
+version. A duplicate or a save/apply/refresh that changes the pinned identity makes
+the old delivery a harmless no-op, preserving approvals and version history.
+A fresh explicit refresh pins the current draft and clears approvals only when
+its new comparison actually completes. Existing synchronous file/service callers
+still compare within the same run lock.
+
+The private run page shows retained GoodJob queued/running/finished/failed status
+and links to its job. Inspect `/good_job` for interrupted/stalled execution, confirm
+the worker is healthy, then request a fresh comparison to pin the current draft.
+No new comparison automatically applies mappings. Job status reads scalar metadata,
+without deserializing large job payloads or displaying private exception text.
+The comparison uses the originally stored normalized evidence.
 It makes no HTTP requests and does not automatically renormalize old captures.
 Team/game tables filter by status and name/ID and paginate at 50 rows. Search
 matches literal evidence values case-insensitively, including nested values, rather

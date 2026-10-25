@@ -1,8 +1,6 @@
 # frozen_string_literal: true
 
-class RepairDuplicateGamesJob < ApplicationJob
-  queue_as :default
-
+class RepairDuplicateGamesJob < HeavyJob
   def perform(season_id: nil, year: nil, apply: false)
     apply = ActiveModel::Type::Boolean.new.cast(apply)
     scope = game_scope(season_id:, year:)

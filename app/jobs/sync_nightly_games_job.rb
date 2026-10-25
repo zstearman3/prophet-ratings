@@ -1,8 +1,6 @@
 # frozen_string_literal: true
 
-class SyncNightlyGamesJob < ApplicationJob
-  queue_as :default
-
+class SyncNightlyGamesJob < HeavyJob
   PAST_LOOKBACK_DAYS = 2
 
   rescue_from Ingestion::GameSyncProvider::Incomplete do |error|

@@ -63,10 +63,32 @@ RSpec.describe 'Admin CBBD identity review', type: :request do
     expect(Game.count).to eq(0)
   end
 
+  it 'queues comparison without selecting replay or calculating in the HTTP process' do
+    sign_in admin
+    run
+    allow(Ingestion::Reconciliation::Comparison).to receive(:new).and_call_original
+    queries = review_queries do
+      expect { post compare_admin_cbbd_review_run_path(run) }.to have_enqueued_job(CompareCbbdReviewJob)
+        .with(run.id, Ingestion::Reconciliation::RunReview.new(run).comparison_identity)
+    end
+    expect(queries.join).not_to include('normalized_replay', '"cbbd_review_runs".*')
+    expect(Ingestion::Reconciliation::Comparison).not_to have_received(:new)
+    expect(run.reload.active_comparison_id).to be_nil
+  end
+
+  it 'shows durable comparison status and recovery guidance without loading job payloads or error text' do
+    sign_in admin
+    GoodJob::Job.create!(job_class: 'CompareCbbdReviewJob', labels: ["cbbd-comparison:#{run.id}"],
+                         serialized_params: { 'private' => 'payload-marker' }, error: 'private-error-marker', finished_at: Time.current)
+    get admin_cbbd_review_run_path(run)
+    expect(response.body).to include('Comparison: failed', 'Inspect comparison job in GoodJob', 'fresh comparison')
+    expect(response.body).not_to include('payload-marker', 'private-error-marker')
+  end
+
   it 'renders evidence, saves real indexed browser rows across sections and applies as signed-in actor' do
     sign_in admin
     game
-    post compare_admin_cbbd_review_run_path(run)
+    perform_enqueued_jobs { post compare_admin_cbbd_review_run_path(run) }
     comparison = run.reload.active_comparison
     get admin_cbbd_review_run_path(run)
     expect(response.body).to include('Source observations', 'Save visible draft', 'Shadow', 'Synthetic Home')
@@ -134,7 +156,7 @@ RSpec.describe 'Admin CBBD identity review', type: :request do
     AcquireCbbdReviewJob.perform_now(value.id)
     expect(value.reload.status).to eq('completed')
     expect(value.captures.count).to eq(2)
-    post compare_admin_cbbd_review_run_path(value)
+    perform_enqueued_jobs { post compare_admin_cbbd_review_run_path(value) }
     get admin_cbbd_review_run_path(CbbdReviewRun.find(value.id), entity: 'game')
     expect(response.body).to include('Synthetic Home', 'Source observations', 'Approve mapping')
     expect([TeamExternalIdentity.count, GameExternalIdentity.count, IdentityMappingDecision.count]).to eq([0, 0, 0])

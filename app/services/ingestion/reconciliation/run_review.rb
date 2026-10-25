@@ -12,6 +12,23 @@ module Ingestion
         locked { create_comparison(@run.verified_replay) }
       end
 
+      def enqueue_comparison
+        CompareCbbdReviewJob.perform_later(@run.id, comparison_identity)
+      end
+
+      def comparison_identity
+        pointer = @run.active_comparison_id
+        previous = @run.comparisons.select(:draft_revision, :identity_mapping_decision_id).find_by(id: pointer)
+        { 'evidence_digest' => @run.evidence_digest, 'active_comparison_id' => pointer,
+          'draft_revision' => previous&.draft_revision, 'identity_mapping_decision_id' => previous&.identity_mapping_decision_id }
+      end
+
+      def compare_pinned(identity)
+        locked do
+          create_comparison(@run.verified_replay) if comparison_identity == identity.stringify_keys
+        end
+      end
+
       def save(submission)
         locked do
           @comparison = current(submission)

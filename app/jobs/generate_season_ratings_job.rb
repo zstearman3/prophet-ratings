@@ -1,9 +1,8 @@
 # frozen_string_literal: true
 
-class GenerateSeasonRatingsJob < ApplicationJob
+class GenerateSeasonRatingsJob < HeavyJob
   include PinnedModelVersion
 
-  queue_as :default
   around_perform { |_job, block| Season.with_ratings_lock(&block) }
 
   # Delete/rebuild only an explicit season, config and historical date window.

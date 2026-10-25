@@ -1,9 +1,8 @@
 # frozen_string_literal: true
 
-class ResumeSeasonRatingsJob < ApplicationJob
+class ResumeSeasonRatingsJob < HeavyJob
   include PinnedModelVersion
 
-  queue_as :default
   around_perform { |_job, block| Season.with_ratings_lock(&block) }
 
   # Backfills ratings, predictions, and finalized game-derived values for a season.

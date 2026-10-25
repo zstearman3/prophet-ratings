@@ -1,8 +1,6 @@
 # frozen_string_literal: true
 
-class SyncDailyGamesJob < ApplicationJob
-  queue_as :default
-
+class SyncDailyGamesJob < HeavyJob
   rescue_from Ingestion::GameSyncProvider::Incomplete do |error|
     raise error
   end

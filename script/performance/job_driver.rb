@@ -3,34 +3,58 @@
 module OffseasonPerformance
   # Verifies real queued transitions and immutable comparison outputs after each HTTP request.
   class JobDriver
-    QUEUE_CLASSES = { 'preview' => 'PreviewPreseasonJob', 'publish' => 'PublishPreseasonJob', 'schedule' => 'RefreshScheduleJob' }.freeze
+    QUEUE_CLASSES = { 'preview' => 'PreviewPreseasonJob', 'publish' => 'PublishPreseasonJob', 'schedule' => 'RefreshScheduleJob',
+                      'compare' => 'CompareCbbdReviewJob' }.freeze
 
     def initialize(scenario)
       @scenario = scenario
     end
 
     def prepare
-      { 'publication' => (reviewed_preview if @scenario.publish?),
-        'before_job' => GoodJob::Job.maximum(:created_at) || Time.zone.at(0),
-        'before_comparison' => (CbbdReviewComparison.maximum(:id) if @scenario.comparison?) }
+      state = { 'publication' => (reviewed_preview if @scenario.publish?),
+                'before_job' => GoodJob::Job.maximum(:created_at) || Time.zone.at(0) }
+      if @scenario.comparison?
+        state['comparison_identity'] = comparison_identity
+        state['before_comparison'] = CbbdReviewComparison.maximum(:id)
+      end
+      state
     end
 
     def complete(result, state)
-      complete_queue(result, state) if @scenario.queued?
-      result['comparison_id'] = self.class.comparison(state.fetch('before_comparison')) if @scenario.comparison?
-      result
+      comparison = state['comparison_identity']
+      return result unless @scenario.queued? || comparison
+
+      job = completed_job(result, state.fetch('before_job'))
+      result.merge!(comparison ? comparison_result(job, comparison,
+                                                   state.fetch('before_comparison')) : { 'terminal' => terminal(job, state) })
     end
 
-    def complete_queue(result, state)
-      job = new_job(state.fetch('before_job'))
+    def completed_job(result, before)
+      job = new_job(before)
       result['worker'] = JobDriver.wait_job(job.active_job_id)
-      result['terminal'] = terminal(job, state)
+      job
     end
 
-    def self.comparison(before)
-      comparison = CbbdReviewComparison.where('id > ?', before.to_i).order(:id).last!
+    def comparison_result(job, identity, before)
+      raise 'Comparison pin mismatch' unless JobDriver.pin_matches?(job, identity)
+
+      { 'comparison_id' => self.class.comparison(before, @scenario.fixture.fetch('cbbd_id')) }
+    end
+
+    def self.pin_matches?(job, identity)
+      ActiveJob::Arguments.deserialize(job.serialized_params.fetch('arguments')) == identity
+    end
+
+    def self.comparison(before, run_id)
+      pointer = CbbdReviewRun.where(id: run_id).pick(:active_comparison_id)
+      comparison = CbbdReviewComparison.where(cbbd_review_run_id: run_id).where('id > ?', before.to_i).find(pointer)
       comparison.verify_artifact
       comparison.id
+    end
+
+    def comparison_identity
+      run = CbbdReviewRun.select(:id, :evidence_digest, :active_comparison_id).find(@scenario.fixture.fetch('cbbd_id'))
+      [run.id, Ingestion::Reconciliation::RunReview.new(run).comparison_identity]
     end
 
     def reviewed_preview
@@ -48,13 +72,16 @@ module OffseasonPerformance
     end
 
     def new_job(before)
-      job = GoodJob::Job.where('created_at > ?', before).order(created_at: :desc).first!
-      self.class.verify_identity(job, @scenario.name)
+      name = @scenario.name
+      driver = self.class
+      job = GoodJob::Job.where(job_class: QUEUE_CLASSES.fetch(name), queue_name: driver.queue)
+                        .where('created_at > ?', before).order(created_at: :desc).first!
+      driver.verify_identity(job, name)
       job
     end
 
     def self.queue
-      PhaseQueue.name(ENV.fetch('BENCHMARK_OWNER'), ENV.fetch('BENCHMARK_PHASE'))
+      PhaseQueue.name(ENV.fetch('BENCHMARK_OWNER'), ENV.fetch('BENCHMARK_PHASE'), 'heavy')
     end
 
     def self.verify_identity(job, name)

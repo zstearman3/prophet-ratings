@@ -48,6 +48,7 @@ RSpec.describe RefreshScheduleJob do
 
   it 'leaves a live run unchanged when its execution lock is held elsewhere' do
     run.update!(status: 'running', report: { days: [{ date: today.to_s }] })
+    allow(GoodJob::Job).to receive(:advisory_lock_key).and_call_original
     allow(GoodJob::Job).to receive(:advisory_lock_key).with("prophet-ratings:schedule-refresh:#{run.id}").and_return(false)
     expect { described_class.perform_now(run.id) }.not_to(change { run.reload.attributes })
   end

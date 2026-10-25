@@ -6,6 +6,7 @@ require_relative 'client'
 require_relative 'scenario'
 require_relative 'measurements'
 require_relative 'job_driver'
+require_relative 'mixed_workload'
 require 'benchmark'
 require 'securerandom'
 require 'socket'
@@ -34,7 +35,14 @@ module OffseasonPerformance
     end
 
     def collect(result)
-      result['cold'] = sample(@clients.first) if @scenario.get?
+      client = @clients.first
+      return MixedWorkload.new(@scenario).call(result) { http_sample(client, nil) } if @scenario.name == 'mixed'
+
+      collect_regular(result, client)
+    end
+
+    def collect_regular(result, client)
+      result['cold'] = sample(client) if @scenario.get?
       @scenario.solver? ? Driver.solver(result) : collect_windows(result)
     end
 
@@ -99,9 +107,15 @@ module OffseasonPerformance
 
     def http_sample(client, publication)
       id = SecureRandom.hex(12)
+      started_at = Time.now.to_f
       response, elapsed = timed_request(client, publication, id)
-      Measurements.http(response, id,
-                        { 'elapsed' => elapsed, 'valid' => @scenario.valid_response?(response), 'scenario' => @scenario.name })
+      metrics = Measurements.http(response, id,
+                                  { 'elapsed' => elapsed, 'valid' => @scenario.valid_response?(response), 'scenario' => @scenario.name })
+      Driver.finish_sample(metrics, started_at)
+    end
+
+    def self.finish_sample(metrics, started_at)
+      metrics.merge('started_at' => started_at, 'finished_at' => Time.now.to_f)
     end
 
     def timed_request(client, publication, id)

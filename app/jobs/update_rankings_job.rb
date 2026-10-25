@@ -1,11 +1,10 @@
 # frozen_string_literal: true
 
-class UpdateRankingsJob < ApplicationJob
+class UpdateRankingsJob < HeavyJob
   ADVISORY_LOCK_KEY = Season::RATINGS_LOCK_KEY
 
   include PinnedModelVersion
 
-  queue_as :default
   around_perform :run_with_exclusive_lock
 
   def perform(season = Season.current, enqueue_nightly_predictions: true, **options)

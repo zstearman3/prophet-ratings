@@ -16,7 +16,9 @@ x-app: &app
     CBBD_RETRIES: '0'
     WEB_CONCURRENCY: '0'
     PIDFILE: /benchmark/puma.pid
-    RAILS_MAX_THREADS: '5'
+    RAILS_MAX_THREADS: '3'
+    DB_POOL: '6'
+    GOOD_JOB_SUBPROCESSES: '0'
     BENCHMARK_OWNER: ${BENCHMARK_OWNER:?owner required}
     BENCHMARK_PHASE: ${BENCHMARK_PHASE:-setup}
     BENCHMARK_SCALE: ${BENCHMARK_SCALE:-1}

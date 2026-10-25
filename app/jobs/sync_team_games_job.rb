@@ -1,8 +1,6 @@
 # frozen_string_literal: true
 
-class SyncTeamGamesJob < ApplicationJob
-  queue_as :default
-
+class SyncTeamGamesJob < HeavyJob
   def perform(team_id, season_id = Season.last.id)
     team = Team.find(team_id)
     season = Season.find(season_id)

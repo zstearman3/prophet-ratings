@@ -32,5 +32,14 @@ module ProphetRatings
 
     config.active_job.queue_adapter = :good_job
     config.good_job.retry_on_unhandled_error = false
+    unless Rails.env.test?
+      # Web processes only enqueue, even if an inherited environment requests async.
+      config.good_job.execution_mode = :external
+      config.good_job.queues = ENV.fetch('GOOD_JOB_QUEUES', 'heavy:1;-heavy:1')
+      config.good_job.poll_interval = ENV.fetch('GOOD_JOB_POLL_INTERVAL', '1').to_i
+      config.good_job.subprocesses = ENV.fetch('GOOD_JOB_SUBPROCESSES', '0').to_i
+      config.good_job.shutdown_timeout = ENV.fetch('GOOD_JOB_SHUTDOWN_TIMEOUT', '30').to_i
+      config.good_job.enable_cron = false if Rails.env.development?
+    end
   end
 end

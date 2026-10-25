@@ -15,7 +15,7 @@ require_relative 'phase_runner'
 module OffseasonPerformance
   # Coordinates standalone runs while leaving application code, maintainer services and data untouched.
   class Runner
-    SCENARIOS = %w[dashboard readiness departures preseason status preview publish cbbd compare schedule solver].freeze
+    SCENARIOS = %w[dashboard readiness departures preseason status preview publish cbbd compare schedule solver mixed].freeze
     GETS = Scenario::GETS
 
     def initialize(argv)

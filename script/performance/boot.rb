@@ -44,3 +44,5 @@ ActiveJob::Base.around_perform do |job, block|
 end
 
 require_relative 'solver_job'
+
+require_relative 'mixed_jobs'

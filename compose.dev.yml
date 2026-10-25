@@ -7,7 +7,9 @@ x-app: &app
     DATABASE_URL: postgresql://postgres:password@db:5432/prophet_ratings_development
     GOOD_JOB_EXECUTION_MODE: external
     GOOD_JOB_ENABLE_CRON: "false"
-    GOOD_JOB_MAX_THREADS: "2"
+    GOOD_JOB_QUEUES: "heavy:1;-heavy:1"
+    GOOD_JOB_SUBPROCESSES: "0"
+    DB_POOL: "6"
     RAILS_MAX_THREADS: "3"
   env_file:
     - path: .env.docker

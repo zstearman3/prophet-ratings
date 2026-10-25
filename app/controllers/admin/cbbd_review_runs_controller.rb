@@ -31,7 +31,7 @@ module Admin
     end
 
     def compare
-      review.compare
+      review.enqueue_comparison
       redirect_to admin_cbbd_review_run_path(run), notice: I18n.t('admin.cbbd_review_runs.compared')
     end
 
@@ -72,7 +72,8 @@ module Admin
     end
 
     def load_run
-      @run = CbbdReviewRun.find(params.expect(:id))
+      scope = action_name == 'compare' ? CbbdReviewRun.select(:id, :evidence_digest, :active_comparison_id) : CbbdReviewRun.all
+      @run = scope.find(params.expect(:id))
     end
 
     def require_admin
