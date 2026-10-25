@@ -97,8 +97,7 @@ class SeasonConferenceAlignment
     existing = target_memberships.select { |candidate| candidate.team_id == team_id }
     return report_conflict(membership.admin_label) if existing.many?
 
-    existing = existing.first
-    reconcile_membership(membership, existing)
+    reconcile_membership(membership, existing.first)
   end
 
   def reconcile_membership(membership, existing)

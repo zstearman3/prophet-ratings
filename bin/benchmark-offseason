@@ -1,0 +1,9 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+Dir.chdir(File.expand_path('..', __dir__))
+require_relative '../script/performance/runner'
+runner = OffseasonPerformance::Runner.new(ARGV)
+%w[INT TERM].each { |signal| Signal.trap(signal) { raise Interrupt, signal } }
+runner.call
+exit runner.exit_code

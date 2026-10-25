@@ -71,13 +71,18 @@ module Admin
     end
 
     def default_window
-      season = page[:season]
-      return {} unless season
+      return {} unless page[:season]
 
-      historical = season.end_date < Game.current_schedule_date
-      first = historical ? season.start_date : [season.start_date, Game.current_schedule_date].max
+      first, last, historical = default_window_dates
       { 'mode' => historical ? 'historical' : 'upcoming', 'rescan' => false,
-        'start_date' => first.iso8601, 'end_date' => [first + 6.days, season.end_date].min.iso8601 }
+        'start_date' => first.iso8601, 'end_date' => [first + 6.days, last].min.iso8601 }
+    end
+
+    def default_window_dates
+      first, last = page[:season].attributes.values_at('start_date', 'end_date')
+      today = Game.current_schedule_date
+      historical = last < today
+      [historical ? first : [first, today].max, last, historical]
     end
 
     def invalid_submission(error)

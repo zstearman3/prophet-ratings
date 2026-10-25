@@ -4,6 +4,10 @@
 class ScheduleRefreshRun < ApplicationRecord
   IDENTITY = %w[season_id requested_by_id retry_of_id provider start_date end_date requested_dates max_requests retries mode rescan].freeze
   TERMINAL = %w[succeeded incomplete failed].freeze
+  WINDOW_ERRORS = {
+    true => 'Use ordered ISO dates inside the target season, no later than yesterday.',
+    false => 'Use ordered ISO dates today or later inside the target season; use historical sync for expired dates.'
+  }.freeze
   RETRY_EXISTS = 'A retry already exists; open the linked retry run to continue unfinished work.'
   belongs_to :season
   belongs_to :requested_by, class_name: 'User'
@@ -104,12 +108,7 @@ class ScheduleRefreshRun < ApplicationRecord
     self.requested_dates = requested_dates.presence || (first..last).map(&:iso8601)
     validate_dates(first, last)
   rescue ArgumentError, TypeError
-    message = if historical?
-                'Use ordered ISO dates inside the target season, no later than yesterday.'
-              else
-                'Use ordered ISO dates today or later inside the target season; use historical sync for expired dates.'
-              end
-    errors.add(:base, message)
+    errors.add(:base, WINDOW_ERRORS.fetch(historical?))
   end
 
   def validate_dates(first, last)
@@ -119,9 +118,10 @@ class ScheduleRefreshRun < ApplicationRecord
   end
 
   def dates_inside?(window)
+    today = Game.current_schedule_date
     requested_dates.all? do |value|
       date = Ingestion::HistoricalSyncWindow.parse_date(value)
-      window.cover?(date) && (historical? ? date < Game.current_schedule_date : date >= Game.current_schedule_date)
+      window.cover?(date) && (historical? ? date < today : date >= today)
     end
   end
 end

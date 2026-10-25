@@ -7,6 +7,10 @@ class SeasonMembershipAssignment
     choice.to_i unless %w[independent excluded].include?(choice)
   end
 
+  def self.update_target_membership(existing, desired_id)
+    desired_id ? existing.update!(conference_id: desired_id) : existing.destroy!
+  end
+
   def initialize(season)
     @season = season
   end
@@ -30,7 +34,7 @@ class SeasonMembershipAssignment
   def update_membership(team, existing, desired_id)
     return if existing&.conference_id == desired_id
 
-    return update_target_membership(existing, desired_id) if existing&.start_season_id == season.id
+    return self.class.update_target_membership(existing, desired_id) if existing&.start_season_id == season.id
     return assign_membership(team, desired_id) if desired_id
     return unless existing
 
@@ -44,9 +48,5 @@ class SeasonMembershipAssignment
 
   def active_memberships(team)
     team.team_conferences.select { |membership| membership.covers_year?(season.year) }
-  end
-
-  def update_target_membership(existing, desired_id)
-    desired_id ? existing.update!(conference_id: desired_id) : existing.destroy!
   end
 end

@@ -1,0 +1,76 @@
+x-app: &app
+  image: ${BENCHMARK_IMAGE:?unique benchmark image required}
+  working_dir: /rails
+  environment: &environment
+    RAILS_ENV: production
+    RAILS_LOG_LEVEL: warn
+    FORCE_SSL: 'false'
+    SECRET_KEY_BASE: synthetic-benchmark-secret-not-a-provider-key-0000000000000000000000000000000000000000
+    DATABASE_URL: postgresql://postgres:synthetic@db/offseason_benchmark
+    GOOD_JOB_EXECUTION_MODE: external
+    GOOD_JOB_ENABLE_CRON: 'false'
+    RAILS_SERVER_TIMING: 'false'
+    CBBD_API_KEY: synthetic-offline-only
+    CBBD_CAPTURE_DIRECTORY: /benchmark/captures
+    CBBD_MAX_REQUESTS: '20'
+    CBBD_RETRIES: '0'
+    WEB_CONCURRENCY: '0'
+    PIDFILE: /benchmark/puma.pid
+    RAILS_MAX_THREADS: '5'
+    BENCHMARK_OWNER: ${BENCHMARK_OWNER:?owner required}
+    BENCHMARK_PHASE: ${BENCHMARK_PHASE:-setup}
+    BENCHMARK_SCALE: ${BENCHMARK_SCALE:-1}
+    BENCHMARK_TELEMETRY: /benchmark/telemetry.jsonl
+    OPENBLAS_NUM_THREADS: '1'
+  volumes:
+    - .:/rails:ro
+    - ${BENCHMARK_OUTPUT:?output directory required}:/benchmark
+    - builds:/rails/app/assets/builds
+    - assets:/rails/public/assets
+    - runtime:/rails/tmp
+    - logs:/rails/log
+  networks: [isolated]
+  cpus: 0.5
+  mem_limit: 512m
+  memswap_limit: 512m
+services:
+  db:
+    image: postgres:15-trixie
+    environment:
+      POSTGRES_PASSWORD: synthetic
+      POSTGRES_DB: offseason_benchmark
+    command: [postgres, -c, shared_buffers=64MB, -c, max_connections=30, -c, work_mem=4MB]
+    cpus: 0.5
+    mem_limit: 3g
+    memswap_limit: 3g
+    volumes: [database:/var/lib/postgresql/data]
+    networks: [isolated]
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U postgres -d offseason_benchmark]
+      interval: 1s
+      timeout: 3s
+      retries: 60
+  web:
+    <<: *app
+    command: [bundle, exec, puma, -C, config/puma.rb, script/performance/web.ru]
+  worker:
+    <<: *app
+    environment:
+      <<: *environment
+      BENCHMARK_ROLE: worker
+    command: [bundle, exec, ruby, -r, ./script/performance/boot.rb, -e, 'GoodJob::CLI.start(OffseasonPerformance::PhaseQueue.worker_arguments(ENV.fetch("BENCHMARK_OWNER"), ENV.fetch("BENCHMARK_PHASE")))']
+  driver:
+    <<: *app
+    cpus: 1
+    mem_limit: 3g
+    memswap_limit: 3g
+    command: [bundle, exec, ruby, script/performance/driver.rb]
+networks:
+  isolated:
+    internal: true
+volumes:
+  builds:
+  database:
+  assets:
+  runtime:
+  logs:

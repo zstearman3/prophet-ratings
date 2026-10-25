@@ -9,7 +9,7 @@ module ProphetRatings
     def initialize(game, ratings_config_version: nil)
       @game = game
       @ratings_config_version = RatingsConfigVersion.resolve(ratings_config_version)
-      @generated_at = nil
+      @generation = { at: nil }
       @config = @ratings_config_version.settings
     end
 
@@ -29,8 +29,9 @@ module ProphetRatings
     # Historical working inputs are explicit reconstructions, never operational issuances.
     def reconstruct(snapshots:)
       game.with_lock do
-        @home_snapshot, @away_snapshot = snapshots
-        @generated_at = Time.current
+        @generation[:home] = snapshots[0]
+        @generation[:away] = snapshots[1]
+        @generation[:at] = Time.current
         build_revision
       end
     end
@@ -40,32 +41,35 @@ module ProphetRatings
     attr_reader :game, :ratings_config_version
 
     def generate_revision
-      @generated_at = Time.current
+      @generation[:at] = Time.current
       build_revision if prediction_inputs_available?
     end
 
     def build_revision
-      context = ForecastContext.capture(game, [home_snapshot, away_snapshot], ratings_config_version)
+      context = ForecastContext.capture(game, [snapshot(:home), snapshot(:away)], ratings_config_version)
       result = ForecastContext.new(context).predictor.call
       save_revision(context, result)
     end
 
     def save_revision(context, result)
-      previous = game.predictions.where(ratings_config_version:).where.not(revision_key: nil)
-                     .order(generated_at: :desc, id: :desc).first
+      predictions = game.predictions
+      previous = predictions.where(ratings_config_version:).where.not(revision_key: nil)
+                            .order(generated_at: :desc, id: :desc).first
       return previous if identical_revision?(previous, context)
 
-      game.predictions.create!(prediction_attributes(result).merge(provenance_attributes(context),
-                                                                   ratings_config_version:, revision_key: revision_key(context, previous)))
+      attributes = self.class.prediction_attributes(result).merge(provenance_attributes(context))
+      predictions.create!(attributes.merge(ratings_config_version:, revision_key: revision_key(context, previous)))
     end
 
     def identical_revision?(previous, context)
-      previous && retry_context(previous.calculation_context) == retry_context(context) && previous.forecast_kind == forecast_kind &&
-        previous.input_cutoff == input_cutoff && previous.forecast_start_time == game.start_time
+      previous &&
+        GamePredictionBuilder.retry_context(previous.calculation_context) == GamePredictionBuilder.retry_context(context) &&
+        previous.attributes.values_at('forecast_kind', 'input_cutoff',
+                                      'forecast_start_time') == [forecast_kind, input_cutoff, game.start_time]
     end
 
     # Republishing identical sources can touch updated_at without changing any forecast input.
-    def retry_context(context)
+    public_class_method def self.retry_context(context)
       context.as_json.deep_dup.tap do |inputs|
         inputs.fetch('season_source').delete('updated_at')
         inputs.fetch('snapshots').each { |snapshot| snapshot.fetch('source').delete('updated_at') }
@@ -78,16 +82,18 @@ module ProphetRatings
     end
 
     def provenance_attributes(context)
-      { home_team_snapshot: home_snapshot.persisted? ? home_snapshot : nil,
-        away_team_snapshot: away_snapshot.persisted? ? away_snapshot : nil,
-        calculation_context: context, forecast_kind:, generated_at: @generated_at,
+      home = snapshot(:home)
+      away = snapshot(:away)
+      { home_team_snapshot: home.persisted? ? home : nil,
+        away_team_snapshot: away.persisted? ? away : nil,
+        calculation_context: context, forecast_kind:, generated_at: @generation[:at],
         forecast_start_time: game.start_time, input_cutoff: }
     end
 
     def forecast_kind
-      return 'reconstruction' unless home_snapshot.persisted? && away_snapshot.persisted?
+      return 'reconstruction' unless snapshot(:home).persisted? && snapshot(:away).persisted?
 
-      if game.scheduled? && game.start_time > @generated_at &&
+      if game.scheduled? && game.start_time > @generation[:at] &&
          [game.home_team_score, game.away_team_score].compact.empty?
         'pregame'
       else
@@ -96,11 +102,11 @@ module ProphetRatings
     end
 
     def input_cutoff
-      [game.schedule_date - 1, Game.schedule_date_for(@generated_at)].min
+      [game.schedule_date - 1, Game.schedule_date_for(@generation[:at])].min
     end
 
     def prediction_inputs_available?
-      return true if home_snapshot && away_snapshot &&
+      return true if snapshot(:home) && snapshot(:away) &&
                      required_snapshot_volatilities.all? { |value| value.is_a?(Numeric) && value.finite? && value >= 0 }
 
       Rails.logger.warn("Prediction skipped for game=#{game.id}: missing or invalid rating inputs (prior-day only); " \
@@ -111,36 +117,32 @@ module ProphetRatings
     # Shared-pace persisted diagnostics require snapshot SDs, not mutable fallbacks.
     def required_snapshot_volatilities
       return [] unless @config.dig(:prediction, :uncertainty_model) == 'shared_pace_v1'
-      return [nil] unless home_snapshot && away_snapshot
 
-      [home_snapshot, away_snapshot].flat_map do |snapshot|
+      snapshots = [snapshot(:home), snapshot(:away)]
+      return [nil] unless snapshots.all?
+
+      snapshots.flat_map do |snapshot|
         [snapshot.offensive_efficiency_volatility, snapshot.defensive_efficiency_volatility, snapshot.pace_volatility]
       end
     end
 
-    def prediction_attributes(result)
+    public_class_method def self.prediction_attributes(result)
+      meta = result[:meta]
+      home_efficiency, away_efficiency = meta.values_at(:home_expected_ortg, :away_expected_ortg)
       {
-        home_offensive_efficiency: result[:meta][:home_expected_ortg],
-        away_offensive_efficiency: result[:meta][:away_expected_ortg],
-        home_defensive_efficiency: result[:meta][:away_expected_ortg],
-        away_defensive_efficiency: result[:meta][:home_expected_ortg],
+        home_offensive_efficiency: home_efficiency,
+        away_offensive_efficiency: away_efficiency,
+        home_defensive_efficiency: away_efficiency,
+        away_defensive_efficiency: home_efficiency,
         home_score: result[:home_expected_score],
         away_score: result[:away_expected_score],
         home_win_probability: result[:win_probability_home],
-        pace: result[:meta][:expected_pace]
+        pace: meta[:expected_pace]
       }
     end
 
-    ##
-    # Returns the latest rating snapshot for the game's home team season, or nil if none exists.
-    def home_snapshot
-      @home_snapshot ||= latest_snapshot(game.home_team_season)
-    end
-
-    ##
-    # Returns the most recent rating snapshot for the away team's season, or nil if none exists.
-    def away_snapshot
-      @away_snapshot ||= latest_snapshot(game.away_team_season)
+    def snapshot(side)
+      @generation[side] ||= latest_snapshot(game.public_send("#{side}_team_season"))
     end
 
     ##
@@ -150,10 +152,11 @@ module ProphetRatings
     # @param [TeamSeason] team_season - The team season for which to retrieve the snapshot.
     # @return [TeamRatingSnapshot, nil] The latest applicable rating snapshot, or nil if none exist.
     def latest_snapshot(team_season)
+      generated_at = @generation[:at]
       TeamRatingSnapshot
         .where(team_season:, ratings_config_version:)
         .where(snapshot_date: ..input_cutoff)
-        .where(created_at: ..@generated_at, updated_at: ..@generated_at)
+        .where(created_at: ..generated_at, updated_at: ..generated_at)
         .order(snapshot_date: :desc)
         .first
     end

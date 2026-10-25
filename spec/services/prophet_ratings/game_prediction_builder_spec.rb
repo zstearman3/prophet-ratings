@@ -3,13 +3,6 @@
 require 'rails_helper'
 
 RSpec.describe ProphetRatings::GamePredictionBuilder do
-  include ActiveSupport::Testing::TimeHelpers
-
-  around { |example| travel_to(Time.utc(2026, 10, 10, 16)) { example.run } }
-
-  let(:season) { create(:season, average_efficiency: 100, average_pace: 70) }
-  let(:version) { create(:ratings_config_version) }
-  let(:game) { create(:game, season:, venue_type: 'neutral', status: :scheduled, start_time: 1.day.from_now) }
   let(:snapshots) do
     [true, false].map do |home|
       team = create(:team_season, season:)
@@ -20,6 +13,23 @@ RSpec.describe ProphetRatings::GamePredictionBuilder do
                                                            pace_volatility: 0)
     end
   end
+  let(:game) { create(:game, season:, venue_type: 'neutral', status: :scheduled, start_time: 1.day.from_now) }
+  let(:version) { create(:ratings_config_version) }
+  let(:season) { create(:season, average_efficiency: 100, average_pace: 70) }
+
+  around { |example| travel_to(Time.utc(2026, 10, 10, 16)) { example.run } }
+
+  it 'rejects dirty and unsaved configuration before acquiring the game lock' do
+    game = create(:game)
+    model = RatingsConfigVersion.publish!
+    model.name = 'unsaved change'
+    allow(game).to receive(:with_lock).and_call_original
+    expect { described_class.new(game, ratings_config_version: model) }.to raise_error(ArgumentError, /unchanged persisted/)
+    expect { described_class.new(game, ratings_config_version: RatingsConfigVersion.new) }.to raise_error(ArgumentError)
+    expect(game).not_to have_received(:with_lock)
+  end
+
+  include ActiveSupport::Testing::TimeHelpers
 
   def refresh_publication(snapshot)
     snapshot.stats['season_forecast_inputs'] =
