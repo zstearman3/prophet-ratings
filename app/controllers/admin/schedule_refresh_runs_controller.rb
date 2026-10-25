@@ -14,8 +14,9 @@ module Admin
     def show
       @run = ScheduleRefreshRun.find(params.expect(:id))
       observations = run.rejection_observations
+      reviews = GameScoringReview.where(source_observation_id: observations.keys).includes(:game)
       @evidence = { games: run.season.games.where(id: run.report_game_ids).index_by(&:id), observations:,
-                    scoring_reviews: GameScoringReview.where(source_observation_id: observations.keys).index_by(&:source_observation_id) }
+                    scoring_reviews: reviews.index_by(&:source_observation_id) }
     end
 
     def create

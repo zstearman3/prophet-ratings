@@ -42,6 +42,9 @@ RSpec.describe 'Admin scoring discrepancy review' do
 
   it 'shows the accepted review on the original run without claiming the unfinished date completed' do
     review = approve
+    allow(GameScoringReview).to receive(:where).with(source_observation_id: [observation.id]).and_wrap_original do |query, conditions|
+      query.call(conditions).strict_loading
+    end
     get admin_schedule_refresh_run_path(run)
     expect(response.body).to include('Reviewed and imported', game_path(review.game), path)
     expect(run.reload.pending_dates).to eq([date.iso8601])
