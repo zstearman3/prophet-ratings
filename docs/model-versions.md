@@ -80,6 +80,28 @@ recorded selection: they select once on their first execution and subsequent
 retries retain it. Review/drain or replace those jobs during rollout if their
 original intended version matters; it cannot be reconstructed from the queue.
 
+## Complete v1.16 early-season candidate
+
+`config/examples/v1_16_coherent_early_season.json` is a complete publishable
+payload. It retains the v1.15 departure cap and coefficients, with the new bundle
+name and `early_season_policy: coherent_v1`. This bypasses the legacy 14-day
+solver gate while retaining two-game eligibility, supported-opponent observations,
+and the existing calendar blend. It does not establish predictive improvement.
+
+Publish it explicitly in the target application's Rails console:
+
+```ruby
+payload = JSON.parse(Rails.root.join('config/examples/v1_16_coherent_early_season.json').read)
+version = RatingsConfigVersion.publish!(payload)
+```
+
+Publication preserves existing model versions and does not select a season model,
+activate a global default, initialize captures, or replay ratings. Use the
+[scoped model-switch and recovery workflow](offseason.md#explicit-ratings-recovery-and-rebuilds)
+to initialize the candidate's own priors, anchors and snapshots before using it
+for calculations or activating it as the default. Keep existing v1.15 outputs under their original model identity.
+Historical reconstructed predictions remain distinct from archived forecasts.
+
 ## Legacy and live-input compatibility
 
 Existing immutable versions, priors, snapshots, and predictions are preserved.

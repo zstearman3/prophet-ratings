@@ -655,7 +655,8 @@ Optional recruiting/departure approvals, current and captured input gaps, schedu
 venue, prediction coverage and latest operation results remain visible. Missing
 inputs are unknown, including when their contract uses a zero fallback; observed
 zero is distinct. Acknowledge the exact displayed gap set. Leave optional work
-open or enter a bounded deferral reason; required checks cannot be deferred.
+open or select its deferral checkbox; new UI deferrals record `Approved by admin`
+automatically. Required checks cannot be deferred.
 Absent schedule leaves prediction readiness open/deferred and does not prevent
 otherwise valid season preparation. Follow the season-scoped repair links and
 return through that season's dashboard to readiness.
@@ -673,8 +674,15 @@ and stale-review checks remain enforced. Reviews saved with an older fingerprint
 format require a fresh review before activation. No rating formulas or published
 captures are changed.
 
+The readiness page leads with required-check blockers and review/activation
+actions. Check cards summarize the evidence; input gaps use a bounded, scrollable
+table. Full diagnostic JSON, participant evidence and saved approval/action audit
+remain available in closed details panels. Saved-review evidence is separated
+from the fresh report. Stale reviews and unresolved required checks disable new
+activation actions; successful recorded actions remain replayable.
+
 Save a review to retain the displayed report, reviewer/time, fingerprint,
-acknowledgement and deferral reasons. This changes no current/default flags.
+acknowledgement and deferrals. This changes no current/default flags.
 Then deliberately use **Activate season** or **Make model default** as separate
 actions, inspecting each displayed previous/target ID. Season activation reuses
 stored membership choices and the existing season activation API. Neither action

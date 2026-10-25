@@ -11,17 +11,36 @@
   'predictions' => admin_prediction_evaluation_path(season_id: season.id, model_id: report['model_id']),
   'operations' => admin_offseason_setup_path(season_id: season.id)
 } %>
-<% report.fetch('checks').each do |check| %>
-  <section class="rounded border p-4 space-y-2">
-    <h3 class="font-semibold"><%= check['label'] %> — <%= decisions&.key?(check['key']) ? 'deferred' : check['status'] %><%= ' (required)' if check['hard'] %></h3>
-    <pre class="whitespace-pre-wrap text-sm"><%= JSON.pretty_generate(check['evidence']) %></pre>
-    <%= link_to 'Review next action', fix_paths.fetch(check.fetch('key')), class: 'text-blue-700 underline' %>
-    <% if decisions&.key?(check['key']) %><p>Reason: <%= decisions[check['key']] %></p><% end %>
-  </section>
-<% end %>
-<h3 class="font-semibold">Captured and current input gaps</h3>
-<p>Unknown inputs are distinct from observed zero. Captured inputs remain the evidence applied to published outputs.</p>
-<pre class="whitespace-pre-wrap text-sm"><%= JSON.pretty_generate(report.fetch('gaps')) %></pre>
-
-<h3 class="font-semibold">Included participants, identity and publication evidence</h3>
-<pre class="whitespace-pre-wrap text-sm"><%= JSON.pretty_generate(report.fetch('teams')) %></pre>
+<div class="grid gap-4 md:grid-cols-2">
+  <% report.fetch('checks').each do |check| %>
+    <% status = decisions&.key?(check['key']) ? 'deferred' : check['status'] %>
+    <section id="<%= prefix %>check-<%= check['key'] %>" class="rounded border bg-white p-4 space-y-3">
+      <div class="flex items-start justify-between gap-3">
+        <h3 class="font-semibold"><%= check['label'] %><%= ' (required)' if check['hard'] %></h3>
+        <%= readiness_badge(status) %>
+      </div>
+      <ul class="max-h-40 overflow-auto space-y-1 text-sm text-gray-700"><%= readiness_check_evidence(check, report) %></ul>
+      <%= link_to 'Review next action', fix_paths.fetch(check.fetch('key')), class: 'text-sm text-blue-700 underline' %>
+      <% if decisions&.key?(check['key']) %><p class="text-sm">Reason: <%= decisions[check['key']] %></p><% end %>
+    </section>
+  <% end %>
+</div>
+<section id="<%= prefix %>readiness-gaps" class="rounded border bg-white p-5 space-y-3">
+  <h3 class="text-xl font-semibold">Captured and current input gaps (<%= report.fetch('gaps').size %>)</h3>
+  <p class="text-sm text-gray-600">Unknown inputs are distinct from observed zero. Captured inputs remain the evidence applied to published outputs.</p>
+  <% if report.fetch('gaps').empty? %><p>No input gaps recorded.</p><% else %>
+    <div class="max-h-80 overflow-auto rounded border">
+      <table class="w-full text-left text-sm">
+        <thead class="sticky top-0 bg-gray-100"><tr><th class="p-3">Team</th><th class="p-3">Source</th><th class="p-3">Input</th><th class="p-3">Unresolved evidence</th></tr></thead>
+        <tbody><% report.fetch('gaps').each do |gap| %><tr class="border-t">
+          <td class="p-3"><%= gap['team_name'] %></td><td class="p-3"><%= gap['source'] %></td><td class="p-3"><%= gap['kind']&.humanize %></td><td class="p-3"><%= gap['reason'] %></td>
+        </tr><% end %></tbody>
+      </table>
+    </div>
+  <% end %>
+</section>
+<details class="rounded border bg-gray-50 p-5">
+  <summary class="cursor-pointer font-semibold">Full diagnostic evidence · <%= report.fetch('teams').size %> included participants</summary>
+  <p class="mt-3 text-sm text-gray-600">Original check details, exact input gaps, identities, captured outputs and preopening snapshots are retained here.</p>
+  <pre class="mt-3 max-h-80 overflow-auto whitespace-pre-wrap break-words text-xs"><%= JSON.pretty_generate(report) %></pre>
+</details>
