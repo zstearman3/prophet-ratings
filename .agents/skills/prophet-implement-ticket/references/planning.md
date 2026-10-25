@@ -8,9 +8,17 @@ Use this compact structure, scaled to the task:
 
 1. Goal, scope/non-goals, ticket link, worktree/branch, and development/dependency SHAs.
 2. Current behavior and relevant code/test evidence; constraints and stored-data/model assumptions.
-3. Risk score, mitigations, escalation decisions, and budget feasibility including final gates.
+3. Risk score, mitigations, escalation decisions, budget feasibility including final gates, and the early-evidence checkpoint below when an acceptance criterion could invalidate the approach.
 4. Ordered independently testable tasks: exact files, relevant interfaces, required behavior, concrete test assertions/fixtures, commands and expected outcomes, and documentation changes. State behavior/interfaces precisely without duplicating whole function bodies. Derive numerical expectations independently and explain their assumptions.
 5. Acceptance-criterion-to-task/check mapping, regression cases, and review focus. Cover plausible missing/incomplete-data cases when relevant. Plan real-solver verification when required by AGENTS.md; stubbed specs alone do not establish numerical correctness.
+
+## Early evidence for the highest-risk requirement
+
+Identify the acceptance criterion most likely to invalidate the proposed approach. When feasibility is unproven, make the first implementation task the smallest end-to-end slice that exercises that criterion. Specify the uncertainty, representative input, observable pass/fail condition, command or check, and which dependent work waits for the result. A reviewed plan is not feasibility evidence.
+
+Measure that slice before broad implementation or dependent UI/publication integration. Record the observed result and source revision. Expand dependent work only after the observed result meets the planned feasibility condition; on failure, diagnose, revise and rerun the affected check within the slice. For a ticket requiring memory growth evidence, exercise its required scales and unchanged workload/caps at this checkpoint, rather than relying on a small fixture or a passing single scale. Early evidence does not replace final verification after relevant executable changes.
+
+Reuse applicable recorded evidence when its code and assumptions still match. For a routine change with no material feasibility uncertainty, the first targeted correctness check is sufficient; do not invent a spike, benchmark or extra approval gate. Benchmark use remains opt-in under AGENTS.md.
 
 Use targeted failing/passing tests for behavior changes. Documentation-only work needs meaningful document/skill validation rather than artificial application tests. Repository verification rules override upstream examples: use the project's actual commands, cover new files, and reserve both required hook suites for final changes or necessary reruns after fixes.
 
