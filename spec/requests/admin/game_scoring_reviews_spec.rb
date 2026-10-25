@@ -17,6 +17,7 @@ RSpec.describe 'Admin scoring discrepancy review' do
     expect(response.body).to include('Synthetic Home', 'Synthetic Away', '65', '63', 'Reported game score', 'Free throws made')
     expect(response.parsed_body.at_css('input[name="choices[home]"][value="65"][checked]')).to be_present
     expect(response.parsed_body.css('textarea, input[name*="reason"]')).to be_empty
+    expect(response.parsed_body.at_css('#scoring-review-form')['data-turbo']).to eq('false')
     expect(Game.count).to eq(0)
   end
 
@@ -24,6 +25,7 @@ RSpec.describe 'Admin scoring discrepancy review' do
     post preview_admin_schedule_refresh_run_game_scoring_review_path(run, observation), params: { choices: { home: '63' } }
     expect(response).to have_http_status(:ok)
     expect(response.body).to include('63', '64', 'changes the reported result', 'Synthetic Away')
+    expect(response.parsed_body.at_css('form')['data-turbo']).to eq('false')
     expect(Game.count).to eq(0)
     patch path, params: { choices: { home: '63' }, confirmed: '1' }
     expect(response).to redirect_to(path)

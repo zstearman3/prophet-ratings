@@ -14,7 +14,7 @@
   <% elsif page[:reviewable] %>
     <p>The reported game score is the default. Shooting arithmetic can disagree with the final score. Select the trusted total for each affected team; shooting counts remain as supplied.</p>
     <p>The selected total becomes the game score and team points. It drives the result and points-based ratings. Shooting-based stats keep the supplied counts. A name-only opponent remains outside ratings.</p>
-    <%= form_with url: preview_admin_schedule_refresh_run_game_scoring_review_path(page[:run], page[:observation]), method: :post, id: 'scoring-review-form', class: 'space-y-5' do %>
+    <%= form_with url: preview_admin_schedule_refresh_run_game_scoring_review_path(page[:run], page[:observation]), method: :post, data: { turbo: false }, id: 'scoring-review-form', class: 'space-y-5' do %>
       <% page[:evidence].candidates.each do |label, totals| %>
         <% side = page[:evidence].payload.fetch(label.to_sym) %>
         <fieldset class="rounded border p-4 space-y-3">

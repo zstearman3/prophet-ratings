@@ -9,7 +9,7 @@
   <% end %>
   <p>Approval imports this result with the selected point totals. Original shooting counts and source evidence remain unchanged, including any scoring mismatch. Eligible games enter ratings using these selected points; name-only opponents remain outside ratings.</p>
   <p>Your identity, approval time, and selected values will be recorded automatically as Approved by admin.</p>
-  <%= form_with url: admin_schedule_refresh_run_game_scoring_review_path(page[:run], page[:observation]), method: :patch do %>
+  <%= form_with url: admin_schedule_refresh_run_game_scoring_review_path(page[:run], page[:observation]), method: :patch, data: { turbo: false } do %>
     <% page[:choices].each do |label, total| %><%= hidden_field_tag "choices[#{label}]", total %><% end %>
     <%= hidden_field_tag :confirmed, '1' %>
     <%= submit_tag 'Approve and import selected result', class: 'rounded bg-prophet-indigo px-4 py-2 text-white' %>
