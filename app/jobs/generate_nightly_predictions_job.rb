@@ -1,9 +1,8 @@
 # frozen_string_literal: true
 
-class GenerateNightlyPredictionsJob < ApplicationJob
+class GenerateNightlyPredictionsJob < HeavyJob
   include PinnedModelVersion
 
-  queue_as :default
   around_perform { |_job, block| Season.with_ratings_lock(&block) }
 
   LOOKAHEAD_DAYS = 7

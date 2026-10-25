@@ -24,6 +24,12 @@ class CbbdReviewRun < ApplicationRecord
     where(season:).select(:id, :status, :start_date, :end_date, :created_at).order(id: :desc).limit(30)
   end
 
+  def comparison_job
+    GoodJob::Job.labeled("cbbd-comparison:#{id}").where(job_class: 'CompareCbbdReviewJob')
+                .select(:id, :created_at, :performed_at, :finished_at, Arel.sql('(error IS NOT NULL) AS failed'))
+                .order(created_at: :desc).first
+  end
+
   def comparison_summaries
     comparisons.select(:version, :identity_mapping_decision_id).order(version: :desc)
   end

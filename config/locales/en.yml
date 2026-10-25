@@ -35,7 +35,7 @@ en:
     cbbd_review_runs:
       queued: Bounded acquisition queued.
       saved: Draft saved. Only explicitly approved rows can apply.
-      compared: Comparison refreshed from retained normalized evidence. Review approvals again.
+      compared: Comparison queued from retained evidence. Refresh status to inspect progress; review approvals after completion.
       applied: Identity mappings applied atomically.
     coaching_reviews:
       queued: "Coaching discovery queued. Refresh status to see progress."

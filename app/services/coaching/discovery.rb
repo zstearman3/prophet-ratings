@@ -10,6 +10,10 @@ module Coaching
     def call
       return unless review.reload.discovery_status.in?(%w[queued fetching])
 
+      if review.discovery_status == 'fetching'
+        raise 'Discovery interrupted; explicitly queue discovery again. Existing decisions are unchanged.'
+      end
+
       acquire
     rescue StandardError => error
       record_failure(error)

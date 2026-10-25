@@ -22,6 +22,17 @@ RSpec.describe Coaching::Discovery do
     expect(Season.count).to eq(0)
   end
 
+  it 'fails direct replay of interrupted discovery and allows an explicitly queued next attempt' do
+    review.update!(discovery_status: 'fetching', ready: true)
+    described_class.new(review).call
+    expect(review.reload).to have_attributes(discovery_status: 'failed', ready: true)
+    expect(scraper).not_to have_received(:call)
+    review.update!(discovery_status: 'queued')
+    described_class.new(review).call
+    expect(review.reload.discovery_status).to eq('complete')
+    expect(scraper).to have_received(:call).once
+  end
+
   it 'retains decisions and readiness on source failure without scheduling a futile job retry' do
     candidate = CoachingChange.create!(effective_year: 2027, status: 'rejected')
     review.update!(ready: true)

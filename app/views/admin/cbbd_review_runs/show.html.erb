@@ -13,6 +13,11 @@
     <%= button_to 'Refresh comparison from retained evidence', compare_admin_cbbd_review_run_path(@run), method: :post %>
     <p>Refresh creates a new report version, keeps history and clears every approval. No HTTP or renormalization occurs. Save before navigating; unsaved choices are lost.</p>
   <% end %>
+  <% if (comparison_job = @run.comparison_job) %>
+    <p>Comparison: <%= comparison_job.finished_at ? (comparison_job.failed ? 'failed' : 'finished') : (comparison_job.performed_at ? 'running' : 'queued') %>.
+      <%= link_to 'Inspect comparison job in GoodJob', "/good_job/jobs/#{comparison_job.id}" %>
+      If interrupted or stalled, inspect the worker and request a fresh comparison above to pin the current draft. Retained versions and approvals remain available.</p>
+  <% end %>
   <nav>Versions:
     <% @run.comparison_summaries.each do |version| %>
       <%= link_to "#{version.version}#{version.identity_mapping_decision_id ? ' (applied)' : ''}", admin_cbbd_review_run_path(@run, version: version.version) %>

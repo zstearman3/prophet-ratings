@@ -10,12 +10,12 @@ module OffseasonPerformance
       "#{owner}_#{phase}"
     end
 
-    def self.name(owner, phase)
-      "#{prefix(owner, phase)}_default"
+    def self.name(owner, phase, queue = 'default')
+      "#{prefix(owner, phase)}_#{queue}"
     end
 
     def self.worker_arguments(owner, phase)
-      ['start', '--max-threads=1', "--queues=#{name(owner, phase)}"]
+      ['start', '--max-threads=1', '--subprocesses=0', "--queues=#{name(owner, phase, 'heavy')}:1;#{name(owner, phase)}:1"]
     end
   end
 end

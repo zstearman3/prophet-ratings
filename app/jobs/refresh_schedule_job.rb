@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # ID-only delivery; the lock spans acquisition and all date commits.
-class RefreshScheduleJob < ApplicationJob
+class RefreshScheduleJob < HeavyJob
   discard_on StandardError
   rescue_from GoodJob::InterruptError do
     recover_interruption(arguments.first)

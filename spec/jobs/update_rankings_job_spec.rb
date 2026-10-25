@@ -22,6 +22,7 @@ RSpec.describe UpdateRankingsJob do
 
   before do
     RatingsConfigVersion.publish!
+    allow(GoodJob::Job).to receive(:advisory_lock_key).and_call_original
     allow(GoodJob::Job).to receive(:advisory_lock_key).with(described_class::ADVISORY_LOCK_KEY).and_wrap_original do |_method, *, &block|
       block.call
     end
@@ -134,6 +135,7 @@ RSpec.describe UpdateRankingsJob do
   end
 
   it 'exits without recalculating when another rankings update holds the lock' do
+    allow(GoodJob::Job).to receive(:advisory_lock_key).and_call_original
     allow(GoodJob::Job).to receive(:advisory_lock_key).with(described_class::ADVISORY_LOCK_KEY).and_return(false)
 
     described_class.perform_now(season.id)

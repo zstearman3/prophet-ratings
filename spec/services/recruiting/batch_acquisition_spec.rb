@@ -28,6 +28,14 @@ RSpec.describe Recruiting::BatchAcquisition do
     expect(batch.dataset.manifest.fetch('rows').size).to eq(2)
   end
 
+  it 'fails direct replay of an interrupted fetching batch without HTTP or evidence replacement' do
+    batch.update!(status: 'fetching', snapshot_bytes: 'retained-capture')
+    described_class.new(batch).call
+    expect(batch.reload).to have_attributes(status: 'failed', snapshot_bytes: 'retained-capture')
+    expect(batch.failure_message).to include('interrupted')
+    expect(HTTParty).not_to have_received(:get)
+  end
+
   it 'does not fetch a ready batch again or duplicate its rows' do
     described_class.new(batch).call
     before = [batch.reload.attributes, batch.entries.map(&:attributes)]

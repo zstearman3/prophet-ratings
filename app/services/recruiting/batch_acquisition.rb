@@ -10,6 +10,8 @@ module Recruiting
     def call
       return if batch.reload.status.in?(%w[ready published failed])
 
+      raise 'Acquisition interrupted; explicitly fetch a new batch. Retained evidence is unchanged.' if batch.status == 'fetching'
+
       acquire
     rescue StandardError => error
       record_failure(error)

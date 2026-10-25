@@ -456,6 +456,61 @@ backups; review/import/scoring replay retained evidence without HTTP. See
 [departures.md](departures.md) for shared budgets, interrupted-attempt recovery,
 strict missing-versus-zero semantics and historical HTML compatibility.
 
+## Worker concurrency and recovery
+
+Non-test web processes use GoodJob `external` execution, including when an inherited
+`GOOD_JOB_EXECUTION_MODE` requests async/inline execution. Run one web process and
+one external worker for the default topology. Puma defaults to `WEB_CONCURRENCY=0`
+(one application process) and `RAILS_MAX_THREADS=3`. CPU count never adds processes.
+
+The worker defaults to `heavy:1;-heavy:1`: one heavy execution thread and one
+ordinary execution thread in the **same Rails process**. The exclusion pool also
+serves pre-existing queues, mailers and `SyncOddsJob`. Acquisitions, coaching
+discovery, CBBD comparison, schedule imports, all game sync/repair jobs, ratings,
+predictions and preseason preview/publication inherit `HeavyJob` and enqueue on
+`heavy`. Existing model/season/operation IDs and child ordering remain pinned.
+A PostgreSQL advisory lock spans each heavy delivery's actual work, including
+retained jobs serialized on `default` and direct `perform_now`. A direct nested
+`perform` uses its outer job's lock. Existing per-operation and ratings-writer
+locks still apply; a worker queue alone is not the writer lock.
+
+Contention never executes unlocked: retry after five seconds on the correctly
+prefixed heavy queue, at most five delivery executions, then a retained failed
+GoodJob job. Inspect `/good_job` before explicitly retrying. Jobs may have fewer
+remaining attempts after earlier errors; delivery counts are not reset. The
+shared database lock also serializes heavy bodies across accidental extra worker
+processes, but extra processes still multiply Rails memory and database pools.
+
+`GOOD_JOB_POLL_INTERVAL=1`, `GOOD_JOB_SUBPROCESSES=0` and
+`GOOD_JOB_SHUTDOWN_TIMEOUT=30` are explicit defaults. `GOOD_JOB_QUEUES`, those
+variables, `WEB_CONCURRENCY`, `RAILS_MAX_THREADS` and `DB_POOL` are deliberate
+operator overrides: changing queue pools/processes can invalidate the measured
+resource budget. Semicolon pools share a process; GoodJob pipe pools create
+subprocesses. Do not use pipes or add worker replicas as a memory optimization.
+Web execution stays external; running `good_job start` is the supported worker.
+
+The database pool defaults to six connections per application process, including
+production URLs. GoodJob needs two execution connections plus its two-thread
+SharedExecutor/listener and cron/utility headroom. Thread count is not identical
+to open connections: six is pool capacity, not six permanently open sessions.
+One web + one worker + benchmark driver reserve 18 connections, leaving 12 of
+benchmark PostgreSQL's 30 available for setup/administration. More processes
+require a fresh connection and memory budget. Local development memory caps stay
+768 MiB; performance web/worker caps stay 512 MiB.
+
+After a worker interruption, acquisition/coaching and preseason jobs handle
+GoodJob's interruption callback before any fetch/calculation. Under their existing
+operation/writer locks, only pending work becomes failed with recovery guidance;
+terminal results, captures, approvals and request ledgers remain. Explicitly start
+a new finite acquisition (or queue coaching discovery again); no delivery renews
+a finite budget. Retry a pinned preview/publication through its existing admin
+recovery controls after checking the old worker stopped and inputs remain current.
+Schedule refresh keeps its unfinished-date successor workflow. Generic ratings
+failures remain visible in GoodJob; use the persisted coverage/replay guidance in
+[offseason.md](offseason.md) instead of restarting a destructive rebuild blindly.
+No process recycling is configured. Recreate deployed web/worker processes after
+release to apply these defaults; this change does not deploy infrastructure.
+
 ## Offseason performance budgets
 
 Use the isolated [offline offseason benchmark](performance.md) to generate the

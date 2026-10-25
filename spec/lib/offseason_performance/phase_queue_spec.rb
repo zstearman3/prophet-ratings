@@ -14,7 +14,9 @@ RSpec.describe OffseasonPerformance::PhaseQueue do
     job_class.queue_as :default
     queue = job_class.new.queue_name
     expect(queue).to eq('offseason-abcdef_schedule-serial_default')
-    expect(described_class.worker_arguments(owner, 'schedule-serial')).to eq(['start', '--max-threads=1', "--queues=#{queue}"])
+    pools = "#{described_class.name(owner, 'schedule-serial', 'heavy')}:1;#{queue}:1"
+    expect(described_class.worker_arguments(owner, 'schedule-serial'))
+      .to eq(['start', '--max-threads=1', '--subprocesses=0', "--queues=#{pools}"])
     expect(GoodJob::Job.unfinished.queue_string(queue).pluck(:id)).to eq([current.id])
     expect(GoodJob::Job.exists?(prior.id)).to be(true)
   end

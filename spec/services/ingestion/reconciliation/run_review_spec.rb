@@ -25,6 +25,34 @@ RSpec.describe Ingestion::Reconciliation::RunReview do
     choices.map { |choice| choice.merge('selected' => '1', 'deferred' => '0') }
   end
 
+  it 'queues scalar identities, compares once, and rejects later draft edits without clearing approvals' do
+    first = review.compare
+    review.save(submission(first, draft_rows))
+    allow(CompareCbbdReviewJob).to receive(:perform_later) { |*args| CompareCbbdReviewJob.new(*args) }
+    job = review.enqueue_comparison
+    expect(job.arguments).to eq([run.id, review.comparison_identity])
+    job = CompareCbbdReviewJob.deserialize(job.serialize)
+    expect { job.perform_now }.to change { run.comparisons.count }.by(1)
+    expect { job.perform_now }.not_to(change { run.comparisons.count })
+    current = run.reload.active_comparison
+    stale = review.enqueue_comparison
+    review.save(submission(current, draft_rows))
+    approvals = current.reload.draft
+    expect { stale.perform_now }.not_to(change { run.comparisons.count })
+    expect(current.reload.draft).to eq(approvals)
+  end
+
+  it 'rejects mismatched evidence and approvals before constructing another version' do
+    previous = review.compare
+    review.save(submission(previous, draft_rows))
+    identity = review.comparison_identity
+    expect { review.compare_pinned(identity.merge('evidence_digest' => 'stale')) }.not_to(change { run.comparisons.count })
+    decision = review.apply(submission(previous, []).merge('confirm' => '1', 'reason' => 'Approved by admin'), reviewer:)
+    expect { review.compare_pinned(identity) }.not_to(change { run.comparisons.count })
+    expect(previous.reload.identity_mapping_decision).to eq(decision)
+    expect(previous.selected_choices).to match_array(choices)
+  end
+
   it 'merges pages, explicitly saves unchecked browser controls, and atomically applies only approvals' do
     comparison = review.compare
     review.save(submission(comparison, draft_rows.first(2)))

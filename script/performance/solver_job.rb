@@ -2,7 +2,7 @@
 
 module OffseasonPerformance
   # Exercises the real Python boundary with an independently known deterministic solution.
-  class SolverJob < ApplicationJob
+  class SolverJob < HeavyJob
     def perform
       solution = self.class.solution.merge(job_id:)
       File.write('/benchmark/solver.json', JSON.generate(solution))

@@ -291,6 +291,14 @@ require scoped recovery instead. Legacy forecasts can block changed baselines;
 review their provenance rather than deleting or relabeling them. Revisions do not
 regenerate forecasts or activate a season/model.
 
+Heavy operations now share one serial heavy worker pool; odds/mailers retain an
+ordinary pool in the same process. CBBD comparison refresh is asynchronous and
+pins the current evidence/draft identities. Inspect its retained job on the private
+run page before requesting a fresh comparison. See [worker concurrency and
+recovery](development.md#worker-concurrency-and-recovery) for bounded contention,
+interrupted acquisition and publication recovery. No retry automatically resets a
+request budget, approves mappings or activates a season.
+
 ## Explicit ratings recovery and rebuilds
 
 Recovery is separate from annual setup. Resume recalculates without deleting history:

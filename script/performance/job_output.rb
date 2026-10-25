@@ -7,8 +7,21 @@ module OffseasonPerformance
       name = job.class.name
       return File.size('/benchmark/solver.json') if name == 'OffseasonPerformance::SolverJob'
 
+      return File.size("/benchmark/mixed-#{job.job_id}.json") if name.start_with?('OffseasonPerformance::Mixed')
+
+      persisted_bytes(name, job.arguments.first)
+    end
+
+    def self.persisted_bytes(name, id)
+      return comparison_bytes(id) if name == 'CompareCbbdReviewJob'
+
       model, expression = output_query(name)
-      model.where(id: Integer(job.arguments.first)).pick(Arel.sql(expression))
+      model.where(id: Integer(id)).pick(Arel.sql(expression))
+    end
+
+    def self.comparison_bytes(id)
+      CbbdReviewComparison.where(cbbd_review_run_id: id).order(id: :desc)
+                          .pick(Arel.sql('octet_length(report::text) + octet_length(replay::text)'))
     end
 
     def self.output_query(name)

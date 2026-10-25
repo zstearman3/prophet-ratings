@@ -10,6 +10,7 @@ services are used.
 bin/benchmark-offseason --scale 1 --output tmp/performance-1x.json
 bin/benchmark-offseason --scale 2 --output tmp/performance-2x.json
 bin/benchmark-offseason --scale 1 --scenario departures --assert --output tmp/departures.json
+bin/benchmark-offseason --scale 1 --scenario mixed --assert --output tmp/mixed.json
 bin/benchmark-offseason --help
 ```
 
@@ -161,12 +162,14 @@ cache state inside the executor, without changing it.
 | preview | POST `/admin/preseason_publications?season_id=S`, real PreviewPreseasonJob and 365-team review |
 | publish | POST `/admin/preseason_publications/P/publish?season_id=S`, fresh reviewed fingerprint and acknowledgement each sample; real PublishPreseasonJob and 365 captured priors/snapshots |
 | cbbd | GET `/admin/cbbd_review_runs/C`, full retained comparison |
-| compare | POST `/admin/cbbd_review_runs/C/compare`, creates/verifies immutable report; elapsed/memory recorded without an invented latency budget |
+| compare | POST `/admin/cbbd_review_runs/C/compare`, waits for the matching pinned CompareCbbdReviewJob and new active immutable artifact; POST timing excludes worker calculation |
 | schedule | POST `/admin/schedule_refresh_runs?season_id=S`, bounded historical CBBD RefreshScheduleJob, successful terminal state, stable synthetic game identity and a new audit observation per acquisition |
+| mixed | authenticated status JSON during two serial heavy real-solver deliveries and one overlapping ordinary delivery; complete 10 warmups + 30 measured samples |
 | solver | benchmark-only queued external job, real StatisticsUtils/Python boundary with 1,460×730 repeated identity matrix, alternating known coefficients 2/−3, ridge zero, maximum error ≤1e−8 |
 
 Every phase has an owner/phase ActiveJob prefix and an exact matching GoodJob
-queue selector. Prior interrupted jobs and audit rows remain retained but cannot
+selectors for only that phase’s heavy/default queues, one thread each in a single
+worker process with zero subprocesses. Prior interrupted jobs and audit rows remain retained but cannot
 execute in later phases.
 
 Queue samples record actual job IDs, worker telemetry and terminal state. Job
@@ -180,6 +183,36 @@ headroom. Already-published shortcuts do not qualify. Schedule imports run after
 publication and use the prior season, preserving repeat initialization semantics.
 Only benchmark bootstrap loads the test solver job/instrumentation; normal app
 boot has no benchmark hooks.
+
+### Mixed worker coexistence
+
+`--scenario mixed` constructs the unchanged full 365-team scale-one fixture. Two
+distinct `MixedHeavyJob` deliveries receive the same operation token, fixture
+season ID and published model ID. Each uses the existing real 1,460×730 solver
+probe (alternating coefficients 2/−3, ridge zero) and retains its matrix/input
+state after solving. Readiness is signaled only after the solve. The driver then
+enqueues an ordinary job, makes 10 warmup + 30 measured authenticated status GETs
+paced by 300 ms, and releases held work after the window. Each heavy delivery
+holds operands at least 10 seconds with a bounded driver/readiness timeout. No
+forced GC, fixture reduction, query-cache change or cap increase is used.
+
+The result records actual retained GoodJob execution start/end timestamps,
+process IDs, job IDs and serialized pinned arguments. It rejects overlapping
+heavy intervals, ordinary start more than 10 seconds after enqueue, ordinary work
+outside the first heavy interval, HTTP samples outside that interval, mismatched
+operation/process identity, missing execution evidence and failed jobs. Real
+solver coefficients are checked independently against the known solution. Normal
+status latency, SQL/GC/RSS/current-memory, 30-sample stability and child-inclusive
+web/worker peak checks all still apply. Worker pool/DB size/PID and thread settings
+are recorded with solver results. A missing or failed stability window is not a
+pass; solving/retention transitions can affect it and require honest reporting.
+
+This measures sharing one Rails heap with two execution threads. A second heavy
+process would add another Rails heap and database pool, while the shared advisory
+lock still serializes its heavy body. Prefer the measured single-process topology
+only when this assertion passes. This synthetic solver coexistence result does
+not certify every heavy algorithm: the previously recorded preview/comparison
+memory failures below remain separate work.
 
 ## Results and regression gate
 
@@ -425,3 +458,75 @@ RUBY
 ruby tmp/performance-recovery/selected_benchmarks.rb --scale 1 --output tmp/performance-recovery/final-selected-1x.json
 ruby tmp/performance-recovery/selected_benchmarks.rb --scale 2 --assert --output tmp/performance-recovery/final-selected-2x.json
 ```
+
+## Bound-worker mixed evidence (2026-10-25)
+
+The initial `--scale 1 --scenario mixed --assert` run passed, owner
+`offseason-84093dfb40fe5ea7`, 13:53:03–13:55:31 UTC. Ignored evidence:
+`tmp/worker-ticket/mixed.json`, `tmp/worker-ticket/mixed.log` and its per-owner
+`commands.log`/telemetry directory. All fixture stages completed without OOM;
+365 target teams, 5,474 distinct school players, 8,030 school captures, 120,450
+player observations, 60,225 historical snapshots and 10,000 CBBD game observations
+match the original scale-one fixture. Content/persisted bytes and canonical
+digests are retained in the result; model hash remains
+`e68b5a3a82c91fb04ceffd9eac8363b3111c03c45bb6c6e5d7d0b304a06b04b9`.
+
+| Check | Observed |
+| --- | --- |
+| Status window | 10 warmups + 30 measured, all HTTP 200 with valid JSON |
+| Status p95 | 0.057786 seconds |
+| Web child-inclusive container peak | 184,401,920 bytes (175.86 MiB) |
+| Worker child-inclusive container peak | 262,246,400 bytes (250.10 MiB) |
+| Web first/last-ten median drift | 6,746,112 bytes |
+| Worker first/last-ten median drift | 567,296 bytes |
+| Ordinary enqueue-to-start | 0.011198 seconds, overlapping first heavy execution |
+| Gap between heavy executions | 0.027182 seconds, no overlap |
+| Real solver | Both 1,460×730 probes, maximum coefficient error 0 |
+| Live-state hold | 13.0604 and 10.0493 seconds |
+| Worker runtime | PID 1, same durable process ID for all three executions, zero subprocesses, two one-thread phase pools, DB pool 6 |
+
+All measured HTTP timestamps fall within the first persisted heavy interval;
+all three jobs completed successfully. Web/worker each retained the 512 MiB cap
+and passed the 400 MiB peak budget and the complete stability checks. PostgreSQL
+peak was 1,604,374,528 bytes, separately budgeted at 3 GiB/30 connections. The
+result records other running local containers as host contention. Only this mixed
+scenario was rerun; historical preview/comparison limitations above still apply.
+This supports one shared worker process for the measured coexistence workload; it
+does not claim every heavy algorithm now fits the worker budget.
+
+### Final runtime after required static-check repair
+
+The final-source rerun also passed, owner `offseason-91c6cf1338847cee`,
+2026-10-25 14:18:16–14:20:41 UTC. Evidence is retained in
+`tmp/worker-ticket/mixed-final.json`, `tmp/worker-ticket/mixed-final.log` and its
+per-owner directory. The fixture counts, content/persisted bytes, dataset,
+legacy-prior, CBBD evidence/comparison and model digests exactly match the initial
+run. All 1,050 recorded source-file hashes matched the checkout before this
+documentation update; no runtime source changed after benchmark launch.
+
+The repair split benchmark orchestration, output counting and interval validation
+into local helpers without changing the measured work or limits. The complete
+matrix and expected/actual solver vectors remain reachable throughout the live
+hold. A deterministic rehearsal matched 439 original/final validator outcomes,
+including exact nil-only error acceptance, nonfinite/missing timestamps, the
+10-second boundary, process/operation identity and HTTP interval mutations.
+
+| Final check | Observed |
+| --- | --- |
+| Status window | 10 warmups + 30 measured, all HTTP 200/valid JSON |
+| Status p95 | 0.042955 seconds |
+| Web container peak | 184,438,784 bytes |
+| Worker container peak including children | 260,444,160 bytes |
+| Web/worker median drift | 6,301,696 / 204,800 bytes |
+| Ordinary enqueue-to-start | 0.016882 seconds, overlaps first heavy execution |
+| Gap between heavy executions | 0.019428 seconds, no overlap |
+| Real solver | Both 1,460×730 probes, maximum coefficient error 0 |
+| Live-state holds | 12.9172 and 10.0930 seconds |
+| Worker runtime | Same retained process ID for all three jobs; PID 1, zero subprocesses, two one-thread phase pools, DB pool 6 |
+
+Both application containers passed their unchanged 400 MiB peak budgets at
+512 MiB caps; PostgreSQL peak was separately 1,592,422,400 bytes at its 3 GiB cap.
+All measured HTTP intervals were inside the first heavy execution, all three jobs
+finished successfully, and complete stability checks passed. This final rerun
+supersedes the initial run for runtime provenance; the earlier heavy-algorithm
+limitations still apply.

@@ -1,8 +1,6 @@
 # frozen_string_literal: true
 
-class SyncFromLastGamesJob < ApplicationJob
-  queue_as :default
-
+class SyncFromLastGamesJob < HeavyJob
   def perform(season_id = nil, enqueue_rankings: true)
     season = resolve_season(season_id)
     return unless season

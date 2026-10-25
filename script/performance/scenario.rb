@@ -5,7 +5,7 @@ module OffseasonPerformance
   class Scenario
     GETS = %w[dashboard readiness departures preseason cbbd].freeze
     QUEUES = %w[preview publish schedule].freeze
-    NAMES = (GETS + %w[status compare] + QUEUES + ['solver']).freeze
+    NAMES = (GETS + %w[status compare] + QUEUES + %w[solver mixed]).freeze
     MARKERS = { 'dashboard' => 'Offseason', 'readiness' => 'Offseason readiness', 'departures' => 'Pick 60',
                 'preseason' => 'proposed-preseason-ratings', 'cbbd' => 'CBBD' }.freeze
     attr_reader :name, :phase, :fixture
@@ -53,7 +53,7 @@ module OffseasonPerformance
     end
 
     def http_method
-      get? || @name == 'status' ? Net::HTTP::Get : Net::HTTP::Post
+      get? || %w[status mixed].include?(@name) ? Net::HTTP::Get : Net::HTTP::Post
     end
 
     def path(publication)
@@ -67,7 +67,7 @@ module OffseasonPerformance
       cbbd = "/admin/cbbd_review_runs/#{fixture['cbbd_id']}"
       { 'dashboard' => '/admin/offseason_setup', 'readiness' => '/admin/offseason_readiness_reviews',
         'departures' => "/admin/departure_batches/#{fixture['departure_id']}", 'preseason' => preseason,
-        'status' => "#{preseason}/progress", 'preview' => '/admin/preseason_publications',
+        'status' => "#{preseason}/progress", 'mixed' => "#{preseason}/progress", 'preview' => '/admin/preseason_publications',
         'publish' => "/admin/preseason_publications/#{publication&.id}/publish", 'cbbd' => cbbd,
         'compare' => "#{cbbd}/compare", 'schedule' => '/admin/schedule_refresh_runs' }
     end
@@ -80,7 +80,7 @@ module OffseasonPerformance
 
     def valid_body?(body)
       return body.include?(MARKERS.fetch(@name)) if MARKERS.key?(@name)
-      return JSON.parse(body).keys.sort == %w[status updated_at] if @name == 'status'
+      return JSON.parse(body).keys.sort == %w[status updated_at] if %w[status mixed].include?(@name)
 
       true
     end

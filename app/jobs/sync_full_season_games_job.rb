@@ -1,8 +1,6 @@
 # frozen_string_literal: true
 
-class SyncFullSeasonGamesJob < ApplicationJob
-  queue_as :default
-
+class SyncFullSeasonGamesJob < HeavyJob
   # Carries the complete per-date report through async failures and operator exits.
   class IncompleteSync < StandardError
     attr_reader :report

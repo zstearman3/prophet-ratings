@@ -28,6 +28,16 @@ RSpec.describe OffseasonPerformance::Driver do
     thread&.kill
   end
 
+  it 'reads a fresh wall clock at each end of the HTTP sample' do
+    driver = described_class.new('status', 'serial')
+    allow(Time).to receive(:now).and_return(Time.at(100).utc, Time.at(102).utc)
+    response = instance_double(Net::HTTPResponse, code: '200', body: '{"status":"review","updated_at":"time"}')
+    allow(driver).to receive(:timed_request).and_return([response, 2])
+    allow(OffseasonPerformance::Measurements).to receive(:http).and_return('valid' => true)
+    expect(driver.http_sample(nil, nil)).to include('started_at' => 100.0, 'finished_at' => 102.0)
+    expect(Time).to have_received(:now).twice
+  end
+
   it 'retains completed serial samples when a later request fails' do
     driver = described_class.new('status', 'serial')
     values = [1, 2]
