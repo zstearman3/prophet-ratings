@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_24_010000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_24_020000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -223,9 +223,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_24_010000) do
     t.datetime "source_updated_at"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "scoring_review_id"
     t.index ["game_id", "accepted", "id"], name: "index_game_observations_on_game_id_and_accepted_and_id"
     t.index ["game_id"], name: "index_game_observations_on_game_id"
     t.index ["provider", "external_game_id"], name: "index_game_observations_on_provider_and_external_game_id"
+    t.index ["scoring_review_id"], name: "index_game_observations_on_scoring_review_id"
+    t.index ["scoring_review_id"], name: "index_one_accepted_observation_per_scoring_review", unique: true, where: "(accepted = true)"
   end
 
   create_table "game_odds", force: :cascade do |t|
@@ -242,6 +245,25 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_24_010000) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["game_id"], name: "index_game_odds_on_game_id_unique", unique: true
+  end
+
+  create_table "game_scoring_reviews", force: :cascade do |t|
+    t.bigint "season_id", null: false
+    t.bigint "schedule_refresh_run_id", null: false
+    t.bigint "source_observation_id", null: false
+    t.bigint "reviewed_by_id", null: false
+    t.string "source_fingerprint", null: false
+    t.string "reason", default: "Approved by admin", null: false
+    t.jsonb "choices", default: {}, null: false
+    t.jsonb "approved_payload", default: {}, null: false
+    t.jsonb "participants", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["reviewed_by_id"], name: "index_game_scoring_reviews_on_reviewed_by_id"
+    t.index ["schedule_refresh_run_id"], name: "index_game_scoring_reviews_on_schedule_refresh_run_id"
+    t.index ["season_id"], name: "index_game_scoring_reviews_on_season_id"
+    t.index ["source_fingerprint"], name: "index_game_scoring_reviews_on_source_fingerprint", unique: true
+    t.index ["source_observation_id"], name: "index_game_scoring_reviews_on_source_observation_id", unique: true
   end
 
   create_table "game_sync_dates", force: :cascade do |t|
@@ -882,8 +904,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_24_010000) do
   add_foreign_key "departure_batches", "offseason_input_revisions", column: "revision_id"
   add_foreign_key "departure_batches", "seasons"
   add_foreign_key "game_external_identities", "games"
+  add_foreign_key "game_observations", "game_scoring_reviews", column: "scoring_review_id"
   add_foreign_key "game_observations", "games"
   add_foreign_key "game_odds", "games"
+  add_foreign_key "game_scoring_reviews", "game_observations", column: "source_observation_id"
+  add_foreign_key "game_scoring_reviews", "schedule_refresh_runs"
+  add_foreign_key "game_scoring_reviews", "seasons"
+  add_foreign_key "game_scoring_reviews", "users", column: "reviewed_by_id"
   add_foreign_key "game_sync_dates", "seasons"
   add_foreign_key "offseason_input_revisions", "offseason_input_revisions", column: "predecessor_id"
   add_foreign_key "offseason_input_revisions", "seasons"

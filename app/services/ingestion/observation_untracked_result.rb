@@ -3,9 +3,10 @@
 module Ingestion
   # Untracked opponents contribute visible results, never inferred statistics or rating inputs.
   class ObservationUntrackedResult
-    def initialize(observation, game)
+    def initialize(observation, game, scoring_review: nil)
       @data = observation.data
       @game = game
+      @scoring_review = scoring_review
     end
 
     def call
@@ -30,13 +31,22 @@ module Ingestion
     def validate_boxes
       transient = validation_game
       GameObservation::SIDES.each do |label|
-        ObservationUntrackedBox.new(@data, label).validate
-        ProphetRatings::GameBoxScoreValidator.new(transient, label).call if GameObservation.complete_side?(@data[label])
+        ObservationUntrackedBox.new(@data, label, scoring_review: @scoring_review).validate
+        if GameObservation.complete_side?(@data[label])
+          ProphetRatings::GameBoxScoreValidator.new(transient, label,
+                                                    scoring_review: @scoring_review).call
+        end
       end
     end
 
+    def validation_context
+      Game.new(ObservationWriter.side_attributes(@data).merge(season: Season.find_by(year: @data[:season_year]),
+                                                              start_time: @data[:start_time] ||
+                                                              Game.schedule_time_for(Date.iso8601(@data[:schedule_date]))))
+    end
+
     def validation_game
-      transient = Game.new(ObservationWriter.side_attributes(@data))
+      transient = validation_context
       GameObservation::SIDES.each do |label|
         side = @data[label]
         transient.public_send("#{label}_team_game=", TeamGame.new(side[:stats])) if GameObservation.complete_side?(side)

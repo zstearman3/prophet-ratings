@@ -3,9 +3,9 @@
 module Ingestion
   # All provider imports share identity, transaction, freshness and strict finalization rules.
   class GameObservationImporter
-    def initialize(observation:, season: nil)
+    def initialize(observation:, season: nil, scoring_review: nil)
       @observation = observation.is_a?(GameObservation) ? observation : GameObservation.new(observation)
-      @season = season
+      @settings = { season:, scoring_review: }
     end
 
     def call
@@ -32,18 +32,26 @@ module Ingestion
 
     def apply_transaction
       Game.transaction(requires_new: true) do
-        resolution.lock
-        @game = resolution.game
-        lock_game
+        prepare_locked_game
         apply_observation
       end
     end
 
+    def prepare_locked_game
+      resolution.lock
+      @settings[:scoring_review]&.validate_payload(data, resolution)
+      @game = resolution.game
+      lock_game
+    end
+
     def prepare_resolution
       observation.validate
-      @season ||= Season.find_by(year: data[:season_year])
-      @resolution = ObservationResolution.new(observation, @season).resolve
-      ObservationUntrackedResult.new(observation, Game.new).validate if resolution.untracked? && observation.final?
+      season = @settings[:season] || Season.find_by(year: data[:season_year])
+      @resolution = ObservationResolution.new(observation, season).resolve
+      return unless resolution.untracked? && observation.final?
+
+      ObservationUntrackedResult.new(observation, Game.new,
+                                     scoring_review: @settings[:scoring_review]).validate
     end
 
     def lock_game
@@ -58,7 +66,7 @@ module Ingestion
     def apply_observation
       return ObservationScheduleProjection.new(observation, resolution, game).call if observation.schedule_projection?
 
-      writer = ObservationWriter.new(observation, resolution, game)
+      writer = ObservationWriter.new(observation, resolution, game, scoring_review: @settings[:scoring_review])
       if writer.identical?
         associate_identity
         return retain('unchanged', 'canonical_values_unchanged')
@@ -101,7 +109,7 @@ module Ingestion
     end
 
     def retain(outcome, reason, options = {})
-      ObservationAudit.new(observation, game).retain(outcome, reason, options)
+      ObservationAudit.new(observation, game).retain(outcome, reason, options.merge(scoring_review: @settings[:scoring_review]))
     end
   end
 end

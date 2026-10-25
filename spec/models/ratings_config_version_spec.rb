@@ -3,6 +3,19 @@
 require 'rails_helper'
 
 RSpec.describe RatingsConfigVersion do
+  it 'publishes the checked-in early-season candidate without changing the active model' do
+    active = create(:ratings_config_version, current: true)
+    payload = JSON.parse(Rails.root.join('config/examples/v1_16_coherent_early_season.json').read)
+    version = described_class.publish!(payload)
+    season = create(:season)
+
+    expect(described_class.current).to eq(active)
+    expect(version.current?).to be(false)
+    expect(described_class.publish!(payload)).to eq(version)
+    expect(ProphetRatings::EarlySeasonPolicy.adjustment_period?(season, season.start_date - 1, version.settings)).to be(false)
+    expect(ProphetRatings::EarlySeasonPolicy.adjustment_period?(season, season.start_date + 1, version.settings)).to be(true)
+  end
+
   it 'rejects silently reusing a name for different assumptions and preserves existing configuration' do
     original = { bundle_name: 'frozen', preseason: { previous_season_weight: 0.85 } }
     version = create(:ratings_config_version, name: 'frozen')

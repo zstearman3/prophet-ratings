@@ -1,14 +1,1 @@
-<section class="mx-auto max-w-5xl space-y-4 pb-8">
-  <h1 class="text-3xl font-bold">Retained readiness review #<%= @page[:review].id %></h1>
-  <p>Reviewed by admin #<%= @page[:review].reviewer_id %> at <%= @page[:review].created_at %>; model #<%= @page[:review].ratings_config_version_id || 'none' %>.</p>
-  <p><%= @page[:review].fingerprint == @page[:report]['fingerprint'] ? 'Evidence still matches this review.' : 'Evidence changed. Save a fresh review before another action. Retained successful actions replay their original result.' %></p>
-  <%= render 'checks', report: @page[:review].report, decisions: @page[:review].deferrals %>
-  <h2>Retained acknowledgement</h2><pre class="whitespace-pre-wrap"><%= JSON.pretty_generate(@page[:review].acknowledgement) %></pre>
-  <h2>Retained action results</h2><pre class="whitespace-pre-wrap"><%= JSON.pretty_generate(@page[:review].results) %></pre>
-  <h2>Failed attempts after rollback</h2><pre class="whitespace-pre-wrap"><%= JSON.pretty_generate(@page[:review].attempts) %></pre>
-  <p>Activate season: reviewed previous season #<%= @page[:review].report['current_season_id'] || 'none' %> → target #<%= @page[:season].id %>. Membership choices are reused; no source alignment or calculations run.</p>
-  <%= button_to 'Activate season', activate_season_admin_offseason_readiness_review_path(@page[:review], season_id: @page[:season].id), method: :post %>
-  <p>Make model default: reviewed previous default #<%= @page[:review].report['default_model_id'] || 'none' %> → target #<%= @page[:review].ratings_config_version_id || 'none' %>. This affects future work using the default. Explicitly queued season/model payloads stay pinned. Legacy or manual jobs omitting season ID resolve the current season at execution; inspect those jobs in GoodJob before switching.</p>
-  <%= button_to 'Make model default', activate_model_admin_offseason_readiness_review_path(@page[:review], season_id: @page[:season].id), method: :post %>
-</section>
 <%= render template: 'admin/offseason_readiness_reviews/index' %>

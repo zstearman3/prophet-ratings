@@ -1,31 +1,63 @@
-<section class="mx-auto max-w-5xl space-y-5 pb-12">
-  <h1 class="text-3xl font-bold">Offseason readiness — ending year <%= @page[:season].year %></h1>
-  <p><%= @page[:season].start_date %> to <%= @page[:season].end_date %> · Selected model <%= @page[:report]['model_name'] || 'none' %></p>
-  <p>Actual current season #<%= @page[:report]['current_season_id'] || 'none' %>; effective default model #<%= @page[:report]['default_model_id'] || 'none' %>.</p>
-  <p>This review records operational evidence and unresolved work. It does not certify prediction accuracy or launch readiness. Saving a review changes neither current season nor default model.</p>
-  <% if @page[:error] %><p role="alert"><%= @page[:error] %></p><% end %>
-  <nav class="flex flex-wrap gap-3">
-    <%= link_to 'Return to season dashboard', admin_offseason_setup_path(season_id: @page[:season].id) %>
-    <%= link_to 'Memberships, aliases and dates', rails_admin.review_memberships_path(model_name: 'season', id: @page[:season].id) %>
-    <%= link_to 'Recruiting', admin_recruiting_batches_path(season_id: @page[:season].id) %>
-    <%= link_to 'Coaching', admin_coaching_review_path(@page[:season].year) %>
-    <%= link_to 'Departures', admin_departure_batches_path(season_id: @page[:season].id) %>
-    <%= link_to 'Model selection and preseason publication', admin_preseason_publications_path(season_id: @page[:season].id) %>
-    <%= link_to 'Schedule and game reconciliation', admin_schedule_refresh_runs_path(season_id: @page[:season].id) %>
-    <%= link_to 'Model analysis', admin_prediction_evaluation_path(season_id: @page[:season].id, model_id: @page[:report]['model_id']) %>
-    <%= link_to 'GoodJob operations', '/good_job' %>
-  </nav>
-  <h2 class="text-2xl font-semibold">Fresh stored evidence</h2>
-  <%= render 'checks', report: @page[:report], decisions: nil %>
-  <%= form_with url: admin_offseason_readiness_reviews_path(season_id: @page[:season].id), method: :post do |form| %>
-    <%= hidden_field_tag :fingerprint, @page[:report].fetch('fingerprint') %>
-    <label><%= check_box_tag :acknowledge, '1' %> Acknowledge the exact captured and current input gaps shown above</label>
-    <% @page[:report].fetch('checks').reject { |check| check['hard'] || check['status'] == 'pass' }.each do |check| %>
-      <div class="my-3"><%= label_tag "deferrals_#{check['key']}", "Optional deferral reason: #{check['label']} (blank leaves open)" %>
-      <%= text_area_tag "deferrals[#{check['key']}]", nil, maxlength: 1000, class: 'block w-full border' %></div>
+<section class="mx-auto max-w-5xl space-y-6 pb-12">
+  <header class="rounded border bg-white p-6 space-y-3">
+    <p class="text-sm font-semibold text-prophet-indigo">OFFSEASON SETUP</p>
+    <h1 class="text-3xl font-bold"><%= @page[:review] ? "Retained readiness review ##{@page[:review].id}" : "Offseason readiness — ending year #{@page[:season].year}" %></h1>
+    <p class="text-lg">Season <%= @page[:season].year %> · <%= @page[:season].start_date %> to <%= @page[:season].end_date %></p>
+    <p>Selected model: <strong><%= @page[:report]['model_name'] || 'None selected' %></strong></p>
+    <p class="text-sm text-gray-600">Actual current season #<%= @page[:report]['current_season_id'] || 'none' %>; effective default model #<%= @page[:report]['default_model_id'] || 'none' %>.</p>
+    <p class="text-sm text-gray-600">This review does not certify prediction accuracy or launch readiness. Saving it changes neither current season nor default model.</p>
+    <nav class="flex flex-wrap gap-4 text-sm text-blue-700 underline">
+      <%= link_to 'Return to season dashboard', admin_offseason_setup_path(season_id: @page[:season].id) %>
+      <%= link_to 'Model analysis', admin_prediction_evaluation_path(season_id: @page[:season].id, model_id: @page[:report]['model_id']) %>
+      <%= link_to 'GoodJob operations', '/good_job' %>
+    </nav>
+  </header>
+  <% if @page[:error] %><p role="alert" class="rounded border border-red-200 bg-red-50 p-4 text-red-800"><%= @page[:error] %></p><% end %>
+
+  <section class="rounded border bg-gray-50 p-5 space-y-3" aria-labelledby="readiness-summary">
+    <h2 id="readiness-summary" class="text-xl font-semibold">Required checks</h2>
+    <% blockers = OffseasonReadinessReview.required_problems(@page[:report]) %>
+    <% if blockers.empty? %>
+      <p class="font-semibold text-green-800">Required checks passed. You can save a review and activate this season.</p>
+    <% else %>
+      <p class="font-semibold text-yellow-800">Resolve <%= pluralize(blockers.size, 'required check') %> before activation.</p>
+      <ul class="list-disc pl-5"><% blockers.each do |check| %><li><%= link_to check['label'], "#check-#{check['key']}", class: 'text-blue-700 underline' %></li><% end %></ul>
     <% end %>
-    <%= form.submit 'Save readiness review', class: 'rounded bg-blue-800 px-4 py-2 text-white' %>
+    <p class="text-sm text-gray-600">Optional schedule, prediction and input checks may remain open. A historical test does not require upcoming games or a full-season import.</p>
+  </section>
+
+  <section id="readiness-actions" class="rounded border border-indigo-200 bg-indigo-50 p-5 space-y-5" aria-label="Readiness actions">
+    <% if @page[:review] %>
+      <%= render 'activation', review: @page[:review], report: @page[:report] %>
+      <details class="rounded border bg-white p-4" <%= 'open' if @page[:review].fingerprint != @page[:report]['fingerprint'] %>>
+        <summary class="cursor-pointer font-semibold">Save a fresh review</summary>
+        <div class="mt-4"><%= render 'review_form', report: @page[:report] %></div>
+      </details>
+    <% else %>
+      <%= render 'review_form', report: @page[:report] %>
+    <% end %>
+  </section>
+
+  <h2 class="text-2xl font-semibold">Fresh stored evidence</h2>
+  <%= render 'checks', report: @page[:report], decisions: nil, prefix: '' %>
+
+  <% if @page[:review] %>
+    <details class="rounded border bg-white p-5">
+      <summary class="cursor-pointer font-semibold">Evidence saved with review #<%= @page[:review].id %></summary>
+      <div class="mt-4 space-y-5">
+        <%= render 'checks', report: @page[:review].report, decisions: @page[:review].deferrals, prefix: 'retained-' %>
+        <details class="rounded border p-4">
+          <summary class="cursor-pointer font-semibold">Approval and action audit</summary>
+          <pre class="mt-3 max-h-80 overflow-auto whitespace-pre-wrap break-words text-xs"><%= JSON.pretty_generate(@page[:review].attributes.slice('acknowledgement', 'results', 'attempts')) %></pre>
+        </details>
+      </div>
+    </details>
   <% end %>
-  <h2 class="text-xl font-semibold">Retained reviews</h2>
-  <% @page[:reviews].each do |review| %><p><%= link_to "Review ##{review.id} by admin ##{review.reviewer_id} at #{review.created_at}", admin_offseason_readiness_review_path(review, season_id: @page[:season].id) %> · <%= review.results.keys.join(', ') %></p><% end %>
+
+  <details class="rounded border bg-white p-5">
+    <summary class="cursor-pointer font-semibold">Previous readiness reviews (<%= @page[:reviews].size %>)</summary>
+    <div class="mt-3 space-y-2"><% @page[:reviews].each do |review| %>
+      <p><%= link_to "Review ##{review.id} by admin ##{review.reviewer_id} at #{review.created_at}", admin_offseason_readiness_review_path(review, season_id: @page[:season].id), class: 'text-blue-700 underline' %> · <%= review.results.keys.join(', ').presence || 'No activation recorded' %></p>
+    <% end %></div>
+  </details>
 </section>

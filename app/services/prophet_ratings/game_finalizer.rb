@@ -7,8 +7,9 @@ module ProphetRatings
     ##
     # Initializes a new GameFinalizer for the given game.
     # @param game The game record to be finalized.
-    def initialize(game, ratings_config_version: nil)
+    def initialize(game, ratings_config_version: nil, scoring_review: nil)
       @game = game
+      @scoring_review = scoring_review
       @ratings_config_version = ratings_config_version
     end
 
@@ -16,8 +17,9 @@ module ProphetRatings
     # Finalizes the game by updating its status, derived fields, team game statistics, and prediction errors.
     def call
       game.transaction(requires_new: true) do
-        GameBoxScoreValidator.new(game, :home).call
-        GameBoxScoreValidator.new(game, :away).call
+        review = @scoring_review || GameScoringReview.for_game(game)
+        GameBoxScoreValidator.new(game, :home, scoring_review: review).call
+        GameBoxScoreValidator.new(game, :away, scoring_review: review).call
         update_derived_fields
         validate_finalization_prerequisites!
         game.home_team_game.calculate_game_stats

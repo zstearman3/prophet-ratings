@@ -5,10 +5,11 @@ module Ingestion
   class ObservationWriter
     attr_reader :observation, :resolution, :game
 
-    def initialize(observation, resolution, game)
+    def initialize(observation, resolution, game, scoring_review: nil)
       @observation = observation
       @resolution = resolution
       @game = game
+      @scoring_review = scoring_review
     end
 
     def attributes
@@ -47,9 +48,9 @@ module Ingestion
 
     def finalize
       GameObservation::SIDES.each { |label| game.association(:"#{label}_team_game").reset }
-      return ObservationUntrackedResult.new(observation, game).call if resolution.untracked?
+      return ObservationUntrackedResult.new(observation, game, scoring_review: @scoring_review).call if resolution.untracked?
 
-      game.finalize
+      ProphetRatings::GameFinalizer.new(game, scoring_review: @scoring_review).call
     end
 
     def identical_side?(label)

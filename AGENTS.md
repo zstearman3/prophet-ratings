@@ -299,6 +299,15 @@ Do not over-invest in visual polish before the data and prediction flows are tru
 
 TailwindCSS is available. Keep UI components simple and readable.
 
+### Human approvals and confirmations
+
+In the app, approving or confirming an action must not require a human to type a
+reason or justification. The approval itself is the reason: record a standard
+message such as `Approved by admin` automatically, together with the approving
+user, timestamp, and the exact decision or selected values. Preserve relevant
+source evidence. Collect substantive inputs needed to perform the action, such
+as selecting the trusted score, without adding a written explanation requirement.
+
 ---
 
 ## Launch Priorities

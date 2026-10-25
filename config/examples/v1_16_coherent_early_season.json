@@ -1,0 +1,122 @@
+{
+  "ridge": {
+    "alpha": 0.001
+  },
+  "anchor": {
+    "weight": 0.05
+  },
+  "blowout": {
+    "enabled": false,
+    "max_margin": 15,
+    "cap_multiplier": 1.25
+  },
+  "factors": {
+    "turnover_rate": {
+      "ridge_alpha": 0.001,
+      "anchor_weight": 0.05,
+      "defense_weight": 1.0,
+      "offense_weight": 1.0
+    },
+    "free_throw_rate": {
+      "ridge_alpha": 0.001,
+      "anchor_weight": 0.05,
+      "defense_weight": 1.0,
+      "offense_weight": 1.0
+    },
+    "three_pt_proficiency": {
+      "ridge_alpha": 0.001,
+      "anchor_weight": 0.05,
+      "defense_weight": 1.0,
+      "offense_weight": 1.0
+    },
+    "offensive_rebound_rate": {
+      "ridge_alpha": 0.001,
+      "anchor_weight": 0.05,
+      "defense_weight": 1.0,
+      "offense_weight": 1.0
+    },
+    "effective_fg_percentage": {
+      "ridge_alpha": 0.001,
+      "anchor_weight": 0.05,
+      "defense_weight": 1.0,
+      "offense_weight": 1.0
+    }
+  },
+  "defaults": {
+    "season_defaults": {
+      "average_pace": 70.0,
+      "average_efficiency": 105.0
+    }
+  },
+  "learning": {
+    "home_court": {
+      "sample_scale": 16.0,
+      "maximum_weight": 0.5,
+      "minimum_observations": 1
+    },
+    "volatility": {
+      "sample_scale": 16.0,
+      "maximum_weight": 0.5,
+      "minimum_observations": 4
+    }
+  },
+  "preseason": {
+    "profile": {
+      "attrition_multiplier": 5.0,
+      "max_efficiency_adjustment": 5.0,
+      "recruiting_score_multiplier": 0.1
+    },
+    "departures": {
+      "slope": 7.142857142857143,
+      "weight": 1.0,
+      "formula": "points_share_v1",
+      "max_net_efficiency": 5.0
+    },
+    "recruiting": {
+      "weight": 1.0,
+      "formula": "class_points_baseline_v1",
+      "attenuation_floor": 0.2,
+      "baseline_net_lower": 0.0,
+      "baseline_net_upper": 30.0,
+      "class_points_lower": 60.0,
+      "class_points_upper": 70.0,
+      "max_net_efficiency": 5.0
+    },
+    "fallback_pace": 69.5,
+    "fallback_efficiency": 105.5,
+    "efficiency_adjustment": {
+      "formula": "reviewed_net_v1",
+      "lower_bound": -5.0,
+      "upper_bound": 5.0
+    },
+    "previous_season_weight": 0.85,
+    "adjustment_start_after_days": 14
+  },
+  "weighting": {
+    "min_recency_weight": 0.75,
+    "recency_decay_days": 60.0,
+    "min_preseason_weight": 0.1,
+    "preseason_decay_days": 40
+  },
+  "prediction": {
+    "confidence_levels": {
+      "high_max": 2.0,
+      "medium_max": 5.0
+    },
+    "uncertainty_model": "shared_pace_v1",
+    "probability_precision": "float64_v1"
+  },
+  "bundle_name": "v1.16-coherent-early-season",
+  "ratings_formula": "corrected_v1",
+  "contract_version": 1,
+  "baseline_volatility": {
+    "pace_volatility": 4.5,
+    "efficiency_volatility": 11.5
+  },
+  "early_season_policy": "coherent_v1",
+  "home_court_advantage": 2.2,
+  "home_court_adjusted_stats": [
+    "offensive_efficiency",
+    "defensive_efficiency"
+  ]
+}

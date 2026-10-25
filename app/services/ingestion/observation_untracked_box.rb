@@ -3,11 +3,11 @@
 module Ingestion
   # Missing counts remain unknown, but every supplied checkable relationship must hold.
   class ObservationUntrackedBox
-    def initialize(data, label)
+    def initialize(data, label, scoring_review: nil)
       @data = data
+      @scoring_review = scoring_review
       @label = label
-      @side = data.fetch(label)
-      @stats = @side.fetch(:stats)
+      @stats = data.fetch(label).fetch(:stats)
     end
 
     def validate
@@ -29,16 +29,20 @@ module Ingestion
 
     def validate_points
       points = @stats[:points]
-      reject('score does not equal points') if points && points != @side[:score]
+      reject('score does not equal points') if points && points != @data.fetch(@label)[:score]
     end
 
     def validate_scoring_components
+      return if @scoring_review&.matches_payload?(@data)
+
       total = self.class.component_total(ProphetRatings::GameBoxScoreValidator::COMPONENTS.fetch(:points), @stats)
-      reject('score does not equal scoring component total') if total && total != @side[:score]
+      reject('score does not equal scoring component total') if total && total != @data.fetch(@label)[:score]
     end
 
     def validate_components
       ProphetRatings::GameBoxScoreValidator::COMPONENTS.each do |field, components|
+        next if field == :points && @scoring_review&.matches_payload?(@data)
+
         value = @stats[field]
         total = self.class.component_total(components, @stats)
         reject("#{field} does not equal component total") if value && total && value != total
