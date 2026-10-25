@@ -69,14 +69,10 @@ module ProphetRatings
     def validate_publication
       publication_date = @season.start_date - 1.day
       SeasonParticipationReview.new(@season).validate_publication(@ratings_config_version, publication_date)
-      return unless @season.current? || finalized_games? || snapshots_outside_publication_date?(publication_date) ||
+      return unless @season.current? || @season.games.completed.exists? || snapshots_outside_publication_date?(publication_date) ||
                     changed_live_core_ratings?
 
       raise ArgumentError, 'Existing in-season outputs must be preserved; use an explicitly scoped season:rebuild_ratings.'
-    end
-
-    def finalized_games?
-      @season.games.completed.exists?
     end
 
     def snapshots_outside_publication_date?(publication_date)
@@ -96,13 +92,10 @@ module ProphetRatings
 
     def publication_baselines
       config = @config.fetch(:baseline_volatility)
-      { average_efficiency: @season.rating_team_seasons.average(:adj_offensive_efficiency),
-        average_pace: preseason_average_pace,
+      teams = @season.rating_team_seasons
+      { average_efficiency: teams.average(:adj_offensive_efficiency),
+        average_pace: teams.average(:adj_pace),
         efficiency_std_deviation: config.fetch(:efficiency_volatility), pace_std_deviation: config.fetch(:pace_volatility) }
-    end
-
-    def preseason_average_pace
-      @season.rating_team_seasons.average(:adj_pace)
     end
 
     def validate_prediction_baselines

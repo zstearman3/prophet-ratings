@@ -2,12 +2,14 @@
 
 module ProphetRatings
   class Gaussian
-    def initialize(mean, stddev, rand_helper = -> { Kernel.rand })
+    RANDOM = -> { Kernel.rand }
+
+    def initialize(mean, stddev, rand_helper = RANDOM)
       @mean = mean
       @stddev = stddev
+      @next = 0
       @valid = false
       @rand_helper = rand_helper
-      @next = 0
     end
 
     def rand

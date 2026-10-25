@@ -38,6 +38,23 @@ bundle exec overcommit --run pre_push
 
 See `docs/development.md` for hook prerequisites, setup, and known verification limitations.
 
+### Performance benchmarks are opt-in
+
+`bin/benchmark-offseason` is an expensive diagnostic tool, not a routine validation
+requirement. Ordinary tickets use targeted tests and the two required hook suites
+above; do not run the benchmark merely because application code changed, a PR is
+being opened, or the benchmark exists. Do not add it to default hooks, CI,
+`bin/test`, or `bin/check` without an explicit request.
+
+- For a performance investigation or a ticket that explicitly requires benchmark evidence, run only the relevant scenario with `--scale 1 --scenario NAME` by default.
+- Use `--scale 2` only when investigating data growth or memory scaling, or when explicitly requested. Scale 1 is the standard synthetic dataset; scale 2 doubles retained history/evidence while keeping the same teams. It does not mean running ordinary tests twice.
+- Reserve full all-scenario baseline runs for an explicitly scoped baseline refresh or performance audit. Do not rerun both scales for unrelated fixes or documentation changes.
+- Select the smallest measurement that answers the ticket's question, reuse applicable recorded evidence, and report what was and was not measured. Even a single scenario constructs the complete fixture, so setup can be expensive.
+
+Read `docs/performance.md` only when using or changing the benchmark tooling.
+These guidelines do not replace the required hook suites or targeted correctness
+and real-solver checks described elsewhere in this file.
+
 ### Definition of Done and Handoff
 
 A task that changes repository files is complete when:

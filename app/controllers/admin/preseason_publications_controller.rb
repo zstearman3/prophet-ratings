@@ -22,9 +22,10 @@ module Admin
     end
 
     def show
-      page[:publication] = PreseasonPublicationPage.review(page[:season].preseason_publications).find(params.expect(:id))
-      page[:report] = PreseasonPublicationPreview.presentation(page[:publication].report)
-      page[:published_outputs] = PreseasonPublicationPage.outputs(page[:publication]) if page[:publication].status == 'published'
+      publication = PreseasonPublicationPage.review(page[:season].preseason_publications).find(params.expect(:id))
+      page[:publication] = publication
+      page[:report] = PreseasonPublicationPreview.presentation(publication.report)
+      page[:published_outputs] = PreseasonPublicationPage.outputs(publication) if publication.status == 'published'
     end
 
     def progress

@@ -4,29 +4,12 @@ class TeamMatcher
   def initialize
     @teams = Team.includes(:team_aliases).to_a
 
-    # Build normalized alias map for fast lookup
-    @alias_map = {}
-    @teams.each do |team|
-      team.team_aliases.each do |team_alias|
-        normalized = normalize(team_alias.value)
-        @alias_map[normalized] = team
-      end
-    end
-
-    # Hash of Team => array of names for fuzzy matching
-    @team_to_names = @teams.each_with_object({}) do |team, hash|
-      names = []
-      names << team.school
-      names.concat(team.team_aliases.map(&:value))
-      names.compact!
-      names.uniq!
-
-      hash[team] = names
-    end
+    @alias_map = build_alias_map
+    @team_to_names = @teams.index_with { |team| [team.school, *team.team_aliases.map(&:value)].compact.uniq }
 
     @fuzzy_matcher = FuzzyMatch.new(
       @team_to_names,
-      read: ->(team) { @team_to_names[team] }
+      read: method(:names_for).to_proc
     )
   end
 
@@ -45,6 +28,20 @@ class TeamMatcher
   end
 
   private
+
+  def build_alias_map
+    @teams.each_with_object({}) do |team, aliases|
+      add_aliases(team, aliases)
+    end
+  end
+
+  def names_for(team)
+    @team_to_names[team]
+  end
+
+  def add_aliases(team, aliases)
+    team.team_aliases.each { |team_alias| aliases[normalize(team_alias.value)] = team }
+  end
 
   def normalize(str)
     str.downcase.gsub(/[^a-z0-9]/, '')

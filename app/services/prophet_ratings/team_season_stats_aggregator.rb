@@ -124,7 +124,8 @@ module ProphetRatings
         aggregates[stat] = avg
       end
 
-      possession_vals = team_games.filter_map { |g| pace_for(g.game) }
+      pace_stat = @ratings_config_version.settings[:ratings_formula] == 'corrected_v1' ? :pace : :possessions
+      possession_vals = team_games.filter_map { |g| g.game&.public_send(pace_stat) }
       aggregates[:pace] = possession_vals.any? ? possession_vals.sum / possession_vals.size.to_f : nil
 
       fgm = self.class.sum_stat(team_games, :field_goals_made)
@@ -146,11 +147,6 @@ module ProphetRatings
         offensive_efficiency_std_dev: StatisticsUtils.stddev(off_vals),
         defensive_efficiency_std_dev: StatisticsUtils.stddev(def_vals)
       }
-    end
-
-    def pace_for(game)
-      stat = @ratings_config_version.settings[:ratings_formula] == 'corrected_v1' ? :pace : :possessions
-      game&.public_send(stat)
     end
 
     def offensive_efficiency_volatility(home_predictions, away_predictions)
@@ -187,9 +183,10 @@ module ProphetRatings
 
     def blend_volatility(errors, baseline)
       weight = learning_weight(errors.size, :volatility)
-      return baseline if weight.zero?
-
-      (weight * StatisticsUtils.stddev(errors)) + ((1.0 - weight) * baseline)
+      case weight
+      when 0 then baseline
+      else (weight * StatisticsUtils.stddev(errors)) + ((1.0 - weight) * baseline)
+      end
     end
 
     def calculate_volatility(team_season)

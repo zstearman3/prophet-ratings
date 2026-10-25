@@ -455,3 +455,14 @@ bounded draft/player/team JSON requests. Retain private response attempts in
 backups; review/import/scoring replay retained evidence without HTTP. See
 [departures.md](departures.md) for shared budgets, interrupted-attempt recovery,
 strict missing-versus-zero semantics and historical HTML compatibility.
+
+## Offseason performance budgets
+
+Use the isolated [offline offseason benchmark](performance.md) to generate the
+365-team synthetic workload and measure production-mode web/external-worker
+latency, memory, SQL, GC and real Python solver behavior at fixed container caps.
+These benchmarks are opt-in, not routine validation. Default to the smallest
+relevant scenario at 1×; use 2× for data-growth or memory-scaling investigations,
+or when explicitly requested. When both scales are required, run them
+sequentially. Full baseline runs require an explicitly scoped refresh or audit.
+The benchmark owns its disposable services and never stops the development stack.

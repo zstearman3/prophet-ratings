@@ -116,14 +116,11 @@ class CoachingChange < ApplicationRecord
   end
 
   def validate_current_inputs
-    return if new_record? || current_input_attributes == REVIEW_FIELDS.index_with { |field| attribute_in_database(field) }
+    stored = REVIEW_FIELDS.index_with { |field| attribute_in_database(field) }
+    return if new_record? || self.class.find_by(id:)&.attributes&.slice(*REVIEW_FIELDS) == stored
 
     errors.add(:base, 'Coaching facts or decision changed since loading; reload and review the current record before saving')
     raise ActiveRecord::RecordInvalid, self
-  end
-
-  def current_input_attributes
-    self.class.find_by(id:)&.attributes&.slice(*REVIEW_FIELDS)
   end
 
   def invalidate_reviews

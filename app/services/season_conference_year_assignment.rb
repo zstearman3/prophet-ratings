@@ -9,10 +9,7 @@ class SeasonConferenceYearAssignment
   end
 
   def call
-    memberships = team.team_conferences.select { |membership| membership.covers_year?(season.year) }
-    raise ArgumentError, "#{team.school}: resolve overlapping membership ranges first." if memberships.many?
-
-    @membership = memberships.first
+    @membership = target_membership
     return if membership&.conference_id == conference_id
 
     replace_membership
@@ -21,6 +18,13 @@ class SeasonConferenceYearAssignment
   private
 
   attr_reader :season, :team, :conference_id, :membership
+
+  def target_membership
+    memberships = team.team_conferences.select { |candidate| candidate.covers_year?(season.year) }
+    raise ArgumentError, "#{team.school}: resolve overlapping membership ranges first." if memberships.many?
+
+    memberships.first
+  end
 
   def replace_membership
     preserve_surrounding_years if membership
