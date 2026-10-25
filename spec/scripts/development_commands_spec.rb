@@ -9,8 +9,9 @@ require 'timeout'
 RSpec.describe 'Development commands' do # rubocop:disable RSpec/DescribeClass
   let(:sandbox) { Dir.mktmpdir('prophet-command-spec-') }
   let(:command_log) { File.join(sandbox, 'commands.jsonl') }
+  # Standalone CLI/fake executables need no inherited Bundler preload on every subprocess.
   let(:environment) do
-    { 'PATH' => "#{sandbox}:#{ENV.fetch('PATH')}", 'COMMAND_LOG' => command_log,
+    { 'RUBYOPT' => nil, 'PATH' => "#{sandbox}:#{ENV.fetch('PATH')}", 'COMMAND_LOG' => command_log,
       'COMPOSE_PROJECT_NAME' => 'prophet-command-spec', 'TEST_DATABASE_URL' => 'postgresql://invalid.example/development' }
   end
 
@@ -67,20 +68,15 @@ RSpec.describe 'Development commands' do # rubocop:disable RSpec/DescribeClass
     commands.find { |command| command['args'].include?('down') }
   end
 
-  it 'runs only the test service, forwards RSpec arguments and removes its disposable project' do
+  it 'checks the schema, forwards RSpec arguments and removes only its disposable test project', :aggregate_failures do
     expect(run_script('test', 'spec/models/team_spec.rb', '--seed', '7')).to be_success
 
     test_run = commands.find { |command| command['args'].include?('run') }
     expect(test_run['args']).to include('--rm', '--no-deps', '-T', 'test')
+    expect(test_run['args'].join(' ')).to include('db:schema:load db:abort_if_pending_migrations && bundle exec rspec')
     expect(test_run['args'].last(3)).to eq(['spec/models/team_spec.rb', '--seed', '7'])
     expect(cleanup_command['args']).to include('--volumes')
     expect(cleanup_command['args'][2]).to match(/\Aprophet-ratings-test-\d+-\d+\z/)
-  end
-
-  it 'checks for pending migrations before running Docker specs' do
-    expect(run_script('test')).to be_success
-    test_run = commands.find { |command| command['args'].include?('run') }
-    expect(test_run['args'].join(' ')).to include('db:schema:load db:abort_if_pending_migrations && bundle exec rspec')
   end
 
   it 'gives native specs a dedicated test URL using the assigned port' do
@@ -127,17 +123,13 @@ RSpec.describe 'Development commands' do # rubocop:disable RSpec/DescribeClass
     expect(cleanup_command['args']).to include('--volumes')
   end
 
-  it 'cleans up foreground development without deleting data or images' do
-    expect(run_script('dev')).to be_success
-    expect(cleanup_command['args']).to include('--remove-orphans')
-    expect(cleanup_command['args']).not_to include('--volumes', '--rmi')
-  end
-
-  it 'updates the tracked schema during startup rather than redirecting the dump' do
+  it 'migrates the tracked schema and cleans up foreground development without deleting data or images', :aggregate_failures do
     expect(run_script('dev')).to be_success
     migration = commands.find { |command| command['args'].include?('db:migrate') }
     expect(migration['args'].last(4)).to eq(['web', 'bin/rails', 'db:create', 'db:migrate'])
     expect(migration['args'].join(' ')).not_to include('SCHEMA=')
+    expect(cleanup_command['args']).to include('--remove-orphans')
+    expect(cleanup_command['args']).not_to include('--volumes', '--rmi')
   end
 
   it 'fails before native specs when the checked-in schema leaves pending migrations' do

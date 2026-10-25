@@ -22,7 +22,10 @@ RSpec.describe ReleaseTool::Draft do
   context 'with isolated Git and GitHub executables' do
     let(:sandbox) { Dir.mktmpdir('release-cli-spec-') }
     let(:command_log) { File.join(sandbox, 'commands.jsonl') }
-    let(:environment) { { 'PATH' => "#{sandbox}:#{ENV.fetch('PATH')}", 'COMMAND_LOG' => command_log, 'GH_REPO' => 'wrong/repo' } }
+    # Standalone CLI/fake executables need no inherited Bundler preload on every subprocess.
+    let(:environment) do
+      { 'RUBYOPT' => nil, 'PATH' => "#{sandbox}:#{ENV.fetch('PATH')}", 'COMMAND_LOG' => command_log, 'GH_REPO' => 'wrong/repo' }
+    end
 
     before do
       %w[git gh].each do |name|

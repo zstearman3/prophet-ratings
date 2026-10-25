@@ -32,13 +32,13 @@ Read [risk-and-escalation.md](references/risk-and-escalation.md). Record a score
 
 Use the installed `superpowers:writing-plans` with [planning.md](references/planning.md). Save one implementation plan under this ticket's Implementation section, including acceptance coverage, risk, verification, and budget feasibility. A local working copy may live in the task worktree's ignored `tmp/` for agent handoff; link its exact path and keep durable decisions on the ticket. Do not commit scratch plans by default. If Notion writing is unavailable, preserve the plan locally and disclose synchronization as incomplete; safe authorized work can continue.
 
-Dispatch one fresh-context plan reviewer with the assignment in [agent-roles.md](references/agent-roles.md). Address material findings or reject them with evidence. A reviewed plan with no unresolved material concerns permits implementation without another human approval. Reassess scope/risk for material plan changes; re-review only the affected decisions. Apply the shared repair limit in budget.md.
+Dispatch one fresh-context plan reviewer with the assignment in [agent-roles.md](references/agent-roles.md). Address material findings or reject them with evidence. A reviewed plan with no unresolved material concerns permits implementation without another human approval. Reassess scope/risk for material plan changes; re-review only the affected decisions. Track planning revisions separately and apply the convergence checkpoints in budget.md.
 
 ## Implement and verify
 
 Update Status to `In progress` when implementation begins. An implementation invocation authorizes the ticket status/body updates in this workflow.
 
-Dispatch one implementer for the complete reviewed plan using agent-roles.md. It writes code and tests in the same isolated task worktree, records deviations and targeted verification, and returns control before publication. The coordinator does not implement concurrently. Routine reversible departures are recorded locally; changed scope, new model assumptions, data implications, or irreversible choices require reassessment before dependent edits.
+Dispatch one implementer for the complete reviewed plan using agent-roles.md and the selected-model routing in budget.md. It executes the planned early-evidence slice first when feasibility is unproven, reports the result before expanding dependent work, and continues with the same implementation context. It writes code and tests in the same isolated task worktree, records deviations and targeted verification, and returns control before publication. The coordinator does not implement concurrently. Routine reversible departures are recorded locally; changed scope, new model assumptions, data implications, or irreversible choices require reassessment before dependent edits.
 
 Follow `AGENTS.md` for targeted tests, relevant documentation, numerical solver checks, and both required hook suites. Both must pass against the final files, with new files covered. Keep full suites sequential; do not rerun unchanged final checks without a reason. This workflow authorizes committing intended task changes, pushing the task branch, and opening a PR only after the gates below pass. Deployment, infrastructure, imports/backfills, destructive operations, and merging need separate authority from the user's request.
 
@@ -46,7 +46,7 @@ Follow `AGENTS.md` for targeted tests, relevant documentation, numerical solver 
 
 Dispatch separate fresh-context code-review and QA agents using agent-roles.md. Neither may be the implementer, coordinator, plan reviewer, or each other. Code review examines correctness and complexity across the complete ticket branch against the intended PR base, including poor abstractions and opportunities to consolidate or simplify while preserving behavior/results; QA independently derives checks from the ticket and validates behavior/evidence. Neither replaces the other. Reviewers do not edit application code or run concurrent full suites. QA may execute focused checks serially in the task worktree.
 
-Disposition every finding: fix material defects, or dismiss with concrete evidence. Record minor nonblocking suggestions without expanding scope or asking the user about each one. Re-run affected checks and both hook suites after any implementation change. Request focused follow-up review/QA for affected behavior and invalidated conclusions, not a fresh whole-ticket cycle. All required evidence must describe the final revision. Follow budget.md's two-cycle repair limit; exhaustion never makes a finding acceptable.
+Disposition every finding: fix material defects, or dismiss with concrete evidence. Record minor nonblocking suggestions without expanding scope or asking the user about each one. Re-run affected checks and both hook suites after any implementation change. Request focused follow-up review/QA for affected behavior and invalidated conclusions, not a fresh whole-ticket cycle. All required evidence must describe the final revision. Apply budget.md's evidence-based convergence checkpoints; planning revisions and implementation repairs are recorded separately. Budget pressure never makes a finding acceptable.
 
 For a read-only Spike, plan and investigate the agreed questions. Have an independent reviewer assess the reasoning/evidence and a separate QA agent check question coverage and reproducibility. No empty implementation dispatch, tests, commit, push, or PR is needed when no repository files changed; explicitly report the read-only verification exemption. Preserve preflight, risk, budget, and escalation rules.
 
@@ -60,7 +60,7 @@ After publication, update Status to `Testing`, leaving `Done` to the user unless
 - Changes and departures; review/QA results and findings addressed or dismissed.
 - Exact verification commands/results and remaining manual or operational steps.
 - Actual worktree, development/dependency SHAs, task branch, commit, and PR links.
-- Budget observations, repair cycles used, and any incomplete synchronization.
+- Effective implementation/reviewer model routing, early-evidence results, budget observations, planning revisions and implementation repair rounds with convergence decisions, and any incomplete synchronization.
 
 On a prerequisite, budget, verification, review, or publication blocker, keep the ticket out of Testing/Done. Record the exact blocker, completed/pending phases, checks attempted, worktree/branch, and next action so another run resumes without duplicating work. Do not invent a Blocked status. Inspect remote state before retrying an ambiguous push/PR operation. Preserve local work if Notion fails, and disclose synchronization separately.
 

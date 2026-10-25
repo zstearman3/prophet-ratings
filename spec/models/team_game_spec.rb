@@ -109,34 +109,36 @@ RSpec.describe TeamGame do
       expect { team_game.calculate_game_stats }.to raise_error(ActiveRecord::RecordInvalid)
     end
 
-    it 'calculates effective field goal percentage' do
-      fgm = team_game.field_goals_made
-      three_pm = team_game.three_pt_made
-      fga = team_game.field_goals_attempted
+    it 'calculates shooting percentages and turnover rate' do
+      aggregate_failures 'calculates effective field goal percentage' do
+        fgm = team_game.field_goals_made
+        three_pm = team_game.three_pt_made
+        fga = team_game.field_goals_attempted
 
-      expected_efg = expected_effective_fg_percentage(fgm:, three_pm:, fga:)
-      expect(team_game.effective_fg_percentage).to be_within(0.001).of(expected_efg)
-    end
+        expected_efg = expected_effective_fg_percentage(fgm:, three_pm:, fga:)
+        expect(team_game.effective_fg_percentage).to be_within(0.001).of(expected_efg)
+      end
 
-    it 'calculates true shooting percentage' do
-      pts = team_game.points
-      fga = team_game.field_goals_attempted
-      fta = team_game.free_throws_attempted
+      aggregate_failures 'calculates true shooting percentage' do
+        pts = team_game.points
+        fga = team_game.field_goals_attempted
+        fta = team_game.free_throws_attempted
 
-      expected_ts = expected_true_shooting_percentage(pts:, fga:, fta:)
-      expect(team_game.true_shooting_percentage).to be_within(0.001).of(expected_ts)
-    end
+        expected_ts = expected_true_shooting_percentage(pts:, fga:, fta:)
+        expect(team_game.true_shooting_percentage).to be_within(0.001).of(expected_ts)
+      end
 
-    it 'calculates turnover rate' do
-      fga = team_game.field_goals_attempted
-      orb = team_game.offensive_rebounds
-      tov = team_game.turnovers
-      fta = team_game.free_throws_attempted
+      aggregate_failures 'calculates turnover rate' do
+        fga = team_game.field_goals_attempted
+        orb = team_game.offensive_rebounds
+        tov = team_game.turnovers
+        fta = team_game.free_throws_attempted
 
-      possessions = expected_possessions(fga:, orb:, tov:, fta:)
-      expected_tov_rate = expected_turnover_rate(tov:, possessions:)
+        possessions = expected_possessions(fga:, orb:, tov:, fta:)
+        expected_tov_rate = expected_turnover_rate(tov:, possessions:)
 
-      expect(team_game.turnover_rate).to be_within(0.001).of(expected_tov_rate)
+        expect(team_game.turnover_rate).to be_within(0.001).of(expected_tov_rate)
+      end
     end
   end
 end

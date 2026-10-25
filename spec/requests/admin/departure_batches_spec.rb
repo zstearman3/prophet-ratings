@@ -139,12 +139,7 @@ RSpec.describe 'Admin departure batches' do
     expect(queries.size).to eq(2)
     expect(queries.last).not_to include('evidence', 'plan')
     expect(Departures::BatchPage).to have_received(:table_options).once
-  end
 
-  it 'lists acquisition statuses without loading raw evidence rows' do
-    sign_in admin
-    batch = create_from_form
-    2.times { capture_cbbd(batch) }
     Departures::BatchPreparation.create(season, cbbd_fields)
     listing_queries = acquisition_queries { get admin_departure_batches_path(season_id: season.id) }
     expect(response.body).to include('completed')

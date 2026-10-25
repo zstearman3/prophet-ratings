@@ -55,33 +55,32 @@ RSpec.describe ProphetRatings::PreseasonRevision do
     expect(reloaded_revision.preview[:preview_key]).to eq(report[:preview_key])
   end
 
-  it 'previews corrections and added coverage without writing, then preserves old outputs and frozen forecasts' do
-    create(:team_offseason_profile, team_season: home, manual_adjustment: 2)
-    added = create(:team_season, season:)
-    report = revision.preview
-    expect(report[:teams].find { |row| row[:team_id] == added.team_id }[:added]).to be(true)
-    corrected = report[:teams].find { |row| row[:team_id] == home.team_id }
-    expect(corrected[:profile_after]['attributes']['source_reference']).to eq('Synthetic operator evidence')
-    expect(corrected[:outputs_after]['preseason_adj_offensive_efficiency']).to eq(107.5)
-    expect(report[:baselines][:after]['average_efficiency']).to eq(106.167)
-    expect([PreseasonPrior.count, season.reload.preseason_revision]).to eq([2, nil])
-  end
-
-  it 'preserves old outputs and frozen forecasts when publishing corrected/added coverage' do
+  it 'previews corrected coverage without writes, then publishes while preserving frozen outputs' do
     prediction = scheduled_forecast
     original = [version.reload.attributes, prediction.attributes, TeamRatingSnapshot.order(:id).map(&:attributes),
                 PreseasonPrior.order(:id).map(&:attributes)]
     create(:team_offseason_profile, team_season: home, manual_adjustment: 2)
     added = create(:team_season, season:)
     report = revision.preview
+    aggregate_failures 'preview without writes' do
+      expect(report[:teams].find { |row| row[:team_id] == added.team_id }[:added]).to be(true)
+      corrected = report[:teams].find { |row| row[:team_id] == home.team_id }
+      expect(corrected[:profile_after]['attributes']['source_reference']).to eq('Synthetic operator evidence')
+      expect(corrected[:outputs_after]['preseason_adj_offensive_efficiency']).to eq(107.5)
+      expect(report[:baselines][:after]['average_efficiency']).to eq(106.167)
+      expect([PreseasonPrior.count, season.reload.preseason_revision]).to eq([2, nil])
+    end
+
     revision.call(preview_key: report[:preview_key])
-    expect([version.reload.attributes, prediction.reload.attributes,
-            TeamRatingSnapshot.where(ratings_config_version: version).order(:id).map(&:attributes),
-            PreseasonPrior.where(ratings_config_version: version).order(:id).map(&:attributes)]).to eq(original)
-    expect(season.reload.preseason_revision).to eq(revision_version)
-    expect(home.reload.overall_rank).to eq(1)
-    expect(added.reload.preseason_prior.ratings_config_version).to eq(revision_version)
-    expect(prediction.replay).to eq(ProphetRatings::ForecastContext.new(original[1].fetch('calculation_context')).predictor.call)
+    aggregate_failures 'published revision preserves historical outputs' do
+      expect([version.reload.attributes, prediction.reload.attributes,
+              TeamRatingSnapshot.where(ratings_config_version: version).order(:id).map(&:attributes),
+              PreseasonPrior.where(ratings_config_version: version).order(:id).map(&:attributes)]).to eq(original)
+      expect(season.reload.preseason_revision).to eq(revision_version)
+      expect(home.reload.overall_rank).to eq(1)
+      expect(added.reload.preseason_prior.ratings_config_version).to eq(revision_version)
+      expect(prediction.replay).to eq(ProphetRatings::ForecastContext.new(original[1].fetch('calculation_context')).predictor.call)
+    end
   end
 
   it 'reuses identities on an unchanged rerun and rejects later corrections under the published version' do

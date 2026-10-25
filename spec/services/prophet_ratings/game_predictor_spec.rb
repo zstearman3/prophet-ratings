@@ -38,7 +38,7 @@ RSpec.describe ProphetRatings::GamePredictor do
              defensive_efficiency_std_dev: 8.0)
     end
 
-    it 'includes all expected keys in the prediction structure' do
+    it 'returns the prediction contract with team names, numeric scores and uncalibrated confidence' do
       config = create(:ratings_config_version)
       home_snapshot = create(:team_rating_snapshot, team_season: home_team_season, ratings_config_version: config)
       away_snapshot = create(:team_rating_snapshot, team_season: away_team_season, ratings_config_version: config)
@@ -47,70 +47,18 @@ RSpec.describe ProphetRatings::GamePredictor do
         away_rating_snapshot: away_snapshot,
         season:
       ).call
+
       expect(result).to include(
-        :home_team,
-        :away_team,
-        :home_expected_score,
-        :away_expected_score,
-        :expected_margin,
-        :win_probability_home,
-        :confidence_level,
-        :explanation,
-        :meta
+        home_team: home_team.school,
+        away_team: away_team.school,
+        home_expected_score: a_kind_of(Numeric),
+        away_expected_score: a_kind_of(Numeric),
+        expected_margin: a_kind_of(Numeric),
+        win_probability_home: be_between(0.0, 1.0),
+        confidence_level: 'Uncalibrated',
+        explanation: a_kind_of(String),
+        meta: a_kind_of(Hash)
       )
-    end
-
-    it 'assigns correct teams in prediction structure' do
-      config = create(:ratings_config_version)
-      home_snapshot = create(:team_rating_snapshot, team_season: home_team_season, ratings_config_version: config)
-      away_snapshot = create(:team_rating_snapshot, team_season: away_team_season, ratings_config_version: config)
-      result = described_class.new(
-        home_rating_snapshot: home_snapshot,
-        away_rating_snapshot: away_snapshot,
-        season:
-      ).call
-      expect(result[:home_team]).to eq(home_team_season.team.school)
-      expect(result[:away_team]).to eq(away_team_season.team.school)
-    end
-
-    it 'assigns numeric values for scores and margin' do
-      config = create(:ratings_config_version)
-      home_snapshot = create(:team_rating_snapshot, team_season: home_team_season, ratings_config_version: config)
-      away_snapshot = create(:team_rating_snapshot, team_season: away_team_season, ratings_config_version: config)
-      result = described_class.new(
-        home_rating_snapshot: home_snapshot,
-        away_rating_snapshot: away_snapshot,
-        season:
-      ).call
-      expect(result[:home_expected_score]).to be_a(Numeric)
-      expect(result[:away_expected_score]).to be_a(Numeric)
-      expect(result[:expected_margin]).to be_a(Numeric)
-    end
-
-    it 'assigns probabilities and confidence as floats between 0 and 1' do
-      config = create(:ratings_config_version)
-      home_snapshot = create(:team_rating_snapshot, team_season: home_team_season, ratings_config_version: config)
-      away_snapshot = create(:team_rating_snapshot, team_season: away_team_season, ratings_config_version: config)
-      result = described_class.new(
-        home_rating_snapshot: home_snapshot,
-        away_rating_snapshot: away_snapshot,
-        season:
-      ).call
-      expect(result[:win_probability_home]).to be_between(0.0, 1.0)
-      expect(result[:confidence_level]).to eq('Uncalibrated')
-    end
-
-    it 'assigns explanation and meta as correct types' do
-      config = create(:ratings_config_version)
-      home_snapshot = create(:team_rating_snapshot, team_season: home_team_season, ratings_config_version: config)
-      away_snapshot = create(:team_rating_snapshot, team_season: away_team_season, ratings_config_version: config)
-      result = described_class.new(
-        home_rating_snapshot: home_snapshot,
-        away_rating_snapshot: away_snapshot,
-        season:
-      ).call
-      expect(result[:explanation]).to be_a(String)
-      expect(result[:meta]).to be_a(Hash)
     end
 
     it 'uses home-court adjustment for confirmed home games' do

@@ -39,7 +39,7 @@ RSpec.describe 'Admin offseason readiness reviews' do
     expect(PublishPreseasonJob).not_to have_received(:perform_later)
   end
 
-  it 'keeps review actions ahead of readable gaps and collapsed diagnostic evidence' do
+  it 'keeps review actions prominent, retains decisions and activates separately with actual state' do
     sign_in admin
     publish_readiness_fixture(season, model, row, admin)
     get admin_offseason_readiness_reviews_path(season_id: season.id)
@@ -53,13 +53,12 @@ RSpec.describe 'Admin offseason readiness reviews' do
     expect(document.css('#readiness-actions ~ * #readiness-gaps, #readiness-actions ~ #readiness-gaps')).not_to be_empty
     expect(document.css('textarea[name^="deferrals"]')).to be_empty
     expect(document.at_css('input[name="deferrals[schedule]"]')['value']).to eq('Approved by admin')
-  end
-
-  it 'puts saved-review activation before evidence and renders the fresh report only once' do
-    sign_in admin
-    publish_readiness_fixture(season, model, row, admin)
-    review = save_readiness_review(season, admin)
-    get admin_offseason_readiness_review_path(review, season_id: season.id)
+    report = OffseasonReadiness.new(season).call
+    post admin_offseason_readiness_reviews_path(season_id: season.id),
+         params: { fingerprint: report['fingerprint'], acknowledge: '1', deferrals: { schedule: 'Await schedule publication' } }
+    follow_redirect!
+    expect(response.body).to include('Retained readiness review', 'Await schedule publication', 'Make model default',
+                                     'jobs omitting season ID')
     document = response.parsed_body
     actions = document.at_css('#readiness-actions')
     expect(actions).to be_present
@@ -70,17 +69,6 @@ RSpec.describe 'Admin offseason readiness reviews' do
     expect(document.css('#readiness-gaps').size).to eq(1)
     expect(document.at_css('details #retained-readiness-gaps')).to be_present
     expect(document.at_css('form[action*="activate_season"]')['data-turbo']).to eq('false')
-  end
-
-  it 'retains review decisions, activates separately and revisits original evidence with actual state' do
-    sign_in admin
-    publish_readiness_fixture(season, model, row, admin)
-    report = OffseasonReadiness.new(season).call
-    post admin_offseason_readiness_reviews_path(season_id: season.id),
-         params: { fingerprint: report['fingerprint'], acknowledge: '1', deferrals: { schedule: 'Await schedule publication' } }
-    follow_redirect!
-    expect(response.body).to include('Retained readiness review', 'Await schedule publication', 'Make model default',
-                                     'jobs omitting season ID')
     review = OffseasonReadinessReview.last
     post activate_season_admin_offseason_readiness_review_path(review, season_id: season.id), params: { model_id: 999_999 }
     follow_redirect!
