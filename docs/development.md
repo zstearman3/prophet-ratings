@@ -167,6 +167,30 @@ Use [`bin/release`](releases.md) to preview release notes and prepare a dated ta
 and draft GitHub release from `development`. Promotion to `main` remains separate
 and triggers deployment.
 
+### Production migration gate
+
+The deployment workflow runs `python3 bin/run-ecs-migrations` before updating
+web or worker services. It rejects ECS placement failures, waits for the exact
+launched task, and checks its stop status and every launched container's exit code.
+A missing result, abnormal stop, nonzero/missing exit code, AWS error or waiter
+timeout fails the job and skips both service updates. The dedicated migration task
+must contain only containers that terminate successfully; a long-running sidecar
+will block rollout. GitHub's Ubuntu runner supplies Python 3 and the AWS CLI.
+
+The deploy identity needs `ecs:DescribeTasks` in addition to its existing launch
+and deployment permissions. The [AWS task waiter](https://docs.aws.amazon.com/cli/latest/reference/ecs/wait/tasks-stopped.html)
+polls every six seconds for up to 100 unsuccessful checks (about ten minutes).
+The gate logs the task ARN, stop reason and container results. On timeout or API
+failure, inspect that task and its CloudWatch logs before retrying: it may still be
+running. The workflow does not kill or automatically relaunch migrations, or undo
+already committed schema changes. Review unusually long migrations separately.
+This gate does not establish application health, serialize concurrent releases or
+replace the existing mutable image-tag deployment strategy.
+
+`bin/test spec/scripts/ecs_migrations_spec.rb` exercises the workflow commands with
+a fake AWS CLI, including failed launch/wait/describe and unsuccessful task results.
+It performs no AWS requests or migrations.
+
 ## Working on migrations
 
 `development` is this project's integration branch; branch features from it.
