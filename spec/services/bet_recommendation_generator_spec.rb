@@ -58,97 +58,18 @@ describe BetRecommendationGenerator do
   end
 
   describe '.call' do
-    it 'generates a spread recommendation' do
+    it 'generates spread and moneyline recommendations with their source associations and model output' do
       recs = described_class.call(game:)
-      spread_rec = recs.find { |rec| rec.bet_type == 'spread' }
-      expect(spread_rec).to be_present
-    end
-
-    it 'spread recommendation has correct game and prediction association' do
-      recs = described_class.call(game:)
-      spread_rec = recs.find { |rec| rec.bet_type == 'spread' }
-      expect(spread_rec.game).to eq(game)
-      expect(spread_rec.prediction).to eq(prediction)
-    end
-
-    it 'spread recommendation has correct game_odd and bet_type association' do
-      recs = described_class.call(game:)
-      spread_rec = recs.find { |rec| rec.bet_type == 'spread' }
-      expect(spread_rec.game_odd).to eq(game_odd)
-      expect(spread_rec.bet_type).to eq('spread')
-    end
-
-    it 'spread recommendation has correct team value' do
-      recs = described_class.call(game:)
-      spread_rec = recs.find { |rec| rec.bet_type == 'spread' }
-      expect(spread_rec.team).to be_in([nil, 'home', 'away'])
-    end
-
-    it 'spread recommendation has correct vegas line and odds' do
-      recs = described_class.call(game:)
-      spread_rec = recs.find { |rec| rec.bet_type == 'spread' }
-      expect(spread_rec.vegas_line).to be_in([4.5, -4.5])
-      expect(spread_rec.vegas_odds).to eq(-110)
-    end
-
-    it 'spread recommendation has correct model value and confidence' do
-      recs = described_class.call(game:)
-      spread_rec = recs.find { |rec| rec.bet_type == 'spread' }
-      expect(spread_rec.model_value).to be_in([5.0, -5.0])
-      expect(spread_rec.confidence).to be_between(0.0, 1.0)
-    end
-
-    it 'spread recommendation has correct ev and recommended' do
-      recs = described_class.call(game:)
-      spread_rec = recs.find { |rec| rec.bet_type == 'spread' }
-      expect(spread_rec.ev).to be_a(Float)
-      expect(spread_rec.recommended).to be_in([true, false])
-    end
-
-    it 'generates a moneyline recommendation' do
-      recs = described_class.call(game:)
-      moneyline_rec = recs.find { |rec| rec.bet_type == 'moneyline' }
-      expect(moneyline_rec).to be_present
-    end
-
-    it 'moneyline recommendation has correct game and prediction association' do
-      recs = described_class.call(game:)
-      moneyline_rec = recs.find { |rec| rec.bet_type == 'moneyline' }
-      expect(moneyline_rec.game).to eq(game)
-      expect(moneyline_rec.prediction).to eq(prediction)
-    end
-
-    it 'moneyline recommendation has correct game_odd and bet_type association' do
-      recs = described_class.call(game:)
-      moneyline_rec = recs.find { |rec| rec.bet_type == 'moneyline' }
-      expect(moneyline_rec.game_odd).to eq(game_odd)
-      expect(moneyline_rec.bet_type).to eq('moneyline')
-    end
-
-    it 'moneyline recommendation has correct team value' do
-      recs = described_class.call(game:)
-      moneyline_rec = recs.find { |rec| rec.bet_type == 'moneyline' }
-      expect(moneyline_rec.team).to be_in(%w[home away])
-    end
-
-    it 'moneyline recommendation has correct vegas odds and model value' do
-      recs = described_class.call(game:)
-      moneyline_rec = recs.find { |rec| rec.bet_type == 'moneyline' }
-      expect(moneyline_rec.vegas_odds).to be_in([game_odd.moneyline_home, game_odd.moneyline_away, nil])
-      expect(moneyline_rec.model_value).to be_between(0.0, 1.0)
-    end
-
-    it 'moneyline recommendation has correct confidence' do
-      recs = described_class.call(game:)
-      moneyline_rec = recs.find { |rec| rec.bet_type == 'moneyline' }
-      expect(moneyline_rec.confidence).to be_between(0.0, 1.0)
-    end
-
-    it 'moneyline recommendation has correct ev and recommended' do
-      recs = described_class.call(game:)
-      moneyline_rec = recs.find { |rec| rec.bet_type == 'moneyline' }
-      expect(moneyline_rec.ev).to be_a(Float)
-      expect(moneyline_rec.recommended).to be_in([true, false])
+      expect(recs.find { |rec| rec.bet_type == 'spread' }).to have_attributes(
+        game:, prediction:, game_odd:, bet_type: 'spread', team: be_in([nil, 'home', 'away']),
+        vegas_line: be_in([4.5, -4.5]), vegas_odds: -110, model_value: be_in([5.0, -5.0]),
+        confidence: be_between(0.0, 1.0), ev: a_kind_of(Float), recommended: be_in([true, false])
+      )
+      expect(recs.find { |rec| rec.bet_type == 'moneyline' }).to have_attributes(
+        game:, prediction:, game_odd:, bet_type: 'moneyline', team: be_in(%w[home away]),
+        vegas_odds: be_in([game_odd.moneyline_home, game_odd.moneyline_away, nil]), model_value: be_between(0.0, 1.0),
+        confidence: be_between(0.0, 1.0), ev: a_kind_of(Float), recommended: be_in([true, false])
+      )
     end
 
     context 'with deterministic score uncertainty' do
@@ -209,51 +130,13 @@ describe BetRecommendationGenerator do
         allow(prediction).to receive(:total_std_deviation).and_return(10.0)
       end
 
-      it 'generates a total recommendation' do
+      it 'generates a total recommendation with its source associations, line and model output' do
         recs = described_class.call(game:)
-        total_rec = recs.find { |rec| rec.bet_type == 'total' }
-        expect(total_rec).to be_present
-      end
-
-      it 'total recommendation has correct game and prediction association' do
-        recs = described_class.call(game:)
-        total_rec = recs.find { |rec| rec.bet_type == 'total' }
-        expect(total_rec.game).to eq(game)
-        expect(total_rec.prediction).to eq(prediction)
-      end
-
-      it 'total recommendation has correct game_odd and bet_type association' do
-        recs = described_class.call(game:)
-        total_rec = recs.find { |rec| rec.bet_type == 'total' }
-        expect(total_rec.game_odd).to eq(game_odd)
-        expect(total_rec.bet_type).to eq('total')
-      end
-
-      it 'total recommendation has correct team value' do
-        recs = described_class.call(game:)
-        total_rec = recs.find { |rec| rec.bet_type == 'total' }
-        expect(total_rec.team).to be_in([nil, 'over', 'under'])
-      end
-
-      it 'total recommendation has correct vegas line and odds' do
-        recs = described_class.call(game:)
-        total_rec = recs.find { |rec| rec.bet_type == 'total' }
-        expect(total_rec.vegas_line).to eq(145.5)
-        expect(total_rec.vegas_odds).to eq(-110)
-      end
-
-      it 'total recommendation has correct model value and confidence' do
-        recs = described_class.call(game:)
-        total_rec = recs.find { |rec| rec.bet_type == 'total' }
-        expect(total_rec.model_value).to eq(145.0)
-        expect(total_rec.confidence).to be_between(0.0, 1.0)
-      end
-
-      it 'total recommendation has correct ev and recommended' do
-        recs = described_class.call(game:)
-        total_rec = recs.find { |rec| rec.bet_type == 'total' }
-        expect(total_rec.ev).to be_a(Float)
-        expect(total_rec.recommended).to be_in([true, false])
+        expect(recs.find { |rec| rec.bet_type == 'total' }).to have_attributes(
+          game:, prediction:, game_odd:, bet_type: 'total', team: be_in([nil, 'over', 'under']),
+          vegas_line: 145.5, vegas_odds: -110, model_value: 145.0,
+          confidence: be_between(0.0, 1.0), ev: a_kind_of(Float), recommended: be_in([true, false])
+        )
       end
     end
   end

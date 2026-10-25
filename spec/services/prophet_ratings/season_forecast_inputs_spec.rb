@@ -48,22 +48,30 @@ RSpec.describe ProphetRatings::SeasonForecastInputs do
     expect { capture }.to raise_error(ArgumentError, /republish ratings/)
   end
 
-  {
-    'contract_version' => 2, 'model_version_id' => -1, 'season_id' => -1,
-    'snapshot_date' => '2026-10-09', 'result_cutoff' => '2026-10-09', 'source' => 'reconstruction',
-    'values' => {}, 'value_sources' => {}
-  }.each do |field, invalid|
-    it "rejects incompatible #{field} metadata" do
-      snapshots.first.stats['season_forecast_inputs'][field] = invalid
-      expect { capture }.to raise_error(ArgumentError, /season forecast inputs|Season forecast inputs/)
+  it 'rejects each incompatible publication metadata field' do
+    original_stats = snapshots.first.stats.deep_dup
+    {
+      'contract_version' => 2, 'model_version_id' => -1, 'season_id' => -1,
+      'snapshot_date' => '2026-10-09', 'result_cutoff' => '2026-10-09', 'source' => 'reconstruction',
+      'values' => {}, 'value_sources' => {}
+    }.each do |field, invalid|
+      aggregate_failures "incompatible #{field} metadata" do
+        snapshots.first.stats = original_stats.deep_dup
+        snapshots.first.stats['season_forecast_inputs'][field] = invalid
+        expect { capture }.to raise_error(ArgumentError, /season forecast inputs|Season forecast inputs/)
+      end
     end
   end
 
-  %w[average_efficiency average_pace efficiency_std_deviation pace_std_deviation].each do |field|
-    [nil, Float::INFINITY, Float::NAN, -1].each do |invalid|
-      it "rejects invalid #{field}=#{invalid.inspect}" do
-        snapshots.first.stats['season_forecast_inputs']['values'][field] = invalid
-        expect { capture }.to raise_error(ArgumentError, /finite positive means/)
+  it 'rejects each invalid saved mean and deviation' do
+    original_stats = snapshots.first.stats.deep_dup
+    %w[average_efficiency average_pace efficiency_std_deviation pace_std_deviation].each do |field|
+      [nil, Float::INFINITY, Float::NAN, -1].each do |invalid|
+        aggregate_failures "invalid #{field}=#{invalid.inspect}" do
+          snapshots.first.stats = original_stats.deep_dup
+          snapshots.first.stats['season_forecast_inputs']['values'][field] = invalid
+          expect { capture }.to raise_error(ArgumentError, /finite positive means/)
+        end
       end
     end
   end
@@ -104,10 +112,15 @@ RSpec.describe ProphetRatings::SeasonForecastInputs do
     expect { capture }.to raise_error(ArgumentError, /must match across both/)
   end
 
-  %i[team_id team_season_id season_id ratings_config_version_id].each do |field|
-    it "rejects snapshot identity mismatch in #{field}" do
-      snapshots.first.public_send("#{field}=", -1)
-      expect { capture }.to raise_error(ArgumentError, /selected model, season and game participant/)
+  it 'rejects each snapshot identity mismatch' do
+    identity_fields = %w[team_id team_season_id season_id ratings_config_version_id]
+    original_identity = snapshots.first.attributes.slice(*identity_fields)
+    identity_fields.each do |field|
+      aggregate_failures "snapshot identity mismatch in #{field}" do
+        snapshots.first.assign_attributes(original_identity)
+        snapshots.first.public_send("#{field}=", -1)
+        expect { capture }.to raise_error(ArgumentError, /selected model, season and game participant/)
+      end
     end
   end
 

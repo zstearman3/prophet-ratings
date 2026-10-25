@@ -70,56 +70,17 @@ RSpec.describe OddsApi::ConsensusCalculator, type: :service do
   end
 
   describe '#consensus' do
-    it 'returns a hash with consensus odds' do
-      consensus = calculator.consensus
-      expect(consensus).to include(:fetched_at, :moneyline_home, :moneyline_away, :spread_point, :spread_home_odds)
+    it 'returns averaged odds, the modal spread and a fetch timestamp' do
+      expect(calculator.consensus).to include(
+        fetched_at: be_present, moneyline_home: -147.5, moneyline_away: 132.5,
+        spread_point: -3.5, spread_home_odds: -112.5,
+        total_points: 127.5, total_over_odds: -107.5, total_under_odds: -112.5
+      )
     end
 
-    it 'averages moneylines for home' do
-      consensus = calculator.consensus
-      expect(consensus[:moneyline_home]).to eq(-147.5)
-    end
-
-    it 'averages moneylines for away' do
-      consensus = calculator.consensus
-      expect(consensus[:moneyline_away]).to eq(132.5)
-    end
-
-    it 'returns mode for spread point' do
-      consensus = calculator.consensus
-      expect(consensus[:spread_point]).to eq(-3.5)
-    end
-
-    it 'averages spread home odds' do
-      consensus = calculator.consensus
-      expect(consensus[:spread_home_odds]).to eq(-112.5)
-    end
-
-    it 'returns the consensus total line and odds' do
-      consensus = calculator.consensus
-      expect(consensus[:total_points]).to eq(127.5)
-      expect(consensus[:total_over_odds]).to eq(-107.5)
-      expect(consensus[:total_under_odds]).to eq(-112.5)
-    end
-
-    it 'handles missing market data gracefully for moneyline_home' do
-      bad_bookmakers = [
-        { key: 'book3', title: 'Book3', markets: [] }
-      ]
-      calc = described_class.new(bookmakers: bad_bookmakers, home_team:, away_team:)
-      consensus = calc.consensus
-      expect(consensus[:moneyline_home]).to be_nil
-    end
-
-    it 'handles missing market data gracefully for spread_point' do
-      bad_bookmakers = [
-        { key: 'book3', title: 'Book3', markets: [] }
-      ]
-      calc = described_class.new(bookmakers: bad_bookmakers, home_team:, away_team:)
-      consensus = calc.consensus
-      expect(consensus[:spread_point]).to be_nil
+    it 'leaves moneyline and spread unavailable when market data is missing' do
+      calc = described_class.new(bookmakers: [{ key: 'book3', title: 'Book3', markets: [] }], home_team:, away_team:)
+      expect(calc.consensus).to include(moneyline_home: nil, spread_point: nil)
     end
   end
-
-  # Add more specs for edge cases as needed
 end

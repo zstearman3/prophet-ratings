@@ -36,6 +36,10 @@ RSpec.describe 'Concurrent schedule refresh retries' do
     session = ActionDispatch::Integration::Session.new(Rails.application)
     session.post('/users/sign_in', params: { user: { email: admin.email, password: 'synthetic-password' } })
     expect(session.response).to have_http_status(:redirect)
+    # Deserialize each login cookie before the threads race: Rails' first serializer
+    # fallback probe uses process-global silence_warnings, which is not thread-safe.
+    session.get(admin_schedule_refresh_run_path(run))
+    expect(session.response).to have_http_status(:ok)
     session
   end
 
@@ -54,6 +58,7 @@ RSpec.describe 'Concurrent schedule refresh retries' do
   end
 
   it 'persists and enqueues one child across concurrent authenticated POSTs on separate database sessions' do
+    warning_level = $VERBOSE
     target = retry_admin_schedule_refresh_run_path(run)
     sessions = Array.new(2) { signed_in_session }
     pids = []
@@ -76,6 +81,7 @@ RSpec.describe 'Concurrent schedule refresh retries' do
     child = ScheduleRefreshRun.find_by!(retry_of_id: run.id)
     jobs = ActiveJob::Base.queue_adapter.enqueued_jobs.select { |job| job[:job] == RefreshScheduleJob }
     aggregate_failures do
+      expect($VERBOSE).to eq(warning_level)
       expect(pids.uniq.size).to eq(2)
       expect(statuses).to contain_exactly(302, 422)
       expect(ScheduleRefreshRun.where(retry_of_id: run.id).count).to eq(1)
