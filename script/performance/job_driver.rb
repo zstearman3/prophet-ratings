@@ -80,7 +80,7 @@ module OffseasonPerformance
     end
 
     def self.verify_job_output(row, id)
-      raise "Job failed #{id}" unless row.fetch('terminal') == 'performed'
+      raise "Job failed #{id}" unless row['terminal'] == 'performed'
 
       bytes = row['output_bytes']
       valid = bytes.is_a?(Numeric) && bytes >= 0

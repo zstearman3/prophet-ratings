@@ -461,5 +461,8 @@ strict missing-versus-zero semantics and historical HTML compatibility.
 Use the isolated [offline offseason benchmark](performance.md) to generate the
 365-team synthetic workload and measure production-mode web/external-worker
 latency, memory, SQL, GC and real Python solver behavior at fixed container caps.
-Run 1× and 2× checks sequentially; the benchmark owns its disposable services and
-never stops the development stack.
+These benchmarks are opt-in, not routine validation. Default to the smallest
+relevant scenario at 1×; use 2× for data-growth or memory-scaling investigations,
+or when explicitly requested. When both scales are required, run them
+sequentially. Full baseline runs require an explicitly scoped refresh or audit.
+The benchmark owns its disposable services and never stops the development stack.
