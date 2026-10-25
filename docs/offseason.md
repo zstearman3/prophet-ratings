@@ -726,3 +726,10 @@ switches. Existing scheduler/sync callsites pass season IDs. Legacy/manual queue
 jobs without a season ID still resolve the current season at execution; inspect
 and deliberately handle those jobs in GoodJob before switching. No queue payload
 is rewritten or retroactively pinned. CLI activation retains its existing semantics.
+
+### CBBD future-ingestion cutover
+
+Use the [CBBD cutover runbook](cbbd-cutover.md) after reviewed memberships and
+identity mappings. The proposed disposition retains production history; future
+provider routing is separate from historical replacement, deployment and season
+activation. Operational gates currently require a NO RELEASE recommendation.

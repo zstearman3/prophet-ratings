@@ -1580,3 +1580,11 @@ CLI/nightly reports keep their previous shape. Private filesystem CBBD
 capture prerequisites and operator retention duties above still apply. No live
 provider coverage, publication completeness or prediction accuracy is certified by
 a successful or empty acquisition.
+
+## Scheduled CBBD cutover
+
+Production scheduling now enters through `ScheduledGameSyncJob`; the explicit
+CBBD opt-in uses persisted finite past/future acquisitions and an atomic analytics
+handoff. Manual `SyncNightlyGamesJob` CBBD calls retain their explicit bounds and
+do not automatically release ratings. See [cutover readiness](cbbd-cutover.md) for
+cadence, configuration, durable evidence, recovery and the NO RELEASE gates.

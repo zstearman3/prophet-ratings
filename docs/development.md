@@ -573,3 +573,12 @@ relevant scenario at 1×; use 2× for data-growth or memory-scaling investigatio
 or when explicitly requested. When both scales are required, run them
 sequentially. Full baseline runs require an explicitly scoped refresh or audit.
 The benchmark owns its disposable services and never stops the development stack.
+
+### Scheduled CBBD readiness checks
+
+`spec/services/ingestion/cbbd/scheduled_sync_spec.rb` exercises the synthetic
+capture/import/daily-analytics chain; `spec/jobs/scheduled_game_sync_job_spec.rb`
+checks pinned delivery identity and real GoodJob transactional handoff using the
+disposable test database. No live API calls or application stack are needed.
+See [the runbook](cbbd-cutover.md) for production gates; these checks do not authorize
+deployment or establish live account/storage/memory readiness.

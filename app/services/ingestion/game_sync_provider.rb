@@ -90,9 +90,17 @@ module Ingestion
     def acquire
       return { 'complete' => true, 'observations' => [], 'acquisition' => { 'complete' => true, 'attempts' => 0 } } if dates.empty?
 
-      result = Cbbd::Adapter.new(season: season.year, start_date: dates.min, end_date: dates.max, **@policy.options).call
+      result = acquisition_result
       validate_observations(result)
       result
+    end
+
+    def acquisition_result
+      options = @policy.options
+      prepared = options[:prepared_run]
+      return prepared.verified_sync_replay(season, dates) if prepared
+
+      Cbbd::Adapter.new(season: season.year, start_date: dates.min, end_date: dates.max, **options).call
     end
 
     def validate_observations(result)
