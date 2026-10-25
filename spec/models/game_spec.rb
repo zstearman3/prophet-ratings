@@ -32,7 +32,7 @@ RSpec.describe Game do
   let(:home_team_season) { create(:team_season, season:) }
   let(:away_team_season) { create(:team_season, season:) }
   let(:ratings_config_version) { RatingsConfigVersion.ensure_current! }
-  let!(:home_snapshot) do
+  let(:home_snapshot) do
     create(:team_rating_snapshot, :with_forecast_inputs,
            team_season: home_team_season,
            snapshot_date: game.schedule_date - 1,
@@ -41,7 +41,7 @@ RSpec.describe Game do
            adj_defensive_efficiency: 105.0,
            adj_pace: 72.0)
   end
-  let!(:away_snapshot) do
+  let(:away_snapshot) do
     create(:team_rating_snapshot, :with_forecast_inputs,
            team_season: away_team_season,
            snapshot_date: game.schedule_date - 1,
@@ -51,25 +51,16 @@ RSpec.describe Game do
            adj_pace: 68.0)
   end
 
-  before do
-    # Ensure associations are set up for the game if needed
-    allow(game).to receive_messages(home_team_season:, away_team_season:, home_team_game: nil,
-                                    away_team_game: nil)
-  end
-
   describe '#generate_prediction!' do
-    it 'creates a prediction for the game' do
-      expect do
-        game.generate_prediction!
-      end.to change(Prediction, :count).by(1)
+    before do
+      home_snapshot
+      away_snapshot
+      allow(game).to receive_messages(home_team_season:, away_team_season:, home_team_game: nil, away_team_game: nil)
     end
 
-    it 'assigns correct attributes to the prediction' do
-      game.generate_prediction!
-      prediction = Prediction.last
-      expect(prediction.game).to eq(game)
-      expect(prediction.home_team_snapshot).to eq(home_snapshot)
-      expect(prediction.away_team_snapshot).to eq(away_snapshot)
+    it 'creates a prediction associated with the game and selected snapshots' do
+      expect { game.generate_prediction! }.to change(Prediction, :count).by(1)
+      expect(Prediction.last).to have_attributes(game:, home_team_snapshot: home_snapshot, away_team_snapshot: away_snapshot)
     end
   end
 

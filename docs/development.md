@@ -269,9 +269,61 @@ context. Remove exclusions as code is cleaned up; do not regenerate the baseline
 just to pass checks. Specs and generated/configuration files are outside Reek's
 application-code scan.
 
-The suite reports 15 pre-existing pending examples (mostly generated placeholders
-plus unsupported double-header ingestion). Rails Admin's bundled SCSS emits Sass
+The suite retains one pending example for unsupported double-header ingestion;
+generated empty spec placeholders have been removed. Rails Admin's bundled SCSS emits Sass
 deprecation warnings, with a regression spec covering stylesheet compilation.
+
+### RSpec runtime audit (2026-10-25)
+
+Profile the ordinary suite with a fixed seed and JSON timing output:
+
+```bash
+bin/test --seed 24731 --profile 30 --format json --out tmp/rspec-profile.json
+```
+
+The audit consolidates repeated calls with identical inputs in prediction,
+recommendation, odds consensus, and command-wrapper specs. Compound matchers and
+aggregated failures retain the original assertions. Game prediction fixtures now
+load only for prediction examples. Twelve generated pending-only files were
+removed; they contained no regression checks.
+
+Mocked HTTP tests skip real throttling waits and record retry delays while still
+executing retries, capture persistence, and error handling. Standalone CLI test
+subprocesses clear the inherited `RUBYOPT` Bundler preload; the application bundle
+and normal test launcher remain unchanged. Authorization, concurrency, historical
+provenance, and missing-input checks remain intact.
+
+Initial Docker measurement: 2,675 examples in 191.84 seconds; the first consolidated
+run: 2,629 examples in 121.96 seconds (36.4% shorter). These are RSpec execution
+times, excluding image build, database setup/teardown, and Rails load time.
+Unchanged examples also ran faster, so machine load contributed to the difference;
+this is an observed reduction, not an isolated estimate of the code's effect.
+Compare the same execution mode and seed. Do not remove distinct missing-data,
+provenance, concurrency, or authorization cases just to meet a timing target.
+
+A second full-suite audit consolidated publication/forecast lifecycle checks,
+revision preview/publication, TeamGame calculation outputs, readiness pages, and
+acquisition show/index checks. Forecast-input validation matrices retain every
+invalid value and reset original inputs between cases while sharing their database
+fixtures. Launcher metadata checks share the successful run; progress and memory
+checks use one chunk, and invalid-argument checks exercise the launcher in-process
+with Docker blocked and stdout settings restored. CLI subprocess coverage remains
+for argument errors, help, real orchestration, cleanup, and signals.
+
+The second pass reduced 2,629 examples to 2,594, retaining all meaningful assertions.
+Same-seed Docker execution measured 97.50 seconds before and 93.55 seconds after
+(4.1% shorter), both with zero failures and one pending example. The eight affected
+files decreased from 19.03 to 12.04 seconds within those runs; unchanged-file timing
+varied. This pass did not demonstrate another 10% full-suite improvement. Distinct
+numerical, authorization, ingestion, and concurrency scenarios were retained.
+
+Both initial profiled runs had three pre-existing stderr failures. These were
+traced to concurrent first-time cookie deserialization in the schedule retry spec:
+Rails' serializer fallback probe uses process-global `silence_warnings`, and
+interleaved initialization left `$VERBOSE` nil. The concurrency fixture now reads
+each authenticated session once before starting the competing POSTs and checks
+that the warning level is preserved. The original stderr assertions, separate
+database sessions, lock contention, and exactly-one-retry checks remain intact.
 
 The CBBD membership dropdown has focused browser-interaction logic checked with
 Node's built-in test runner in the existing image (no host Node required):

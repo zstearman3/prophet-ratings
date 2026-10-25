@@ -214,6 +214,13 @@ A future version of the project may need to explain model behavior to users, so 
 
 When changing behavior, add or update tests.
 
+Prefer specs that guard noticeable behavior or meaningful failure cases; do not add
+generated pending placeholders or repeat coverage already provided by stronger tests.
+Consolidate assertions that exercise the same inputs and expensive setup into focused
+examples, using aggregated failures where useful while preserving distinct edge cases
+and regression guards. In mocked external-service tests, verify retry/throttle
+behavior without real sleeps.
+
 Prioritize tests around:
 
 - Data import correctness

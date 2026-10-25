@@ -12,8 +12,9 @@ RSpec.describe RatingsBackfill::Launcher do
   let(:root) { File.expand_path('../../..', __dir__) }
   let(:sandbox) { Dir.mktmpdir('ratings-backfill-spec-') }
   let(:command_log) { File.join(sandbox, 'commands.jsonl') }
+  # Standalone CLI/fake executables need no inherited Bundler preload on every subprocess.
   let(:environment) do
-    { 'PATH' => "#{sandbox}:#{ENV.fetch('PATH')}", 'COMMAND_LOG' => command_log,
+    { 'RUBYOPT' => nil, 'PATH' => "#{sandbox}:#{ENV.fetch('PATH')}", 'COMMAND_LOG' => command_log,
       'COMPOSE_PROJECT_NAME' => 'backfill-spec', 'FAKE_PLAN' => plan.to_json }
   end
   let(:plan) do
@@ -89,26 +90,21 @@ RSpec.describe RatingsBackfill::Launcher do
     runs.drop(1).map { |command| command.fetch('request').values_at('from', 'through') }
   end
 
-  it 'resumes from stored coverage in bounded inclusive windows' do
-    output, _, status = run_launcher
+  it 'resumes bounded windows through the Rails boundary and cleans up only its unique containers', :aggregate_failures do
+    plan.merge!(range_start: '2024-11-01', range_end: '2024-11-18', extra_metadata: 'future-proof')
+    output, errors, status = run_launcher
     expect(status).to be_success
     expect(windows).to eq([%w[2024-11-04 2024-11-10], %w[2024-11-11 2024-11-17], %w[2024-11-18 2024-11-18]])
     expect(runs.drop(1).map { |command| command['request']['model_id'] }).to eq([34, 34, 34])
     expect(output).to include('backfill-spec', '3/18', '[backfill] starting', 'Backfill complete')
-  end
-
-  it 'uses unique containers, the repository wrapper, and exact successful cleanup' do
-    _, errors, status = run_launcher
     names = runs.map { |command| command['args'][command['args'].index('--name') + 1] }
-    expect(status).to be_success
     expect(names.uniq.size).to eq(4)
     expect(commands.select { |command| command['args'].first == 'rm' }.map { |command| command['args'].last }).to eq(names)
     expect(runs).to all(include('cwd' => root))
     expect(errors).to include('child diagnostic')
-  end
-
-  it 'runs the Rails boundary with environment before the service without builds or dependency startup' do
-    run_launcher
+    expected = { 'range_start' => '2024-11-01', 'range_end' => '2024-11-18',
+                 'cohort_key' => 'stored-cohort', 'extra_metadata' => 'future-proof' }
+    expect(runs.drop(1).map { |command| command.fetch('request') }).to all(include(expected))
     runs.each do |command|
       expect(command['args']).to include('--no-deps', '-T', 'web', 'bin/rails', 'runner', 'script/ratings_backfill_chunk.rb')
       expect(command['args']).not_to include('--rm', 'build', 'up', 'down')
@@ -142,6 +138,7 @@ RSpec.describe RatingsBackfill::Launcher do
   end
 
   it 'reports periodic elapsed time and memory for the owned child only' do
+    plan[:through] = '2024-11-10'
     output, _, status = run_launcher('--progress-seconds', '0.05', env: { 'FAKE_SLEEP' => '0.2' })
     expect(status).to be_success
     expect(output).to include('elapsed=', '2024-11-04..2024-11-10', '128MiB / 1GiB 12.5%')
@@ -152,6 +149,7 @@ RSpec.describe RatingsBackfill::Launcher do
   end
 
   it 'applies the optional memory cap with a temporary compose override' do
+    plan[:through] = '2024-11-10'
     _, _, status = run_launcher('--project', 'custom-project', '--memory', '1g')
     expect(status).to be_success
     expect(runs.first['override']).to eq(["services:\n  web:\n    mem_limit: 1g\n"])
@@ -173,16 +171,6 @@ RSpec.describe RatingsBackfill::Launcher do
     expect(status).not_to be_success
     expect(errors).to include('BACKFILL_PLAN')
     expect(runs.size).to eq(1)
-  end
-
-  it 'preserves the original range and backend cohort metadata for every chunk' do
-    plan.merge!(range_start: '2024-11-01', range_end: '2024-11-18', extra_metadata: 'future-proof')
-    _, _, status = run_launcher
-    expect(status).to be_success
-    expected = { 'range_start' => '2024-11-01', 'range_end' => '2024-11-18',
-                 'cohort_key' => 'stored-cohort', 'extra_metadata' => 'future-proof' }
-    requests = runs.drop(1).filter_map { |command| command['request'] }
-    expect(requests).to all(include(expected))
   end
 
   it 'retains a planning container that refuses an overlapping backfill without starting chunks' do
@@ -249,10 +237,17 @@ RSpec.describe RatingsBackfill::Launcher do
    '--progress-seconds 0', '--chunk-days 1.5', '--project Invalid',
    '--from 2024-11-19 --through 2024-11-18'].each do |invalid|
     it "rejects invalid arguments before touching Docker: #{invalid}" do
-      _, errors, status = run_launcher(*invalid.split)
-      expect(status).not_to be_success
-      expect(errors).not_to be_empty
+      original_sync = $stdout.sync
+      allow(RatingsBackfill::DockerClient).to receive(:new).and_raise('Invalid arguments reached Docker')
+      status = nil
+      expect do
+        status = described_class.new(['--year', '2025', '--model', 'baseline', *invalid.split]).call
+      end.to output(/\S/).to_stderr
+      expect(status).to eq(1)
+      expect(RatingsBackfill::DockerClient).not_to have_received(:new)
       expect(File.exist?(command_log)).to be false
+    ensure
+      $stdout.sync = original_sync
     end
   end
 end

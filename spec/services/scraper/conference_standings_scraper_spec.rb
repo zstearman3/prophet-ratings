@@ -3,16 +3,19 @@
 require 'rails_helper'
 
 RSpec.describe Scraper::ConferenceStandingsScraper do
-  subject(:scraper) { described_class.new(year: 2026) }
+  let(:scraper) { described_class.new(year: 2026) }
 
   let(:html) { Rails.root.join('spec/fixtures/conference_standings.html').read }
+
+  before { allow(scraper).to receive(:sleep) }
 
   it 'requests the target season and parses visible and commented tables without writes' do
     response = instance_double(HTTParty::Response, code: 200, body: html)
     allow(HTTParty).to receive(:get).with(scraper.source_url, timeout: 30).and_return(response)
 
-    expect { scraper.call }.not_to change(TeamConference, :count)
-    expect(scraper.call).to contain_exactly(
+    rows = nil
+    expect { rows = scraper.call }.not_to change(TeamConference, :count)
+    expect(rows).to contain_exactly(
       { team_slug: 'first', team_name: 'First University', conference_slug: 'alpha',
         conference_name: 'Alpha Conference', conference_abbreviation: 'ALP' },
       { team_slug: 'second', team_name: 'Second University', conference_slug: 'alpha',

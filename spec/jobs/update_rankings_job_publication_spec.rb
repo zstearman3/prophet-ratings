@@ -84,51 +84,55 @@ RSpec.describe UpdateRankingsJob do
       publish_with_predictions
     end
 
-    it 'includes yesterday final but excludes today final and unfinished games' do
-      expect(snapshots.count).to eq(4)
-      expect(season.team_rating_snapshots.where(snapshot_date: Date.new(2025, 11, 4))).to be_empty
-      # One finalized regulation game contributes 70, not the leaked two-game average of 80.
-      expect(teams.first(2).map { |team| team.reload.pace.to_f }).to eq([70, 70])
-      expect(teams.first(2).map { |team| team.wins + team.losses }).to eq([1, 1])
-      expect(teams.last(2).map { |team| team.reload.pace }).to eq([nil, nil])
-    end
+    it 'publishes only prior-day results with matching model and cutoff evidence' do
+      aggregate_failures 'includes yesterday final but excludes today final and unfinished games' do
+        expect(snapshots.count).to eq(4)
+        expect(season.team_rating_snapshots.where(snapshot_date: Date.new(2025, 11, 4))).to be_empty
+        # One finalized regulation game contributes 70, not the leaked two-game average of 80.
+        expect(teams.first(2).map { |team| team.reload.pace.to_f }).to eq([70, 70])
+        expect(teams.first(2).map { |team| team.wins + team.losses }).to eq([1, 1])
+        expect(teams.last(2).map { |team| team.reload.pace }).to eq([nil, nil])
+      end
 
-    it 'publishes matching model, date and cutoff evidence for season inputs and coherent anchors' do
-      snapshots.each do |snapshot|
-        expect(snapshot.ratings_config_version_id).to eq(version.id)
-        expect(snapshot.stats.fetch('rating_anchors')).to include('as_of' => '2025-11-03', 'model_version_id' => version.id)
-        expect(snapshot.stats.fetch('season_forecast_inputs')).to include(
-          'snapshot_date' => '2025-11-03', 'result_cutoff' => '2025-11-03', 'season_id' => season.id, 'model_version_id' => version.id
-        )
+      aggregate_failures 'publishes matching model, date and cutoff evidence for season inputs and coherent anchors' do
+        snapshots.each do |snapshot|
+          expect(snapshot.ratings_config_version_id).to eq(version.id)
+          expect(snapshot.stats.fetch('rating_anchors')).to include('as_of' => '2025-11-03', 'model_version_id' => version.id)
+          expect(snapshot.stats.fetch('season_forecast_inputs')).to include(
+            'snapshot_date' => '2025-11-03', 'result_cutoff' => '2025-11-03', 'season_id' => season.id, 'model_version_id' => version.id
+          )
+        end
       end
     end
 
-    it 'uses the new prior-day publication and frozen season inputs for today pregame forecast' do
-      expect(prediction).to have_attributes(forecast_kind: 'pregame', input_cutoff: Date.new(2025, 11, 3),
-                                            ratings_config_version_id: version.id)
-      expect([prediction.home_team_snapshot, prediction.away_team_snapshot]).to eq(snapshots.to_a.values_at(0, 2))
-      expect(prediction.calculation_context.fetch('season_source')).to include(
-        'snapshot_date' => '2025-11-03', 'result_cutoff' => '2025-11-03', 'source' => 'publication'
-      )
-      expect(prediction.calculation_context.fetch('season')).to eq(snapshots.first.stats.dig('season_forecast_inputs', 'values'))
-      expect(unfinished.predictions).to be_empty
-    end
+    it 'issues a frozen forecast from prior-day inputs and reuses unchanged retries' do
+      aggregate_failures 'uses the new prior-day publication and frozen season inputs for today pregame forecast' do
+        expect(prediction).to have_attributes(forecast_kind: 'pregame', input_cutoff: Date.new(2025, 11, 3),
+                                              ratings_config_version_id: version.id)
+        expect([prediction.home_team_snapshot, prediction.away_team_snapshot]).to eq(snapshots.to_a.values_at(0, 2))
+        expect(prediction.calculation_context.fetch('season_source')).to include(
+          'snapshot_date' => '2025-11-03', 'result_cutoff' => '2025-11-03', 'source' => 'publication'
+        )
+        expect(prediction.calculation_context.fetch('season')).to eq(snapshots.first.stats.dig('season_forecast_inputs', 'values'))
+        expect(unfinished.predictions).to be_empty
+      end
 
-    it 'records actual morning issuance after source creation and correction timestamps' do
-      expect(prediction.generated_at).to eq(Time.utc(2025, 11, 4, 12))
-      sources = [prediction.home_team_snapshot, prediction.away_team_snapshot]
-      expect(sources).to all(have_attributes(created_at: be <= prediction.generated_at, updated_at: be <= prediction.generated_at))
-    end
+      aggregate_failures 'records actual morning issuance after source creation and correction timestamps' do
+        expect(prediction.generated_at).to eq(Time.utc(2025, 11, 4, 12))
+        sources = [prediction.home_team_snapshot, prediction.away_team_snapshot]
+        expect(sources).to all(have_attributes(created_at: be <= prediction.generated_at, updated_at: be <= prediction.generated_at))
+      end
 
-    it 'reuses unchanged publication and forecast identities without replacing captured context' do
-      snapshot_ids = snapshots.pluck(:id)
-      prediction_id = prediction.id
-      context = prediction.calculation_context
-      travel 1.minute
-      publish_with_predictions
-      expect(snapshots.pluck(:id)).to eq(snapshot_ids)
-      expect(forecast_game.predictions.pluck(:id)).to eq([prediction_id])
-      expect(prediction.reload.calculation_context).to eq(context)
+      aggregate_failures 'reuses unchanged publication and forecast identities without replacing captured context' do
+        snapshot_ids = snapshots.pluck(:id)
+        prediction_id = prediction.id
+        context = prediction.calculation_context
+        travel 1.minute
+        publish_with_predictions
+        expect(snapshots.reload.pluck(:id)).to eq(snapshot_ids)
+        expect(forecast_game.predictions.pluck(:id)).to eq([prediction_id])
+        expect(prediction.reload.calculation_context).to eq(context)
+      end
     end
   end
 

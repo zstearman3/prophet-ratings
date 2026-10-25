@@ -13,6 +13,8 @@ RSpec.describe Departures::AnnualDataset do
       'scope_evidence' => 'Reviewed synthetic final regular and postseason', 'max_requests' => 15, 'retries' => 2 }
   end
 
+  let(:retry_delays) { [] }
+
   around do |example|
     original_rake = Rake.application
     original_env = ENV.to_h
@@ -31,7 +33,12 @@ RSpec.describe Departures::AnnualDataset do
     FileUtils.remove_entry(directory)
   end
 
-  before { stub_cbbd }
+  before do
+    stub_cbbd
+    allow(Ingestion::Cbbd::Client).to receive(:new).and_wrap_original do |original, **options|
+      original.call(**options, sleeper: retry_delays.method(:push))
+    end
+  end
 
   def invoke(name)
     Rake::Task["departures:#{name}"].reenable
@@ -60,7 +67,7 @@ RSpec.describe Departures::AnnualDataset do
   end
 
   [EOFError, OpenSSL::SSL::SSLError].each do |transport_error|
-    it "retains successful capture provenance after later #{transport_error} failure" do
+    it "retains successful capture provenance after later #{transport_error} failure", :aggregate_failures do
       allow(Ingestion::Cbbd::HttpTransport).to receive(:call)
         .with(satisfy { |uri| uri.path == '/stats/player/season' }, anything).and_raise(transport_error)
       expect do
@@ -72,6 +79,7 @@ RSpec.describe Departures::AnnualDataset do
                                                          'http_status' => 200)
       expect(manifest.fetch('sources').first.fetch('captured_at')).to be_present
       expect(dataset.fetch('selections').size).to eq(60)
+      expect(retry_delays).to eq([1, 2, 1, 2])
     end
   end
 
