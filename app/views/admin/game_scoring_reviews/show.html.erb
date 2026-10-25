@@ -1,0 +1,45 @@
+<section class="mx-auto max-w-5xl space-y-6 pb-12">
+  <h1 class="text-3xl font-bold">Resolve scoring discrepancy</h1>
+  <p><%= schedule_observation_matchup(page[:observation]) %> · <%= page[:observation].normalized_payload['schedule_date'] %></p>
+  <%= link_to 'Return to import results', admin_schedule_refresh_run_path(page[:run]), class: 'text-blue-700 underline' %>
+  <% if page[:error] %><p role="alert" class="rounded bg-red-100 p-3"><%= page[:error] %></p><% end %>
+  <% if page[:review] %>
+    <section class="rounded border bg-green-50 p-5 space-y-3">
+      <h2 class="text-xl font-semibold">Approved by admin</h2>
+      <p><%= page[:review].reviewed_by.email %> · <%= page[:review].created_at %>. Review <%= page[:review].id %>.</p>
+      <% if page[:review].game %><p><%= link_to "Imported game #{page[:review].game.id}", game_path(page[:review].game), class: 'text-blue-700 underline' %>:
+        <%= page[:review].game.home_team_score %>–<%= page[:review].game.away_team_score %>.</p><% end %>
+      <p>The original evidence and shooting counts are preserved. Retry unfinished dates with a new budget to recompute date completion.</p>
+    </section>
+  <% elsif page[:reviewable] %>
+    <p>The reported game score is the default. Shooting arithmetic can disagree with the final score. Select the trusted total for each affected team; shooting counts remain as supplied.</p>
+    <p>The selected total becomes the game score and team points. It drives the result and points-based ratings. Shooting-based stats keep the supplied counts. A name-only opponent remains outside ratings.</p>
+    <%= form_with url: preview_admin_schedule_refresh_run_game_scoring_review_path(page[:run], page[:observation]), method: :post, data: { turbo: false }, id: 'scoring-review-form', class: 'space-y-5' do %>
+      <% page[:evidence].candidates.each do |label, totals| %>
+        <% side = page[:evidence].payload.fetch(label.to_sym) %>
+        <fieldset class="rounded border p-4 space-y-3">
+          <legend class="px-2 font-semibold"><%= label.humanize %> team</legend>
+          <p>Reported game score: <%= side[:score] %>. Reported box points: <%= side.dig(:stats, :points) %>.</p>
+          <p>Shooting arithmetic: <%= scoring_arithmetic(side) %>.</p>
+          <% if totals.size > 1 %>
+            <% totals.each do |total| %>
+              <label class="block"><%= radio_button_tag "choices[#{label}]", total, total == side[:score] %> <%= scoring_choice_label(side, total) %></label>
+            <% end %>
+          <% else %><p>Scoring totals agree; the reported total is retained.</p><% end %>
+        </fieldset>
+      <% end %>
+      <%= submit_tag 'Review selected result', class: 'rounded bg-prophet-indigo px-4 py-2 text-white' %>
+    <% end %>
+    <details class="rounded border p-4">
+      <summary class="cursor-pointer font-semibold">Supplied box counts</summary>
+      <table class="w-full text-sm"><thead><tr><th class="p-2 text-left">Statistic</th><th class="p-2">Home</th><th class="p-2">Away</th></tr></thead><tbody>
+        <% Ingestion::GameObservation::STAT_KEYS.each do |key| %>
+          <tr class="border-t"><th class="p-2 text-left"><%= key.to_s.humanize %></th><td class="p-2 text-center"><%= page[:evidence].payload.dig(:home, :stats, key) %></td><td class="p-2 text-center"><%= page[:evidence].payload.dig(:away, :stats, key) %></td></tr>
+        <% end %>
+      </tbody></table>
+    </details>
+  <% else %>
+    <p role="alert">This observation cannot be resolved by scoring review. Only complete final CBBD boxes with scoring-total discrepancies qualify; other validation must be resolved separately. A running import must finish first.</p>
+  <% end %>
+  <p><%= link_to 'Inspect original source observation', rails_admin.show_path(model_name: 'game_observation', id: page[:observation].id), class: 'text-blue-700 underline' %>. Original source evidence is never edited by approval.</p>
+</section>

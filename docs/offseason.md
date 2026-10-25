@@ -554,6 +554,27 @@ Games against name-only opponents stay visible, with no fabricated opponent
 membership. Completed name-only games use `final_unmatched` and do not enter
 ratings calculations. Inconsistent supplied scoring totals remain held for review.
 
+For eligible historical CBBD scoring discrepancies, open **Review date → Resolve
+scoring discrepancy**. Compare reported game/box points with the supplied shooting
+arithmetic and box counts. The reported final score is selected by default. Choose
+a trusted supplied total for each affected team, review the resulting score, then
+**Approve and import selected result**. No written reason is required: the app
+records **Approved by admin**, the reviewer, time, and exact choices automatically.
+A choice that changes the reported score is flagged before confirmation.
+
+The selected total becomes the stored game score and team points; eligible games
+enter ratings with those points even when unchanged shooting counts do not add
+up. Name-only opponents retain `final_unmatched` and remain outside ratings.
+The original observation stays unchanged, with an immutable review and linked
+accepted import recording the exception. Other invalid/missing stats or identity
+conflicts remain blocking; this action cannot overwrite a completed game.
+
+Approval imports one game. The original run keeps its historical failure evidence
+and displays the resolved game/review. Use **Retry unfinished dates with new
+budget** to recompute date completion. Identical source facts reuse the saved
+choice without duplicate games; changed source facts or stored game inputs remain
+held rather than silently reusing an approval. No ratings backfill is queued.
+
 A retained run records requester/time, provider, requested dates, fixed numeric
 limits, status and safe date/import/outcome evidence. Sports Reference permits
 three additional attempts for upcoming dates (5/10/20 second waits), or five for
@@ -634,7 +655,8 @@ Optional recruiting/departure approvals, current and captured input gaps, schedu
 venue, prediction coverage and latest operation results remain visible. Missing
 inputs are unknown, including when their contract uses a zero fallback; observed
 zero is distinct. Acknowledge the exact displayed gap set. Leave optional work
-open or enter a bounded deferral reason; required checks cannot be deferred.
+open or select its deferral checkbox; new UI deferrals record `Approved by admin`
+automatically. Required checks cannot be deferred.
 Absent schedule leaves prediction readiness open/deferred and does not prevent
 otherwise valid season preparation. Follow the season-scoped repair links and
 return through that season's dashboard to readiness.
@@ -652,8 +674,15 @@ and stale-review checks remain enforced. Reviews saved with an older fingerprint
 format require a fresh review before activation. No rating formulas or published
 captures are changed.
 
+The readiness page leads with required-check blockers and review/activation
+actions. Check cards summarize the evidence; input gaps use a bounded, scrollable
+table. Full diagnostic JSON, participant evidence and saved approval/action audit
+remain available in closed details panels. Saved-review evidence is separated
+from the fresh report. Stale reviews and unresolved required checks disable new
+activation actions; successful recorded actions remain replayable.
+
 Save a review to retain the displayed report, reviewer/time, fingerprint,
-acknowledgement and deferral reasons. This changes no current/default flags.
+acknowledgement and deferrals. This changes no current/default flags.
 Then deliberately use **Activate season** or **Make model default** as separate
 actions, inspecting each displayed previous/target ID. Season activation reuses
 stored membership choices and the existing season activation API. Neither action

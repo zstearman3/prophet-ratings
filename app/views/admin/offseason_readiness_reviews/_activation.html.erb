@@ -1,0 +1,24 @@
+<% available = review.fingerprint == report['fingerprint'] && OffseasonReadinessReview.required_problems(report).empty? %>
+<p class="text-sm">Saved by admin #<%= review.reviewer_id %> at <%= review.created_at %>; model #<%= review.ratings_config_version_id || 'none' %>.</p>
+<% if review.fingerprint == report['fingerprint'] %>
+  <p class="font-semibold text-green-800">Evidence still matches this review.</p>
+<% else %>
+  <p role="status" class="rounded border border-yellow-200 bg-yellow-50 p-3">Evidence changed. Save a fresh review before another action. Retained successful actions replay their original result.</p>
+<% end %>
+<div class="grid gap-4 md:grid-cols-2">
+  <section class="rounded border bg-white p-4 space-y-3">
+    <h2 class="text-xl font-semibold">Activate season</h2>
+    <p>Reviewed previous season #<%= review.report['current_season_id'] || 'none' %> → season <%= @page[:season].year %> (#<%= @page[:season].id %>).</p>
+    <p class="text-sm text-gray-600">Uses the stored membership choices. No imports or ratings calculations run.</p>
+    <%= button_to 'Activate season', activate_season_admin_offseason_readiness_review_path(review, season_id: @page[:season].id), method: :post, disabled: !available && !review.results.key?('season'), form: { data: { turbo: false } }, class: 'cursor-pointer rounded bg-prophet-indigo px-4 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50' %>
+    <% if review.results['season'] %><p class="text-sm">Saved result: <%= review.results.dig('season', 'status') %>.</p><% end %>
+  </section>
+  <section class="rounded border bg-white p-4 space-y-3">
+    <h2 class="text-xl font-semibold">Make model default</h2>
+    <p>Reviewed previous default #<%= review.report['default_model_id'] || 'none' %> → model #<%= review.ratings_config_version_id || 'none' %>.</p>
+    <p class="text-sm text-gray-600">Changes the default for future work. Pinned jobs keep their selected model.</p>
+    <%= button_to 'Make model default', activate_model_admin_offseason_readiness_review_path(review, season_id: @page[:season].id), method: :post, disabled: !available && !review.results.key?('model'), form: { data: { turbo: false } }, class: 'cursor-pointer rounded border border-indigo-300 bg-white px-4 py-3 font-semibold text-prophet-indigo disabled:cursor-not-allowed disabled:opacity-50' %>
+    <% if review.results['model'] %><p class="text-sm">Saved result: <%= review.results.dig('model', 'status') %>.</p><% end %>
+  </section>
+</div>
+<p class="text-sm text-gray-600">Legacy or manual jobs omitting season ID resolve the current season at execution; inspect those jobs in GoodJob before switching.</p>

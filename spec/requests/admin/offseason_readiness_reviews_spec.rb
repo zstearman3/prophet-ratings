@@ -39,6 +39,39 @@ RSpec.describe 'Admin offseason readiness reviews' do
     expect(PublishPreseasonJob).not_to have_received(:perform_later)
   end
 
+  it 'keeps review actions ahead of readable gaps and collapsed diagnostic evidence' do
+    sign_in admin
+    publish_readiness_fixture(season, model, row, admin)
+    get admin_offseason_readiness_reviews_path(season_id: season.id)
+    document = response.parsed_body
+    expect(document.at_css('#readiness-actions')).to be_present
+    expect(document.xpath('//pre[not(ancestor::details)]')).to be_empty
+    expect(document.css('details[open] pre')).to be_empty
+    expect(document.at_css('#readiness-actions form')['data-turbo']).to eq('false')
+    expect(document.at_css('#readiness-gaps table')).to be_present
+    expect(document.at_css('#readiness-gaps').text).to include(row.team.school, 'captured', 'current')
+    expect(document.css('#readiness-actions ~ * #readiness-gaps, #readiness-actions ~ #readiness-gaps')).not_to be_empty
+    expect(document.css('textarea[name^="deferrals"]')).to be_empty
+    expect(document.at_css('input[name="deferrals[schedule]"]')['value']).to eq('Approved by admin')
+  end
+
+  it 'puts saved-review activation before evidence and renders the fresh report only once' do
+    sign_in admin
+    publish_readiness_fixture(season, model, row, admin)
+    review = save_readiness_review(season, admin)
+    get admin_offseason_readiness_review_path(review, season_id: season.id)
+    document = response.parsed_body
+    actions = document.at_css('#readiness-actions')
+    expect(actions).to be_present
+    expect(actions.text).to include('Activate season', 'Make model default')
+    expect(actions.at_css('input[value="Activate season"][disabled], button[disabled]')).to be_nil
+    expect(document.xpath('//pre[not(ancestor::details)]')).to be_empty
+    expect(document.css('h1').size).to eq(1)
+    expect(document.css('#readiness-gaps').size).to eq(1)
+    expect(document.at_css('details #retained-readiness-gaps')).to be_present
+    expect(document.at_css('form[action*="activate_season"]')['data-turbo']).to eq('false')
+  end
+
   it 'retains review decisions, activates separately and revisits original evidence with actual state' do
     sign_in admin
     publish_readiness_fixture(season, model, row, admin)
@@ -109,7 +142,12 @@ RSpec.describe 'Admin offseason readiness reviews' do
     PreseasonPublication.select_model(season, other)
     get admin_offseason_readiness_review_path(review, season_id: season.id)
     document = response.parsed_body
-    retained = document.css('section').find { |section| section.at_css('h3')&.text&.include?('Stored prediction coverage') }
+    expect(document.css('#readiness-actions form[action*="activate_"] button[disabled]').size).to eq(2)
+    retained = document.at_css('#retained-check-predictions')
+    fresh = document.at_css('#check-predictions')
+    expect(fresh.at_xpath('.//a[text()="Review next action"]')['href']).to eq(
+      admin_prediction_evaluation_path(season_id: season.id, model_id: other.id)
+    )
     href = retained.at_xpath('.//a[text()="Review next action"]')['href']
     expect(href).to eq(admin_prediction_evaluation_path(season_id: season.id, model_id: model.id))
     get href

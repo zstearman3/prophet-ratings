@@ -11,7 +11,7 @@ module Ingestion
     end
 
     def retain(outcome, reason, options = {})
-      record = ::GameObservation.create!(attributes.merge(outcome:, reason:, accepted: options.fetch(:accepted, false)))
+      record = ::GameObservation.create!(audit_attributes(outcome, reason, options))
       self.class.report(record).merge(changes: options.fetch(:changes, {}), unmatched: options.fetch(:unmatched, []),
                                       possible_move_ids: possible_moves)
     end
@@ -27,6 +27,12 @@ module Ingestion
     private
 
     attr_reader :data, :game
+
+    def audit_attributes(outcome, reason, options)
+      review, accepted = options.values_at(:scoring_review, :accepted)
+      reason = "admin_reviewed_scoring: #{reason}" if review
+      attributes.merge(outcome:, reason:, accepted: accepted || false, scoring_review: review)
+    end
 
     def attributes
       { game_id: persisted_game_id, provider: data[:provider], external_game_id: data[:external_game_id],

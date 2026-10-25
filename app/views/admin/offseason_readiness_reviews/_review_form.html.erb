@@ -1,0 +1,22 @@
+<h2 class="text-xl font-semibold">Save readiness review</h2>
+<p class="mt-2 text-sm">Review the checks below, then save this evidence. Activation is a separate action on the saved review.</p>
+<%= form_with url: admin_offseason_readiness_reviews_path(season_id: @page[:season].id), method: :post, data: { turbo: false }, class: 'mt-4 space-y-4' do |form| %>
+  <%= hidden_field_tag :fingerprint, report.fetch('fingerprint') %>
+  <% if report.fetch('gaps').any? %>
+    <label class="flex items-start gap-3 rounded border bg-white p-4">
+      <%= check_box_tag :acknowledge, '1', false, class: 'mt-1' %>
+      <span>Acknowledge the <%= pluralize(report.fetch('gaps').size, 'captured and current input gap') %> listed in the <a href="#readiness-gaps" class="text-blue-700 underline">input gap table</a>.</span>
+    </label>
+  <% end %>
+  <% optional = report.fetch('checks').reject { |check| check['hard'] || check['status'] == 'pass' } %>
+  <% if optional.any? %>
+    <details class="rounded border bg-white p-4">
+      <summary class="cursor-pointer font-semibold">Optional: mark open checks as deferred (<%= optional.size %>)</summary>
+      <p class="mt-3 text-sm text-gray-600">Leave these unchecked to keep them open. A deferral records Approved by admin automatically.</p>
+      <div class="mt-3 space-y-2"><% optional.each do |check| %>
+        <label class="flex items-start gap-3"><%= check_box_tag "deferrals[#{check['key']}]", 'Approved by admin' %><span>Defer <%= check['label'] %></span></label>
+      <% end %></div>
+    </details>
+  <% end %>
+  <%= form.submit 'Save readiness review', class: 'cursor-pointer rounded bg-prophet-indigo px-5 py-3 font-semibold text-white' %>
+<% end %>
