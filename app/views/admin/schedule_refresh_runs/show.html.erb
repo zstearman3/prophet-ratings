@@ -1,43 +1,80 @@
-<section class="mx-auto max-w-5xl space-y-5 p-6">
-  <h1 class="text-2xl font-bold">Schedule refresh <%= @run.id %> · season <%= @run.season.year %></h1>
-  <%= link_to 'Return to schedule review', admin_schedule_refresh_runs_path(season_id: @run.season.id) %>
-  <%= link_to 'Return to offseason setup', admin_offseason_setup_path(season_id: @run.season.id) %>
-  <%= link_to 'Refresh status', admin_schedule_refresh_run_path(@run) %>
-  <p>Status: <strong><%= @run.status %></strong>. <%= @run.provider %>, <%= @run.start_date %>–<%= @run.end_date %> inclusive Eastern.</p>
-  <p>Requested by <%= @run.requested_by.email %> at <%= @run.created_at %>. Started <%= @run.started_at || 'not yet' %>; finished <%= @run.finished_at || 'not yet' %>.</p>
-  <% if @run.retry_of %><p>Retry of <%= link_to "run #{@run.retry_of_id}", admin_schedule_refresh_run_path(@run.retry_of_id) %>.</p><% end %>
-  <p><%= @run.cbbd? ? "Total request ceiling: #{@run.max_requests}; retries per request: #{@run.retries}." : 'Sports Reference: up to 3 additional attempts per failed date, waits 5/10/20 seconds.' %></p>
-  <p>Queued does not mean acquired. Successful or empty acquisition does not certify complete publication, reviewed reconciliation, or prediction readiness. No games are deleted on source absence.</p>
-  <% if @run.error %><p role="alert"><%= @run.error %></p><% end %>
-  <p>Failed or unattempted dates: <%= @run.pending_dates.join(', ').presence || 'none' %>.</p>
-  <% if @run.retry_run %>
-    <p>Existing retry: <%= link_to "run #{@run.retry_run.id} (#{@run.retry_run.status})", admin_schedule_refresh_run_path(@run.retry_run) %>.
-      Continue from this linked run; each parent grants one retry budget.</p>
-  <% elsif ScheduleRefreshRun::TERMINAL.include?(@run.status) && @run.pending_dates.any? %>
-    <p>Explicit retry creates a new linked run for exactly these dates with a fresh budget at the original numeric limits. Review quota and runtime setup first. Expired dates require historical sync.</p>
-    <%= button_to 'Retry unfinished dates with new budget', retry_admin_schedule_refresh_run_path(@run), method: :post %>
-  <% end %>
-  <h2 class="text-xl">Committed date evidence</h2>
-  <% @run.report.fetch('days', []).each do |day| %>
-    <div class="rounded border p-3">
-      <p><%= day['date'] %>: <%= day['error'] ? 'failed (no committed imports)' : (day['valid_empty'] ? 'successful empty' : 'successful') %>; imported <%= day.fetch('imported_rows', 0) %>; changed <%= day.fetch('changed_rows', 0) %>. Counts: <%= day.fetch('counts', {}) %>. Outcomes: <%= day.fetch('outcomes', {}) %>.</p>
-      <% day.fetch('rejection_observation_ids', []).each do |id| %>
-        <% if @evidence[:observations][id] %>
-          <p><%= link_to "Review rejected observation #{id}", rails_admin.show_path(model_name: 'game_observation', id:) %>
-            · <%= @evidence[:observations][id].outcome %>. This retained audit identifies the source game and participants; domain writes were rolled back.</p>
-        <% else %>
-          <p>Rejected observation <%= id %> is unavailable or outside this run's provider/season scope.</p>
-        <% end %>
-      <% end %>
-      <% day.fetch('games', []).each do |game| %>
-        <p><%= game['outcome'] %>: <%= game['reason'].presence || 'Inspect private observation evidence for details' %>.
-          <% if @evidence[:games][game['game_id']] %><%= link_to "Game #{game['game_id']}", game_path(@evidence[:games][game['game_id']]) %><% end %>
-          <% game.fetch('possible_move_ids', []).each do |id| %> Possible move: <%= @evidence[:games][id] ? link_to("Game #{id}", game_path(@evidence[:games][id])) : id %>.<% end %>
-        </p>
-      <% end %>
+<section class="mx-auto max-w-5xl space-y-8 pb-12">
+  <header class="space-y-3">
+    <h1 class="text-3xl font-bold"><%= @run.historical? ? 'Historical import' : 'Schedule refresh' %> <%= @run.id %> · season <%= @run.season.year %></h1>
+    <nav class="flex flex-wrap gap-4">
+      <%= link_to 'Return to schedule review', admin_schedule_refresh_runs_path(season_id: @run.season.id), class: 'text-blue-700 underline' %>
+      <%= link_to 'Return to offseason setup', admin_offseason_setup_path(season_id: @run.season.id), class: 'text-blue-700 underline' %>
+    </nav>
+  </header>
+  <section class="rounded border bg-gray-50 p-5 space-y-3" data-status="<%= @run.status %>">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <h2 class="text-xl font-semibold"><%= @run.status.humanize %></h2>
+      <%= link_to 'Refresh status', admin_schedule_refresh_run_path(@run), class: 'rounded border bg-white px-4 py-2 font-medium hover:bg-gray-100' %>
     </div>
+    <p><%= @run.cbbd? ? 'CBBD' : 'Sports Reference' %> · <%= @run.start_date %>–<%= @run.end_date %> inclusive Eastern.</p>
+    <% unless ScheduleRefreshRun::TERMINAL.include?(@run.status) %><p role="status">Your import runs in the background. Refresh status to see completed dates and any errors.</p><% end %>
+    <% if @run.historical? %><p><%= @run.rescan? ? 'Reimporting completed dates as well as unfinished dates.' : 'Resuming unfinished dates; previously imported dates are skipped.' %></p><% end %>
+    <% if @run.error.present? %><p role="alert" class="rounded bg-red-100 p-3"><%= @run.error %></p><% end %>
+    <% if @run.report['acquisition_complete'] == false %>
+      <div role="alert" class="rounded bg-red-100 p-3 space-y-2">
+        <p class="font-semibold"><%= @run.cbbd? ? 'CBBD' : 'Source' %> retrieval failed</p>
+        <p><%= schedule_acquisition_issues(@run.report).presence || 'The source response was incomplete. Review retained acquisition details before retrying.' %></p>
+        <p>No team matching changes are needed to resolve a retrieval failure.</p>
+      </div>
+    <% end %>
+    <p class="text-sm text-gray-600">Successful or empty acquisition does not certify complete publication, reviewed reconciliation, or prediction readiness. No games are deleted on source absence.</p>
+  </section>
+  <% if @run.retry_of %><p>Retry of <%= link_to "run #{@run.retry_of_id}", admin_schedule_refresh_run_path(@run.retry_of_id), class: 'text-blue-700 underline' %>.</p><% end %>
+  <% if @run.retry_run %>
+    <section class="rounded border bg-blue-50 p-5 space-y-2">
+      <h2 class="font-semibold">Existing retry: <%= link_to "run #{@run.retry_run.id} (#{@run.retry_run.status})", admin_schedule_refresh_run_path(@run.retry_run), class: 'text-blue-700 underline' %></h2>
+      <p>Continue from this linked run; each parent grants one retry budget.</p>
+    </section>
+  <% elsif ScheduleRefreshRun::TERMINAL.include?(@run.status) && @run.pending_dates.any? %>
+    <section class="rounded border bg-yellow-50 p-5 space-y-3">
+      <h2 class="font-semibold">Some dates still need importing</h2>
+      <p>Failed or unattempted dates: <%= @run.pending_dates.join(', ') %>.</p>
+      <p class="text-sm">Retry these dates in a linked run with a fresh budget at the original numeric limits. Review your request quota first.<% unless @run.historical? %> Expired dates require historical sync; start a historical import from schedule review.<% end %></p>
+      <%= button_to 'Retry unfinished dates with new budget', retry_admin_schedule_refresh_run_path(@run), method: :post, class: 'rounded bg-prophet-indigo px-4 py-2 font-medium text-white' %>
+    </section>
   <% end %>
-  <p>Absent from successful source dates (review only): <% @run.report.fetch('absent_ids', []).each do |id| %><%= @evidence[:games][id] ? link_to("Game #{id}", game_path(@evidence[:games][id])) : id %> <% end %></p>
-  <%= link_to 'Review CBBD identities', admin_cbbd_review_runs_path(season_id: @run.season.id) %>
-  <details><summary>Safe retained acquisition and outcome counts</summary><pre class="overflow-auto"><%= JSON.pretty_generate(@run.report) %></pre></details>
+  <section class="space-y-3">
+    <h2 class="text-xl font-semibold">Results by date</h2>
+    <p class="text-sm text-gray-600">Committed date evidence is saved as the import progresses. Open a date's details to inspect individual games and identity issues.</p>
+    <% if @run.report.fetch('days', []).empty? %>
+      <p class="rounded border bg-gray-50 p-4">No dates have completed yet.</p>
+    <% else %>
+      <div class="overflow-x-auto rounded border">
+        <table class="w-full text-sm" id="schedule-import-results">
+          <thead class="bg-gray-100 text-left"><tr><th class="p-3">Date</th><th class="p-3">Result</th><th class="p-3 text-right">Imported</th><th class="p-3 text-right">Changed</th><th class="p-3">Details</th></tr></thead>
+          <tbody>
+            <% @run.report.fetch('days', []).sort_by { |day| day['date'].to_s }.each do |day| %>
+              <tr class="border-t align-top">
+                <td class="p-3 whitespace-nowrap"><%= day['date'] %></td>
+                <td class="p-3"><%= day['error'] ? (day.fetch('imported_rows', 0).positive? ? 'Partially imported' : 'Failed') : (day['status'] == 'skipped' ? 'Already imported' : (day['valid_empty'] ? 'No games' : 'Imported')) %></td>
+                <td class="p-3 text-right"><%= day.fetch('imported_rows', 0) %></td>
+                <td class="p-3 text-right"><%= day.fetch('changed_rows', 0) %></td>
+                <td class="p-3"><%= render 'day_details', day: day %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% end %>
+  </section>
+  <% if @run.report.fetch('absent_ids', []).any? %>
+    <section class="rounded border p-5 space-y-3">
+      <h2 class="text-xl font-semibold">Games absent from successful source dates</h2>
+      <p>Review only: these games were not deleted.</p>
+      <p><% @run.report.fetch('absent_ids', []).each do |id| %><%= @evidence[:games][id] ? link_to("Game #{id}", game_path(@evidence[:games][id]), class: 'mr-3 text-blue-700 underline') : id %> <% end %></p>
+    </section>
+  <% end %>
+  <%= link_to 'Review CBBD identities', admin_cbbd_review_runs_path(season_id: @run.season.id), class: 'text-blue-700 underline' %>
+  <details class="rounded border p-5 space-y-3 text-sm">
+    <summary class="cursor-pointer font-semibold">Run details and request budget</summary>
+    <p>Requested by <%= @run.requested_by.email %> at <%= @run.created_at %>. Started <%= @run.started_at || 'not yet' %>; finished <%= @run.finished_at || 'not yet' %>.</p>
+    <p><%= @run.cbbd? ? "Total request ceiling: #{@run.max_requests}; retries per request: #{@run.retries}." : (@run.historical? ? 'Sports Reference: up to 5 retries per failed date, waits 5/10/20/40/80 seconds.' : 'Sports Reference: up to 3 retries per failed date, waits 5/10/20 seconds.') %></p>
+    <p>Failed or unattempted dates: <%= @run.pending_dates.join(', ').presence || 'none' %>.</p>
+  </details>
+  <details class="rounded border p-5 space-y-3 text-sm"><summary class="cursor-pointer font-semibold">Safe retained acquisition and outcome counts</summary><pre class="overflow-auto rounded bg-gray-50 p-3"><%= JSON.pretty_generate(@run.report) %></pre></details>
 </section>

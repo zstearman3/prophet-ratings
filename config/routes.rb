@@ -7,6 +7,8 @@ Rails.application.routes.draw do
       post :activate_model, on: :member
     end
     resources :preseason_publications, only: %i[index create show] do
+      get :progress, on: :member
+      post :retry_preview, on: :member
       post :select_model, on: :collection
       post :publish, on: :member
     end
@@ -33,6 +35,7 @@ Rails.application.routes.draw do
         post :recover
         post :correct
         patch :publish
+        patch :coverage
         get :source
       end
     end

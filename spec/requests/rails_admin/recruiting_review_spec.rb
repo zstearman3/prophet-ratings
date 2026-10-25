@@ -164,6 +164,37 @@ RSpec.describe 'Admin recruiting dataset review', type: :request do
     end
   end
 
+  it 'can save Queens and exclude an unranked entry after a failed approval without a manual reload' do
+    team.update!(school: 'Queens (NC)')
+    document['rows'].first.merge!('team_label' => 'Queens', 'provider_team_id' => nil,
+                                  'team_url' => 'https://247sports.com/season/2026-basketball/commits/')
+    document['rows'] << document['rows'].first.merge('team_label' => nil, 'provider_team_id' => nil,
+                                                     'team_url' => nil, 'rank' => '0', 'class_points' => nil)
+    values = review_values
+    queens, unranked = batch.entries.order(:row_number).to_a
+    values[:rows][queens.id.to_s][:team_id] = team.id.to_s
+
+    patch "#{batch_path}/publish", params: { review: values }
+
+    expect(response).to have_http_status(:unprocessable_content)
+    expect(batch.reload.status).to eq('ready')
+    expect(queens.reload.team_id).to be_nil
+    form = response.parsed_body.at_css('#recruiting-review-form')
+    values[:review_key] = form.at_css('input[name="review[review_key]"]')['value']
+    values[:rows][unranked.id.to_s][:team_id] = 'excluded'
+
+    patch form['action'], params: { review: values }
+
+    expect(response).to redirect_to(batch_path)
+    expect(queens.reload.team_id).to eq(team.id)
+    expect(unranked.reload).to be_excluded
+    values = review_values
+    values[:rows][unranked.id.to_s][:team_id] = 'excluded'
+    patch "#{batch_path}/publish", params: { review: values }
+    expect(response).to redirect_to(batch_path)
+    expect(batch.reload.revision.team_input(team.id)).to include('status' => 'verified_points')
+  end
+
   it 'shows unresolved errors and preserves submitted choices instead of publishing partial accidental mappings' do
     values = review_values
     values[:rows][batch.entries.sole.id.to_s][:team_id] = ''

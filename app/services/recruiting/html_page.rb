@@ -70,10 +70,11 @@ module Recruiting
       href = link&.[]('href')
       provider_id = team_identity(href, year)
 
-      label = link&.text
+      label = (link || node.at_css('.team'))&.text
       {
         'team_label' => label&.strip, 'raw_team_label' => label, 'provider_team_id' => provider_id, 'team_url' => href,
-        'rank' => field(node, '.rank-column .primary'), 'class_points' => field(node, '.points .number'),
+        'rank' => field(node, '.rank-column .primary'),
+        'class_points' => field(node, '.points .number') || field(node, '.points'),
         'average_rating' => field(node, '.avg'), 'commit_count' => commits(node)
       }
     end

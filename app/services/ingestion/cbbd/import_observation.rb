@@ -13,12 +13,11 @@ module Ingestion
 
       def call
         observation = GameObservation.new(payload)
-        reasons = row['reasons'].to_a
-        if row['status'] == 'final' && row['numeric_valid'] == false && reasons.any? && complete_boxes?
-          return ObservationAudit.new(observation, nil).retain('invalid', reasons.join('; ')).merge(final_box: 'invalid')
-        end
+        reasons = ImportValidation.new(row).reasons
+        return ObservationAudit.new(observation, nil).retain('invalid', reasons.join('; ')).merge(final_box: 'invalid') if reasons.any?
 
-        GameObservationImporter.new(observation:, season: @season).call.merge(final_box: box_coverage)
+        report = GameObservationImporter.new(observation:, season: @season).call
+        report.merge(final_box: result_coverage(report))
       end
 
       def payload
@@ -61,6 +60,13 @@ module Ingestion
 
       def complete_boxes?
         %w[home away].all? { |label| GameObservation.complete_side?(side(label)) }
+      end
+
+      def result_coverage(report)
+        outcome, game_id = report.values_at(:outcome, :game_id)
+        return 'not_applicable' if %w[final unchanged].include?(outcome) && Game.final_unmatched.exists?(id: game_id)
+
+        box_coverage
       end
 
       def box_coverage

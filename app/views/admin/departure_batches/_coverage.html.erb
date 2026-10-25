@@ -1,0 +1,49 @@
+<% coverage = @page[:coverage]; fields = @page[:coverage_fields] || coverage.fetch('fields') %>
+<% picks = coverage.fetch('selections').pluck('overall_pick').sort; gaps = picks.empty? ? [] : (1..picks.max).to_a - picks %>
+<% proposed_picks = @page[:capture_only] && !@page[:coverage_fields] ? picks.join(' ') : fields['expected_picks'] %>
+<section class="rounded border p-5 space-y-5" aria-labelledby="coverage-heading">
+  <div class="space-y-2"><h2 id="coverage-heading" class="text-2xl font-semibold">2. Review source coverage</h2><p>Captured results are observations. Verify the final draft and completed college season before using these sources to account for departures.</p></div>
+  <%= render 'production_warnings', warnings: coverage.fetch('production_warnings', []) %>
+  <% if coverage.fetch('errors').any? %>
+    <div role="alert" class="rounded bg-red-100 p-3"><p class="font-medium">These sources need attention before coverage can be saved.</p><ul class="mt-2 list-disc pl-5"><% coverage.fetch('errors').each do |error| %><li><%= error %></li><% end %></ul><p class="mt-2">Inspect source details below. Fetch again when the source or worker configuration is corrected.</p></div>
+  <% end %>
+    <div class="overflow-x-auto rounded border">
+      <table class="w-full text-left text-sm"><caption class="p-3 text-left font-semibold">Captured sources</caption><thead class="bg-gray-100"><tr><th class="p-3">Source</th><th class="p-3">Result</th><th class="p-3">Rows returned</th></tr></thead><tbody class="divide-y">
+        <% coverage.fetch('sources').each do |source| %><tr><td class="p-3"><%= departure_source_label(source) %></td><td class="p-3"><% if source['failure'].present? %><span class="text-red-700">Needs attention: <%= source['failure'] %></span><% else %>Captured · HTTP <%= source['http_status'] %><% end %></td><td class="p-3"><%= source['row_count'] || 'Unknown' %></td></tr><% end %>
+      </tbody></table>
+    </div>
+    <div class="space-y-3">
+      <h3 class="text-lg font-semibold">Draft selections · <%= coverage.fetch('selections').size %> observed</h3>
+      <p class="rounded bg-yellow-100 p-3">Unverified: returned picks do not establish a complete draft. Compare with independent final results, including the last actual pick and any rescinded picks.</p>
+      <% if gaps.any? %><p><strong>Unobserved picks before the last returned pick:</strong> <%= gaps.join(', ') %>. Check which were actual selections.</p><% end %>
+      <div class="max-h-96 overflow-auto rounded border"><table class="w-full text-left text-sm"><thead class="bg-gray-100"><tr><th class="p-3">Pick</th><th class="p-3">Round</th><th class="p-3">Player</th><th class="p-3">Source affiliation</th></tr></thead><tbody class="divide-y">
+        <% coverage.fetch('selections').each do |selection| %><tr><td class="p-3"><%= selection['overall_pick'] %></td><td class="p-3"><%= selection['round'] %></td><td class="p-3 font-medium"><%= selection['player_name_source'] %></td><td class="p-3"><%= selection['affiliation_source'].presence || 'Unknown' %></td></tr><% end %>
+      </tbody></table></div>
+      <p class="break-words text-sm"><strong>Observed pick list (unverified):</strong> <%= picks.join(' ') %></p>
+    </div>
+  <% if coverage.fetch('errors').empty? %>
+    <%= form_with url: coverage_admin_departure_batch_path(@batch), scope: :coverage, method: :patch, data: { turbo: false }, class: 'space-y-6' do |form| %>
+      <%= form.hidden_field :review_key, value: fields.fetch('review_key', coverage.fetch('review_key')) %>
+      <fieldset class="space-y-4"><legend class="text-lg font-semibold">Confirm the final draft</legend>
+        <div><%= form.label :expected_picks, 'Actual picks in the final draft', class: 'block font-medium' %><%= form.text_field :expected_picks, value: proposed_picks, required: true, class: 'mt-1 block w-full rounded border p-2', aria: { describedby: 'expected-picks-help' } %><p id="expected-picks-help" class="mt-1 text-sm text-gray-600">Unverified proposal from the observed selections. Compare with final results and edit the complete actual pick numbers, separated by spaces or commas. Remove rescinded picks and include any missing final selections; they remain visible as gaps.</p></div>
+        <div><%= form.label :picks_evidence, 'Independent final draft source or reference', class: 'block font-medium' %><%= form.text_field :picks_evidence, value: fields['picks_evidence'], required: true, class: 'mt-1 block w-full rounded border p-2' %><p class="mt-1 text-sm text-gray-600">Record the final results URL, publication or reference you compared with the captured selections.</p></div>
+        <label class="flex items-start gap-2"><%= form.check_box :confirm_picks, { checked: fields['confirm_picks'] == '1', required: true, class: 'mt-1 rounded border' } %><span>I compared these pick numbers with independent final draft results.</span></label>
+      </fieldset>
+      <fieldset class="space-y-4"><legend class="text-lg font-semibold">Confirm the completed college season</legend>
+        <p>Regular-season and postseason totals must cover the full college season ending <%= @batch.season.year - 1 %>, excluding exhibitions. A successful response alone does not establish final coverage.</p>
+        <div><%= form.label :scope_evidence, 'Completed-season source or coverage note', class: 'block font-medium' %><%= form.text_field :scope_evidence, value: fields['scope_evidence'], required: true, class: 'mt-1 block w-full rounded border p-2' %><p class="mt-1 text-sm text-gray-600">Record how you verified final regular and postseason totals, and explain any selected no-postseason teams below.</p></div>
+        <label class="flex items-start gap-2"><%= form.check_box :confirm_scope, { checked: fields['confirm_scope'] == '1', required: true, class: 'mt-1 rounded border' } %><span>I verified these sources describe the completed regular season and postseason.</span></label>
+        <div class="rounded bg-gray-50 p-4 space-y-3"><h4 class="font-semibold">Teams that may have had no postseason</h4><p class="text-sm">Select a team only after independently verifying it did not participate. These candidates have known regular-season data and no production in either successful postseason source. Unselected teams stay unknown.</p>
+          <%= hidden_field_tag 'coverage[absent_postseason_team_ids][]', '' %>
+          <% if coverage.fetch('no_postseason_teams').empty? %><p class="text-sm">No eligible no-postseason candidates are established by these sources.</p><% end %>
+          <% coverage.fetch('no_postseason_teams').each do |candidate| %>
+            <% value = candidate.fetch('provider_team_id').to_s %>
+            <label class="flex items-start gap-2"><%= check_box_tag 'coverage[absent_postseason_team_ids][]', value, Array(fields['absent_postseason_team_ids']).map(&:to_s).include?(value), id: "coverage_absent_#{value}", class: 'mt-1 rounded border' %><span><%= departure_absence_label(candidate) %><%= ' · local team mapping unresolved' unless candidate['team_id'] %></span></label>
+          <% end %>
+        </div>
+      </fieldset>
+      <p class="text-sm text-gray-600">Saving reuses the exact retained responses without another fetch. It creates a new review attempt and clears saved player decisions and approval.</p>
+      <%= form.submit 'Save coverage and review players', class: 'rounded bg-prophet-indigo px-4 py-2 font-medium text-white hover:bg-prophet-indigo/80' %>
+    <% end %>
+  <% end %>
+</section>

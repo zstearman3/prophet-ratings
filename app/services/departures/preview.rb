@@ -35,6 +35,10 @@ module Departures
       Contract.unique!(keys, 'school player identities')
     end
 
+    def self.resolved_row?(row)
+      Contract::RESOLVED.include?(row.fetch('status')) && row.fetch('unknown_team_ids', []).empty?
+    end
+
     private
 
     attr_reader :dataset, :review, :identity
@@ -52,15 +56,18 @@ module Departures
     end
 
     def report(rows)
-      { 'dataset_revision' => dataset.fetch('dataset_revision'), 'reviewed_revision' => review.present? ? Contract.digest(review) : nil,
-        'draft_complete' => draft_complete?, 'coverage_complete' => coverage_complete?(rows),
-        'expected_selections' => dataset.fetch('expected_picks').size,
-        'accounted_selections' => rows.size, 'status_counts' => rows.group_by { |row| row.fetch('status') }.transform_values(&:size),
-        'failures' => dataset.fetch('failures'), 'selections' => rows }
+      result = { 'dataset_revision' => dataset.fetch('dataset_revision'),
+                 'reviewed_revision' => review.present? ? Contract.digest(review) : nil,
+                 'draft_complete' => draft_complete?, 'coverage_complete' => coverage_complete?(rows),
+                 'expected_selections' => dataset.fetch('expected_picks').size,
+                 'accounted_selections' => rows.size,
+                 'status_counts' => rows.group_by { |row| row.fetch('status') }.transform_values(&:size),
+                 'failures' => dataset.fetch('failures'), 'selections' => rows }
+      result.merge(dataset.slice('production_warnings'))
     end
 
     def coverage_complete?(rows)
-      draft_complete? && rows.all? { |row| Contract::RESOLVED.include?(row.fetch('status')) }
+      draft_complete? && rows.all? { |row| self.class.resolved_row?(row) }
     end
 
     def team_reports(rows)

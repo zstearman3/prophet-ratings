@@ -7,7 +7,8 @@
         "queued": "Acquisition queued; refresh to see worker progress.",
         "recovered": "Saved HTML retained in a successor attempt.",
         "published": "Reviewed departure inputs published. Model selection remains separate.",
-        "correction": "Correction draft opened using retained evidence; approval and acknowledgement cleared."
+        "correction": "Correction draft opened using retained evidence; approval and acknowledgement cleared.",
+        "coverage_saved": "Coverage saved from retained sources. Review player decisions before publishing."
       }
     }
   }

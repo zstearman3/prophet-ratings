@@ -1,14 +1,26 @@
-<section class="mx-auto max-w-5xl space-y-5 pb-12">
-  <h1 class="text-3xl font-bold">Departure batches</h1>
-  <% if @page[:error] %><p role="alert"><%= @page[:error] %></p><% end %>
-  <%= form_with url: admin_departure_batches_path, method: :get do |form| %>
-    <%= form.label :season_id, 'Target season' %><%= form.collection_select :season_id, Season.order(year: :desc), :id, :year, selected: @page[:season]&.id %><%= form.submit 'View season' %>
-  <% end %>
+<section class="mx-auto max-w-5xl space-y-8 pb-12">
+  <header class="space-y-3">
+    <h1 class="text-3xl font-bold">Departure batches</h1>
+    <p>Review annual NBA draft departures for your target season using saved source evidence.</p>
+    <% if notice %><p role="status" class="rounded bg-green-100 p-3"><%= notice %></p><% end %>
+    <% if @page[:error] %><p role="alert" class="rounded bg-red-100 p-3"><%= @page[:error] %></p><% end %>
+    <%= form_with url: admin_departure_batches_path, method: :get, class: 'flex flex-wrap items-end gap-3' do |form| %>
+      <div><%= form.label :season_id, 'Target season', class: 'block font-medium' %><%= form.collection_select :season_id, Season.order(year: :desc), :id, :year, { selected: @page[:season]&.id }, class: 'mt-1 rounded border p-2' %></div>
+      <%= form.submit 'View season', class: 'rounded border px-4 py-2 font-medium hover:bg-gray-100' %>
+    <% end %>
+    <% if @page[:season] %><%= link_to 'Back to offseason setup', admin_offseason_setup_path(season_id: @page[:season].id), class: 'text-blue-700 underline' %><% end %>
+  </header>
   <% if @page[:season] %>
-    <%= link_to 'Back to offseason setup', admin_offseason_setup_path(season_id: @page[:season].id) %>
-    <h2 class="text-xl font-semibold">Saved batches for <%= @page[:season].year %></h2>
-    <% Array(@page[:batches]).each do |batch| %><p><%= link_to "Batch ##{batch.id}: #{batch.status} · #{batch['acquisition_status'] || 'prepared'}", admin_departure_batch_path(batch) %></p><% end %>
-    <h2 class="text-xl font-semibold">Prepare a departure batch</h2>
-    <%= render 'preparation', preparation: @page[:preparation], season: @page[:season], destination: admin_departure_batches_path, verb: :post %>
+    <section class="rounded border p-5 space-y-4">
+      <h2 class="text-xl font-semibold">1. Fetch draft and college stats</h2>
+      <%= render 'capture', season: @page[:season], capture: @page[:capture] || {} %>
+    </section>
+    <section class="space-y-3">
+      <h2 class="text-xl font-semibold">Saved batches for <%= @page[:season].year %></h2>
+      <% if Array(@page[:batches]).empty? %><p>No saved batches for this season. Start with the fetch above.</p><% end %>
+      <% Array(@page[:batches]).each do |batch| %>
+        <p class="rounded border p-4"><%= link_to "Batch ##{batch.id} · #{batch.status.humanize}", admin_departure_batch_path(batch), class: 'text-blue-700 underline' %> · <%= departure_listing_status(batch) %></p>
+      <% end %>
+    </section>
   <% else %><p>Prepare a target season first.</p><% end %>
 </section>

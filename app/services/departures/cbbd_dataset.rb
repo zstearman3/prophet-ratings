@@ -5,6 +5,8 @@ module Departures
   class CbbdDataset
     VERSION = 'draft-departures-v2'
     EXTRACTION = 'cbbd-draft-season-totals-v1'
+    REPORTED_TOTALS_EXTRACTION = 'cbbd-draft-season-totals-v2'
+    AUTOMATIC_EXTRACTION = 'cbbd-draft-season-totals-v4'
     SCOPES = %w[regular postseason].freeze
 
     def initialize(manifest:, directory:)
@@ -40,12 +42,55 @@ module Departures
     end
 
     def self.validate_plan(plan)
-      Contract.check!(plan.values_at('provider', 'schema', 'extraction_version') == ['cbbd', VERSION, EXTRACTION],
+      Contract.check!(plan.values_at('provider', 'schema') == ['cbbd', VERSION] && supported_extraction?(plan['extraction_version']),
                       'Unsupported departure provider/schema/extraction contract')
       AnnualDataset.validate_picks(plan.fetch('expected_picks'))
-      Contract.text!(plan.fetch('scope_evidence'), 'reviewed final scope evidence')
+      validate_scope(plan)
       validate_limits(plan)
       validate_absences(plan)
+    end
+
+    def self.validate_scope(plan)
+      if automatic?(plan)
+        validate_automatic(plan)
+      else
+        Contract.text!(plan.fetch('scope_evidence'), 'reviewed final scope evidence')
+      end
+    end
+
+    def self.supported_extraction?(version)
+      version == EXTRACTION || reported_totals?('extraction_version' => version)
+    end
+
+    def self.reported_totals?(settings)
+      settings['extraction_version'] == REPORTED_TOTALS_EXTRACTION || automatic?(settings)
+    end
+
+    def self.automatic?(settings)
+      ['cbbd-draft-season-totals-v3', AUTOMATIC_EXTRACTION].include?(settings['extraction_version'])
+    end
+
+    def self.optional_postseason_players?(settings)
+      settings['extraction_version'] == AUTOMATIC_EXTRACTION
+    end
+
+    def self.validate_automatic(plan)
+      Contract.check!(plan.fetch('scope_evidence') == { 'policy' => DraftTeamSnapshot::POLICY }, 'Invalid automatic scope policy')
+      Contract.check!(plan.fetch('draft_policy') == 'confirmed_retained_results', 'Invalid draft confirmation policy')
+      validate_team_matches(plan.fetch('team_matches'))
+    end
+
+    def self.validate_team_matches(matches)
+      Contract.check!(matches.is_a?(Array), 'Invalid prior-season team scope')
+      Contract.unique!(matches.pluck('provider_team_id'), 'prior-season provider teams')
+      matches.each { |entry| validate_team_match(entry) }
+    end
+
+    def self.validate_team_match(entry)
+      Contract.integer!(entry.fetch('provider_team_id'), 'provider team ID', minimum: 1)
+      Contract.integer!(entry.fetch('team_id'), 'team ID', minimum: 1)
+      prior_id = entry['prior_team_season_id']
+      Contract.integer!(prior_id, 'prior TeamSeason', minimum: 1) if prior_id
     end
 
     def self.validate_absences(plan)
@@ -113,6 +158,7 @@ module Departures
 
     def build(parsed)
       facts = manifest.except('dataset_revision').merge(normalized(parsed))
+      facts['production_warnings'] = CbbdProduction.warnings(facts.fetch('production')) if self.class.reported_totals?(manifest)
       facts.merge('dataset_revision' => Contract.digest(facts))
     end
 

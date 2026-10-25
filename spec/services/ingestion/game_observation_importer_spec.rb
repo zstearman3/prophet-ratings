@@ -99,6 +99,182 @@ RSpec.describe Ingestion::GameObservationImporter do
      GameObservation.where(game:, accepted: true).order(:id).map(&:attributes)]
   end
 
+  describe 'CBBD opponents outside rated membership' do
+    let(:payload) do
+      canonical_payload.deep_merge(provider: 'cbbd', home: { external_team_id: 'home' },
+                                   away: { name: 'Visiting College', external_team_id: 'visitor' })
+    end
+
+    before { TeamExternalIdentity.associate!(team: home_team, provider: 'cbbd', external_id: 'home') }
+
+    it 'keeps a named completed result with only its tracked side and no model inputs' do
+      report = ingest
+      expect(report).to include(outcome: 'final', accepted: true)
+      game = Game.find(report.fetch(:game_id))
+      expect(game).to have_attributes(status: 'final_unmatched', away_team_name: 'Visiting College',
+                                      home_team_score: 100, away_team_score: 90, possessions: nil, minutes: nil)
+      expect(game.home_team_game).to have_attributes(team_season: home_team_season, points: 100, opponent_team_season: nil)
+      expect(game.away_team_game).to be_nil
+      expect(Game.final).not_to include(game)
+    end
+
+    it 'keeps confirmed score-only results without fabricating missing raw counts' do
+      values = payload.deep_dup
+      values[:home][:stats] = { points: 100 }
+      values[:away][:stats] = {}
+      game = Game.find(ingest(values).fetch(:game_id))
+      expect(game).to be_final_unmatched
+      expect(game.home_team_game).to have_attributes(points: 100, field_goals_made: nil, minutes: nil)
+      expect(game.away_team_game).to be_nil
+    end
+
+    it 'still rejects checkable inconsistencies in otherwise incomplete boxes' do
+      values = payload.deep_dup
+      values[:away][:stats] = { points: 90, two_pt_made: 20, three_pt_made: 10, free_throws_made: 18 }
+      expect(ingest(values)).to include(outcome: 'invalid')
+      expect(Game.count).to eq(0)
+    end
+
+    it 'checks the score against supplied scoring components even when points are missing' do
+      values = payload.deep_dup
+      values[:away][:stats] = { two_pt_made: 20, three_pt_made: 10, free_throws_made: 18 }
+      expect(ingest(values)).to include(outcome: 'invalid', reason: 'away score does not equal scoring component total')
+      expect(Game.count).to eq(0)
+    end
+
+    it 'holds a local named team without reviewed external identity even outside the season' do
+      away_team_season.destroy!
+      result = ingest(payload.deep_merge(away: { name: away_team.school }))
+      expect(result).to include(outcome: 'unmatched', reason: 'unmapped_external_team_identity')
+      expect(Game.count).to eq(0)
+    end
+
+    it 'keeps a tracked away team when the home opponent is unknown' do
+      swapped = payload.merge(home: payload[:away], away: payload[:home])
+      game = Game.find(ingest(swapped).fetch(:game_id))
+      expect(game).to have_attributes(status: 'final_unmatched', home_team_score: 90, away_team_score: 100)
+      expect(game.home_team_game).to be_nil
+      expect(game.away_team_game.team_season).to eq(home_team_season)
+    end
+
+    it 'rejects malformed partial opponent counts even on an otherwise identical repeat' do
+      game = Game.find(ingest.fetch(:game_id))
+      original = game.attributes
+      values = payload.deep_dup
+      values[:away][:stats] = { points: 999 }
+      expect(ingest(values)).to include(outcome: 'invalid', reason: 'away score does not equal points')
+      expect(game.reload.attributes).to eq(original)
+    end
+
+    it 'does not create identities, teams or forecasts for the unknown opponent' do
+      version = create(:ratings_config_version)
+      game = Game.find(ingest.fetch(:game_id))
+      expect(game.generate_prediction!(ratings_config_version: version)).to be_nil
+      expect(Team.count).to eq(2)
+      expect(TeamSeason.count).to eq(2)
+      expect(TeamExternalIdentity.count).to eq(1)
+      expect(Prediction.count).to eq(0)
+    end
+
+    it 'imports repeats without duplicate games or side writes' do
+      game = Game.find(ingest.fetch(:game_id))
+      original = [game.attributes, game.home_team_game.attributes]
+      expect(ingest).to include(outcome: 'unchanged', game_id: game.id)
+      expect([game.reload.attributes, game.home_team_game.reload.attributes]).to eq(original)
+      expect([Game.count, TeamGame.count, GameExternalIdentity.count]).to eq([1, 1, 1])
+    end
+
+    it 'retains future fixtures with a named opponent and no result statistics' do
+      result = ingest(payload.merge(source_status: 'scheduled', source_completed: false))
+      game = Game.find(result.fetch(:game_id))
+      expect(game).to be_scheduled
+      expect(game.away_team_game).to be_nil
+      expect(game.home_team_game.points).to be_nil
+    end
+
+    it 'supports a known team that is outside the selected season membership' do
+      away_team_season.destroy!
+      TeamExternalIdentity.associate!(team: away_team, provider: 'cbbd', external_id: 'visitor')
+      game = Game.find(ingest(payload.deep_merge(away: { name: away_team.school })).fetch(:game_id))
+      expect(game).to be_final_unmatched
+      expect(game.away_team_game).to be_nil
+    end
+
+    it 'keeps unreviewed external identities for local tracked teams held' do
+      result = ingest(payload.deep_merge(away: { name: away_team.school }))
+      expect(result).to include(outcome: 'unmatched', reason: 'unmapped_external_team_identity')
+      expect(Game.count).to eq(0)
+    end
+
+    it 'keeps ambiguous local names held even without an external mapping' do
+      create(:team_alias, team: home_team, value: 'Visiting College', source: 'reviewed')
+      create(:team_alias, team: away_team, value: 'Visiting College', source: 'reviewed-second')
+      expect(ingest).to include(outcome: 'ambiguous')
+      expect(Game.count).to eq(0)
+    end
+
+    it 'requires at least one selected-season participant' do
+      home_team_season.destroy!
+      expect(ingest).to include(outcome: 'unmatched', reason: 'missing_team_season')
+      expect(Game.count).to eq(0)
+    end
+
+    it 'still rejects inconsistent totals on the unknown side atomically' do
+      expect(ingest(payload.deep_merge(away: { stats: { field_goals_made: 32 } }))).to include(outcome: 'invalid')
+      expect([Game.count, TeamGame.count, GameExternalIdentity.count]).to eq([0, 0, 0])
+      expect(GameObservation.last).to have_attributes(accepted: false, outcome: 'invalid')
+    end
+
+    it 'does not replace an existing linked participant with a name-only opponent' do
+      TeamExternalIdentity.associate!(team: away_team, provider: 'cbbd', external_id: 'away')
+      first = ingest(payload.deep_merge(away: { name: away_team.school, external_team_id: 'away' }))
+      expect(ingest(payload.merge(source_updated_at: '2025-01-03T12:00:00Z'))).to include(outcome: 'conflict')
+      expect(Game.find(first.fetch(:game_id)).away_team_game.team).to eq(away_team)
+    end
+
+    it 'does not silently replace the source identity of a name-only opponent' do
+      game = Game.find(ingest.fetch(:game_id))
+      expect(ingest(payload.deep_merge(source_updated_at: '2025-01-03T12:00:00Z',
+                                       away: { external_team_id: 'different' }))).to include(outcome: 'conflict')
+      expect(game.reload.away_team_name).to eq('Visiting College')
+    end
+
+    it 'does not bootstrap separate visiting opponents onto the same known team game' do
+      first = ingest
+      next_game = payload.deep_merge(external_game_id: '002', source_url: 'https://example.test/002',
+                                     away: { name: 'Other College', external_team_id: 'other' })
+      second = ingest(next_game)
+      expect(second).to include(outcome: 'final')
+      expect(second[:game_id]).not_to eq(first[:game_id])
+      expect(Game.count).to eq(2)
+    end
+
+    it 'requires source freshness before changing an accepted unmatched result' do
+      game = Game.find(ingest.fetch(:game_id))
+      correction = payload.deep_merge(source_updated_at: nil,
+                                      home: { score: 102, stats: { points: 102, two_pt_made: 25, field_goals_made: 36 } })
+      expect(ingest(correction)).to include(outcome: 'conflict', reason: 'unknown_source_freshness')
+      expect(game.reload.home_team_score).to eq(100)
+    end
+
+    it 'requires ordered source evidence for venue corrections on unmatched results' do
+      game = Game.find(ingest.fetch(:game_id))
+      correction = payload.merge(source_updated_at: nil, venue: { venue_type: 'neutral', neutral: true,
+                                                                  venue_source: 'cbbd', venue_confidence: 'confirmed' })
+      expect(ingest(correction)).to include(outcome: 'conflict', reason: 'unknown_source_freshness')
+      expect(game.reload.venue_type).to eq('unknown')
+    end
+
+    it 'promotes the same game after explicit identity and membership reconciliation' do
+      game = Game.find(ingest.fetch(:game_id))
+      away_team.update!(school: 'Visiting College')
+      TeamExternalIdentity.associate!(team: away_team, provider: 'cbbd', external_id: 'visitor')
+      expect(ingest).to include(outcome: 'final', game_id: game.id)
+      expect(game.reload).to be_final
+      expect(game.away_team_game.team_season).to eq(away_team_season)
+    end
+  end
+
   shared_examples 'canonical persistence' do
     it 'stores raw evidence once for accepted, unchanged and rejected attempts' do
       raw = { exact: ['evidence', nil] }

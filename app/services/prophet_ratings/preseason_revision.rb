@@ -45,7 +45,7 @@ module ProphetRatings
         included_team_ids: rows.pluck(:team_id), teams: rows,
         baselines: { before: season.attributes.slice(*baselines.keys), after: baselines }
       }
-      report.merge(preview_key: Digest::SHA256.hexdigest(self.class.canonical_json(report.as_json).to_json))
+      report.merge(preview_key: Departures::Contract.digest(report.as_json))
     end
 
     def validate_revision_identity
@@ -61,11 +61,12 @@ module ProphetRatings
     end
 
     def preview_rows
-      calculator = PreseasonRatingsCalculator.new(season, ratings_config_version: ratings_config_version)
+      calculator = PreseasonRatingsCalculator.new(season, ratings_config_version: ratings_config_version,
+                                                          reviewed_revisions:)
       season.rating_team_seasons.order(:team_id).map do |row|
-        row.team_offseason_profile&.validate_revision_evidence
+        calculator.validate_profile(row)
         inputs = calculator.preview_inputs(row).as_json
-        PreseasonReportBuilder.new(row, inputs, ratings_config_version.config, prior: row.preseason_prior).call
+        PreseasonReportBuilder.new(row, inputs, ratings_config_version.config, prior: PreseasonReportBuilder.prior_for_report(row)).call
       end
     end
 
@@ -113,8 +114,12 @@ module ProphetRatings
     end
 
     public_class_method def self.matching_capture?(captures, row)
-      capture = captures.find_by(team_season_id: row.fetch(:team_season_id))
-      capture && capture.inputs == row.fetch(:inputs) && capture.outputs == row.fetch(:outputs_after)
+      capture = PreseasonPrior.uncached { captures.find_by(team_season_id: row.fetch(:team_season_id)) }
+      return false unless capture
+
+      normalizer = ReviewedInputRevisions
+      normalizer.compact_inputs(capture.inputs) == normalizer.compact_inputs(row.fetch(:inputs)) &&
+        capture.outputs == row.fetch(:outputs_after)
     end
 
     public_class_method def self.proposed_baselines(rows)

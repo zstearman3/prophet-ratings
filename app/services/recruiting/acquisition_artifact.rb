@@ -15,7 +15,7 @@ module Recruiting
         'source_url' => HtmlPage.source_url(@source.year), 'source_as_of' => nil,
         'source_as_of_reason' => 'Displayed source update text retained per page; timezone not independently verified',
         'snapshot_kind' => 'raw_html_bundle', 'snapshot_location' => 'RecruitingBatch.snapshot_bytes (base64 exact page bytes)',
-        'extraction_version' => Extract::VERSION, 'html_parser_version' => 1,
+        'extraction_version' => Extract::VERSION, 'html_parser_version' => 2,
         'coverage_note' => "#{pages.size} pages captured, #{rows.size} rows; next page: #{@source.next_url || 'none advertised'}; " \
                            'annual completeness not independently verified',
         'pages' => pages.map { |page| page.except('html_base64') }, 'failure' => @source.failure, 'rows' => rows

@@ -65,14 +65,14 @@ RSpec.describe SeasonMembershipReview, :cbbd do
       .to raise_error(ArgumentError, /Local roster/)
   end
 
-  it 'never falls back to labels for unknown school IDs and guards school import' do
+  it 'proposes unique label matches for unknown IDs but requires saving them before roster approval' do
     source['source_rows'].first[:team_external_id] = '999'
     source['source_rows'].first[:team_name] = team.school
     refresh
-    expect(season.membership_proposal['issues'].join).to include('999')
-    expect(season.membership_proposal['rows'].sole['choice']).to eq('unresolved')
+    expect(season.membership_proposal['issues']).to be_empty
+    expect(season.membership_proposal['rows'].sole['choice']).to eq(conference.id.to_s)
     expect { SeasonSchoolImport.new(season).preview('proposal_key' => review.proposal_key) }.to raise_error(ArgumentError, /manual/i)
-    expect { review.apply(submission, reviewer: 'admin') }.to raise_error(ArgumentError, /Resolve source identities/)
+    expect { review.apply(submission, reviewer: 'admin') }.to raise_error(ArgumentError, /Save CBBD identity matches/)
   end
 
   it 'retains unknown source schools until explicit manual setup and a fresh fetch' do

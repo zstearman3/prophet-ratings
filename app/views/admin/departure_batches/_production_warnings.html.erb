@@ -1,0 +1,26 @@
+<% if warnings.any? %>
+  <div data-points-reconciliation class="rounded border border-yellow-300 bg-yellow-50 p-4 space-y-3">
+    <p class="font-semibold"><%= pluralize(warnings.size, 'difference') %> between player and team totals</p>
+    <p>We use CBBD's reported team total to calculate the share of points lost, with each drafted player's reported points. These differences are informational and do not prevent publication. No new fetch is needed for this warning.</p>
+    <details>
+      <summary class="cursor-pointer font-medium">View points differences</summary>
+      <div class="mt-3 overflow-x-auto rounded border bg-white">
+        <table class="w-full text-left text-sm">
+          <caption class="p-3 text-left">Difference = known player subtotal minus reported team total. Missing player points still leave coverage incomplete.</caption>
+          <thead class="bg-gray-100"><tr><th class="p-3">Team</th><th class="p-3">Scope</th><th class="p-3">Known player subtotal</th><th class="p-3">Reported team total</th><th class="p-3">Difference</th></tr></thead>
+          <tbody class="divide-y">
+            <% warnings.each do |warning| %>
+              <tr>
+                <td class="p-3"><%= warning['team_name_source'] %> <span class="text-gray-600">(CBBD <%= warning['provider_team_id'] %>)</span></td>
+                <td class="p-3"><%= warning['scope'] == 'regular' ? 'Regular season' : 'Postseason' %></td>
+                <td class="p-3"><%= warning['known_player_points_subtotal'] %><%= ' · incomplete' unless warning['all_player_points_known'] %></td>
+                <td class="p-3"><%= warning['team_points'] %></td>
+                <td class="p-3"><%= warning['difference'] %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </details>
+  </div>
+<% end %>

@@ -8,15 +8,47 @@ or imports/backfills game data. A general local player/stat store is future work
 ## Saved admin workflow
 
 From **Offseason setup → Review departure batches**, select a target season with
-prepared team memberships. Save the explicit draft/prior/target years, actual
-expected picks (omit rescinded picks), and reviewed final-scope evidence. Do not
-assume every draft has 60 picks. No URLs, HTML uploads, JSON plans or hashes are
-needed for a new browser batch.
+prepared team memberships. The browser derives the years: target season ending
+2026 uses the 2025 NBA draft and college season ending 2025. Select **Fetch draft
+and college stats** to create a saved batch and queue its first bounded capture in
+one action. Viewing or refreshing a page never creates a batch or fetches data.
+Request/retry limits are under **Advanced settings**; no coverage assertions are
+required before seeing the sources.
 
 Set `CBBD_API_KEY` in the worker's runtime environment (locally in ignored
 `.env.docker` when needed). Never put the key in preparation, job arguments, source
-files or logs. Run the existing GoodJob worker, then queue acquisition and refresh
-status. The five generated logical requests are:
+files or logs. Run the existing GoodJob worker and refresh the batch page to check
+its queued/running/failed status. Web-only startup leaves the capture queued.
+
+A successful raw capture displays **Confirm draft results and college teams**.
+Review the drafted players and their matched college teams, then check the single
+confirmation and select **Publish departure inputs**. Pick numbers are displayed
+as source data, not entered or separately certified. There are no completed-season
+attestations, no-postseason checkboxes, accounting categories or evidence forms.
+Production and lost-points shares are calculated automatically from CBBD.
+
+Players without a match to a team with a prior-season `TeamSeason` are shown as
+**Skipped**. This includes international/lower-division players and teams outside
+the tracked prior season. Skipped players do not make other teams' estimates
+unknown. **Stats unavailable** means a matched college player's production is
+incomplete; only that team's estimate remains unknown. Use **Correct a college
+team mapping** if a mapping is wrong, then refresh the review.
+
+Viewing the page does not save decisions, publish inputs or call CBBD. The final
+confirmation creates a new immutable attempt from the same retained bytes,
+freezes the prior-season membership/mapping scope and calculated decisions, and
+publishes through the existing input-import transaction. A stale review is
+rejected if evidence, relevant membership, mappings or publication state changed.
+Published results stay frozen. No ratings job runs automatically.
+
+Use **Fetch sources again** only when updated responses are needed. Source
+downloads, previous attempts and the HTTP ledger remain under **Source details
+and attempt history**. Failed or malformed sources remain blocking and are never
+treated as zero. Existing manually prepared strict-v1/v2 file/API workflows and
+historical HTML review retain their original contracts; the simplified browser
+flow uses extraction `cbbd-draft-season-totals-v4`.
+
+The five generated logical requests are:
 
 - `/draft/picks?year=Y`
 - `/stats/player/season?season=Y&seasonType=regular`
@@ -54,66 +86,64 @@ Failures/earlier attempts are never relabelled or erased.
 
 ## Review identities, scope and missingness
 
-Every parsed actual pick in both rounds remains visible with its original name,
-affiliation, pick/round and nullable provider IDs. CBBD `athleteId` joins exactly
-to all captured prior-season player/team rows. Names and affiliation alone never
-establish player identity. `sourceTeamCollegeId` is distinct from the draft source
-team's own ID. Missing athlete/team identities remain unknown.
+Every returned draft selection remains visible with its source name, affiliation,
+pick/round and provider IDs. The browser's single confirmation approves this
+returned player list and college matching. The application trusts the captured
+CBBD snapshot for this estimate; it does not claim an independently certified
+final draft or completed season. An empty draft response is not publishable.
 
-Eligible stints require exact existing `TeamExternalIdentity(provider: cbbd,
-external_id: teamId)` mappings. Use the linked CBBD review workflow to resolve
-mappings; selecting another local team cannot override a durable provider mapping.
-No automatic teams, aliases, player records or identity writes occur here. Review
-all evidenced prior-season team stints, using each team's independent denominator.
+V4 matches exact CBBD athlete IDs to captured prior-season player/team rows and
+existing `TeamExternalIdentity(provider: cbbd, external_id: teamId)` mappings.
+When the draft athlete ID is null, a unique normalized full-name match within the
+same CBBD college may propose an existing captured athlete ID. The UI identifies
+that match method and retains the original draft row/nullable ID. Ambiguous names
+or contradictory nonnull IDs are not silently replaced. No new players, teams,
+aliases or provider identities are created here.
 
-The accounting categories remain eligible, verified no-college, verified
-nonparticipant, outside-prior-season, unknown participation, unknown production,
-unresolved identity and conflicting evidence. These CBBD endpoints do not provide
-positive evidence for the three resolved exclusion categories. New CBBD decisions
-cannot turn missing rows, a null athlete ID or club affiliation into a verified
-exclusion; retain an unknown category and acknowledge permitted gaps. Historical
-HTML decisions retain their original evidence-backed exclusion behavior.
+Only matches to teams with a prior-season `TeamSeason` affect the model. That
+scope is frozen with the reviewed input; scoring does not consult transient
+membership state. Rows outside it use the automatic scoped `outside_prior_season`
+decision and appear as **Skipped**, without a global unknown penalty.
 
-Regular and postseason full-player points must reconcile to the independent team
-points **within each scope before merging**. Thus 110/100 regular and 90/100
-postseason cannot cancel into an apparently valid season. Duplicate scope keys,
-wrong seasons, conflicting labels, invalid/fractional/negative points or games,
-nonfinite minutes and inconsistent denominators are hard failures.
-Null provider points remain unknown production, while negative/fractional or
-conflicting numeric points remain hard failures. An independent known team
-denominator is retained even when a player's points are unknown.
-Integral numeric values such as `12.0` normalize to 12; original JSON values remain
-retained. Player minutes may be fractional and are audit-only. Team `totalMinutes`
-is game-clock minutes, may be null, and is never substituted for player-minutes.
-The full-team player-minute sum comes from the player rows.
+The loss remains sum of drafted players' reported points / independent team
+season points. Full-roster differences are informational warnings, with neither
+reported value adjusted. Null/missing points for a matched player or a missing
+team denominator remain unknown; known subtotals are never extrapolated. The sum
+of included drafted points cannot exceed the common team denominator.
 
-A missing scope/player row is absence, not a fabricated zero. A missing player in
-a scope where the team has production keeps that player's season incomplete.
-For a team with legitimately no postseason, enter its exact CBBD team ID in the
-optional no-postseason field **only with reviewed final-scope evidence** explaining
-that absence. Both postseason requests must still have succeeded, and neither may
-contain production for that team. This assertion cannot excuse a missing player
-when team postseason production exists. Successful empty responses never prove a
-zero draft or complete missing participation. Zero-point positive-games players
-remain eligible when their scopes are complete.
+Regular and postseason totals are combined automatically. When both postseason
+requests succeed and neither contains a team's production, v4 treats that team as
+having no additional postseason production. This is an explicit provider-data
+assumption, not an operator certification. A failed request never establishes
+absence. Under v4, a player absent from successful postseason responses contributes
+no additional postseason points, even when the team played postseason games.
+Their observed regular-season points remain included against the full regular-plus-
+postseason team total. No synthetic player row is created. Explicit null points
+or missing regular-season player rows remain unknown. Zero-point players with
+observed participation remain eligible.
 
-Save category, reason, evidence choices and stints separately from approval.
-Fill the blank stint and save to add another. Numeric facts remain read-only.
-The loss is unchanged: sum of drafted prior-season player points / full-team
-season points. Known subtotals are never extrapolated. Unknown production for exactly mapped prior-season teams remains local to all
-those teams; any unmapped stint or unknown participation keeps
-all teams' loss unknown. Complete accounting with no eligible loss yields verified
-zero; missing/partial coverage stays null.
+Invalid/fractional/negative points or games, duplicate keys, wrong years,
+conflicting labels, nonfinite minutes and inconsistent denominators remain hard
+failures. Team game-clock minutes are audit-only, not player-minute denominators.
+Integral numeric values normalize to integers; original JSON remains retained.
 
-Review the saved report and explicitly approve. Permitted gaps require an
-acknowledgement of the exact displayed gaps with authenticated reviewer/time.
-Failed/corrupt sources, conflicts and invalid facts cannot be acknowledged away.
-Changed preparation, evidence, decisions, current provider mappings, aliases,
-memberships, profiles or latest revisions require fresh review. Publication
-revalidates retained bytes/current mappings under the existing locks and import
-transaction. Failure preserves current inputs. Identical publication retries
-return the same revision without rewinding pointers. Corrections create successors
-with fresh approval and acknowledgement.
+Earlier extraction v1 retains strict roster reconciliation. Extraction v2 retains
+its informational reconciliation warnings plus explicit reviewed scope/absence
+requirements. Extraction v3 retains its original requirement for a player row in every observed
+team scope. Saved evidence and frozen scoring results remain unchanged.
+Legacy/manual reviews keep their explicit categories, reasons and gap approvals;
+the current browser review does not ask operators to fill those fields.
+
+Review fingerprints use capture metadata and the normalized dataset revision;
+publication still verifies retained source bytes and normalized facts. Canonical
+hashes stream sorted JSON, and evidence-file serialization sorts during generation,
+avoiding full copies of the evidence tree. Publication reuses the loaded attempt
+and its verified dataset only inside the locked transaction.
+
+Publication revalidates retained bytes and current mappings under the existing
+locks and transaction. Failures preserve current inputs; identical publication
+retries return the same revision. Corrections create a new draft for fresh
+results/team confirmation without replacing the earlier evidence.
 
 ## Retention and compatibility
 
@@ -122,12 +152,14 @@ these attempts and immutable published revisions in private backups. Downloads
 are admin-only `text/plain` attachments with the original source-kind extension;
 response content is never executed as app HTML.
 
-New evidence uses `draft-departures-v2` / `cbbd-draft-season-totals-v1`, typed
-`cbbd/athlete/ID` identities and `cbbd/team/ID` production keys. Normalized annual
-inputs are the stable seam a future local stat store can supply. Scoring captures
-retain the explicit v2 schema/extraction/provider discriminator. Missing schema
-means historical v1; provider identities cannot be smuggled into that contract.
-No scoring, review or publication path fetches live sources.
+Raw browser captures use `draft-departures-capture-v1` and are not independently
+publishable. The results/team confirmation creates a `draft-departures-v2`
+successor with extraction `cbbd-draft-season-totals-v4`, typed provider identities,
+the frozen rating scope and retained source bytes. Earlier extraction v1/v2/v3
+remain supported. Normalized annual inputs are the seam a future local stat store
+can supply. Scoring captures retain schema/extraction/provider identity; missing
+schema means historical v1, which cannot contain provider identities. Review,
+publication and scoring never fetch live sources.
 
 Historical `draft-departures-v1` / `nba-results-sidearm-totals-v1` manifests,
 HTML parsers, reviews, published revisions and frozen scoring outputs remain
@@ -180,3 +212,8 @@ A reviewed file retains the existing approval shape (`revision_id`, exact
 local `team_id` and captured `identity_evidence_source_ids`; they never fabricate
 player URLs. The saved dataset/review and all retained responses are required for
 offline import. Historical files keep their original URL/source-ID fields.
+
+Published draft/team pages read a compact SQL projection of the frozen revision.
+They do not load acquisition response bodies, replay source captures, or deserialize
+raw scope rows just to display results. The immutable revision and retained-source
+downloads remain unchanged; publication and corrections still validate full evidence.

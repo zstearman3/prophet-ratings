@@ -34,13 +34,26 @@ module Recruiting
 
     # Retain original validation evidence; an approved internal mapping can resolve a missing external ID.
     def self.review_errors(row)
-      source_errors = row.fetch('errors')
-      return source_errors unless missing_provider_id?(row['raw'])
+      resolved = missing_provider_id?(row['raw']) ? [MISSING_PROVIDER_ID_ERROR] : []
+      if excluded_unranked?(row)
+        resolved += ['team_label: preserve nonempty source identity', 'team_url: preserve nonempty source identity',
+                     'rank: requires positive integer']
+      end
 
-      source_errors - [MISSING_PROVIDER_ID_ERROR]
+      row.fetch('errors') - resolved
+    end
+
+    # 247 also lists unlinked schools at rank zero. They may be omitted explicitly, never imported as ranked inputs.
+    def self.excluded_unranked?(row)
+      raw = row['raw']
+      return false unless row['excluded'] == true && missing_provider_id?(raw)
+
+      raw['team_url'].is_a?(NilClass) && normalized(raw['rank']) == '0.0' &&
+        [NilClass, String].include?(raw['team_label'].class)
     end
 
     def self.review_warnings(row)
+      return ['Unlinked, unranked source entry excluded; original evidence retained.'] if excluded_unranked?(row)
       return [] if review_errors(row) == row.fetch('errors')
 
       [MISSING_PROVIDER_ID_WARNING]

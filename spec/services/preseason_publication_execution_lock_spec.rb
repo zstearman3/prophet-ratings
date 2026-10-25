@@ -42,6 +42,8 @@ RSpec.describe PreseasonPublicationExecution do
     PreseasonPublication.select_model(season, model)
     Season.with_ratings_lock { ProphetRatings::PreseasonInitializer.new(season, ratings_config_version: model).call }
     review = PreseasonPublication.review!(season.reload, reviewer: admin, mode: 'initialize')
+    PreviewPreseasonJob.perform_now(review.id)
+    review.reload
     allow(PublishPreseasonJob).to receive(:perform_later).and_return(true)
     PreseasonPublicationQueue.new(review, actor: admin, fingerprint: review.fingerprint, acknowledge: '1').call
     expect(other_connection_lock_available?).to be(true)
@@ -64,6 +66,8 @@ RSpec.describe PreseasonPublicationExecution do
     CoachingReview.create!(year: 2098, ready: true)
     PreseasonPublication.select_model(season, model)
     review = PreseasonPublication.review!(season, reviewer: admin, mode: 'initialize')
+    PreviewPreseasonJob.perform_now(review.id)
+    review.reload
     request_connection = ActiveRecord::Base.connection.select_value('SELECT pg_backend_pid()')
     worker_connection = nil
     allow(PublishPreseasonJob).to receive(:perform_later) do |publication_id|

@@ -12,6 +12,8 @@ module ReadinessFixture
     SeasonParticipationReview.new(season).apply(document)
     PreseasonPublication.select_model(season, model)
     publication = PreseasonPublication.review!(season, reviewer: admin, mode: 'initialize')
+    PreviewPreseasonJob.perform_now(publication.id)
+    publication.reload
     PreseasonPublicationQueue.new(publication, actor: admin, fingerprint: publication.fingerprint, acknowledge: '1').call
     PreseasonPublicationExecution.new(publication).call
     raise publication.reload.error_message unless publication.status == 'published'

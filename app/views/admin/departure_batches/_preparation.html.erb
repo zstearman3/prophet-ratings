@@ -1,13 +1,13 @@
 <%= form_with url: destination, scope: :preparation, method: verb, data: { turbo: false }, class: 'space-y-3' do |form| %>
   <%= hidden_field_tag :season_id, season.id %>
   <% { 'draft_year' => 'Draft year', 'prior_season_year' => 'Prior season ending year', 'target_year' => 'Target ending year' }.each do |key, label| %>
-    <div><%= form.label key, label %> <%= form.number_field key, value: preparation[key], required: true %></div>
+    <div><%= form.label key, label %> <%= form.number_field key, value: preparation[key], required: true, class: 'mt-1 block w-full rounded border p-2' %></div>
   <% end %>
-  <div><%= form.label :expected_picks, 'Actual expected picks (comma or space separated; omit rescinded picks)' %><%= form.text_field :expected_picks, value: preparation['expected_picks'], required: true, class: 'block w-full border' %></div>
+  <div><%= form.label :expected_picks, 'Actual expected picks (comma or space separated; omit rescinded picks)' %><%= form.text_field :expected_picks, value: preparation['expected_picks'], required: true, class: 'mt-1 block w-full rounded border p-2' %></div>
   <p>New acquisitions use CBBD draft picks and full prior-season player/team totals. Five requests cover draft, regular season and postseason. Missing coverage remains unknown; there is no HTML fallback.</p>
-  <div><%= form.label :scope_evidence, 'Reviewed final scope evidence (regular and postseason complete, no exhibitions)' %><%= form.text_field :scope_evidence, value: preparation['scope_evidence'], required: true, class: 'block w-full border' %></div>
-  <div><%= form.label :absent_postseason_team_ids, 'CBBD team IDs verified to have no postseason (optional; explain evidence above)' %><%= form.text_field :absent_postseason_team_ids, value: preparation['absent_postseason_team_ids'], class: 'block w-full border' %></div>
-  <div><%= form.label :max_requests, 'Total HTTP request budget, including retries (1–100)' %><%= form.number_field :max_requests, value: preparation['max_requests'], min: 1, max: 100, required: true %></div>
-  <div><%= form.label :retries, 'Retries per source (0–5), sharing the total budget' %><%= form.number_field :retries, value: preparation['retries'], min: 0, max: 5, required: true %></div>
-  <%= form.submit 'Save preparation', class: 'border p-2' %>
+  <div><%= form.label :scope_evidence, 'Reviewed final scope evidence (regular and postseason complete, no exhibitions)' %><%= form.text_field :scope_evidence, value: preparation['scope_evidence'], required: true, class: 'mt-1 block w-full rounded border p-2' %></div>
+  <div><%= form.label :absent_postseason_team_ids, 'CBBD team IDs verified to have no postseason (optional; explain evidence above)' %><%= form.text_field :absent_postseason_team_ids, value: preparation['absent_postseason_team_ids'], class: 'mt-1 block w-full rounded border p-2' %></div>
+  <div><%= form.label :max_requests, 'Total HTTP request budget, including retries (1–100)' %><%= form.number_field :max_requests, value: preparation['max_requests'], min: 1, max: 100, required: true, class: 'mt-1 block w-full rounded border p-2' %></div>
+  <div><%= form.label :retries, 'Retries per source (0–5), sharing the total budget' %><%= form.number_field :retries, value: preparation['retries'], min: 0, max: 5, required: true, class: 'mt-1 block w-full rounded border p-2' %></div>
+  <%= form.submit 'Save preparation', class: 'rounded bg-prophet-indigo px-4 py-2 text-white' %>
 <% end %>

@@ -17,6 +17,22 @@ RSpec.describe PreseasonPublicationPreview do
     expect([PreseasonPrior.count, TeamRatingSnapshot.count, first.reload.adj_pace]).to eq([0, 0, nil])
   end
 
+  it 'projects saved presentation without replay operands while preserving provenance and values' do
+    report = described_class.new(season, ratings_config_version: version, mode: 'initialize').call
+    row = report['teams'].first
+    row['inputs']['reviewed_departures'] = { 'revision' => { 'id' => 17, 'input_hash' => 'a' * 64 },
+                                             'review' => { 'decision' => 'approved', 'decisions' => ['all-team decisions'] },
+                                             'sources' => [{ 'rows' => ['raw body'] }] }
+    presented = described_class.presentation(report)
+    expect(presented.slice('fingerprint', 'coverage', 'gaps')).to eq(report.slice('fingerprint', 'coverage', 'gaps'))
+    expect(presented['teams'].first.slice('before', 'after', 'efficiency')).to eq(row.slice('before', 'after', 'efficiency'))
+    expect(presented['teams'].first.dig('inputs', 'reviewed_departures')).to eq(
+      'revision' => { 'id' => 17, 'input_hash' => 'a' * 64 }, 'review' => { 'decision' => 'approved' }
+    )
+    expect(presented['teams'].first.dig('inputs', 'baselines')).to eq(row.dig('inputs', 'baselines'))
+    expect(row.dig('inputs', 'reviewed_departures', 'sources')).to be_present
+  end
+
   it 'rejects an empty included roster without creating outputs' do
     empty = create(:season, year: 2029)
     expect { described_class.new(empty, ratings_config_version: version, mode: 'initialize').call }

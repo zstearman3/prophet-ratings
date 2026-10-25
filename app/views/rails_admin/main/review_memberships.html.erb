@@ -41,12 +41,17 @@
     · Captured <%= proposal.fetch('captured_at') %> · <%= proposal.fetch('source_rows').size %> source schools.</p>
   <% if proposal.fetch('issues').any? %>
     <div class="alert alert-warning">
-      <p>Map unmatched conferences below. Import or finish school setup below. Resolve ambiguous identities in RailsAdmin, then fetch again. Full roster approval is blocked until they resolve. Selected conference-only corrections remain available.</p>
+      <p>Review unresolved school and conference matches below. Complete any missing local school setup before approval.
+        Full roster approval is blocked until source identities resolve. Selected conference-only corrections remain available.</p>
       <ul><% proposal.fetch('issues').each do |issue| %><li><%= issue %></li><% end %></ul>
     </div>
   <% end %>
   <%= render partial: 'school_imports', locals: { proposal: proposal } %>
-  <%= render partial: 'conference_mappings', locals: { proposal: proposal } %>
+  <% if proposal['provider'] == 'cbbd' %>
+    <%= render partial: 'cbbd_identity_mappings', locals: { proposal: proposal } %>
+  <% else %>
+    <%= render partial: 'conference_mappings', locals: { proposal: proposal } %>
+  <% end %>
   <% default_operation = established ? 'correct_memberships' : 'approve' %>
   <p>To save conference corrections, select the checkbox beside each school, choose its membership and check the scope confirmation below. Manual decisions are recorded as “Manual Review”.</p>
   <%= form_tag rails_admin.review_memberships_path(model_name: 'season', id: @object.id, operation: default_operation), method: :post, id: 'membership-review-form', data: { turbo: false } do %>
@@ -81,7 +86,7 @@
         it does not publish ratings or activate the season.</p>
     <% end %>
     <% unless established %>
-      <%= button_tag 'Approve memberships, participation and dates', name: nil, formaction: rails_admin.review_memberships_path(model_name: 'season', id: @object.id, operation: 'approve'), class: 'btn btn-primary', disabled: proposal.fetch('issues').any? %>
+      <%= button_tag 'Approve memberships, participation and dates', name: nil, formaction: rails_admin.review_memberships_path(model_name: 'season', id: @object.id, operation: 'approve'), class: 'btn btn-primary', disabled: proposal.fetch('issues').any? || SeasonCbbdIdentityMapping.pending?(proposal) %>
     <% end %>
     <hr>
     <p>For conference-only corrections, select schools in the table. Changes are scoped to this year and preserve surrounding membership ranges.

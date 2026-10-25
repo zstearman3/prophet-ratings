@@ -1,0 +1,14 @@
+<%= form_with url: admin_departure_batches_path, scope: :capture, method: :post, data: { turbo: false }, class: 'space-y-5' do |form| %>
+  <%= hidden_field_tag :season_id, season.id %>
+  <p class="rounded bg-gray-100 p-4"><strong>Target season ending <%= season.year %></strong><br><%= season.year - 1 %> NBA draft · college season ending <%= season.year - 1 %></p>
+  <p>Fetch draft selections and regular-season and postseason player/team totals from CBBD. Then compare the captured results with independent final sources before reviewing players.</p>
+  <details class="rounded border p-4" <%= 'open' if @page[:error] %>>
+    <summary class="cursor-pointer font-medium">Advanced settings</summary>
+    <div class="mt-4 grid gap-4 sm:grid-cols-2">
+      <div><%= form.label :max_requests, 'Total request limit (1–100)', class: 'block font-medium' %><%= form.number_field :max_requests, value: capture.fetch('max_requests', 15), min: 1, max: 100, required: true, class: 'mt-1 block w-full rounded border p-2' %><p class="mt-1 text-sm text-gray-600">Shared by all five sources, including retries.</p></div>
+      <div><%= form.label :retries, 'Retries per source (0–5)', class: 'block font-medium' %><%= form.number_field :retries, value: capture.fetch('retries', 2), min: 0, max: 5, required: true, class: 'mt-1 block w-full rounded border p-2' %><p class="mt-1 text-sm text-gray-600">Retries also count toward the total limit.</p></div>
+    </div>
+  </details>
+  <%= form.submit 'Fetch draft and college stats', class: 'rounded bg-prophet-indigo px-4 py-2 font-medium text-white hover:bg-prophet-indigo/80' %>
+  <p class="text-sm text-gray-600">Fetching runs in the background. Refresh the batch page to check progress.</p>
+<% end %>

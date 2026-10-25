@@ -108,6 +108,7 @@ class SeasonMembershipReview
   def validate_proposal
     proposal = SeasonMembershipProposal.new(season).reviewed(submission)
     raise ArgumentError, 'Resolve source identities and refresh before approval.' if proposal.fetch('issues').any?
+    raise ArgumentError, 'Save CBBD identity matches before approving memberships.' if SeasonCbbdIdentityMapping.pending?(proposal)
     return unless proposal['provider'] == 'cbbd' && submission['confirm_source_coverage'] != '1'
 
     raise ArgumentError, 'Confirm manual target-year source coverage verification before approval.'

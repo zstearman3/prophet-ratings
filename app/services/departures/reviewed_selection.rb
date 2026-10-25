@@ -4,7 +4,7 @@ module Departures
   # Reviewed identity decisions join draft and school provider IDs, never names alone.
   class ReviewedSelection
     def initialize(selection:, decision:, dataset:, identity:)
-      @selection = selection
+      @selection = CbbdDataset.automatic?(dataset) ? DraftTeamMatches.resolve(selection, dataset) : selection
       @decision = decision
       @dataset = dataset
       @identity = identity
@@ -16,7 +16,8 @@ module Departures
       validate_decision
       stints = production_stints
       validate_production(stints)
-      selection.merge(decision.slice('status', 'reason', 'evidence_source_ids', 'team_name_source', 'team_source'),
+      selection.merge(decision.slice('status', 'reason', 'evidence_source_ids', 'team_name_source', 'team_source',
+                                     'unknown_team_ids', 'matched_provider_athlete_id', 'match_method'),
                       'candidate_team_ids' => unresolved_candidates, 'stints' => stints)
     end
 
@@ -41,6 +42,11 @@ module Departures
       Contract.check!(Contract::STATUSES.include?(decision.fetch('status')), 'Invalid accounting status')
       Contract.text!(decision.fetch('reason'), 'decision reason')
       self.class.evidence(decision.fetch('evidence_source_ids'), dataset)
+      DraftTeamMatches.validate_decision(selection, decision, dataset)
+    end
+
+    def automatic?
+      CbbdDataset.automatic?(dataset)
     end
 
     def production_stints
@@ -53,9 +59,9 @@ module Departures
     end
 
     def validate_provider(stints)
-      validator = self.class
-      validator.validate_exclusion(decision.fetch('status'))
-      return unless decision['status'] == 'eligible_prior_season'
+      status = decision.fetch('status')
+      self.class.validate_exclusion(status, dataset:)
+      return unless status == 'eligible_prior_season'
 
       validate_provider_stints(stints)
     end
@@ -63,6 +69,8 @@ module Departures
     def validate_provider_stints(stints)
       key = PlayerIdentity.key(selection)
       self.class.validate_athlete(stints, key)
+      return if automatic?
+
       expected = provider_tables(key).pluck('production_key').sort
       Contract.check!(stints.pluck('production_key').sort == expected, 'Review all evidenced athlete team stints')
     end
@@ -71,7 +79,9 @@ module Departures
       dataset.fetch('production').select { |table| self.class.athlete_table?(table, key) }
     end
 
-    public_class_method def self.validate_exclusion(status)
+    public_class_method def self.validate_exclusion(status, dataset: {})
+      return if CbbdDataset.automatic?(dataset) && status == 'outside_prior_season'
+
       return unless Contract::RESOLVED.include?(status) && status != 'eligible_prior_season'
 
       raise ArgumentError, 'CBBD absence/affiliation does not prove an exclusion; keep participation unknown'
@@ -86,6 +96,7 @@ module Departures
     end
 
     def provider_candidates
+      return DraftTeamMatches.candidate_team_ids(selection, dataset) if automatic?
       return [] unless selection['provider_athlete_id']
 
       tables = provider_tables(PlayerIdentity.key(selection))

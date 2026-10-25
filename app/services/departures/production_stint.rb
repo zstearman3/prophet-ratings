@@ -39,7 +39,7 @@ module Departures
     end
 
     def candidates
-      return PlayerIdentity.team_candidates(table.fetch('provider_team_id')) if table['provider']
+      return PlayerIdentity.team_candidates(table.fetch('provider_team_id'), dataset:) if table['provider']
 
       source = dataset.fetch('sources').find { |entry| entry['id'] == table.fetch('source_id') }
       identity.candidates(table.fetch('team_name_source'), source: URI.parse(source.fetch('url')).host)

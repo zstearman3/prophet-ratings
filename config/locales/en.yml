@@ -72,6 +72,7 @@ en:
         breadcrumb: "Review recruiting"
         link: "Review recruiting"
       review_memberships:
+        identities_mapped: "CBBD identity matches saved. Review the refreshed memberships before approving."
         school_saved: "School and season setup saved. Proposals refreshed; review memberships before approving."
         mapped: "Conference mappings saved. Proposals rebuilt from the saved scrape; review before approving."
         title: "Review season memberships"
