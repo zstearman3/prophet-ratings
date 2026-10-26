@@ -284,18 +284,36 @@ RSpec.describe SeasonMembershipReview do
     expect(season.rating_team_seasons.pluck(:team_id)).to eq([other.id])
   end
 
-  it 'rolls back earlier switches if a later membership conflicts with a future range' do
+  it 'bounds a new membership before a stored future change without undoing other approved switches' do
     other = create(:team, school: 'Z Future U', url: '/cbb/schools/future/men/')
     future = create(:season, year: 2028)
+    later_membership = create(:team_conference, team: other, conference:, start_season: future)
+    retained = later_membership.attributes
+    create(:team_alias, team: other, value: other.school)
+    SeasonPreparer.new(year: season.year).call
+    source << source.first.merge(team_slug: 'future', team_name: other.school)
+    review.refresh
+    approve
+    expect(membership.reload.end_season).to eq(previous)
+    expect(team.conference_for(season)).to eq(conference)
+    expect(other.team_conferences.find_by!(start_season: season).end_season).to eq(season)
+    expect(later_membership.reload.attributes).to eq(retained)
+  end
+
+  it 'rolls back all approval changes if a stored future transition lacks its preceding boundary' do
+    other = create(:team, school: 'Z Future U', url: '/cbb/schools/future/men/')
+    future = create(:season, year: 2029)
     create(:team_conference, team: other, conference:, start_season: future)
     create(:team_alias, team: other, value: other.school)
     SeasonPreparer.new(year: season.year).call
     source << source.first.merge(team_slug: 'future', team_name: other.school)
     review.refresh
-    expect { approve }.to raise_error(ActiveRecord::RecordInvalid, /overlaps/)
+    retained = season.membership_proposal
+    expect { approve }.to raise_error(ArgumentError, /boundary season YEAR=2028.*future/)
     expect(membership.reload.end_season).to be_nil
     expect(team.conference_for(season)).to eq(old_conference)
     expect(season.reload.participation_review).to eq({})
+    expect(season.membership_proposal).to eq(retained)
   end
 
   it 'rejects local identity changes during discovery without replacing the existing draft' do

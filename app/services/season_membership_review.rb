@@ -92,11 +92,7 @@ class SeasonMembershipReview
   end
 
   def assign_memberships(decisions)
-    if season.membership_proposal['provider'] == 'cbbd'
-      decisions.each { |decision| SeasonConferenceYearAssignment.new(season, decision).call }
-    else
-      SeasonMembershipAssignment.new(season).call(decisions)
-    end
+    SeasonMembershipAssignment.new(season).call(decisions)
   end
 
   def review_decisions
@@ -130,6 +126,7 @@ class SeasonMembershipReview
       'dates' => { 'start_date' => season.start_date.iso8601, 'end_date' => season.end_date.iso8601, 'evidence' => evidence },
       'teams' => decisions.map { |decision| decision.slice('team_id', 'status', 'reason') }, 'unresolved_identities' => [],
       'membership_source' => season.membership_proposal, 'membership_decisions' => decisions,
+      'conference_scope' => 'from_target_year',
       'target_year_confirmed' => submission['confirm_target_year'] == '1',
       'source_coverage_confirmed' => submission['confirm_source_coverage'] == '1'
     }

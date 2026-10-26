@@ -443,11 +443,28 @@ schools block full approval until manually resolved. Previous-year drafts requir
 the additional target-year confirmation. Selected conference-only corrections do
 not certify the full roster or replace its approved participation review.
 
-CBBD full approval and selected corrections change **only the target year** and
-preserve surrounding finite/open membership ranges. Prepare missing YEAR−1/YEAR+1
-boundary seasons when instructed, then fetch again. Full approval still protects
-current seasons and stored outputs; corrections preserve participation, dates,
-games, ratings and predictions. No model calculation is triggered.
+Full offseason approval, for both CBBD and Sports Reference, applies conference
+decisions **from the target year forward**. A switch closes the prior membership
+at YEAR−1 and starts the approved conference at YEAR. New memberships are open-ended
+unless the active range has an explicit end or a separate future membership already
+starts later; those stored boundaries, deliberate gaps and later records are preserved.
+An independent or N/A decision closes/removes the active conference from YEAR onward
+without automatically restoring it in YEAR+1. Distinct later memberships remain intact.
+Participation and date approval still describe only the target season.
+
+Full approval does not require YEAR+1 merely to restore the prior conference. A
+preceding boundary is still needed to close earlier history, or to end a new range
+immediately before an explicit future start; a missing required boundary fails the
+whole approval without writes. Prepare only that reported boundary, then fetch/review
+again. New approval evidence records `conference_scope: from_target_year`. Earlier
+approval evidence is unchanged; legacy CBBD full approvals used target-year-only scope.
+This change does not repair or infer the intent of existing future records.
+
+**Apply selected conference corrections only** remains scoped to the selected year
+and preserves both surrounding years. It may still require YEAR−1/YEAR+1 boundary
+seasons to split a range. Full approval still protects current seasons and stored
+outputs; corrections preserve participation, dates, games, ratings and predictions.
+No model calculation is triggered.
 
 For CBBD use `season:prepare` and the review screen. Legacy `season:align_conferences`,
 automatic bootstrap alignment and automatic activation alignment reject CBBD before
