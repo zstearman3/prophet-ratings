@@ -120,8 +120,8 @@ RSpec.describe 'RailsAdmin CBBD membership preparation', type: :request do
   it 'supports explicit manual school setup, retained conference mapping and reviewed approval without SR' do
     refresh
     get path
-    expect(response.body).to include('CBBD schools needing manual setup', '001', 'do not prove complete')
-    expect(response.parsed_body.at_css('.school-setup-form')).to be_nil
+    expect(response.body).to include('CBBD schools needing setup', '001', 'do not prove complete')
+    expect(response.parsed_body.at_css('.school-setup-form')).to be_present
     team = setup_school
     refresh
     ENV['GAME_SYNC_PROVIDER'] = 'sports_reference'
@@ -147,7 +147,7 @@ RSpec.describe 'RailsAdmin CBBD membership preparation', type: :request do
     %w[prepare_school save_school].each do |operation|
       post path, params: { operation:, school_import: { proposal_key:, team_slug: 'forged' } }
       expect(response).to have_http_status(:unprocessable_content)
-      expect(response.body).to include('manual Team metadata')
+      expect(response.body).to include('School is no longer awaiting setup')
     end
     post path, params: { operation: 'map_conferences', mapping: { proposal_key: 'stale', conferences: { '10' => conference.id } } }
     expect(response).to have_http_status(:unprocessable_content)

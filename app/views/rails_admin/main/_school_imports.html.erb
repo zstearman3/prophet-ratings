@@ -1,9 +1,17 @@
 <% if proposal['provider'] == 'cbbd' %>
+  <%= render partial: 'cbbd_school_setup', locals: { proposal: proposal } %>
   <% pending = SeasonSchoolImport.pending(@object) %>
   <% if pending.any? %>
-    <h3>CBBD schools needing manual setup or a match</h3>
-    <p>Choose existing schools in the matching form below. If a school is genuinely missing local setup, create or complete its Team in RailsAdmin with a verified URL and metadata, an alias and a target-year TeamSeason, then refresh the proposal. CBBD directory evidence alone does not supply that metadata.</p>
-    <ul><% pending.each do |source| %><li><%= source.fetch('team_name') %> — CBBD ID <%= source.fetch('team_external_id') %></li><% end %></ul>
+    <h3>CBBD schools needing setup or a match</h3>
+    <p>Choose an existing school in the matching form below. For a missing school or incomplete local setup, use the inline form to supply verified metadata and add its season record and CBBD identity.</p>
+    <% pending.each do |source| %>
+      <%= form_tag rails_admin.review_memberships_path(model_name: 'season', id: @object.id, operation: 'prepare_school'), method: :post, data: { turbo: false }, class: 'school-setup-form mb-2' do %>
+        <%= hidden_field_tag 'school_import[team_external_id]', source.fetch('team_external_id') %>
+        <%= hidden_field_tag 'school_import[proposal_key]', SeasonMembershipProposal.digest(proposal) %>
+        <span><%= source.fetch('team_name') %> — CBBD ID <%= source.fetch('team_external_id') %></span>
+        <%= button_tag 'Create / finish school setup', name: nil, class: 'btn btn-secondary' %>
+      <% end %>
+    <% end %>
   <% end %>
 <% else %>
 <% if @school_import %>

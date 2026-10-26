@@ -12,7 +12,7 @@ class SeasonMembershipAdminAction
 
   def call(attributes)
     school = attributes.fetch('school_import', {})
-    return Result.new(notice: nil, school: SeasonSchoolImport.new(season).preview(school)) if attributes['operation'] == 'prepare_school'
+    return Result.new(notice: nil, school: school_importer.preview(school)) if attributes['operation'] == 'prepare_school'
 
     Result.new(notice: perform(attributes), school: nil)
   end
@@ -54,8 +54,13 @@ class SeasonMembershipAdminAction
   end
 
   def save_school(attributes)
-    SeasonSchoolImport.new(season).save(attributes.fetch('school_import', {}))
+    school_importer.save(attributes.fetch('school_import', {}))
     'school_saved'
+  end
+
+  def school_importer
+    importer = season.membership_proposal['provider'] == 'cbbd' ? SeasonCbbdSchoolSetup : SeasonSchoolImport
+    importer.new(season)
   end
 
   def apply_review(attributes)

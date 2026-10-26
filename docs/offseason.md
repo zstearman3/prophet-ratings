@@ -416,12 +416,21 @@ roster approval requires saved identity mappings. Existing mappings cannot be
 reparented by this form. Changed local identities or aliases invalidate stale
 submissions; refresh and review again.
 
-For missing/unprepared schools, manually create or complete the Team in RailsAdmin
-using an explicitly supplied valid URL and verified required metadata, and add a
-TeamAlias and target-year TeamSeason. Then refresh and save its reviewed CBBD match.
-The directory does not provide all required school/venue metadata; the Sports
-Reference school-import buttons are unavailable for CBBD. An alias proposes a
-match; a saved provider identity is still required for game ingestion.
+For missing/unprepared schools, click **Create / finish school setup** in the
+membership review. The inline form prefills the CBBD name or existing local metadata.
+Supply a verified Sports Reference school URL (the relative
+`/cbb/schools/school-name/men/` path or its HTTPS Sports Reference URL) and any
+verified optional nickname, short name, location, venue and color. No metadata is
+scraped or inferred. Save creates or completes the Team, adds its CBBD source-name
+alias and target-year TeamSeason, saves its exact CBBD identity, and rebuilds the
+proposal from retained source evidence without another fetch. Conference membership,
+participation, dates and ratings still require their separate review steps.
+
+Setup validates the proposal fingerprint and source ID under the review locks.
+Stale/unknown source submissions, conflicting existing school names/aliases/URLs,
+and provider identity conflicts are rejected without partial setup. Invalid form
+values remain available for correction. An alias alone is not an approved provider
+identity for game ingestion.
 
 A nonempty directory and matching echoed season do **not** prove complete D1
 population coverage or announced future realignment: open-ended upstream membership

@@ -1,0 +1,21 @@
+<% if @school_import && @school_import['team_external_id'] %>
+  <% source = proposal.fetch('source_rows').find { |row| row['team_external_id'] == @school_import['team_external_id'] } %>
+  <% if source %>
+    <h3><%= @school_import['existing'] ? 'Finish school setup' : 'Create school' %></h3>
+    <p>CBBD school: <%= source.fetch('team_name') %> — ID <%= source.fetch('team_external_id') %>.</p>
+    <p>Review the school name and enter a verified Sports Reference school URL. Other metadata is optional.
+      Saving adds the school to <%= @object.year %>, remembers its CBBD identity and rebuilds the draft from retained evidence.
+      Review conference membership and participation separately afterward.</p>
+    <%= form_tag rails_admin.review_memberships_path(model_name: 'season', id: @object.id, operation: 'save_school'), method: :post, id: 'cbbd-school-setup-form', data: { turbo: false } do %>
+      <%= hidden_field_tag 'school_import[team_external_id]', @school_import.fetch('team_external_id') %>
+      <%= hidden_field_tag 'school_import[proposal_key]', @school_import.fetch('proposal_key') %>
+      <% attributes = @school_import.fetch('attributes', {}) %>
+      <% (SeasonSchoolImport::FIELDS + ['url']).each do |field| %>
+        <p><%= label_tag "cbbd-school-#{field}", field == 'url' ? 'Sports Reference school URL' : field.humanize %>
+          <%= text_field_tag "school_import[attributes][#{field}]", attributes[field], id: "cbbd-school-#{field}", required: %w[school url].include?(field), class: 'form-control' %></p>
+      <% end %>
+      <%= button_tag 'Save school and season setup', name: nil, class: 'btn btn-primary' %>
+      <%= link_to 'Cancel', rails_admin.review_memberships_path(model_name: 'season', id: @object.id) %>
+    <% end %>
+  <% end %>
+<% end %>
