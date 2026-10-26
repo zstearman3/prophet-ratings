@@ -37,8 +37,12 @@ module Departures
 
     def self.result_status(dataset)
       complete = dataset.fetch('failures').empty? &&
-                 dataset.fetch('selections').pluck('overall_pick').sort == dataset.fetch('expected_picks').sort
+                 picks_complete?(dataset.fetch('selections').pluck('overall_pick'), dataset.fetch('expected_picks'))
       complete ? 'completed' : 'incomplete'
+    end
+
+    def self.picks_complete?(actual, expected)
+      actual.sort == expected.sort
     end
 
     private
@@ -76,7 +80,7 @@ module Departures
 
     def capture_sources
       Dir.mktmpdir('departure-capture-') do |directory|
-        CbbdAcquisition.new(plan: attempt.plan, directory:, checkpoint: capture_checkpoint(directory)).call
+        CbbdAcquisition.new(plan: attempt.plan, directory:, metadata_only: true, checkpoint: capture_checkpoint(directory)).call
       end
     end
 
@@ -87,7 +91,7 @@ module Departures
     def retain_manifest(manifest, directory)
       attempt.with_lock do
         require_running
-        attempt.update!(manifest:, evidence: self.class.retained_bytes(manifest, directory, attempt.evidence))
+        attempt.update!(manifest:, evidence: CaptureStore.new(attempt).retain(manifest, directory))
       end
     end
 

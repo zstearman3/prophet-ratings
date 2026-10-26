@@ -7,8 +7,8 @@ module Ingestion
       HEADERS = %w[retry-after x-ratelimit-limit x-ratelimit-remaining x-ratelimit-reset].freeze
       STATUS_FAILURES = { 401 => 'authentication', 403 => 'authentication', 429 => 'quota' }.freeze
 
-      def initialize(response, key, endpoint: nil)
-        @endpoint = endpoint
+      def initialize(response, key, **options)
+        @options = options
         @response = response
         @key = key
         @status = response[:status]
@@ -70,10 +70,12 @@ module Ingestion
       end
 
       def valid_envelope?(rows)
-        @endpoint == '/teams/directory' ? rows.is_a?(Hash) : self.class.valid_rows?(rows)
+        @options[:endpoint] == '/teams/directory' ? rows.is_a?(Hash) : self.class.valid_rows?(rows)
       end
 
       def parse
+        return (@bounded_outcome ||= { 'outcome' => Departures::JsonRows.outcome(body), 'rows' => [] }) if @options[:metadata_only]
+
         rows = JSON.parse(body)
         return { 'outcome' => 'malformed_envelope', 'rows' => [] } unless valid_envelope?(rows)
 

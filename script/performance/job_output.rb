@@ -5,11 +5,17 @@ module OffseasonPerformance
   module JobOutput
     def self.bytes(job)
       name = job.class.name
+      return normalization_bytes(name) if name.end_with?('DepartureNormalizationJob')
       return File.size('/benchmark/solver.json') if name == 'OffseasonPerformance::SolverJob'
 
       return File.size("/benchmark/mixed-#{job.job_id}.json") if name.start_with?('OffseasonPerformance::Mixed')
 
       persisted_bytes(name, job.arguments.first)
+    end
+
+    def self.normalization_bytes(name)
+      phase = name.include?('Legacy') ? 'legacy' : 'cbbd'
+      File.size("/benchmark/departure-normalization-#{phase}.json")
     end
 
     def self.persisted_bytes(name, id)
@@ -36,6 +42,8 @@ module OffseasonPerformance
     end
 
     def self.definition(job)
+      return 'normalization terminal accounting JSON file bytes' if job.class.name.end_with?('DepartureNormalizationJob')
+
       solver = job.instance_of?(OffseasonPerformance::SolverJob)
       solver ? 'solver result JSON file bytes' : 'persisted terminal report/result JSONB text bytes; includes scalar SQL counting cost'
     end

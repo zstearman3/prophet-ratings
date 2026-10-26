@@ -35,7 +35,7 @@ module OffseasonPerformance
     end
 
     def restart
-      @run.env['BENCHMARK_PHASE'] = "#{@scenario}-#{@phase}"
+      @run.env['BENCHMARK_PHASE'] = "#{@scenario}-#{@phase}".tr('_', '-')
       @run.compose('rm', '-s', '-f', 'web', 'worker')
       FileUtils.rm_f(File.join(@run.directory, 'worker-current.json'))
       Benchmark.realtime { boot }

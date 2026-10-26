@@ -16,6 +16,7 @@ module OffseasonPerformance
   # Coordinates standalone runs while leaving application code, maintainer services and data untouched.
   class Runner
     SCENARIOS = %w[dashboard readiness departures preseason status preview publish cbbd compare schedule solver mixed].freeze
+    AVAILABLE_SCENARIOS = (SCENARIOS + ['departure_normalization']).freeze
     GETS = Scenario::GETS
 
     def initialize(argv)
@@ -96,7 +97,11 @@ module OffseasonPerformance
     end
 
     def run_scenario(scenario)
-      phases = GETS.include?(scenario) ? %w[serial concurrent] : ['serial']
+      phases = if scenario == 'departure_normalization'
+                 %w[legacy cbbd]
+               else
+                 GETS.include?(scenario) ? %w[serial concurrent] : ['serial']
+               end
       phases.each { |phase| PhaseRunner.new(@run, @result, { scenario:, phase: }).call }
     end
 

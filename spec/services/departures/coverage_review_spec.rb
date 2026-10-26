@@ -62,10 +62,10 @@ RSpec.describe Departures::CoverageReview do
 
   it 'retains terminal raw capture without exposing an annual dataset or permitting publication' do
     attempt = capture
-    expect(attempt.status).to eq('completed')
-    expect(attempt.dataset).to be_blank
-    expect(attempt.evidence.keys).to contain_exactly('draft', 'player-regular', 'team-regular', 'player-postseason',
-                                                     'team-postseason', 'capture-1', 'capture-2', 'capture-3', 'capture-4', 'capture-5')
+    expect(attempt).to have_attributes(status: 'completed', dataset: {})
+    expect(attempt.evidence.fetch('storage_version')).to eq(Departures::CaptureStore::VERSION)
+    ids = %w[draft player-regular team-regular player-postseason team-postseason capture-1 capture-2 capture-3 capture-4 capture-5]
+    expect(attempt.evidence.fetch('observations').keys).to match_array(ids)
     review = Departures::BatchReview.new(batch)
     expect { review.save('review_key' => review.review_key, 'rows' => {}) }.to raise_error(ArgumentError, /Acquire/)
     expect { review.publish({ 'review_key' => review.review_key, 'confirm' => '1' }, reviewer: 'admin') }
@@ -152,12 +152,11 @@ RSpec.describe Departures::CoverageReview do
   it 'revalidates every retained byte before creating an offline successor' do
     attempt = capture
     submitted = fields
-    corrupted = attempt.evidence.deep_dup
-    corrupted['capture-1']['snapshot_base64'] = Base64.strict_encode64('changed')
-    attempt.evidence = corrupted
+    observation = DepartureCaptureObservation.find(attempt.evidence.fetch('observations').fetch('capture-1'))
+    corrupt_departure_capture(observation.departure_source_capture_id, 'changed')
     allow(batch).to receive(:attempt).and_return(attempt)
     submitted['review_key'] = coverage.review_key
-    expect { coverage.save(submitted, reviewer: 'admin') }.to raise_error(ArgumentError, /hash/)
+    expect { coverage.save(submitted, reviewer: 'admin') }.to raise_error(ArgumentError, /hash|identity mismatch/)
     expect(batch.acquisitions.count).to eq(1)
   end
 
@@ -216,7 +215,8 @@ RSpec.describe Departures::CoverageReview do
       expect(coverage.report.fetch('no_postseason_teams')).to eq([])
       expect { coverage.save(fields, reviewer: 'admin') }.to raise_error(ArgumentError, /postseason/)
       successor = coverage.save(fields.merge('absent_postseason_team_ids' => []), reviewer: 'admin')
-      expect(successor.dataset.fetch('production').first.fetch('coverage_complete')).to be(false)
+      facts = Departures::RetainedEvidence.new(successor).dataset
+      expect(facts.fetch('production').first.fetch('coverage_complete')).to be(false)
     end
   end
 

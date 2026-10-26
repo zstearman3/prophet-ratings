@@ -223,6 +223,67 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_26_010000) do
     t.index ["season_id"], name: "index_departure_batches_on_season_id"
   end
 
+  create_table "departure_capture_observations", force: :cascade do |t|
+    t.bigint "departure_source_capture_id", null: false
+    t.bigint "departure_acquisition_id", null: false
+    t.string "source_id", null: false
+    t.jsonb "metadata", null: false
+    t.string "extraction_version", null: false
+    t.index ["departure_acquisition_id", "source_id"], name: "idx_departure_observation_identity", unique: true
+    t.index ["departure_acquisition_id"], name: "idx_departure_observation_origin"
+    t.index ["departure_source_capture_id"], name: "idx_departure_observation_capture"
+  end
+
+  create_table "departure_dataset_normalizations", force: :cascade do |t|
+    t.string "identity", null: false
+    t.string "status", default: "running", null: false
+    t.jsonb "header", null: false
+    t.jsonb "source_normalization_ids", default: {}, null: false
+    t.string "dataset_revision"
+    t.jsonb "summary", default: {}, null: false
+    t.index ["identity"], name: "index_departure_dataset_normalizations_on_identity", unique: true
+  end
+
+  create_table "departure_dataset_rows", force: :cascade do |t|
+    t.bigint "departure_dataset_normalization_id", null: false
+    t.string "kind", null: false
+    t.integer "ordinal", null: false
+    t.json "fact", null: false
+    t.index ["departure_dataset_normalization_id", "kind", "ordinal"], name: "idx_departure_dataset_row_order", unique: true
+    t.index ["departure_dataset_normalization_id"], name: "idx_departure_dataset_row_parent"
+  end
+
+  create_table "departure_normalized_rows", force: :cascade do |t|
+    t.bigint "departure_source_normalization_id", null: false
+    t.integer "ordinal", null: false
+    t.string "row_key", null: false
+    t.bigint "provider_team_id"
+    t.bigint "provider_player_id"
+    t.json "fact", null: false
+    t.index ["departure_source_normalization_id", "ordinal"], name: "idx_departure_row_order", unique: true
+    t.index ["departure_source_normalization_id", "row_key"], name: "idx_departure_row_identity", unique: true
+    t.index ["departure_source_normalization_id"], name: "idx_departure_row_source"
+  end
+
+  create_table "departure_source_captures", force: :cascade do |t|
+    t.string "sha256", null: false
+    t.bigint "byte_size", null: false
+    t.binary "body", null: false
+    t.index ["sha256"], name: "index_departure_source_captures_on_sha256", unique: true
+  end
+
+  create_table "departure_source_normalizations", force: :cascade do |t|
+    t.bigint "departure_source_capture_id", null: false
+    t.string "identity", null: false
+    t.jsonb "contract", null: false
+    t.string "status", default: "running", null: false
+    t.string "rows_digest"
+    t.integer "row_count", default: 0, null: false
+    t.text "failure"
+    t.index ["departure_source_capture_id"], name: "idx_departure_normalization_capture"
+    t.index ["identity"], name: "index_departure_source_normalizations_on_identity", unique: true
+  end
+
   create_table "game_external_identities", force: :cascade do |t|
     t.bigint "game_id", null: false
     t.string "provider", null: false
@@ -934,6 +995,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_26_010000) do
   add_foreign_key "departure_batches", "departure_batches", column: "predecessor_id"
   add_foreign_key "departure_batches", "offseason_input_revisions", column: "revision_id"
   add_foreign_key "departure_batches", "seasons"
+  add_foreign_key "departure_capture_observations", "departure_acquisitions"
+  add_foreign_key "departure_capture_observations", "departure_source_captures"
+  add_foreign_key "departure_dataset_rows", "departure_dataset_normalizations"
+  add_foreign_key "departure_normalized_rows", "departure_source_normalizations"
+  add_foreign_key "departure_source_normalizations", "departure_source_captures"
   add_foreign_key "game_external_identities", "games"
   add_foreign_key "game_observations", "game_scoring_reviews", column: "scoring_review_id"
   add_foreign_key "game_observations", "games"

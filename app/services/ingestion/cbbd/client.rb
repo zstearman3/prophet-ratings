@@ -96,7 +96,8 @@ module Ingestion
       end
 
       def retain(response, filters)
-        parsed = Response.new(response, @options.fetch(:api_key), endpoint: filters.fetch('endpoint'))
+        parsed = Response.new(response, @options.fetch(:api_key), endpoint: filters.fetch('endpoint'),
+                                                                  metadata_only: @options.fetch(:metadata_only, false))
         reference = @store.capture(body: parsed.body, metadata: parsed.metadata.merge('request' => filters))
         captures << reference
         parsed.outcome.merge('capture' => reference)

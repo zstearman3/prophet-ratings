@@ -9,13 +9,15 @@ explicit authorization and scope.
 
 ## Scheduling and durable evidence
 
-Production cron uses `ScheduledGameSyncJob` at 01:00, 07:00, 13:00 and 19:00
-America/New_York. `GAME_SYNC_PROVIDER=cbbd` explicitly selects CBBD; the default
-remains `sports_reference`. Each delivery pins its provider, current season,
-published default model, Eastern date, six-hour bucket, season bounds and limits
-before enqueue (also before lock contention on `perform_now`). Changing provider
-configuration affects new deliveries, not retained jobs. There is no automatic
-fallback or source blending.
+Production cron uses `ScheduledGameSyncJob` and selects its cadence at process
+boot. `GAME_SYNC_PROVIDER=cbbd` uses 01:00, 07:00, 13:00 and 19:00 America/New_York.
+The default and explicit `sports_reference` selection retain the exact legacy
+expression `0 /8 * * *`, without adding a timezone override. Restart cron-producing
+processes after changing provider configuration so the cadence changes with it.
+Each CBBD delivery pins its provider, current season, published default model,
+Eastern date, six-hour bucket, season bounds and limits before enqueue (also before
+lock contention on `perform_now`). Provider changes affect new deliveries, not
+retained jobs. There is no automatic fallback or source blending.
 
 `CbbdSyncRun` is the durable operation record. Past dates are the intersection of
 season bounds and today minus three through yesterday; future dates are today
@@ -40,9 +42,10 @@ account entitlement and remaining shared quota before release. Four cycles per d
 two 50-attempt caps, 31 days yields at most 12,400 scheduled attempts in an ordinary
 31-day month, excluding DST extra occurrences, manual/review traffic and other
 account consumers. The repeated fall 01:00 occurrence shares one pinned bucket,
-so it does not mint a second acquisition budget. Six-hour buckets coalesce repeated producers; a new bucket is a
-new bounded refresh. An interrupted acquisition never automatically renews its
-budget. Unknown coverage and incomplete captures remain failures.
+so it does not mint a second acquisition budget. Six-hour buckets coalesce
+repeated producers; a new bucket is a new bounded refresh. An interrupted
+acquisition never automatically renews its budget. Unknown coverage and
+incomplete captures remain failures.
 
 A complete nonempty past phase authorizes the pinned daily analytics job even if
 future refresh fails. Source retries never independently authorize ratings.
@@ -159,7 +162,7 @@ Unrelated integrations and licensing of retained legacy data remain out of scope
 ## Disposable rehearsal and historical disposition
 
 The automated rehearsal uses checked-in synthetic
-`spec/fixtures/ingestion/cbbd/final.json`: season2026, final on 2025-11-01, score
+`spec/fixtures/ingestion/cbbd/final.json`: season 2026, final on 2025-11-01, score
 65–64, 40 minutes; synthetic future game on 2025-11-03. Before ingestion no games
 exist. After ingestion the final and scheduled game retain CBBD identities; daily
 publication stores 2025-11-01 snapshots with the pinned model and an operational
@@ -174,11 +177,11 @@ recorded in the implementation handoff; fixtures do not establish live parity.
 Historical correction/resume checks are bounded synthetic evidence only. The
 new offline resume case starts with both team identities absent: zero Games and
 TeamGames survive the failed 2025-11-01 date. After explicit identity repair it
-imports the same retained65–64 evidence; compatible resume then skips the date and
+imports the same retained 65–64 evidence; compatible resume then skips the date and
 preserves IDs and all derived attributes without another request. Existing
-canonical importer tests separately apply ordered synthetic corrections100→102
-(home offensive efficiency125.307), while unknown-freshness corrections are held
-at100. CBBD fixture freshness is unknown: this is not evidence that live CBBD
+canonical importer tests separately apply ordered synthetic corrections 100→102
+(home offensive efficiency 125.307), while unknown-freshness corrections are held
+at 100. CBBD fixture freshness is unknown: this is not evidence that live CBBD
 corrections can be automatically ordered. Existing cross-provider/manual-authority
 and mapping tests retain those protected values and forecast histories.
 
@@ -186,5 +189,5 @@ and mapping tests retain those protected values and forecast histories.
 history keeps its provider provenance and protected finals; cross-provider changes
 need review. Evaluation comparisons must state provider/semantic profile and
 history coverage. Do not claim prediction improvement from this cutover or mark
-the separate ticket08 historical parity/replacement work complete. Any unavailable
+the separate ticket 08 historical parity/replacement work complete. Any unavailable
 live examples and operational gates above remain unverified until authorized.
