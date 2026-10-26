@@ -530,3 +530,82 @@ All measured HTTP intervals were inside the first heavy execution, all three job
 finished successfully, and complete stability checks passed. This final rerun
 supersedes the initial run for runtime provenance; the earlier heavy-algorithm
 limitations still apply.
+
+## Departure normalization scenario (ticket03)
+
+Run explicitly, sequentially at each scale:
+
+```bash
+bin/benchmark-offseason --scale 1 --scenario departure_normalization --assert --output tmp/departure-ticket/normalization-1x.json
+bin/benchmark-offseason --scale 2 --scenario departure_normalization --assert --output tmp/departure-ticket/normalization-2x.json
+```
+
+The default scenario list is unchanged. Setup preserves the complete original
+fixture, including history and CBBD game archives. Two fresh web/external-worker
+phases retain the normal production/eager-load, 0.5 CPU/512 MiB cap, cgroup sampler,
+SQL/GC telemetry and separate PostgreSQL accounting. Neither phase forces GC or
+restarts its worker during measured work. Each queued HeavyJob receives one scalar
+record ID; the result records serialized argument values.
+
+`legacy` consumes `Content.each_source` verbatim in the measured worker. It retains
+exact bodies and immutable observations, parses each HTML source with the existing
+SourceSnapshot adapter, persists normalized records, and streams the complete
+logical dataset digest. Both the exact original digest and processed school/player
+observation cardinalities must match the original fixture (8,030/120,450 at 1×;
+16,060/240,900 at 2×). This offline adapter does not enable HTML network acquisition
+or rewrite existing historical attempts. The benchmark clones the persisted
+legacy manifest inside PostgreSQL and loads a fresh acquisition, preserving its
+exact metadata while avoiding a Ruby JSON roundtrip solely to create the measured
+attempt. Raw source tempfiles are removed after each observation is retained;
+normalized source batches remain fixed at 250. Scalar legacy worker stage counters
+mark cloning, capture completion, annual dataset completion and the final
+checkpoint; these diagnostics neither force GC nor change query caching.
+
+`cbbd` separately measures normal acquisition/checkpoints, PostgreSQL cursor source
+normalization and annual team combination for five nonempty JSON responses:
+365 teams × 15 stints in each scope,60 distinct draft picks, regular/postseason totals,
+zero-point participants and one athlete with two team stints. Its scope stays 365 at
+both scales and its actual response/record counts and bytes are reported
+separately. The driver verifies its digest against the unchanged file replay.
+The exact original legacy corpus supplies the growth proof; this representative
+annual CBBD path supplies coverage of large single-source JSON and current rules.
+
+Both subpaths require a real performed terminal job and worker peak ≤400 MiB at
+both scales. Compare the corresponding 2× minus 1× worker peak: growth must be ≤50 MiB
+with row batches fixed at 250. Missing telemetry/OOM never establishes a pass.
+A stopped worker whose sampler remains stale for 60 seconds fails explicitly
+rather than waiting the full two-hour normalization deadline. Results include
+per-subpath body bytes/counts, immutable observation counts,
+normalized source rows, actual player observations, annual output bytes and
+PostgreSQL database bytes. Existing whole-container peak/current/RSS, elapsed,
+SQL/GC, Docker/runtime versions, host contention and database counters remain in
+the run artifacts. Synchronous review/publication performance is outside this
+scenario; it must not be inferred from normalization results.
+
+### Resumed departure normalization evidence (2026-10-25)
+
+The final source-matched pair is
+`tmp/departure-ticket/resume-measured-normalization-{1x,2x}.json`, owners
+`offseason-fcfc20afdc68ce9a` / `offseason-d27299acc1f11b95`. All 1,077 source
+hashes match between scales. Both full-corpus legacy jobs and separate five-response
+CBBD jobs reached performed terminals with normal query caching; original legacy
+counts and replay digests matched exactly.
+
+| Worker whole-container peak | 1x bytes | 2x bytes | Growth bytes |
+| --- | ---: | ---: | ---: |
+| Legacy | 319,356,928 | 433,881,088 | 114,524,160 |
+| CBBD | 231,456,768 | 231,694,336 | 237,568 |
+
+Legacy still fails AC2: 2x exceeds 400 MiB and growth exceeds 50 MiB. CBBD passes.
+At 2x, the legacy cumulative peak was 404,918,272 bytes at checkpoint completion,
+then 433,881,088 after terminal accounting/output; the latter remains the acceptance
+measurement. Stage timing identifies an interval, not an individual allocation.
+No GC forcing, cache disabling, smaller corpus, batch change or cap increase was
+used. PostgreSQL peaks were separately 1,586,356,224/2,770,911,232 bytes with no
+OOM in the completed pair. Existing local stacks remained running.
+
+A preceding fixture-only attempt lost its database to OOM; an unchanged retry
+produced this completed pair. Another fixture-only run was intentionally interrupted
+before the final correctness fix. Neither supplies worker acceptance evidence.
+See [the implementation handoff](departure-capture-handoff.md) for exact commands,
+source provenance, intermediate attempts, remaining failure and verification gates.

@@ -6,6 +6,27 @@ require 'tmpdir'
 module Departures
   # Replays private database bytes through the unchanged file contracts in a temporary directory.
   class RetainedEvidence
+    def self.new(attempt, **options)
+      return super unless self == RetainedEvidence
+
+      version = storage_version(attempt, options)
+      return super unless version
+
+      stored_reader(attempt, version, options)
+    end
+
+    def self.stored_reader(attempt, version, options)
+      Contract.check!(version == CaptureStore::VERSION, 'Unsupported departure capture storage version')
+      stored = attempt.has_attribute?(:evidence) && attempt.has_attribute?(:dataset) ? attempt : DepartureAcquisition.find(attempt.id)
+      StoredEvidence.new(stored, **options)
+    end
+
+    def self.storage_version(attempt, options)
+      return attempt.evidence['storage_version'] unless options[:comparison] == :persisted || !attempt.has_attribute?(:evidence)
+
+      DepartureAcquisition.where(id: attempt.id).pick(Arel.sql("evidence->>'storage_version'"))
+    end
+
     def initialize(attempt, comparison: :memory)
       @attempt = attempt
       @comparison = comparison

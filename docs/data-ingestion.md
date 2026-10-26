@@ -1580,3 +1580,17 @@ CLI/nightly reports keep their previous shape. Private filesystem CBBD
 capture prerequisites and operator retention duties above still apply. No live
 provider coverage, publication completeness or prediction accuracy is certified by
 a successful or empty acquisition.
+
+### Departure source evidence storage
+
+New departure browser acquisitions opt into metadata-only CBBD responses. The
+shared client's default game/directory ingestion behavior remains unchanged.
+Departure envelope validation uses the same bounded PostgreSQL JSON cursor as
+source normalization; malformed JSON and malformed envelopes retain their
+separate outcomes. Exact sanitized response bytes, including failed/retry bodies,
+are retained before semantic annual processing. Body SHA identities deduplicate
+storage; immutable acquisition observations retain independent request/time/ledger
+provenance. See [departure storage](departures.md#capture-storage-and-bounded-normalization)
+for reference versions, replay validation and legacy compatibility. Acquisition
+and normalization do not create player/team identities, profiles, ratings or
+approvals.

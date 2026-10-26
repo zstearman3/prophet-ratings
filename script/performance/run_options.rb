@@ -27,7 +27,7 @@ module OffseasonPerformance
     end
 
     def self.mode_options(parser, options)
-      parser.on('--scenario NAME', Runner::SCENARIOS) { |value| options[:scenario] = value }
+      parser.on('--scenario NAME', Runner::AVAILABLE_SCENARIOS) { |value| options[:scenario] = value }
       parser.on('--assert') { options[:assert] = true }
     end
 

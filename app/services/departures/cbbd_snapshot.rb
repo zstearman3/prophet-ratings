@@ -16,6 +16,11 @@ module Departures
       source.merge('failure' => error.message)
     end
 
+    def validate_metadata
+      validate_request
+      validate_capture
+    end
+
     def parse_capture
       bytes = saved_bytes if source['snapshot_location']
       source['failure'] ? source : success(bytes)

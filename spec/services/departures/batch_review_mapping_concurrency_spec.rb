@@ -24,6 +24,16 @@ RSpec.describe Departures::BatchReview do
     release << true
     threads.each { |thread| thread.join(10) }
     TeamExternalIdentity.where(team:).delete_all
+    dataset_ids = batch.acquisitions.pluck(Arel.sql("(dataset->>'normalization_id')::bigint")).compact
+    DepartureDatasetRow.where(departure_dataset_normalization_id: dataset_ids).delete_all
+    DepartureDatasetNormalization.where(id: dataset_ids).delete_all
+    observations = DepartureCaptureObservation.where(departure_acquisition_id: batch.acquisitions.select(:id))
+    capture_ids = observations.pluck(:departure_source_capture_id)
+    normalizations = DepartureSourceNormalization.where(departure_source_capture_id: capture_ids)
+    DepartureNormalizedRow.where(departure_source_normalization_id: normalizations.select(:id)).delete_all
+    normalizations.delete_all
+    observations.delete_all
+    DepartureSourceCapture.where(id: capture_ids).delete_all
     DepartureAcquisition.where(departure_batch: batch).delete_all
     batch.reload.destroy!
     season.destroy!
