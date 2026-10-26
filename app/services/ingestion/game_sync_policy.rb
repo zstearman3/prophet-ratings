@@ -30,6 +30,8 @@ module Ingestion
     private
 
     def configure_cbbd
+      return if options[:prepared_run].is_a?(CbbdReviewRun)
+
       @options = cbbd_options.merge(options)
       validate
     end

@@ -1580,3 +1580,28 @@ CLI/nightly reports keep their previous shape. Private filesystem CBBD
 capture prerequisites and operator retention duties above still apply. No live
 provider coverage, publication completeness or prediction accuracy is certified by
 a successful or empty acquisition.
+
+### Departure source evidence storage
+
+New departure browser acquisitions opt into metadata-only CBBD responses. The
+shared client's default game/directory ingestion behavior remains unchanged.
+Departure envelope validation uses the same bounded PostgreSQL JSON cursor as
+source normalization; malformed JSON and malformed envelopes retain their
+separate outcomes. Exact sanitized response bytes, including failed/retry bodies,
+are retained before semantic annual processing. Body SHA identities deduplicate
+storage; immutable acquisition observations retain independent request/time/ledger
+provenance. See [departure storage](departures.md#capture-storage-and-bounded-normalization)
+for reference versions, replay validation and legacy compatibility. Acquisition
+and normalization do not create player/team identities, profiles, ratings or
+approvals.
+
+## Scheduled CBBD cutover
+
+Production scheduling now enters through `ScheduledGameSyncJob`. At process boot,
+CBBD selects the six-hour Eastern cadence; the default and explicit Sports Reference
+selection retain the legacy `0 /8 * * *` cadence. Restart cron-producing processes
+after changing providers. The explicit CBBD opt-in uses persisted finite past/future
+acquisitions and an atomic analytics handoff. Manual `SyncNightlyGamesJob` CBBD
+calls retain their explicit bounds and do not automatically release ratings.
+See [cutover readiness](cbbd-cutover.md) for cadence, configuration, durable
+evidence, recovery and the NO RELEASE gates.

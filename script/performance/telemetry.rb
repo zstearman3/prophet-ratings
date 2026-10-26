@@ -52,6 +52,13 @@ module OffseasonPerformance
       end
     end
 
+    def self.stage(name)
+      metrics = context
+      return unless metrics
+
+      (metrics['stages'] ||= []) << memory.merge('stage' => name, 'at' => Time.current.iso8601(6))
+    end
+
     def self.install
       ActiveSupport::Notifications.subscribe('sql.active_record') do |_name, start, finish, _id, payload|
         metrics = context

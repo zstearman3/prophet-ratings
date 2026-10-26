@@ -22,8 +22,8 @@ def single_task(response):
     return tasks[0]
 
 
-def container_names(task):
-    names = [container["name"] for container in task.get("containers", [])]
+def container_names(containers):
+    names = [container["name"] for container in containers]
     if not names or any(not name for name in names) or len(names) != len(set(names)):
         raise ValueError("Missing or duplicate migration container names")
     return sorted(names)
@@ -35,15 +35,23 @@ def main():
         parser.add_argument(f"--{flag}", required=True)
     options = parser.parse_args()
     scope = ["--cluster", options.cluster, "--region", options.region]
+    # Resolve once before launch: the initial task response may omit containers.
+    definition = aws([
+        "describe-task-definition", "--region", options.region,
+        "--task-definition", options.task_definition,
+    ], output=True)["taskDefinition"]
+    definition_arn = definition.get("taskDefinitionArn")
+    if not isinstance(definition_arn, str) or not definition_arn.startswith("arn:"):
+        raise ValueError("Task definition returned no valid revision ARN")
+    expected_names = container_names(definition.get("containerDefinitions", []))
     launched = single_task(aws([
         "run-task", *scope, "--launch-type", "FARGATE", "--count", "1",
-        "--task-definition", options.task_definition,
+        "--task-definition", definition_arn,
         "--network-configuration", options.network_configuration,
     ], output=True))
     task_arn = launched.get("taskArn")
     if not isinstance(task_arn, str) or not task_arn.startswith("arn:"):
         raise ValueError("Migration launch returned no valid task ARN")
-    expected_names = container_names(launched)
     print(f"Waiting for migration task {task_arn}", flush=True)
     task_scope = [*scope, "--tasks", task_arn]
     wait_failed = False
@@ -61,7 +69,7 @@ def main():
         raise ValueError("Inspect the migration task before retrying; it has not been stopped automatically")
     if (stopped.get("taskArn") != task_arn or stopped.get("lastStatus") != "STOPPED"
             or stopped.get("stopCode") != "EssentialContainerExited"
-            or container_names(stopped) != expected_names):
+            or container_names(stopped.get("containers", [])) != expected_names):
         raise ValueError("Migration task did not stop normally with the expected containers")
     if any(container.get("lastStatus") != "STOPPED" or type(container.get("exitCode")) is not int
            or container["exitCode"] != 0 for container in stopped["containers"]):

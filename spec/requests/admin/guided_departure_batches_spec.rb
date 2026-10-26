@@ -163,7 +163,8 @@ RSpec.describe 'Guided admin departure review' do
       latest = batch.reload.attempt
       expect(latest.predecessor_id).to eq(first.id)
       expect(latest.evidence).to eq(first.evidence)
-      expect(latest.dataset.fetch('production').first.fetch('team_points')).to eq(102)
+      facts = Departures::RetainedEvidence.new(latest).dataset
+      expect(facts.fetch('production').first.fetch('team_points')).to eq(102)
       follow_redirect!
       expect(response.parsed_body.at_css('[data-points-reconciliation]')).to be_present
       expect(Ingestion::Cbbd::HttpTransport).to have_received(:call).exactly(5).times

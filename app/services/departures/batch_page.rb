@@ -17,7 +17,7 @@ module Departures
     def legacy_review
       review = BatchReview.new(batch)
       { attempt:, history:, report: review.report(attempt:), review_key: review.review_key(attempt:),
-        identity: TeamIdentity.new(teams:), teams:, teams_by_id: teams.index_by(&:id),
+        dataset: facts, identity: TeamIdentity.new(teams:), teams:, teams_by_id: teams.index_by(&:id),
         row_issues: DecisionForm.new(facts).issues(batch.decisions), production_options: production_options,
         coverage: coverage_report, capture_only: CapturePreparation.capture_only?(batch.plan) }
     end
@@ -53,7 +53,12 @@ module Departures
     end
 
     def facts
-      attempt&.dataset || {}
+      return {} unless attempt
+
+      saved = attempt.dataset
+      return saved unless saved['storage_version'] == StoredDataset::VERSION
+
+      @facts ||= RetainedEvidence.new(attempt).dataset
     end
 
     def history

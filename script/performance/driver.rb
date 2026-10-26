@@ -7,6 +7,7 @@ require_relative 'scenario'
 require_relative 'measurements'
 require_relative 'job_driver'
 require_relative 'mixed_workload'
+require_relative 'departure_normalization_driver'
 require 'benchmark'
 require 'securerandom'
 require 'socket'
@@ -30,11 +31,17 @@ module OffseasonPerformance
 
     def execute(result)
       collect(result)
-      check(result) unless @scenario.solver?
+      check(result) unless @scenario.solver? || @scenario.name == 'departure_normalization'
       result
     end
 
     def collect(result)
+      return DepartureNormalizationDriver.call(result, @scenario) if @scenario.name == 'departure_normalization'
+
+      collect_application(result)
+    end
+
+    def collect_application(result)
       client = @clients.first
       return MixedWorkload.new(@scenario).call(result) { http_sample(client, nil) } if @scenario.name == 'mixed'
 

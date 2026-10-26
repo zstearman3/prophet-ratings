@@ -18,7 +18,7 @@ module OffseasonPerformance
     end
 
     def self.phase_count(scenario)
-      get = Runner::GETS.include?(scenario)
+      get = Runner::GETS.include?(scenario) || scenario == 'departure_normalization'
       get ? 2 : 1
     end
 

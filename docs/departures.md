@@ -217,3 +217,63 @@ Published draft/team pages read a compact SQL projection of the frozen revision.
 They do not load acquisition response bodies, replay source captures, or deserialize
 raw scope rows just to display results. The immutable revision and retained-source
 downloads remain unchanged; publication and corrections still validate full evidence.
+
+## Capture storage and bounded normalization
+
+New browser acquisitions use `departure-captures-v1`. PostgreSQL stores exact
+credential-sanitized response bytes once per SHA256 in `departure_source_captures`.
+Immutable `departure_capture_observations` retain each response's original
+acquisition, ledger ID, request, timestamps, HTTP outcome and extraction version;
+identical bytes from different requests share the body without sharing provenance.
+Selected source IDs point to the original observation. Checkpoints insert only
+new observations/bodies and atomically update the attempt's small reference map.
+Successors, corrections and published revisions retain those references. All
+existing private-download authorization and attachment behavior applies.
+
+Source normalization uses parser `departure-source-rows-v1`, keyed by content,
+source kind, year and logical request/scope. It retains ordered original rows and
+indexed team/athlete identities. PostgreSQL's native `json` parser uses one
+transaction-scoped cursor and fetches **250 objects** at a time; arrays with
+non-object elements, malformed/trailing JSON and non-array envelopes fail
+explicitly. JSON fact columns preserve raw numeric semantics for logical hashes.
+Bounded fact inserts preserve database uniqueness/foreign-key constraints without
+retaining an Active Record object for every annual output row in a transaction
+or association cache. A source is usable only after its normalization completes. Interrupted work
+cannot certify complete coverage or zero production; explicit retry replaces
+incomplete rows without renewing an acquisition's request budget. Duplicate
+athlete/team identities across batches remain failures. Capture-only coverage
+readers retain normalization failures and expose rows only from completed sources;
+failed postseason parsing cannot become evidence of absent participation.
+
+Pre-release development normalizations created before the quoted-JSON whitespace
+fix can contain squished string facts under the same `departure-source-rows-v1`
+identity. Completed rows are reused, so this fix neither repairs nor detects those
+self-consistent old facts; digest checks still reject later row corruption.
+Verification of the fix uses fresh disposable databases. Storage is unreleased;
+there is no parser-version bump or automatic rewrite of existing evidence.
+
+Annual derivations are keyed separately by the frozen manifest/extraction policy.
+They process one provider team at a time with the existing reconciliation and
+production rules. Capture-only attempts do not freeze strict reconciliation for a
+later automatic policy. Attempts store a small `departure-dataset-v1` reference,
+revision digest and summary; ordered normalized records reconstruct the exact
+logical dataset. Canonical hashing streams records without assembling an annual
+production array. Review and publication explicitly expand facts when needed;
+publication verifies all retained retry/selected bytes, normalized source rows
+and freshly recomputed annual results before applying inputs. Published payloads
+keep full logical dataset/report/team inputs for existing readers, replacing only
+the raw evidence envelope with immutable observation references.
+
+Legacy HTML/JSON/base64 attempts and revision hashes keep their original reader
+and file replay path. No historical conversion or automatic rewrite occurs, and
+no production conversion command is provided. Backups must include the new
+capture, observation and normalization tables together with acquisition/revision
+rows; the additive migration must run before new acquisitions. Source bodies are
+private evidence, not disposable cache entries. Database deletion constraints and
+immutable models preserve acquisition provenance.
+
+Row transfer batches are bounded, but the full legacy normalization benchmark
+still exceeds its 400 MiB peak and 50 MiB growth budgets at 2x; see
+`docs/departure-capture-handoff.md` for final source-matched evidence. Synchronous review,
+file export and publication still expand logical datasets; their peak-memory
+redesign belongs to offseason performance ticket05.

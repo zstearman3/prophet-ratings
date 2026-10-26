@@ -165,7 +165,11 @@ RSpec.describe 'Admin CBBD identity review', type: :request do
   it 'denies generic RailsAdmin inspection, creation, mutation and export for every private review model' do
     comparison = Ingestion::Reconciliation::RunReview.new(run).compare
     capture = run.captures.create!(capture_id: 'private-synthetic', body: '[]', metadata: {})
-    records = { 'cbbd_review_run' => run, 'cbbd_review_capture' => capture, 'cbbd_review_comparison' => comparison }
+    scheduled_run = CbbdSyncRun.create!(season:, ratings_config_version: RatingsConfigVersion.publish!,
+                                        schedule_date: season.start_date + 1, bucket: Time.utc(2026, 11, 2, 6),
+                                        maximum_requests: 2, retries: 0, past_acquisition: run)
+    records = { 'cbbd_review_run' => run, 'cbbd_review_capture' => capture, 'cbbd_review_comparison' => comparison,
+                'cbbd_sync_run' => scheduled_run }
     before = records.values.map(&:attributes)
     records.each do |model, record|
       [[:get, "/admin/#{model}"], [:get, "/admin/#{model}/new"], [:get, "/admin/#{model}/export"],
@@ -178,7 +182,7 @@ RSpec.describe 'Admin CBBD identity review', type: :request do
       end
     end
     expect(records.values.map { |record| record.reload.attributes }).to eq(before)
-    expect([CbbdReviewRun.count, CbbdReviewCapture.count, CbbdReviewComparison.count]).to eq([1, 1, 1])
+    expect([CbbdReviewRun.count, CbbdReviewCapture.count, CbbdReviewComparison.count, CbbdSyncRun.count]).to eq([1, 1, 1, 1])
     sign_in admin
     get "/admin/cbbd_review_runs/#{run.id}"
     expect(response).to have_http_status(:ok)

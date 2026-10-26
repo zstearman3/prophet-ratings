@@ -170,15 +170,20 @@ and triggers deployment.
 ### Production migration gate
 
 The deployment workflow runs `python3 bin/run-ecs-migrations` before updating
-web or worker services. It rejects ECS placement failures, waits for the exact
-launched task, and checks its stop status and every launched container's exit code.
+web or worker services. It first reads the task definition and pins its exact
+revision ARN and expected container names, then launches that revision. Empty or
+omitted container lists in the initial launch response do not prevent waiting.
+It rejects ECS placement failures, waits for the exact launched task, and checks
+its stop status and every defined container's exit code.
 A missing result, abnormal stop, nonzero/missing exit code, AWS error or waiter
 timeout fails the job and skips both service updates. The dedicated migration task
 must contain only containers that terminate successfully; a long-running sidecar
 will block rollout. GitHub's Ubuntu runner supplies Python 3 and the AWS CLI.
 
-The deploy identity needs `ecs:DescribeTasks` in addition to its existing launch
-and deployment permissions. The [AWS task waiter](https://docs.aws.amazon.com/cli/latest/reference/ecs/wait/tasks-stopped.html)
+The deploy identity needs `ecs:DescribeTaskDefinition` and `ecs:DescribeTasks`
+in addition to its existing launch and deployment permissions. Definition lookup
+or validation failures block the workflow before any migration task is launched.
+The [AWS task waiter](https://docs.aws.amazon.com/cli/latest/reference/ecs/wait/tasks-stopped.html)
 polls every six seconds for up to 100 unsuccessful checks (about ten minutes).
 The gate logs the task ARN, stop reason and container results. On timeout or API
 failure, inspect that task and its CloudWatch logs before retrying: it may still be
@@ -516,7 +521,8 @@ import, rating backfill or production migration is required to verify the featur
 
 ### Departure review prerequisites
 
-Run `bin/migrate` for migration `20261021200000` before opening departure batches.
+Run `bin/migrate` for migrations `20261021200000` and `20261025040000` before
+opening departure batches or acquiring new captures.
 The existing GoodJob worker performs queued acquisition; web-only startup leaves
 attempts queued. Raw HTML/metadata and prior attempts are retained in PostgreSQL,
 so include these private tables in database backup and capacity/retention planning.
@@ -597,3 +603,22 @@ relevant scenario at 1×; use 2× for data-growth or memory-scaling investigatio
 or when explicitly requested. When both scales are required, run them
 sequentially. Full baseline runs require an explicitly scoped refresh or audit.
 The benchmark owns its disposable services and never stops the development stack.
+
+Run `bin/migrate` to apply departure capture storage migration `20261025040000`
+before new browser acquisitions. This additive migration introduces immutable
+PostgreSQL body/observation rows and normalized evidence tables. Include all of
+them in backups; do not clean these tables as if they were job caches. New browser
+acquisitions require the migrated schema and PostgreSQL's native JSON functions;
+no new Ruby/Python dependency or historical conversion step is required. Existing
+file/manual captures retain the legacy contract. The opt-in
+`departure_normalization` performance scenario measures source processing only;
+ordinary verification still uses targeted specs and both hook suites.
+
+### Scheduled CBBD readiness checks
+
+`spec/services/ingestion/cbbd/scheduled_sync_spec.rb` exercises the synthetic
+capture/import/daily-analytics chain; `spec/jobs/scheduled_game_sync_job_spec.rb`
+checks pinned delivery identity and real GoodJob transactional handoff using the
+disposable test database. No live API calls or application stack are needed.
+See [the runbook](cbbd-cutover.md) for production gates; these checks do not authorize
+deployment or establish live account/storage/memory readiness.
