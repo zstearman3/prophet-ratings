@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_25_040000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_26_010000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -96,6 +96,33 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_25_040000) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["season_id"], name: "index_cbbd_review_runs_on_season_id"
+  end
+
+  create_table "cbbd_sync_runs", force: :cascade do |t|
+    t.bigint "season_id", null: false
+    t.bigint "ratings_config_version_id", null: false
+    t.date "season_start_date", null: false
+    t.date "season_end_date", null: false
+    t.date "schedule_date", null: false
+    t.datetime "bucket", null: false
+    t.integer "maximum_requests", null: false
+    t.integer "retries", null: false
+    t.bigint "past_acquisition_id"
+    t.string "past_status", default: "pending", null: false
+    t.jsonb "past_report", default: {}, null: false
+    t.bigint "future_acquisition_id"
+    t.string "future_status", default: "pending", null: false
+    t.jsonb "future_report", default: {}, null: false
+    t.string "analytics_status", default: "pending", null: false
+    t.string "analytics_job_id"
+    t.string "analytics_error"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["future_acquisition_id"], name: "index_cbbd_sync_runs_on_future_acquisition_id"
+    t.index ["past_acquisition_id"], name: "index_cbbd_sync_runs_on_past_acquisition_id"
+    t.index ["ratings_config_version_id"], name: "index_cbbd_sync_runs_on_ratings_config_version_id"
+    t.index ["season_id", "bucket"], name: "index_cbbd_sync_runs_on_season_id_and_bucket", unique: true
+    t.index ["season_id"], name: "index_cbbd_sync_runs_on_season_id"
   end
 
   create_table "coaching_changes", force: :cascade do |t|
@@ -954,6 +981,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_25_040000) do
   add_foreign_key "cbbd_review_comparisons", "identity_mapping_decisions"
   add_foreign_key "cbbd_review_runs", "cbbd_review_comparisons", column: "active_comparison_id"
   add_foreign_key "cbbd_review_runs", "seasons"
+  add_foreign_key "cbbd_sync_runs", "cbbd_review_runs", column: "future_acquisition_id"
+  add_foreign_key "cbbd_sync_runs", "cbbd_review_runs", column: "past_acquisition_id"
+  add_foreign_key "cbbd_sync_runs", "ratings_config_versions"
+  add_foreign_key "cbbd_sync_runs", "seasons"
   add_foreign_key "coaching_changes", "teams"
   add_foreign_key "coaching_changes", "teams", column: "discovery_previous_team_id"
   add_foreign_key "coaching_changes", "teams", column: "discovery_team_id"

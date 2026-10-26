@@ -10,7 +10,8 @@ require Rails.root.join('lib/rails_admin/config/actions/evaluate_predictions')
 # rubocop:disable Metrics/BlockLength
 RailsAdmin.config do |config|
   config.asset_source = :sprockets
-  config.excluded_models += %w[RecruitingBatch RecruitingEntry GameScoringReview CbbdReviewRun CbbdReviewCapture CbbdReviewComparison]
+  config.excluded_models += %w[RecruitingBatch RecruitingEntry GameScoringReview CbbdReviewRun CbbdReviewCapture CbbdReviewComparison
+                              CbbdSyncRun]
 
   ### Popular gems integration
 

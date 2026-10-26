@@ -1594,3 +1594,14 @@ provenance. See [departure storage](departures.md#capture-storage-and-bounded-no
 for reference versions, replay validation and legacy compatibility. Acquisition
 and normalization do not create player/team identities, profiles, ratings or
 approvals.
+
+## Scheduled CBBD cutover
+
+Production scheduling now enters through `ScheduledGameSyncJob`. At process boot,
+CBBD selects the six-hour Eastern cadence; the default and explicit Sports Reference
+selection retain the legacy `0 /8 * * *` cadence. Restart cron-producing processes
+after changing providers. The explicit CBBD opt-in uses persisted finite past/future
+acquisitions and an atomic analytics handoff. Manual `SyncNightlyGamesJob` CBBD
+calls retain their explicit bounds and do not automatically release ratings.
+See [cutover readiness](cbbd-cutover.md) for cadence, configuration, durable
+evidence, recovery and the NO RELEASE gates.

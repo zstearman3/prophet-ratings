@@ -584,3 +584,12 @@ no new Ruby/Python dependency or historical conversion step is required. Existin
 file/manual captures retain the legacy contract. The opt-in
 `departure_normalization` performance scenario measures source processing only;
 ordinary verification still uses targeted specs and both hook suites.
+
+### Scheduled CBBD readiness checks
+
+`spec/services/ingestion/cbbd/scheduled_sync_spec.rb` exercises the synthetic
+capture/import/daily-analytics chain; `spec/jobs/scheduled_game_sync_job_spec.rb`
+checks pinned delivery identity and real GoodJob transactional handoff using the
+disposable test database. No live API calls or application stack are needed.
+See [the runbook](cbbd-cutover.md) for production gates; these checks do not authorize
+deployment or establish live account/storage/memory readiness.

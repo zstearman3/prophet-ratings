@@ -49,11 +49,26 @@ class CbbdReviewRun < ApplicationRecord
     normalized_replay.deep_dup
   end
 
+  def verified_sync_replay(target_season, dates)
+    validate_sync_scope(target_season, dates)
+
+    window = dates.min..dates.max
+    verified_replay.tap do |result|
+      result['observations'].select! { |row| window.cover?(Ingestion::HistoricalSyncWindow.parse_date(row['schedule_date'])) }
+    end
+  end
+
   def evidence_hash
     SeasonMembershipProposal.digest([manifest, normalized_replay])
   end
 
   private
+
+  def validate_sync_scope(target_season, dates)
+    return if season_id == target_season.id && dates.all? { |date| (start_date..end_date).cover?(date) }
+
+    raise ArgumentError, 'Prepared evidence does not cover this season/window'
+  end
 
   def initialize_manifest
     return unless manifest.empty?

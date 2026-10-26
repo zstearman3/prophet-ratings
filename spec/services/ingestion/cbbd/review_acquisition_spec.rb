@@ -88,4 +88,20 @@ RSpec.describe Ingestion::Cbbd::ReviewAcquisition do
     expect(run.failure).not_to include('private-key')
     expect { run.verified_replay }.to raise_error(ArgumentError, /normalized/)
   end
+
+  it 'imports verified database evidence offline and retains bytes after a rejected date rolls back' do
+    season.update!(start_date: '2025-11-01', end_date: '2026-04-01')
+    fixture = JSON.parse(Rails.root.join('spec/fixtures/ingestion/cbbd/final.json').read)
+    source = ->(uri, _key) { { status: 200, headers: {}, body: fixture.fetch(uri.path == '/games' ? 'games' : 'boxes').to_json } }
+    described_class.new(run, api_key: 'synthetic', transport: source).call
+    retained = CbbdReviewRun.find(run.id)
+    expect(retained.captures.count).to eq(2)
+    # No mapped teams: canonical validation must reject, leaving durable source evidence.
+    report = Ingestion::GameSyncRun.new(season:, dates: [Date.new(2025, 11, 1)], resume: false,
+                                        provider: 'cbbd', provider_options: { prepared_run: retained }).call
+    expect(report).to include(complete: false, failed_dates: [Date.new(2025, 11, 1)])
+    expect(Game.count).to eq(0)
+    expect(CbbdReviewRun.find(run.id).verified_replay['complete']).to be(true)
+    expect(CbbdReviewRun.find(run.id).captures.count).to eq(2)
+  end
 end

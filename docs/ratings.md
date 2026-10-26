@@ -1541,3 +1541,12 @@ preserving frozen forecast contexts/snapshot associations and participant mismat
 safeguards. Historical input revision, model impact assessment and production
 cutover remain separate operator decisions. See [Data Ingestion](data-ingestion.md)
 for contract fields, freshness, audit outcomes and transactional rollback behavior.
+
+### CBBD scheduled daily authorization
+
+The opt-in scheduled CBBD path pins season/model/Eastern date before enqueue.
+Complete past ingestion authorizes `CbbdSyncAnalyticsJob`, which uses the existing
+prior-day calculator and prediction builder under the shared ratings lock. It
+records ratings and prediction processing separately; prediction retries do not
+repeat committed ratings. Forecast coverage still requires checking skipped inputs.
+See [the cutover runbook](cbbd-cutover.md); daily cutoff and formulas are unchanged.
