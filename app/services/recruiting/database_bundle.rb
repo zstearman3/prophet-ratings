@@ -43,7 +43,9 @@ module Recruiting
     end
 
     def self.validate_rows(report)
-      fatal = report.fetch('rows').flat_map { |row| Row.review_errors(row) + row.fetch('exclusions').grep(/Duplicate|Ambiguous/) }
+      fatal = report.fetch('rows').flat_map do |row|
+        Row.review_errors(row) + row.fetch('exclusions').grep(/Duplicate|Ambiguous|Conflicting/)
+      end
       raise ArgumentError, "Resolve recruiting conflicts: #{fatal.uniq.join('; ')}" if fatal.any?
     end
 
@@ -51,10 +53,10 @@ module Recruiting
       report.fetch('rows').select { |row| row.fetch('exclusions').empty? }.index_by { |row| row.fetch('team_id') }
     end
 
-    def self.input(row)
+    def self.input(row, units = '247_recruit_composite_class_points')
       points = row&.dig('values', 'class_points')
       { 'status' => point_status(points), 'class_points' => points,
-        'units' => { 'class_points' => '247_recruit_composite_class_points' },
+        'units' => { 'class_points' => units },
         'row' => row, 'reason' => row ? 'reviewed_source_row' : 'omitted_or_unresolved_team' }
     end
 
@@ -109,7 +111,7 @@ module Recruiting
       converter = self.class
       rows = converter.eligible_rows(proposal)
       season.team_seasons.order(:team_id).pluck(:team_id).to_h do |id|
-        [id.to_s, converter.input(rows[id])]
+        [id.to_s, converter.input(rows[id], "#{batch.cbbd? ? 'cbbd' : '247'}_recruit_composite_class_points")]
       end
     end
   end

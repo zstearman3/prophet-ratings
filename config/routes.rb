@@ -44,6 +44,7 @@ Rails.application.routes.draw do
     end
     resources :recruiting_batches, only: %i[index create show update] do
       patch :publish, on: :member
+      get :source, on: :member
     end
   end
 

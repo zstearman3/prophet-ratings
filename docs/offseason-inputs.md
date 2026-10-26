@@ -18,7 +18,9 @@ identities and approvals. Unsupported source layouts need an adapter, not invent
 Open **RailsAdmin → Seasons → target season → Review recruiting**.
 
 1. Click **Fetch recruiting data**. The background worker fetches the prior recruiting
-   year's 247 Recruit Composite pages into a database batch and normalized row records.
+   year's CBBD Recruit Composite team class points into a database batch and normalized rows.
+   Target season 2027 explicitly requests class 2026. `CBBD_API_KEY` must be set for the worker;
+   no live 247 fallback occurs. Average rating/commit count and upstream update time remain unknown.
    Keep the worker running (`bin/dev` starts it); use **Refresh status** while fetching.
 2. Review source school, team mapping, class points, average rating, commits and row
    issues (50 rows per page, unresolved rows first). Save changes before switching
@@ -26,9 +28,11 @@ Open **RailsAdmin → Seasons → target season → Review recruiting**.
    numeric values are read-only. Blank points remain unknown; zero stays verified zero.
 3. Click **Save mappings** to pause/resume review, or check the review confirmation
    and **Approve and publish recruiting inputs** to save the choices and publish together.
+   Approval also retains included CBBD ID-to-team mappings atomically; draft saves do not.
+   Existing CBBD identities take precedence over source-label changes, and excluded unmapped IDs stay unassigned.
    No JSON files, paths, hashes, reviewer text or version names are required.
 
-Automatic matching checks canonical school names and stored aliases from every
+After checking durable CBBD identities, automatic matching checks canonical school names and stored aliases from every
 source, ignoring case and surrounding whitespace. Only one distinct team resolves;
 conflicting identities require review. Matching runs when the batch is fetched.
 Fetch a new batch after adding aliases; saved mappings in existing batches stay intact.

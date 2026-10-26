@@ -4,94 +4,69 @@ require 'rails_helper'
 
 RSpec.describe Recruiting::BatchAcquisition do
   let(:season) { create(:season, year: 2027) }
-  let!(:team) { create(:team, school: 'Arkansas') }
-  let(:batch) { RecruitingBatch.create!(season:, source_year: 2026) }
-  let(:first_html) { Rails.root.join('spec/fixtures/recruiting/page1.html').read }
-  let(:second_html) do
-    page = Nokogiri::HTML(Rails.root.join('spec/fixtures/recruiting/page2.html').read)
-    page.css('a[data-js="showmore"]').remove
-    page.to_html
+  let!(:team) { create(:team, school: 'Duke') }
+  let(:batch) do
+    RecruitingBatch.create!(season:, source_year: 2026,
+                            extract_bytes: JSON.generate('provider' => 'cbbd', 'extraction_version' => Recruiting::CbbdExtract::VERSION))
   end
+  let(:body) { '[{"teamId":72,"team":"Duke","year":2026,"ranking":1,"rating":69.16}]' }
 
   before do
-    allow(Recruiting::Acquisition).to receive(:sleep)
-    allow(HTTParty).to receive(:get).and_return(double(code: 200, body: first_html), double(code: 200, body: second_html))
+    allow(ENV).to receive(:fetch).and_call_original
+    allow(ENV).to receive(:fetch).with('CBBD_API_KEY', '').and_return('test-key')
+    allow(Ingestion::Cbbd::HttpTransport).to receive(:call).and_return(status: 200, body:, headers: {})
+    allow(HTTParty).to receive(:get).and_raise('Live 247 must never be requested')
   end
 
-  it 'uses the automated parser to save source pages and normalized database rows without files' do
-    described_class.new(batch).call
-    expect(batch.reload).to have_attributes(status: 'ready', page_count: 2, source_status: 'ok', next_url: nil)
-    expect(batch.entries.order(:row_number).pluck(:source_label)).to eq(%w[Arkansas Nebraska])
-    expect(batch.entries.find_by!(source_label: 'Arkansas')).to have_attributes(team_id: team.id, class_points: BigDecimal('70.43'))
-    source = JSON.parse(batch.snapshot_bytes).fetch('pages').first
-    expect(Base64.strict_decode64(source.fetch('html_base64'))).to eq(first_html)
-    expect(batch.dataset.manifest.fetch('rows').size).to eq(2)
+  it 'saves CBBD captures and normalized rows through the job and makes terminal retries no-ops' do
+    AcquireRecruitingBatchJob.perform_now(batch.id)
+    expect(batch.reload).to have_attributes(status: 'ready', page_count: 1, source_status: 'ok', next_url: nil)
+    expect(batch.entries.sole).to have_attributes(team_id: team.id, class_points: BigDecimal('69.16'), average_rating: nil)
+    original = [batch.attributes, batch.entries.map(&:attributes)]
+    AcquireRecruitingBatchJob.perform_now(batch.id)
+    expect([batch.reload.attributes, batch.entries.map(&:attributes)]).to eq(original)
+    expect(Ingestion::Cbbd::HttpTransport).to have_received(:call).once
+    expect(HTTParty).not_to have_received(:get)
   end
 
-  it 'fails direct replay of an interrupted fetching batch without HTTP or evidence replacement' do
+  it 'preserves interrupted evidence and does not reinterpret legacy queued 247 batches', :aggregate_failures do
     batch.update!(status: 'fetching', snapshot_bytes: 'retained-capture')
     described_class.new(batch).call
     expect(batch.reload).to have_attributes(status: 'failed', snapshot_bytes: 'retained-capture')
     expect(batch.failure_message).to include('interrupted')
-    expect(HTTParty).not_to have_received(:get)
+    legacy = RecruitingBatch.create!(season:, source_year: 2026)
+    described_class.new(legacy).call
+    expect(legacy.reload.status).to eq('failed')
+    expect(legacy.source_label).to eq('247 Recruit Composite')
+    expect(legacy.failure_message).to include('new CBBD batch')
+    expect(Ingestion::Cbbd::HttpTransport).not_to have_received(:call)
   end
 
-  it 'does not fetch a ready batch again or duplicate its rows' do
+  it 'preserves CBBD provenance when runtime credentials are missing and retains authentication failures' do
+    allow(ENV).to receive(:fetch).with('CBBD_API_KEY', '').and_return('')
     described_class.new(batch).call
-    before = [batch.reload.attributes, batch.entries.map(&:attributes)]
-    described_class.new(batch).call
-    expect([batch.reload.attributes, batch.entries.map(&:attributes)]).to eq(before)
-    expect(HTTParty).to have_received(:get).twice
+    expect(batch.reload.status).to eq('failed')
+    expect(batch.source_label).to include('CBBD')
+    expect(batch.failure_message).to eq('CBBD_API_KEY is required')
+    expect(Ingestion::Cbbd::HttpTransport).not_to have_received(:call)
   end
 
-  it 'persists automatic mappings from existing aliases belonging to another source' do
-    team.update!(school: 'Canonical Arkansas')
-    create(:team_alias, team:, source: 'sports_reference', value: ' ARKANSAS ')
-
+  it 'retains failed HTTP evidence instead of producing empty coverage' do
+    allow(Ingestion::Cbbd::HttpTransport).to receive(:call).and_return(status: 401, body: 'Denied', headers: {})
     described_class.new(batch).call
-
-    expect(batch.entries.find_by!(source_label: 'Arkansas').team_id).to eq(team.id)
-    expect(Recruiting::BatchReview.new(batch).report.fetch('rows').first.fetch('team_id')).to eq(team.id)
-  end
-
-  it 'retains failed HTTP evidence and prevents approval rather than creating an empty successful batch' do
-    allow(HTTParty).to receive(:get).and_return(double(code: 403, body: 'Blocked source response'))
-    described_class.new(batch).call
-    expect(batch.reload).to have_attributes(status: 'failed', source_status: 'access_failure')
-    expect(batch.failure_message).to be_present
-    expect(batch.snapshot_bytes).to include(Base64.strict_encode64('Blocked source response'))
+    expect(batch.reload).to have_attributes(status: 'failed', source_status: 'authentication')
+    expect(batch.snapshot_bytes).to include(Base64.strict_encode64('Denied'))
     expect(batch.entries).to be_empty
     expect { Recruiting::BatchReview.new(batch).publish({ 'confirm' => '1' }, reviewer: 'reviewer') }
       .to raise_error(ArgumentError, /unpublished/)
   end
 
-  it 'runs safely through the background job and does not fetch a completed batch twice' do
-    AcquireRecruitingBatchJob.perform_now(batch.id)
-    expect(batch.reload.status).to eq('ready')
-    AcquireRecruitingBatchJob.perform_now(batch.id)
-    expect(HTTParty).to have_received(:get).twice
-  end
-
-  it 'records and logs an unexpected acquisition failure without scheduling a futile job retry' do
-    allow(Recruiting::Acquisition).to receive(:new).and_raise(IOError, 'Source unavailable')
-    allow(Rails.logger).to receive(:error)
-    job = AcquireRecruitingBatchJob.new(batch.id)
-    allow(job).to receive(:retry_job)
-
-    job.perform_now
-
-    expect(batch.reload).to have_attributes(status: 'failed', failure_message: 'Source unavailable')
-    expect(Rails.logger).to have_received(:error).with("Recruiting batch #{batch.id} failed: IOError: Source unavailable")
-    expect(job).not_to have_received(:retry_job)
-  end
-
   it 'preserves the original acquisition exception when recording the failure also fails' do
     error = IOError.new('Source unavailable')
-    allow(Recruiting::Acquisition).to receive(:new).and_raise(error)
+    allow(Recruiting::CbbdAcquisition).to receive(:new).and_raise(error)
     allow(batch).to receive(:update!).and_call_original
     allow(batch).to receive(:update!).with(status: 'failed', failure_message: error.message)
                                      .and_raise(ActiveRecord::StatementInvalid, 'Database unavailable')
-
     expect { described_class.new(batch).call }.to(raise_error { |raised| expect(raised).to equal(error) })
     expect(batch.reload.status).to eq('fetching')
   end

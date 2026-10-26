@@ -10,8 +10,21 @@ module Recruiting
     def initialize(extract_bytes, snapshot_bytes)
       @extract_bytes = extract_bytes
       @snapshot_bytes = snapshot_bytes
-      @extract = Extract.new(extract_bytes)
+      @extract = self.class.parse_extract(extract_bytes)
+      @extract.verify_snapshot(snapshot_bytes) if @extract.is_a?(CbbdExtract)
       @manifest = build_manifest
+    end
+
+    def self.parse_extract(bytes)
+      text = bytes.dup.force_encoding(Encoding::UTF_8)
+      raise ArgumentError, 'Extract must be valid UTF-8' unless text.valid_encoding?
+
+      document = JSON.parse(text)
+      parser(document).new(bytes)
+    end
+
+    def self.parser(document)
+      document.is_a?(Hash) && document['extraction_version'] == CbbdExtract::VERSION ? CbbdExtract : Extract
     end
 
     private

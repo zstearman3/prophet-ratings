@@ -8,7 +8,7 @@ module Ingestion
     # Bounded read-only requests; the same counter covers endpoints and retries.
     class Client
       # Transport allowlist; game acquisition and replay own their narrower endpoint set.
-      ENDPOINTS = %w[/games /games/teams /teams/directory /draft/picks /stats/player/season /stats/team/season].freeze
+      ENDPOINTS = %w[/games /games/teams /teams/directory /draft/picks /recruiting/teams /stats/player/season /stats/team/season].freeze
       TRANSIENT = %w[timeout transport quota].freeze
 
       def initialize(store:, api_key:, **options)

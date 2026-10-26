@@ -56,6 +56,8 @@ RSpec.describe 'Admin recruiting dataset review', type: :request do
     post path, params: { season_id: season.id }
     record = RecruitingBatch.last
     expect(record).to have_attributes(season_id: season.id, source_year: 2026, status: 'queued')
+    expect(record.source_label).to include('CBBD')
+    expect(record.source_url).to eq('https://api.collegebasketballdata.com/recruiting/teams?year=2026')
     expect(AcquireRecruitingBatchJob).to have_received(:perform_later).with(record.id)
     expect(response).to redirect_to("#{path}/#{record.id}")
     follow_redirect!
@@ -261,5 +263,21 @@ RSpec.describe 'Admin recruiting dataset review', type: :request do
     patch "#{record_path}/publish", params: { review: {} }
     expect(response).to redirect_to('/')
     expect(OffseasonInputRevision.count).to eq(0)
+  end
+
+  it 'exposes retained failure responses only to administrators with accurate provider provenance', :aggregate_failures do
+    record = RecruitingBatch.create!(season:, source_year: 2026, status: 'fetching',
+                                     extract_bytes: JSON.generate('provider' => 'cbbd'))
+    transport = ->(_uri, _key) { { status: 401, body: 'Retained denied response', headers: {} } }
+    Recruiting::CbbdAcquisition.new(record, api_key: 'test', transport:).call
+    get "#{path}/#{record.id}"
+    expect(response.body).to include('CBBD', 'authentication', 'Download response 1')
+    expect(response.body).not_to include('247 Recruit Composite source')
+    get "#{path}/#{record.id}/source", params: { capture: '0' }
+    expect(response.body).to eq('Retained denied response')
+    expect(response.headers['Content-Disposition']).to include('attachment')
+    sign_out admin
+    get "#{path}/#{record.id}/source", params: { capture: '0' }
+    expect(response).to redirect_to(new_user_session_path)
   end
 end

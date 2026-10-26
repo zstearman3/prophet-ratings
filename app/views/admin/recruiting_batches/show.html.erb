@@ -4,8 +4,13 @@
   <h1 class="text-3xl font-bold">Review recruiting · <%= @batch.season.year %> season</h1>
   <% if notice %><p role="status" class="bg-green-100 p-3 rounded"><%= notice %></p><% end %>
   <% if @review_error %><p role="alert" class="bg-red-100 p-3 rounded"><%= @review_error %></p><% end %>
-  <p>Batch <%= @batch.id %> · <strong><%= @batch.status.humanize %></strong> · Source year <%= @batch.source_year %> · <%= @batch.page_count %> captured pages</p>
-  <p><%= link_to '247 Recruit Composite source', @batch.source_url, target: '_blank', rel: 'noopener', class: 'text-blue-700 underline' %></p>
+  <p>Batch <%= @batch.id %> · <strong><%= @batch.status.humanize %></strong> · Source year <%= @batch.source_year %> · <%= @batch.page_count %> captured responses</p>
+  <p><%= link_to @batch.source_label, @batch.source_url, target: '_blank', rel: 'noopener', class: 'text-blue-700 underline' %></p>
+  <% @batch.source_captures.each_with_index do |capture, index| %>
+    <p><%= link_to "Download response #{index + 1}", source_admin_recruiting_batch_path(@batch, capture: index), class: 'text-blue-700 underline' %>
+      · <%= capture.dig('metadata', 'outcome') %> · HTTP <%= capture.dig('metadata', 'status') || 'unavailable' %>
+      · captured <%= capture.dig('metadata', 'captured_at') %></p>
+  <% end %>
   <% if @batch.status.in?(%w[queued fetching]) %>
     <p>The background worker is fetching this batch. <%= link_to 'Refresh status', admin_recruiting_batch_path(@batch), class: 'text-blue-700 underline' %>.</p>
   <% end %>
