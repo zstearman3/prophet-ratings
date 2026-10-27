@@ -385,6 +385,33 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_27_020000) do
     t.index ["game_id"], name: "index_game_odds_on_game_id_unique", unique: true
   end
 
+  create_table "game_schedule_reviews", force: :cascade do |t|
+    t.bigint "season_id", null: false
+    t.bigint "schedule_refresh_run_id", null: false
+    t.bigint "game_id", null: false
+    t.bigint "source_observation_id", null: false
+    t.bigint "prior_observation_id", null: false
+    t.bigint "reviewed_by_id", null: false
+    t.string "choice", null: false
+    t.string "selected_external_id", null: false
+    t.string "ignored_external_id", null: false
+    t.string "ignored_fingerprint", null: false
+    t.string "comparison_fingerprint", null: false
+    t.jsonb "selected_payload", null: false
+    t.jsonb "selected_schedule", null: false
+    t.jsonb "participants", null: false
+    t.string "reason", default: "Approved by admin", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["game_id"], name: "index_game_schedule_reviews_on_game_id"
+    t.index ["ignored_external_id"], name: "index_game_schedule_reviews_on_ignored_external_id", unique: true
+    t.index ["prior_observation_id"], name: "index_game_schedule_reviews_on_prior_observation_id"
+    t.index ["reviewed_by_id"], name: "index_game_schedule_reviews_on_reviewed_by_id"
+    t.index ["schedule_refresh_run_id"], name: "index_game_schedule_reviews_on_schedule_refresh_run_id"
+    t.index ["season_id"], name: "index_game_schedule_reviews_on_season_id"
+    t.index ["source_observation_id"], name: "index_game_schedule_reviews_on_source_observation_id", unique: true
+  end
+
   create_table "game_scoring_reviews", force: :cascade do |t|
     t.bigint "season_id", null: false
     t.bigint "schedule_refresh_run_id", null: false
@@ -1063,6 +1090,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_27_020000) do
   add_foreign_key "game_observations", "game_scoring_reviews", column: "scoring_review_id"
   add_foreign_key "game_observations", "games"
   add_foreign_key "game_odds", "games"
+  add_foreign_key "game_schedule_reviews", "game_observations", column: "prior_observation_id"
+  add_foreign_key "game_schedule_reviews", "game_observations", column: "source_observation_id"
+  add_foreign_key "game_schedule_reviews", "games"
+  add_foreign_key "game_schedule_reviews", "schedule_refresh_runs"
+  add_foreign_key "game_schedule_reviews", "seasons"
+  add_foreign_key "game_schedule_reviews", "users", column: "reviewed_by_id"
   add_foreign_key "game_scoring_reviews", "game_observations", column: "source_observation_id"
   add_foreign_key "game_scoring_reviews", "schedule_refresh_runs"
   add_foreign_key "game_scoring_reviews", "seasons"

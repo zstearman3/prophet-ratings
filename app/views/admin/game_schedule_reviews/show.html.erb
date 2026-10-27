@@ -1,0 +1,43 @@
+<section class="mx-auto max-w-5xl space-y-6 pb-12">
+  <h1 class="text-3xl font-bold">Resolve schedule conflict</h1>
+  <p class="text-lg"><%= schedule_observation_matchup(page[:observation]) %></p>
+  <%= link_to 'Return to schedule results', admin_schedule_refresh_run_path(page[:run]), class: 'text-blue-700 underline' %>
+  <% if page[:error] %><p role="alert" class="rounded bg-red-100 p-3"><%= page[:error] %></p><% end %>
+  <% if page[:review] %>
+    <% review = page[:review] %>
+    <section class="rounded border bg-green-50 p-5 space-y-3">
+      <h2 class="text-xl font-semibold">Approved by admin</h2>
+      <p><%= review.reviewed_by.email %> · <%= review.created_at %></p>
+      <p>Kept CBBD <%= review.selected_external_id %> for <%= review.selected_schedule['schedule_date'] %>.
+        Retired CBBD <%= review.ignored_external_id %>.</p>
+      <p><%= link_to "View game #{review.game_id}", game_path(review.game), class: 'text-blue-700 underline' %></p>
+      <p>Retry unfinished dates from the schedule results to recompute completion. The original failed report and both source entries remain in the audit history.</p>
+    </section>
+  <% elsif page[:evidence] %>
+    <% evidence = page[:evidence] %>
+    <p>CBBD supplied different game IDs for this matchup. Choose the schedule entry to keep after checking the dates and times. Dates and tip times below use Eastern time and show the values that will be retained, including manual venue corrections.</p>
+    <%= form_with url: admin_schedule_refresh_run_game_schedule_review_path(page[:run], page[:observation]), method: :patch, data: { turbo: false }, class: 'space-y-5' do %>
+      <%= hidden_field_tag :fingerprint, evidence.fingerprint %>
+      <fieldset class="space-y-4">
+        <legend class="font-semibold">Which entry should the schedule use?</legend>
+        <div class="grid gap-4 md:grid-cols-2">
+          <% { 'existing' => evidence.prior.normalized_payload, 'incoming' => evidence.incoming.data.as_json }.each do |choice, payload| %>
+            <% schedule = evidence.schedule_for(choice) %>
+            <label class="block rounded border bg-white p-5 space-y-3">
+              <span class="block text-lg font-semibold"><%= radio_button_tag :choice, choice, false, required: true, class: 'mr-2' %>Keep <%= choice == 'existing' ? 'existing entry' : 'incoming entry' %></span>
+              <span class="block"><strong>Schedule date:</strong> <%= schedule['schedule_date'] %></span>
+              <span class="block"><strong>Tip time:</strong> <%= schedule['tip_time'].present? ? Time.iso8601(schedule['tip_time']).in_time_zone('America/New_York').strftime('%-I:%M %p %Z') : 'Time unknown' %></span>
+              <span class="block"><strong>Venue:</strong> <%= schedule['venue_name'].presence || 'Unknown' %></span>
+              <span class="block"><strong>CBBD game ID:</strong> <%= payload['external_game_id'] %></span>
+            </label>
+          <% end %>
+        </div>
+      </fieldset>
+      <p>The other source ID will be retired. This keeps the existing local game and its history. Scores and box statistics are not changed. Updated facts from the discarded entry will still require review.</p>
+      <%= submit_tag 'Approve selected schedule entry', class: 'rounded bg-prophet-indigo px-4 py-2 text-white' %>
+    <% end %>
+  <% else %>
+    <p>This conflict cannot be resolved by the pending schedule review. Review the source identities and participants before retrying.</p>
+  <% end %>
+  <p><%= link_to 'Inspect original rejected observation', rails_admin.show_path(model_name: 'game_observation', id: page[:observation].id), class: 'text-blue-700 underline' %></p>
+</section>

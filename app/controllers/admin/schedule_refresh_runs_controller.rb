@@ -16,7 +16,9 @@ module Admin
       observations = run.rejection_observations
       reviews = GameScoringReview.where(source_observation_id: observations.keys).includes(:game)
       @evidence = { games: run.season.games.where(id: run.report_game_ids).index_by(&:id), observations:,
-                    scoring_reviews: reviews.index_by(&:source_observation_id) }
+                    scoring_reviews: reviews.index_by(&:source_observation_id),
+                    schedule_reviews: GameScheduleReview.where(source_observation_id: observations.keys).includes(:game)
+                                                        .index_by(&:source_observation_id) }
     end
 
     def create
