@@ -25,6 +25,11 @@ module Departures
       ApplicationRecord.sanitize_sql_array([sql_template, { normalization_id: @record.id }])
     end
 
+    def retain(attempt_id, expression: sql)
+      query = ApplicationRecord.sanitize_sql_array(["UPDATE departure_acquisitions SET dataset = #{expression} WHERE id = ?", attempt_id])
+      ApplicationRecord.connection.execute(query)
+    end
+
     def validate_saved(attempt_id)
       reference, revision = DepartureAcquisition.where(id: attempt_id).pick(Arel.sql("dataset->>'storage_version'"),
                                                                             Arel.sql("dataset->>'dataset_revision'"))

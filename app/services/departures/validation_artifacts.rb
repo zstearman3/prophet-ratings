@@ -4,7 +4,10 @@ module Departures
   # Worker-only authentication of actual retained bytes and the annual rows consumed by publication.
   class ValidationArtifacts
     METADATA_SQL = <<~SQL.squish.freeze
-      jsonb_build_object('plan_hash', md5(plan::text), 'manifest', manifest - 'sources' - 'captures',
+      jsonb_build_object('plan_hash', encode(sha256(convert_to(plan::text, 'UTF8')), 'hex'),
+                        'batch_plan_hash', (SELECT encode(sha256(convert_to(b.plan::text, 'UTF8')), 'hex')
+                                            FROM departure_batches b WHERE b.id = departure_acquisitions.departure_batch_id),
+                        'manifest', manifest - 'sources' - 'captures',
                         'status', status, 'predecessor_id', predecessor_id)
     SQL
 
@@ -16,8 +19,11 @@ module Departures
 
     def call
       record = record_reference
-      { 'sources' => source_digest, 'annual' => PersistedDatasetStream.new(record).digest,
-        'dataset_revision' => record.dataset_revision, 'evidence' => evidence_digest }
+      retained.merge('annual' => PersistedDatasetStream.new(record).digest, 'dataset_revision' => record.dataset_revision)
+    end
+
+    def retained
+      { 'sources' => source_digest, 'evidence' => evidence_digest }
     end
 
     private

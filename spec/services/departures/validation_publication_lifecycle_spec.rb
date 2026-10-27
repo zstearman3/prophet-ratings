@@ -50,6 +50,42 @@ RSpec.describe Departures::ValidationPublication do
     expect([OffseasonInputRevision.count, TeamOffseasonProfile.count]).to eq([0, 0])
   end
 
+  it 'authenticates full batch and acquisition source plans at publication without annual web hashing' do
+    approval = approval_for(batch)
+    operation = approval.departure_validation
+    plan = batch.plan.deep_dup
+    plan.fetch('sources').first['url'] = 'https://changed.example/unused'
+    overwrite_departure_record(batch, plan:)
+    overwrite_departure_record(batch.attempt, plan:)
+    expect(operation.reload).to be_current
+    expect { described_class.new(approval).call }.to raise_error(ArgumentError, /artifacts changed/)
+    expect(OffseasonInputRevision.count).to eq(0)
+  end
+
+  it 'exposes publication failures and retries the exact retained approval without changing the actor or document' do
+    approval = approval_for(batch)
+    original = approval.attributes
+    allow(Departures::ValidationRevision).to receive(:new).and_raise(IOError, 'temporary storage failure')
+    job = PublishDepartureValidationJob.new(approval.id)
+    allow(job).to receive(:retry_job)
+    job.perform_now
+    expect(job).to have_received(:retry_job).with(hash_including(error: an_instance_of(IOError)))
+    operation = approval.departure_validation.reload
+    expect(operation).to have_attributes(status: 'publish_failed', error: 'temporary storage failure')
+    retry_approval = Departures::ValidationApproval.new(operation).call(reviewer: 'different-admin')
+    expect(retry_approval.attributes).to eq(original)
+  end
+
+  it 'records interrupted publication visibly while retaining the signed approval for retry' do
+    approval = approval_for(batch)
+    allow(Departures::ValidationRevision).to receive(:new).and_raise(GoodJob::InterruptError, 'worker stopped')
+    PublishDepartureValidationJob.perform_now(approval.id)
+    operation = approval.departure_validation.reload
+    expect(operation).to have_attributes(status: 'publish_failed', error: 'worker stopped')
+    expect(operation.approval.id).to eq(approval.id)
+    expect(OffseasonInputRevision.count).to eq(0)
+  end
+
   it 'rejects replaced proposals and reports even when supplied hashes are recomputed' do
     approval = approval_for(batch)
     operation = approval.departure_validation

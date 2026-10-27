@@ -10,6 +10,8 @@ RSpec.describe 'Admin departure batches' do
   let(:team) { create(:team, school: 'Sample School') }
 
   before do
+    allow(PrepareDepartureValidationJob).to receive(:perform_later)
+    allow(PublishDepartureValidationJob).to receive(:perform_later)
     create(:team_season, season:, team:)
     TeamExternalIdentity.associate!(team:, provider: 'cbbd', external_id: '20')
     stub_cbbd
@@ -38,17 +40,23 @@ RSpec.describe 'Admin departure batches' do
     expect(AcquireDepartureBatchJob).to have_received(:perform_later).with(kind_of(Integer))
     attempt = batch.attempt
     AcquireDepartureBatchJob.perform_now(attempt.id)
+    PrepareDepartureValidationJob.perform_now(DepartureValidation.order(:id).last.id)
     get admin_departure_batch_path(batch)
     expect(response).to have_http_status(:ok)
-    expect(response.body).to include('Round 1', 'Round 2', '500 points / 2000', 'Save decisions')
+    expect(response.body).to include('Round 1', 'Round 2', 'Edit player choices')
     key = response.parsed_body.at_css('input[name="review[review_key]"]')['value']
     patch admin_departure_batch_path(batch), params: { review: { review_key: key, rows: cbbd_rows(team) } }
     follow_redirect!
+    expect(response.body).to include('Validation queued')
+    PrepareDepartureValidationJob.perform_now(DepartureValidation.order(:id).last.id)
+    get admin_departure_batch_path(batch)
     expect(response.body).to include('0.25', 'verified_production')
     forms = response.parsed_body.css('form')
     approval = forms.find { |form| form['action'] == publish_admin_departure_batch_path(batch) }
     expect(approval.at_css('input[name="review[confirm]"][type="checkbox"]')['checked']).to be_nil
     patch approval['action'], params: { review: { review_key: approval.at_css('input[name="review[review_key]"]')['value'], confirm: '1' } }
+    expect(batch.reload.status).to eq('draft')
+    PublishDepartureValidationJob.perform_now(DepartureApproval.last.id)
     expect(batch.reload.status).to eq('published')
     post correct_admin_departure_batch_path(batch), params: { reason: 'Decision correction' }
     follow_redirect!
@@ -128,17 +136,15 @@ RSpec.describe 'Admin departure batches' do
     expect(TeamOffseasonProfile.pluck(:departure_revision_id)).to eq([revision.id])
   end
 
-  it 'loads full evidence once for a sixty-pick review and omits it from history and index summaries' do
+  it 'reads saved reports without full acquisitions and keeps history and index source-free' do
     sign_in admin
     batch = create_from_form
     2.times { capture_cbbd(batch) }
-    allow(Departures::BatchPage).to receive(:table_options).and_call_original
+    PrepareDepartureValidationJob.perform_now(DepartureValidation.order(:id).last.id)
     queries = acquisition_queries { get admin_departure_batch_path(batch) }
-    expect(response.body).to include('Pick 60', 'Attempt #', '500 points / 2000')
-    expect(queries.grep(/"departure_acquisitions"\.\*/).size).to eq(1)
-    expect(queries.size).to eq(2)
-    expect(queries.last).not_to include('evidence', 'plan')
-    expect(Departures::BatchPage).to have_received(:table_options).once
+    expect(response.body).to include('Pick 60', 'Attempt #', 'Edit player choices')
+    expect(queries.grep(/"departure_acquisitions"\.\*/)).to be_empty
+    expect(queries.grep(/SELECT .*\."(?:evidence|dataset|manifest)"/)).to be_empty
 
     Departures::BatchPreparation.create(season, cbbd_fields)
     listing_queries = acquisition_queries { get admin_departure_batches_path(season_id: season.id) }

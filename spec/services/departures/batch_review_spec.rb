@@ -152,7 +152,7 @@ RSpec.describe Departures::BatchReview do
     attempt = capture_departures(batch)
     save_departure_rows(batch, departure_rows(team))
     revision = approve_departures(batch)
-    expect(DepartureProgress.new(season).call.status).to eq('complete')
+    expect(DepartureProgress.new(season).call.status).to eq('needs_review')
     team.update!(school: 'Changed canonical identity')
     expect(DepartureProgress.new(season).call.status).to eq('needs_review')
     team.update!(school: 'Sample School')
@@ -164,7 +164,8 @@ RSpec.describe Departures::BatchReview do
       progress = DepartureProgress.new(season).call
       expect([progress.status, progress.last_result]).to eq(
         ['needs_review',
-         "Departure revision ##{revision.id} is retained. Latest departure batch ##{correction.id}: draft; acquisition #{state}."]
+         "Departure revision ##{revision.id} is retained. " \
+         "Latest departure batch ##{correction.id}: draft; acquisition #{state}; validation needed."]
       )
     end
     expect(attempt.reload.status).to eq('completed')

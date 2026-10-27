@@ -148,4 +148,44 @@ RSpec.describe Departures::ValidationPreparation do
     expect(operation).not_to be_current
     expect(DepartureProgress.new(season).call.status).to eq('needs_review')
   end
+
+  it 'rejects a direct SQL proposal replacement after the coherent snapshot commits and before sealing' do
+    operation = described_class.create(batch)
+    preparer = described_class.new(DepartureValidation.find(operation.id))
+    allow(preparer).to receive(:snapshot).and_wrap_original do |method|
+      method.call.tap do
+        held << true
+        release.pop
+      end
+    end
+    in_connection { preparer.call }
+    Timeout.timeout(8) { held.pop }
+    proposal = operation.proposals.first!
+    overwrite_departure_record(proposal, input: proposal.input.merge('loss_share' => 0.0))
+    release << true
+    threads.each { |thread| expect(thread.join(10)).to be_present }
+    expect(operation.reload.status).to eq('failed')
+    expect(operation.certificate).to be_blank
+    expect(OffseasonInputRevision.where(season:)).to be_empty
+  end
+
+  it 'excludes a live worker while allowing later recovery of an unsealed running operation' do
+    operation = described_class.create(batch)
+    preparer = described_class.new(DepartureValidation.find(operation.id))
+    allow(preparer).to receive(:snapshot).and_wrap_original do |method|
+      held << true
+      release.pop
+      method.call
+    end
+    in_connection { preparer.call }
+    Timeout.timeout(8) { held.pop }
+    Timeout.timeout(1) do
+      described_class.new(DepartureValidation.find(operation.id)).call
+      expect { described_class.queue(batch, close_interrupted: true) }.to raise_error(ArgumentError, /worker is busy/)
+    end
+    release << true
+    threads.each { |thread| expect(thread.join(10)).to be_present }
+    expect(operation.reload.status).to eq('ready'), operation.error
+    expect(operation.proposals.count).to eq(1)
+  end
 end

@@ -9,6 +9,24 @@ class DepartureValidation < ApplicationRecord
   has_many :proposals, class_name: 'DepartureProposal', dependent: :restrict_with_exception
   has_one :approval, class_name: 'DepartureApproval', dependent: :restrict_with_exception
 
+  def record_publication_failure(message)
+    with_lock { update!(status: 'publish_failed', error: message) unless status.in?(%w[published stale]) }
+  end
+
+  def progress_status
+    return status unless status == 'ready'
+    return 'stale' unless current?
+
+    approval ? 'publish_queued' : 'ready'
+  end
+
+  def review_state
+    return 'Validation stale' if status.in?(%w[ready published]) && !current?
+    return Departures::BatchPage::LABELS.fetch(status, status.humanize) unless status == 'ready'
+
+    approval ? 'Publication queued' : 'Validation ready'
+  end
+
   def current?
     Departures::ValidationIntegrity.new(self).current?
   end

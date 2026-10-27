@@ -1,0 +1,197 @@
+{
+  "scope": "Early worker-only preparation and actual first publication; final browser/HTTP performance unverified",
+  "base": "3e8163134c6861241f0430ae77198bbe00d36fa2",
+  "checkpoint": "ea31014",
+  "thresholds": {
+    "application_container_cap_bytes": 536870912,
+    "worker_peak_limit_bytes": 419430400,
+    "cross_scale_growth_limit_bytes": 52428800
+  },
+  "runs": [
+    {
+      "scale": 1,
+      "owner": "offseason-dc0a3445b4a856f7",
+      "started_at": "2026-10-27T04:08:50Z",
+      "completed_at": "2026-10-27T04:13:25Z",
+      "result_pass": true,
+      "coverage": {
+        "departure_validation": "measured"
+      },
+      "errors": [],
+      "raw_result_sha256": "385964315bcac9d874efa30954b923ec1275b7d0a192468cf4aed2da830697f6",
+      "source_manifest_sha256": "bd0f26fae0d9ae1023a7cdf3a2a9f7ea853ed55c92041e5edf859ec759c00d7a",
+      "source_file_count": 1115,
+      "fixture": {
+        "dataset_digest": "db165b07d5b1163364660c3e68a192925d51b6ef34e1cd2a4e9cfad23e0c4ea3",
+        "cardinalities": {
+          "target_teams": 365,
+          "distinct_school_players": 5474,
+          "draft_picks": 60,
+          "school_capture_observations": 8030,
+          "player_observations": 120450,
+          "historical_snapshots": 60225,
+          "cbbd_game_observations": 10000
+        },
+        "bytes": {
+          "raw_evidence_json": 25048256,
+          "normalized_dataset_json": 29672259,
+          "published_revision_json": 54953629,
+          "legacy_prior_inputs_json": 58595991
+        },
+        "persisted_bytes": {
+          "raw_evidence_json": 25072348,
+          "normalized_dataset_json": 31158990,
+          "published_revision_json": 56481201
+        },
+        "legacy_prior_digest": "889755c192f6b86740b1ba1e7ca46479dce13818e3df2c336b347e2d69fc1d4a"
+      },
+      "worker_phases": [
+        {
+          "phase": "validate",
+          "status": "ready",
+          "peak_bytes": 277889024,
+          "limits": {
+            "Memory": 536870912,
+            "MemorySwap": 536870912,
+            "NanoCpus": 500000000,
+            "CpuQuota": 0,
+            "CpuPeriod": 0
+          },
+          "container_failures": [],
+          "job_arguments": [
+            1
+          ],
+          "profile_pointers": null,
+          "full_corpus_oracle": {}
+        },
+        {
+          "phase": "publish",
+          "status": "published",
+          "peak_bytes": 243630080,
+          "limits": {
+            "Memory": 536870912,
+            "MemorySwap": 536870912,
+            "NanoCpus": 500000000,
+            "CpuQuota": 0,
+            "CpuPeriod": 0
+          },
+          "container_failures": [],
+          "job_arguments": [
+            1
+          ],
+          "profile_pointers": 365,
+          "full_corpus_oracle": {
+            "exact_original_payload": true,
+            "canonical_input_hash": true,
+            "metadata_differences": [
+              "review.revision_id",
+              "review.reviewed_by",
+              "review.reviewed_at",
+              "review_hash",
+              "report.reviewed_revision"
+            ]
+          }
+        }
+      ],
+      "postgres_final_counters": "458022912\n1594310656\nlow 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0\nusage_usec 78475148\nuser_usec 56033030\nsystem_usec 22442117\nnice_usec 0\nnr_periods 2029\nnr_throttled 1173\nthrottled_usec 64710237\nnr_bursts 0\nburst_usec 0\n"
+    },
+    {
+      "scale": 2,
+      "owner": "offseason-3e07ea4a0c7bb691",
+      "started_at": "2026-10-27T04:13:47Z",
+      "completed_at": "2026-10-27T04:24:45Z",
+      "result_pass": true,
+      "coverage": {
+        "departure_validation": "measured"
+      },
+      "errors": [],
+      "raw_result_sha256": "2d4b1d052baba7983504abd0223c27d0162c23b296c068d74b3882ecd475b5ed",
+      "source_manifest_sha256": "a4da21606052307bec86ae62f96def0f9bd74bcab238b71505f4d97e7ac4d1b4",
+      "source_file_count": 1115,
+      "fixture": {
+        "dataset_digest": "4c1891622a9fe93b67a0dedae7d8b07b6d975e7bfe62a740875b22515954f08e",
+        "cardinalities": {
+          "target_teams": 365,
+          "distinct_school_players": 5474,
+          "draft_picks": 60,
+          "school_capture_observations": 16060,
+          "player_observations": 240900,
+          "historical_snapshots": 120450,
+          "cbbd_game_observations": 20000
+        },
+        "bytes": {
+          "raw_evidence_json": 50090614,
+          "normalized_dataset_json": 59331097,
+          "published_revision_json": 109654825,
+          "legacy_prior_inputs_json": 114806827
+        },
+        "persisted_bytes": {
+          "raw_evidence_json": 50138796,
+          "normalized_dataset_json": 62303378,
+          "published_revision_json": 112692037
+        },
+        "legacy_prior_digest": "ebad1ae22c06091fcae8f7d5163882840604f3007ee52610b914c6713485943b"
+      },
+      "worker_phases": [
+        {
+          "phase": "validate",
+          "status": "ready",
+          "peak_bytes": 290594816,
+          "limits": {
+            "Memory": 536870912,
+            "MemorySwap": 536870912,
+            "NanoCpus": 500000000,
+            "CpuQuota": 0,
+            "CpuPeriod": 0
+          },
+          "container_failures": [],
+          "job_arguments": [
+            1
+          ],
+          "profile_pointers": null,
+          "full_corpus_oracle": {}
+        },
+        {
+          "phase": "publish",
+          "status": "published",
+          "peak_bytes": 252813312,
+          "limits": {
+            "Memory": 536870912,
+            "MemorySwap": 536870912,
+            "NanoCpus": 500000000,
+            "CpuQuota": 0,
+            "CpuPeriod": 0
+          },
+          "container_failures": [],
+          "job_arguments": [
+            1
+          ],
+          "profile_pointers": 365,
+          "full_corpus_oracle": {
+            "exact_original_payload": true,
+            "canonical_input_hash": true,
+            "metadata_differences": [
+              "review.revision_id",
+              "review.reviewed_by",
+              "review.reviewed_at",
+              "review_hash",
+              "report.reviewed_revision"
+            ]
+          }
+        }
+      ],
+      "postgres_final_counters": "603348992\n2915676160\nlow 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0\nusage_usec 245946542\nuser_usec 173801355\nsystem_usec 72145186\nnice_usec 0\nnr_periods 5626\nnr_throttled 4453\nthrottled_usec 221706192\nnr_bursts 0\nburst_usec 0\n"
+    }
+  ],
+  "limitations": [
+    "No integrated browser HTTP windows were measured.",
+    "Source manifests at the starts of the two runs differ in two test files only.",
+    "During the bind-mounted 2x run, source edits included job instance wiring, proposal-model and signed-progress changes, migration/test formatting, and equivalent benchmark-driver decomposition. These results are not a final-source equivalence claim.",
+    "No further expensive benchmark cycle is required before PR publication under the user priority update.",
+    "Raw sampler traces and logs are retained locally under ignored tmp/departure-validation; this portable file is a curated summary, not complete raw telemetry."
+  ],
+  "growth_bytes": {
+    "validate": 12705792,
+    "publish": 9183232
+  }
+}

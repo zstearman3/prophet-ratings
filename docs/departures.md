@@ -20,7 +20,12 @@ Set `CBBD_API_KEY` in the worker's runtime environment (locally in ignored
 files or logs. Run the existing GoodJob worker and refresh the batch page to check
 its queued/running/failed status. Web-only startup leaves the capture queued.
 
-A successful raw capture displays **Confirm draft results and college teams**.
+After acquisition finishes, the worker queues durable validation. Validation
+rechecks retained bytes, calculates the existing rules and saves a compact report,
+choices and exact per-team proposals. **Validation queued**, **Validation in
+progress**, **Validation failed**, **Validation stale** and **Validation ready**
+are distinct from acquisition and approval. A ready result displays
+**Confirm draft results and college teams**.
 Review the drafted players and their matched college teams, then check the single
 confirmation and select **Publish departure inputs**. Pick numbers are displayed
 as source data, not entered or separately certified. There are no completed-season
@@ -34,12 +39,17 @@ unknown. **Stats unavailable** means a matched college player's production is
 incomplete; only that team's estimate remains unknown. Use **Correct a college
 team mapping** if a mapping is wrong, then refresh the review.
 
-Viewing the page does not save decisions, publish inputs or call CBBD. The final
-confirmation creates a new immutable attempt from the same retained bytes,
-freezes the prior-season membership/mapping scope and calculated decisions, and
-publishes through the existing input-import transaction. A stale review is
-rejected if evidence, relevant membership, mappings or publication state changed.
-Published results stay frozen. No ratings job runs automatically.
+Viewing the page or status endpoint reads saved projections only: no parser,
+retained response replay, annual dataset expansion, job enqueue or CBBD call.
+The final confirmation records the authenticated admin ID/email, one timestamp
+and the exact signed proposal, then queues publication. No typed approval reason
+is required; the revision records `Approved by admin` automatically. Source or
+participation evidence and substantive correction reasons are retained separately.
+The publication worker freshly authenticates actual retained content and the
+sealed proposal under locks, then atomically saves the revision, every profile
+pointer and the batch result. A stale review is rejected. Publication failures
+preserve current inputs; retry the existing approval when offered, or explicitly
+validate again. Published results stay frozen. No ratings job runs automatically.
 
 Use **Fetch sources again** only when updated responses are needed. Source
 downloads, previous attempts and the HTTP ledger remain under **Source details
@@ -134,16 +144,26 @@ team scope. Saved evidence and frozen scoring results remain unchanged.
 Legacy/manual reviews keep their explicit categories, reasons and gap approvals;
 the current browser review does not ask operators to fill those fields.
 
-Review fingerprints use capture metadata and the normalized dataset revision;
-publication still verifies retained source bytes and normalized facts. Canonical
-hashes stream sorted JSON, and evidence-file serialization sorts during generation,
-avoiding full copies of the evidence tree. Publication reuses the loaded attempt
-and its verified dataset only inside the locked transaction.
+Validation certificates use the application's message-verifier secret and bind
+exact saved reports, choices, per-team proposals, source artifacts and compact
+domain dependencies. Preserve that secret across web and worker processes; a
+secret change requires fresh validation. Supplied hashes alone are not authority.
+Web currentness checks compact domain identities; actual source bytes, complete
+plans and annual facts are reauthenticated only by workers before publication.
+Canonical payload hashing streams the unchanged logical dataset contract.
 
-Publication revalidates retained bytes and current mappings under the existing
-locks and transaction. Failures preserve current inputs; identical publication
-retries return the same revision. Corrections create a new draft for fresh
-results/team confirmation without replacing the earlier evidence.
+Missing or failed draft proof has an explicit **Validate retained evidence**
+action. Confirm an interrupted validation only after checking that the worker
+stopped; a live worker rejects interruption recovery promptly. Manual decisions
+use captured player/source pages and read-only numeric facts. Saving decisions,
+source coverage or historical HTML recovery queues fresh validation, never
+approval. Failed manual choices remain editable from previously captured rows.
+Corrections copy retained evidence in PostgreSQL and queue validation without
+replacing earlier attempts. Historical unsigned published reports remain readable
+but setup reports review needed; select **Revalidate retained evidence in a correction** to queue retained evidence
+with an automatic reason, then explicitly review and approve the fresh proposal.
+A deliberate substantive correction can still retain its own reason. Source/history lists are paginated, and all original sources remain
+available as private downloads.
 
 ## Retention and compatibility
 
@@ -153,9 +173,9 @@ are admin-only `text/plain` attachments with the original source-kind extension;
 response content is never executed as app HTML.
 
 Raw browser captures use `draft-departures-capture-v1` and are not independently
-publishable. The results/team confirmation creates a `draft-departures-v2`
-successor with extraction `cbbd-draft-season-totals-v4`, typed provider identities,
-the frozen rating scope and retained source bytes. Earlier extraction v1/v2/v3
+publishable. Validation proposes `draft-departures-v2` with extraction
+`cbbd-draft-season-totals-v4`, typed provider identities and frozen rating scope;
+confirmation approves that exact result. The original acquisition is preserved. Earlier extraction v1/v2/v3
 remain supported. Normalized annual inputs are the seam a future local stat store
 can supply. Scoring captures retain schema/extraction/provider identity; missing
 schema means historical v1, which cannot contain provider identities. Review,
@@ -258,9 +278,10 @@ production rules. Capture-only attempts do not freeze strict reconciliation for 
 later automatic policy. Attempts store a small `departure-dataset-v1` reference,
 revision digest and summary; ordered normalized records reconstruct the exact
 logical dataset. Canonical hashing streams records without assembling an annual
-production array. Review and publication explicitly expand facts when needed;
-publication verifies all retained retry/selected bytes, normalized source rows
-and freshly recomputed annual results before applying inputs. Published payloads
+production array. Browser review uses only persisted compact facts. Validation authenticates all
+retained retry/selected bytes and derives annual rows in bounded worker batches;
+publication verifies actual retained artifacts and staged annual facts before
+applying inputs. Published payloads
 keep full logical dataset/report/team inputs for existing readers, replacing only
 the raw evidence envelope with immutable observation references.
 
@@ -274,6 +295,20 @@ immutable models preserve acquisition provenance.
 
 Row transfer batches are bounded, but the full legacy normalization benchmark
 still exceeds its 400 MiB peak and 50 MiB growth budgets at 2x; see
-`docs/departure-capture-handoff.md` for final source-matched evidence. Synchronous review,
-file export and publication still expand logical datasets; their peak-memory
-redesign belongs to offseason performance ticket05.
+`docs/departure-capture-handoff.md` for final source-matched evidence. Legacy synchronous file/API review and export can still expand logical datasets.
+The durable browser lifecycle uses scalar-ID HeavyJobs and bounded worker streams.
+Early 1×/2× worker phases passed their memory gates; final integrated browser HTTP
+performance has not been measured on this source. No new benchmark cycle was run
+for this browser integration.
+
+
+## Durable worker operations
+
+Run the additive `20261027020000` validation migration before using this lifecycle.
+Back up `departure_validations`, `departure_proposals` and `departure_approvals`
+with the existing source, normalization, batch and revision tables. Both web and
+GoodJob workers need the same application secret and migrated schema. HeavyJobs
+receive only operation/approval IDs. Acquisition never creates an approval.
+Worker locks use a fixed table order; browser mutations use a short timeout and
+return an actionable busy response instead of waiting behind heavy publication.
+Exact duplicate publication deliveries return the original retained result.

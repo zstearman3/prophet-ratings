@@ -37,7 +37,9 @@ Rails.application.routes.draw do
         post :acquire
         post :recover
         post :correct
-        patch :publish
+        patch :publish, to: 'departure_validations#publish'
+        post :revalidate, to: 'departure_validations#revalidate'
+        get :progress, to: 'departure_validations#progress'
         patch :coverage
         get :source
       end

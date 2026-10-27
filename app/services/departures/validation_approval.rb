@@ -21,11 +21,19 @@ module Departures
 
     def approve
       @operation.lock!('FOR UPDATE NOWAIT')
-      Contract.check!(@operation.status == 'ready' && @operation.current?, 'Departure dependencies changed; revalidate')
-      @operation.approval || create_approval
+      Contract.check!(@operation.status.in?(%w[ready publish_failed]) && @operation.current?,
+                      'Departure dependencies changed; revalidate')
+      @operation.approval ? authenticated_approval : create_approval
+    end
+
+    def authenticated_approval
+      approval = @operation.approval
+      approval.authenticate
+      approval
     end
 
     def create_approval
+      Contract.check!(@operation.status == 'ready', 'Revalidate before creating a departure approval')
       document = approved_document
       DepartureApproval.create!(departure_validation: @operation, user: @actor.user, reviewed_by: @actor.reviewer,
                                 reviewed_at: @actor.time, document:, review_hash: Contract.digest(document),

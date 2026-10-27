@@ -97,6 +97,54 @@ RSpec.describe Departures::ValidationPreparation do
     expect(OffseasonInputRevision.count).to eq(0)
   end
 
+  it 'rejects proposal replacement between the coherent snapshot and the final locked seal' do
+    operation = described_class.create(batch)
+    preparer = described_class.new(operation)
+    allow(preparer).to receive(:seal).and_wrap_original do |method, proof|
+      proposal = operation.proposals.first!
+      overwrite_departure_record(proposal, input: proposal.input.merge('loss_share' => 0.0))
+      method.call(proof)
+    end
+    preparer.call
+    expect(operation.reload.status).to eq('failed')
+    expect(operation.certificate).to be_blank
+    expect(OffseasonInputRevision.count).to eq(0)
+  end
+
+  it 'safely resumes an interrupted running operation with a committed partial projection', :aggregate_failures do
+    operation = described_class.create(batch)
+    interrupted = described_class.new(operation)
+    allow(interrupted).to receive(:seal).and_raise(Interrupt, 'synthetic worker stop')
+    expect { interrupted.call }.to raise_error(Interrupt)
+    expect(operation.reload.status).to eq('running')
+    expect(operation.proposals.count).to eq(2)
+    described_class.new(operation).call
+    expect(operation.reload.status).to eq('ready'), operation.error
+    expect(operation.proposals.count).to eq(2)
+    expect(operation).to be_current
+  end
+
+  it 'rejects an older operation when a newer acquisition exists before it starts' do
+    operation = described_class.create(batch)
+    capture_departures(batch)
+    described_class.new(operation).call
+    expect(operation.reload.status).to eq('failed')
+    expect(operation.error).to include('Preparation changed')
+    expect(operation.proposals).to be_empty
+  end
+
+  it 'keeps legacy replay and file bundle APIs usable after a pending successor is validated' do
+    attempt = capture_departures(batch)
+    expected = attempt.dataset
+    overwrite_departure_record(attempt, dataset: { 'storage_version' => 'departure-validation-pending-v1' })
+    operation = prepared
+    expect(attempt.reload.dataset).to eq(expected)
+    expect(Departures::RetainedEvidence.new(attempt).verified_dataset(batch.plan)).to eq(expected)
+    approval = Departures::ValidationApproval.new(operation).call(reviewer: 'admin')
+    payload = Departures::RetainedEvidence.new(attempt).bundle(approval.document, season)
+    expect(payload.fetch('dataset')).to eq(expected)
+  end
+
   context 'with a coherent source snapshot' do
     it 'does not enroll retained raw capture bodies in the outer preparation transaction' do
       source = {

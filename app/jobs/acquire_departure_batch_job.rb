@@ -18,11 +18,19 @@ class AcquireDepartureBatchJob < HeavyJob
   def perform(attempt_id)
     @attempt = DepartureAcquisition.find(attempt_id)
     GoodJob::Job.advisory_lock_key("prophet-ratings:departure-attempt:#{attempt_id}") do
-      Departures::BatchAcquisition.new(attempt).call
+      queue_validation if Departures::BatchAcquisition.new(attempt).call
     end
   end
 
   private
 
   attr_reader :attempt
+
+  def queue_validation
+    batch = DepartureBatch.select(:id, :status).find(attempt.departure_batch_id)
+    latest = batch.acquisitions.order(id: :desc).pick(:id)
+    return unless batch.status == 'draft' && latest == attempt.id && attempt.reload.terminal?
+
+    Departures::ValidationPreparation.queue(batch)
+  end
 end

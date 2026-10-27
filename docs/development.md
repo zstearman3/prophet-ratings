@@ -616,6 +616,16 @@ file/manual captures retain the legacy contract. The opt-in
 `departure_normalization` performance scenario measures source processing only;
 ordinary verification still uses targeted specs and both hook suites.
 
+### Durable departure browser review
+
+Apply the additive validation/proposal/approval migration with `bin/migrate`.
+Run both web and GoodJob worker processes with the same application secret.
+Acquisition completion queues validation; explicit admin approval queues a separate
+publication job. Web refreshes/status never run source replay or enqueue work.
+A web-only stack leaves queued work pending. Use the batch's validation/retry or
+correction actions for recovery; see [departures.md](departures.md). Old unsigned
+published history stays readable but does not establish current setup readiness.
+
 ### Scheduled CBBD readiness checks
 
 `spec/services/ingestion/cbbd/scheduled_sync_spec.rb` exercises the synthetic

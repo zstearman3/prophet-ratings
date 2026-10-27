@@ -3,6 +3,8 @@
 module Departures
   # Compact live domain identities; no annual source or payload is loaded for currentness.
   class ValidationDependencies
+    PLAN_SQL = "encode(sha256(convert_to((plan - 'sources' - 'captures')::text, 'UTF8')), 'hex')"
+
     def initialize(batch_id)
       @batch = DepartureBatch.select(DepartureBatch.column_names - ['plan']).find(batch_id)
     end
@@ -15,7 +17,7 @@ module Departures
 
     def batch_state
       id = @batch.id
-      [@batch.attributes, DepartureBatch.where(id:).pick(Arel.sql('md5(plan::text)')),
+      [@batch.attributes, DepartureBatch.where(id:).pick(Arel.sql(PLAN_SQL)),
        @batch.acquisitions.order(id: :desc).pick(:id, :status),
        DepartureValidation.where(departure_batch_id: id).maximum(:id)]
     end

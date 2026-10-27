@@ -152,7 +152,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_27_020000) do
     t.index ["team_id"], name: "index_coaching_changes_on_team_id"
     t.check_constraint "effective_year >= 1 AND effective_year <= 9999", name: "coaching_effective_year"
     t.check_constraint "previous_year >= 1 AND previous_year <= 9999", name: "coaching_previous_year"
-    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying::text, 'confirmed'::character varying::text, 'rejected'::character varying::text])", name: "coaching_status"
+    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying, 'confirmed'::character varying, 'rejected'::character varying]::text[])", name: "coaching_status"
   end
 
   create_table "coaching_reviews", force: :cascade do |t|

@@ -11,13 +11,8 @@ module Departures
       validate_preparation
       sources = parsed_sources
       record = normalize(sources)
-      PreparedDataset.new(record).validate_saved(attempt_id) unless guided? || pending_dataset?
+      PreparedDataset.new(record).validate_saved(attempt_id) unless guided? || ValidationDatasetRetention.new(@operation).pending?
       record
-    end
-
-    def pending_dataset?
-      DepartureAcquisition.where(id: attempt_id, departure_batch_id: @operation.departure_batch_id)
-                          .exists?(["dataset->>'storage_version' = ? AND predecessor_id < id", 'departure-validation-pending-v1'])
     end
 
     private
@@ -47,6 +42,7 @@ module Departures
         SELECT a.plan = b.plan FROM departure_acquisitions a JOIN departure_batches b ON b.id = a.departure_batch_id
         WHERE a.id = :attempt_id AND b.id = :batch_id
           AND a.status IN ('completed', 'incomplete', 'failed')
+          AND a.id = (SELECT MAX(latest.id) FROM departure_acquisitions latest WHERE latest.departure_batch_id = b.id)
       SQL
       query = ApplicationRecord.sanitize_sql_array([sql, { attempt_id:, batch_id: @operation.departure_batch_id }])
       Contract.check!(ApplicationRecord.connection.select_value(query), 'Preparation changed; acquire fresh evidence')
