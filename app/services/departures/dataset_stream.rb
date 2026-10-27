@@ -17,8 +17,9 @@ module Departures
 
     KINDS = %w[selections production failures production_warnings].freeze
 
-    def initialize(record)
+    def initialize(record, keys: [])
       @record = record
+      @additional_keys = keys
     end
 
     def digest
@@ -29,8 +30,7 @@ module Departures
 
     def write(output)
       output << '{'
-      keys = (@record.header.keys + kinds).sort
-      keys.each_with_index { |key, index| write_entry(output, key, index) }
+      entries.each_with_index { |key, index| write_entry(output, key, index) }
       output << '}'
     end
 
@@ -48,25 +48,45 @@ module Departures
 
     private
 
+    attr_reader :record
+
     def kinds
-      header = @record.header
+      header = header_metadata
       header['schema'] == CbbdDataset::VERSION && CbbdDataset.reported_totals?(header) ? KINDS : KINDS.first(3)
+    end
+
+    def header_metadata
+      @record.header
+    end
+
+    def entries
+      (header_keys + kinds + @additional_keys).sort
     end
 
     def write_entry(output, key, index)
       output << ',' unless index.zero?
       output << JSON.generate(key) << ':'
-      if kinds.include?(key)
+      if key == 'dataset_revision'
+        output << JSON.generate(@record.dataset_revision)
+      elsif kinds.include?(key)
         write_rows(output, key)
       else
-        JSON::State.new(sort_keys: true).generate(@record.header.fetch(key), JsonOutput.new(output))
+        write_header(output, key)
       end
+    end
+
+    def header_keys
+      @record.header.keys
+    end
+
+    def write_header(output, key)
+      JSON::State.new(sort_keys: true).generate(@record.header.fetch(key), JsonOutput.new(output))
     end
 
     def write_rows(output, kind)
       output << '['
-      rows = @record.rows.where(kind:).order(:ordinal)
-      rows.find_each(batch_size: JsonRows::BATCH_SIZE).with_index { |row, index| self.class.write_row(output, row, index) }
+      rows = @record.rows.where(kind:).skip_query_cache!
+      rows.find_each(batch_size: JsonRows::BATCH_SIZE, cursor: %i[ordinal id]).with_index { |row, index| self.class.write_row(output, row, index) }
       output << ']'
     end
 

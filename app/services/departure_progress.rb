@@ -1,19 +1,17 @@
 # frozen_string_literal: true
 
-# Approval and the latest attempt remain separate, including failures after publication.
+# Setup reads saved certificates and scalar pointers; source replay belongs to validation workers.
 class DepartureProgress
-  REVIEW_PAYLOAD_SQL = "jsonb_build_object('team_inputs', payload->'team_inputs', 'report', payload->'report') AS payload"
-
   def initialize(season)
     @season = season
-    @revision = OffseasonInputRevision.where(season:, kind: 'departures').select(:id, Arel.sql(REVIEW_PAYLOAD_SQL)).order(:id).last
-    @batch = DepartureBatch.where(season:).order(:id).last
+    @revision = OffseasonInputRevision.where(season:, kind: 'departures').select(:id).order(:id).last
+    @batch = DepartureBatch.where(season:).select(:id, :status, :revision_id).order(:id).last
   end
 
   def call
     OffseasonSetupProgress::Step.new(key: 'departures', label: 'Review departures',
                                      status: current? ? 'complete' : 'needs_review', last_result: "#{approval_summary} #{batch_summary}",
-                                     next_action: 'Review departure batches and coverage; select the model in preseason preview.')
+                                     next_action: 'Review departure batches and validation; select the model in preseason preview.')
   end
 
   private
@@ -27,31 +25,26 @@ class DepartureProgress
   def batch_summary
     return 'No departure preparation is stored.' unless batch
 
-    acquisition_status = batch.acquisitions.order(id: :desc).pick(:status) || 'not requested'
-    "Latest departure batch ##{batch.id}: #{batch.status}; acquisition #{acquisition_status}."
+    acquisition = batch.acquisitions.order(id: :desc).pick(:status) || 'not requested'
+    state = certificate&.progress_status || 'needed'
+    "Latest departure batch ##{batch.id}: #{batch.status}; acquisition #{acquisition}; validation #{state}."
+  end
+
+  def certificate
+    @certificate ||= DepartureValidation.where(departure_batch_id: batch&.id).order(:id).last
   end
 
   def current?
-    return false unless revision && batch&.revision_id == revision.id && batch.status == 'published'
+    id = revision&.id
+    return false unless id && batch&.revision_id == id && batch.status == 'published'
+    return false unless certificate&.status == 'published' && certificate.offseason_input_revision_id == id && certificate.current?
 
-    pointers_current? && report_current?
-  rescue ArgumentError, KeyError
-    false
+    pointers_current?
   end
 
   def pointers_current?
-    id = revision.id
-    rows = season.team_seasons.includes(:team_offseason_profile).to_a
-    rows.map(&:team_id).sort == revision.payload.fetch('team_inputs').keys.map(&:to_i).sort &&
-      rows.all? { |row| row.team_offseason_profile&.departure_revision_id == id }
-  end
-
-  def report_current?
-    report = DepartureAcquisition.uncached do
-      attempt = batch.acquisitions.select(*(DepartureAcquisition.column_names - %w[dataset evidence])).order(:id).last
-      Departures::BatchReview.new(batch, comparison: :persisted).report(attempt:)
-    end
-    report.fetch('errors').empty? && report.except('gaps', 'errors',
-                                                   'reviewed_revision') == revision.payload.fetch('report').except('reviewed_revision')
+    members = season.team_seasons
+    members.order(:team_id).pluck(:team_id) == certificate.proposals.order(:team_id).pluck(:team_id) &&
+      TeamOffseasonProfile.where(team_season_id: members.select(:id), departure_revision_id: revision.id).count == members.count
   end
 end

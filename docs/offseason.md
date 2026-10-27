@@ -474,7 +474,8 @@ manual bootstrap/activation path after review; CSV/manual reconciliation is sepa
 Departure review is available from the season's **Review departure batches** link.
 Prepare the target memberships first, then select **Fetch draft and college stats**.
 Years are derived from the target season. Confirm the displayed drafted players
-and their college teams, then publish. Production is calculated automatically;
+and their college teams after background validation, then approve the exact saved
+proposal to queue publication. Production is calculated automatically;
 players without a matching prior-season team are skipped. Missing stats for a
 matched college remain visible and affect only that team's estimate. See
 [departures](departures.md#saved-admin-workflow) for recovery and correction steps.
@@ -699,11 +700,10 @@ Readiness projects operation summaries and hashes fingerprint-only database rows
 in PostgreSQL instead of copying retained source bodies into the web request.
 Captured inputs are checked one team at a time. Current-input checks share one
 request-local revision cache, which verifies each full revision before retaining
-only its compact operands and unchanged source identity. These checks run before
-departure replay so the largest source loads do not overlap. Departure readiness still replays and verifies its
-retained source evidence one source at a time, without retaining those source
-bodies or annual revisions in the request query cache. It compares the reconstructed dataset against the saved JSON in
-PostgreSQL, avoiding a second parsed copy in Ruby. Approval, pointer, provenance
+only its compact operands and unchanged source identity. Departure setup progress reads only a saved signed publication and scalar profile
+pointers. It never replays departure sources during a setup request. Unsigned
+historical departure revisions remain retained and readable, but require a
+reviewed correction for a current signed publication. Approval, pointer, provenance
 and stale-review checks remain enforced. Reviews saved with an older fingerprint
 format require a fresh review before activation. No rating formulas or published
 captures are changed.

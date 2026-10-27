@@ -8,7 +8,9 @@
         "recovered": "Saved HTML retained in a successor attempt.",
         "published": "Reviewed departure inputs published. Model selection remains separate.",
         "correction": "Correction draft opened using retained evidence; approval and acknowledgement cleared.",
-        "coverage_saved": "Coverage saved from retained sources. Review player decisions before publishing."
+        "coverage_saved": "Coverage saved from retained sources. Review player decisions before publishing.",
+        "validation_queued": "Departure validation queued; refresh to review the saved result.",
+        "publication_queued": "Approved by admin. Departure publication queued."
       }
     }
   }

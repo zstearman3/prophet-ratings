@@ -1,0 +1,31 @@
+<% editor = @page.fetch(:editor); selection = editor.fetch(:selection); key = selection.fetch('selection_key'); decision = editor.fetch(:decision) %>
+<section class="rounded border p-5 space-y-4" id="player-choices">
+  <h2 class="text-xl font-semibold">Edit pick <%= selection['overall_pick'] %> · <%= selection['player_name_source'] %></h2>
+  <p>Choose captured player identities and all prior-season school stints. Numeric facts remain read-only. Saving requires new validation before approval.</p>
+  <%= form_with url: admin_departure_batch_path(@batch), method: :get, data: { turbo: false } do |search| %>
+    <%= search.hidden_field :selection_key, value: key %><%= search.label :player_search, 'Search captured players' %><%= search.search_field :player_search, value: params[:player_search], class: 'rounded border p-2' %><%= search.submit 'Search', class: 'rounded border p-2' %>
+  <% end %>
+  <p><% if editor[:players_page].positive? %><%= link_to 'Previous players', admin_departure_batch_path(@batch, selection_key: key, player_search: params[:player_search], players_page: editor[:players_page] - 1), class: 'mr-4 text-blue-700 underline' %><% end %><% if editor[:players_next] %><%= link_to 'Next players', admin_departure_batch_path(@batch, selection_key: key, player_search: params[:player_search], players_page: editor[:players_page] + 1), class: 'text-blue-700 underline' %><% end %></p>
+  <%= form_with url: admin_departure_batch_path(@batch), scope: :review, method: :patch, data: { turbo: false }, class: 'space-y-4' do |form| %>
+    <%= form.hidden_field :review_key, value: editor.fetch(:review_key) %>
+    <%= fields_for "review[rows][#{key}]" do |entry| %>
+      <%= entry.label :status, 'Accounting category' %><%= entry.select :status, Departures::Contract::STATUSES.map { |status| [status.humanize, status] }, { selected: decision['status'], include_blank: 'Choose a category' }, class: 'block w-full rounded border p-2' %>
+      <%= entry.label :reason, 'Participation / identity decision' %><%= entry.text_field :reason, value: decision['reason'], class: 'block w-full rounded border p-2' %>
+      <%= entry.label :team_id, 'Known affected team (unknown production)' %><%= entry.collection_select :team_id, @page[:teams], :id, :school, { selected: @page[:teams].find { |team| team.school == decision['team_name_source'] }&.id, include_blank: 'Choose a team' }, class: 'block w-full rounded border p-2' %>
+      <p>Participation / player identity evidence (use the source pages to reach other sources):</p>
+      <% editor.fetch(:sources).each do |source| %><label class="mr-3 inline-flex items-center gap-2 py-1"><%= check_box_tag "review[rows][#{key}][evidence_source_ids][]", source['id'], decision.fetch('evidence_source_ids', []).include?(source['id']) %><%= departure_source_label(source) %></label><% end %>
+      <% (decision.fetch('stints', []) + [{}]).each_with_index do |stint, index| %>
+        <fieldset class="rounded border p-4 space-y-3"><legend>Prior-season stint <%= index + 1 %></legend>
+          <%= fields_for "review[rows][#{key}][stints][#{index}]" do |stint_form| %>
+            <%= stint_form.label :production_key, 'Captured school player' %><%= stint_form.select :production_key, editor.fetch(:production_options), { selected: stint.present? ? Departures::PlayerIdentity.choice(stint, stint) : nil, include_blank: 'Choose captured player and school' }, class: 'block w-full rounded border p-2' %>
+            <%= stint_form.label :team_id, 'Existing team' %><%= stint_form.collection_select :team_id, @page[:teams], :id, :school, { selected: stint['team_id'], include_blank: 'Choose a team' }, class: 'block w-full rounded border p-2' %>
+            <p>Identity evidence for this stint:</p><% editor.fetch(:sources).each do |source| %><label class="mr-3 inline-flex items-center gap-2 py-1"><%= check_box_tag "review[rows][#{key}][stints][#{index}][identity_evidence_source_ids][]", source['id'], stint.fetch('identity_evidence_source_ids', []).include?(source['id']) %><%= departure_source_label(source) %></label><% end %>
+            <%= stint_form.check_box :remove %><%= stint_form.label :remove, 'Remove stint' %>
+          <% end %>
+        </fieldset>
+      <% end %>
+    <% end %>
+    <%= form.submit 'Save decisions and validate', class: 'rounded border px-4 py-2' %>
+  <% end %>
+  <p><% if @page[:sources_page].positive? %><%= link_to 'Previous evidence choices', admin_departure_batch_path(@batch, selection_key: key, sources_page: @page[:sources_page] - 1), class: 'mr-4 text-blue-700 underline' %><% end %><% if @page[:sources_next] %><%= link_to 'Next evidence choices', admin_departure_batch_path(@batch, selection_key: key, sources_page: @page[:sources_page] + 1), class: 'text-blue-700 underline' %><% end %></p>
+</section>

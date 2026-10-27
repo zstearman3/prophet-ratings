@@ -1,96 +1,97 @@
 # frozen_string_literal: true
 
 module Departures
-  # Request-scoped rendering data; mutation services always reload their own current state.
+  # GETs consume retained projections only; old data requires an explicit background validation.
   class BatchPage
-    def initialize(batch)
+    EMPTY_REPORT = { 'selections' => [], 'teams' => [], 'gaps' => [], 'failures' => [] }.freeze
+    LABELS = { 'queued' => 'Validation queued', 'running' => 'Validation in progress', 'failed' => 'Validation failed',
+               'stale' => 'Validation stale', 'publish_failed' => 'Publication failed', 'published' => 'Published inputs' }.freeze
+
+    def initialize(batch, attributes = {})
       @batch = batch
-      @teams = Team.includes(:team_aliases).order(:school, :id).to_a
+      @attributes = attributes
     end
 
     def call
-      return legacy_review unless DraftTeamReview.applicable?(batch)
-
-      batch.status == 'published' ? published_page : draft_team_page
+      history = history_rows
+      { attempt:, history: history.first(10), operation:, report:, players: operation&.choices&.fetch('players', []) || [],
+        validation_state:, ready: ready?, teams:, teams_by_id: teams.index_by(&:id),
+        automatic: automatic?, editor: editor, coverage: coverage,
+        history_page: history_page, history_next: history.length > 10 }.merge(preparation_fields).merge(SourceHistory.new(@batch,
+                                                                                                                          @attributes).call)
     end
 
-    def legacy_review
-      review = BatchReview.new(batch)
-      { attempt:, history:, report: review.report(attempt:), review_key: review.review_key(attempt:),
-        dataset: facts, identity: TeamIdentity.new(teams:), teams:, teams_by_id: teams.index_by(&:id),
-        row_issues: DecisionForm.new(facts).issues(batch.decisions), production_options: production_options,
-        coverage: coverage_report, capture_only: CapturePreparation.capture_only?(batch.plan) }
-    end
+    alias legacy_review call
 
     def self.listing(season)
-      latest_status = '(SELECT status FROM departure_acquisitions WHERE departure_batch_id = departure_batches.id ORDER BY id DESC LIMIT 1)'
-      DepartureBatch.where(season:).select(:id, :status, Arel.sql("#{latest_status} AS acquisition_status")).order(id: :desc)
+      latest = '(SELECT status FROM departure_acquisitions WHERE departure_batch_id = departure_batches.id ORDER BY id DESC LIMIT 1)'
+      DepartureBatch.where(season:).select(:id, :status, Arel.sql("#{latest} AS acquisition_status")).order(id: :desc)
     end
 
     private
 
-    attr_reader :batch, :teams
+    def operation
+      @operation ||= DepartureValidation.where(departure_batch_id: @batch.id).order(:id).last
+    end
 
     def attempt
-      @attempt ||= batch.attempt
+      @attempt ||= @batch.acquisitions.select(:id, :status, :failure, :started_at, :finished_at).order(:id).last
     end
 
-    def published_page
-      { attempt: nil, history:, draft_team_review: PublishedReview.new(batch).call, teams_by_id: teams.index_by(&:id) }
+    def preparation_fields
+      plan = @batch.plan
+      { preparation: BatchPreparation.form_attributes(plan), capture_only: CapturePreparation.capture_only?(plan) }
     end
 
-    def draft_team_page
-      report = if attempt&.terminal? && attempt.manifest.present?
-                 DraftTeamReview.new(batch, attempt:).report
-               else
-                 {}
-               end
-      { attempt:, history:, draft_team_review: report, teams_by_id: teams.index_by(&:id) }
+    def editor
+      key = @attributes[:selection_key]
+      return unless key.present? && operation
+
+      DecisionEditor.new(@batch, operation.id.to_s).page(key, @attributes)
     end
 
-    def coverage_report
-      CoverageReview.new(batch).report(attempt:) if batch.plan['provider'] == 'cbbd' && attempt&.terminal?
+    def history_page
+      [@attributes[:history_page].to_i, 0].max
     end
 
-    def facts
-      return {} unless attempt
-
-      saved = attempt.dataset
-      return saved unless saved['storage_version'] == StoredDataset::VERSION
-
-      @facts ||= RetainedEvidence.new(attempt).dataset
+    def history_rows
+      @history_rows ||= @batch.acquisitions.select(:id, :status, :predecessor_id, :started_at, :finished_at, :failure)
+                              .order(id: :desc).offset(history_page * 10).limit(11).to_a
     end
 
-    def history
-      batch.acquisitions.order(:id).select(:id, :status, :manifest, :started_at, :finished_at, :predecessor_id, :failure,
-                                           Arel.sql("dataset->'failures' AS source_failures"))
+    def coverage
+      saved = operation&.choices&.fetch('coverage', nil)
+      saved&.merge('review_key' => operation.id.to_s)
     end
 
-    def production_options
-      production_tables.flat_map { |table| self.class.table_options(table) }
+    def report
+      published = @batch.status == 'published'
+      saved = published ? historical_report : operation&.report
+      return EMPTY_REPORT.merge(saved || {}) if published || saved.present? || !operation || automatic?
+
+      EMPTY_REPORT.merge('selections' => DecisionInputData.new(operation).selections)
     end
 
-    def production_tables
-      tables = facts.fetch('production', [])
-      return tables unless facts['provider'] == 'cbbd'
-
-      athletes = facts.fetch('selections').pluck('provider_athlete_id').compact
-      tables.filter_map { |table| self.class.drafted_players(table, athletes) }
+    def historical_report
+      OffseasonInputRevision.where(id: @batch.revision_id).pick(Arel.sql("payload->'report'"))
     end
 
-    public_class_method def self.drafted_players(table, athletes)
-      players = table.fetch('players').select { |player| athletes.include?(player['provider_athlete_id']) }
-      table.merge('players' => players) if players.any?
+    def teams
+      @teams ||= Team.select(:id, :school).order(:school, :id).to_a
     end
 
-    public_class_method def self.table_options(table)
-      denominator = table.fetch('team_points') || 'Unknown'
-      table.fetch('players').map do |player|
-        label = "#{table.fetch('team_name_source')} · #{player['player_name_source']} · " \
-                "#{player['player_points'] || 'Unknown'} points / #{denominator} · " \
-                "#{player['player_minutes']} minutes · #{player['games']} games"
-        [label, PlayerIdentity.choice(table, player)]
-      end
+    def automatic?
+      operation&.choices&.fetch('automatic', false) || DraftTeamReview.applicable?(@batch)
+    end
+
+    def ready?
+      @batch.status == 'draft' && operation&.status == 'ready' && operation.current? && !operation.approval
+    end
+
+    def validation_state
+      return operation.review_state if operation
+
+      @batch.status == 'published' ? 'Historical report · validation needed' : 'Validation needed'
     end
   end
 end

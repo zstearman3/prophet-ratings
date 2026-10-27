@@ -13,6 +13,8 @@ RSpec.describe 'Admin departure results and college review' do
   let(:batch) { Departures::CapturePreparation.create(season, {}) }
 
   before do
+    allow(PrepareDepartureValidationJob).to receive(:perform_later)
+    allow(PublishDepartureValidationJob).to receive(:perform_later)
     create(:team_season, season:, team:)
     create(:team_season, season: prior_season, team:)
     create(:team_season, season:, team: new_team)
@@ -45,6 +47,8 @@ RSpec.describe 'Admin departure results and college review' do
 
   def capture
     AcquireDepartureBatchJob.perform_now(batch.attempt.id)
+    operation = DepartureValidation.where(departure_batch_id: batch.id).order(:id).last
+    PrepareDepartureValidationJob.perform_now(operation.id)
     batch.reload.attempt
   end
 
@@ -101,11 +105,13 @@ RSpec.describe 'Admin departure results and college review' do
     reviewed_players = response.parsed_body.at_css('[data-draft-team-review] table').to_html
     patch publish_admin_departure_batch_path(batch), params: { draft_review: approval }
     expect(response).to redirect_to(admin_departure_batch_path(batch))
+    expect(batch.reload.status).to eq('draft')
+    PublishDepartureValidationJob.perform_now(DepartureApproval.last.id)
     expect(batch.reload.status).to eq('published')
     expect(batch.revision.team_input(team.id)).to include('known_points_subtotal' => 100, 'team_points' => 102,
                                                           'loss_share' => 100.0 / 102)
     expect(batch.revision.team_input(new_team.id).fetch('loss_share')).to eq(0.0)
-    expect(batch.attempt.predecessor_id).to eq(original.id)
+    expect(batch.attempt.id).to eq(original.id)
     expect(batch.attempt.evidence).to eq(original.evidence)
     expect(original.reload.attributes).to eq(attributes)
     reads = []

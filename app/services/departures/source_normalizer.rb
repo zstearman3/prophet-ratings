@@ -4,11 +4,20 @@ module Departures
   # Parsing is independent of annual reconciliation/extraction policy.
   class SourceNormalizer
     PARSER = 'departure-source-rows-v1'
+    # Fresh and cached parsing share extraction while choosing their persistence contracts once.
+    Storage = Data.define(:identity, :capture, :writer)
 
-    def initialize(source, bytes, settings)
+    def initialize(source, bytes, settings, identity: nil)
       @source = source
       @bytes = bytes
       @settings = settings
+      @storage = self.class.storage(identity)
+    end
+
+    def self.storage(identity)
+      return Storage.new(identity:, capture: CaptureStore.method(:capture_reference), writer: FreshSourceRowWriter) if identity
+
+      Storage.new(identity: nil, capture: CaptureStore.method(:capture), writer: SourceRowWriter)
     end
 
     def call
@@ -29,7 +38,11 @@ module Departures
     attr_reader :source, :settings
 
     def write_rows(record)
-      SourceRowWriter.new(record, source).call { |writer| write_batches(writer) }
+      row_writer(record).call { |writer| write_batches(writer) }
+    end
+
+    def row_writer(record)
+      @storage.writer.new(record, source)
     end
 
     def write_batches(writer)
@@ -41,12 +54,23 @@ module Departures
     end
 
     def normalization
-      capture = CaptureStore.capture(@bytes)
-      contract = source.slice('id', 'type', 'request', 'team_name_source', 'scope', 'scope_evidence', 'url')
-                       .merge('parser' => PARSER, 'year' => settings.fetch('prior_season_year'))
-      DepartureSourceNormalization.create_or_find_by!(identity: Contract.digest([capture.sha256, contract])) do |row|
-        row.assign_attributes(departure_source_capture_id: capture.id, contract:)
+      identity = @storage.identity
+      capture = @storage.capture.call(@bytes)
+      attributes = { departure_source_capture_id: capture.id, contract: source_contract }
+      return DepartureSourceNormalization.create!(identity:, **attributes) if identity
+
+      self.class.cached_normalization(capture.sha256, attributes)
+    end
+
+    public_class_method def self.cached_normalization(digest, attributes)
+      DepartureSourceNormalization.create_or_find_by!(identity: Contract.digest([digest, attributes.fetch(:contract)])) do |row|
+        row.assign_attributes(attributes)
       end
+    end
+
+    def source_contract
+      source.slice('id', 'type', 'request', 'team_name_source', 'scope', 'scope_evidence', 'url')
+            .merge('parser' => PARSER, 'year' => settings.fetch('prior_season_year'))
     end
 
     def batches(&)

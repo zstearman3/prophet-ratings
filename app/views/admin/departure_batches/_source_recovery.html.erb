@@ -1,0 +1,12 @@
+<details class="rounded border p-4"><summary>Recover a source from original saved HTML</summary>
+  <p class="mt-3">Select a source from the evidence pages, then provide its original successful response and actual capture metadata. Recovery queues validation and clears saved player decisions.</p>
+  <%= form_with url: recover_admin_departure_batch_path(@batch), scope: :recovery, multipart: true, data: { turbo: false }, class: 'mt-4 space-y-3' do |form| %>
+    <%= form.label :source_id, 'Configured source' %><%= form.select :source_id, @page[:sources].select { |source| source['type'] }.map { |source| [departure_source_label(source), source.fetch('id')] }, {}, class: 'block w-full rounded border p-2' %>
+    <%= form.label :url, 'Original configured URL' %><%= form.url_field :url, required: true, class: 'block w-full rounded border p-2' %>
+    <%= form.label :http_status, 'Actual HTTP status' %><%= form.number_field :http_status, value: 200, required: true, class: 'block rounded border p-2' %>
+    <%= form.label :html, 'Original saved HTML' %><%= form.file_field :html, accept: 'text/html', required: true, class: 'block' %>
+    <% %i[captured_at observed_at source_as_of].each do |field| %><%= form.label field, "#{field.to_s.humanize} (ISO 8601)" %><%= form.text_field field, class: 'block w-full rounded border p-2', required: field != :source_as_of %><% end %>
+    <%= form.label :source_as_of_reason, 'Source as-of unavailable: explanation' %><%= form.text_field :source_as_of_reason, class: 'block w-full rounded border p-2' %>
+    <%= form.submit 'Recover source and validate', class: 'rounded border px-4 py-2' %>
+  <% end %>
+</details>

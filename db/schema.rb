@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_26_020000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_27_020000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -205,6 +205,23 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_26_020000) do
     t.index ["predecessor_id"], name: "index_departure_acquisitions_on_predecessor_id"
   end
 
+  create_table "departure_approvals", force: :cascade do |t|
+    t.bigint "departure_validation_id", null: false
+    t.bigint "user_id"
+    t.bigint "predecessor_id"
+    t.string "reviewed_by", null: false
+    t.datetime "reviewed_at", null: false
+    t.string "reason", default: "Approved by admin", null: false
+    t.jsonb "document", null: false
+    t.string "review_hash", null: false
+    t.text "signature"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["departure_validation_id"], name: "index_departure_approvals_on_departure_validation_id", unique: true
+    t.index ["predecessor_id"], name: "index_departure_approvals_on_predecessor_id"
+    t.index ["user_id"], name: "index_departure_approvals_on_user_id"
+  end
+
   create_table "departure_batches", force: :cascade do |t|
     t.bigint "season_id", null: false
     t.bigint "revision_id"
@@ -265,6 +282,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_26_020000) do
     t.index ["departure_source_normalization_id"], name: "idx_departure_row_source"
   end
 
+  create_table "departure_proposals", force: :cascade do |t|
+    t.bigint "departure_validation_id", null: false
+    t.bigint "team_id", null: false
+    t.jsonb "input", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["departure_validation_id", "team_id"], name: "idx_on_departure_validation_id_team_id_9e7285e173", unique: true
+    t.index ["departure_validation_id"], name: "index_departure_proposals_on_departure_validation_id"
+    t.index ["team_id"], name: "index_departure_proposals_on_team_id"
+  end
+
   create_table "departure_source_captures", force: :cascade do |t|
     t.string "sha256", null: false
     t.bigint "byte_size", null: false
@@ -282,6 +310,28 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_26_020000) do
     t.text "failure"
     t.index ["departure_source_capture_id"], name: "idx_departure_normalization_capture"
     t.index ["identity"], name: "index_departure_source_normalizations_on_identity", unique: true
+  end
+
+  create_table "departure_validations", force: :cascade do |t|
+    t.bigint "departure_batch_id", null: false
+    t.bigint "departure_acquisition_id", null: false
+    t.bigint "departure_dataset_normalization_id"
+    t.bigint "offseason_input_revision_id"
+    t.string "status", default: "queued", null: false
+    t.string "validator_version", null: false
+    t.jsonb "report", default: {}, null: false
+    t.jsonb "choices", default: {}, null: false
+    t.string "dependency_hash"
+    t.jsonb "artifacts", default: {}, null: false
+    t.text "publication_receipt"
+    t.text "certificate"
+    t.text "error"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["departure_acquisition_id"], name: "index_departure_validations_on_departure_acquisition_id"
+    t.index ["departure_batch_id"], name: "index_departure_validations_on_departure_batch_id"
+    t.index ["departure_dataset_normalization_id"], name: "idx_on_departure_dataset_normalization_id_e41300d490"
+    t.index ["offseason_input_revision_id"], name: "index_departure_validations_on_offseason_input_revision_id"
   end
 
   create_table "game_external_identities", force: :cascade do |t|
@@ -1019,6 +1069,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_26_020000) do
   add_foreign_key "conference_external_identities", "conferences"
   add_foreign_key "departure_acquisitions", "departure_acquisitions", column: "predecessor_id"
   add_foreign_key "departure_acquisitions", "departure_batches"
+  add_foreign_key "departure_approvals", "departure_validations"
+  add_foreign_key "departure_approvals", "offseason_input_revisions", column: "predecessor_id"
+  add_foreign_key "departure_approvals", "users"
   add_foreign_key "departure_batches", "departure_batches", column: "predecessor_id"
   add_foreign_key "departure_batches", "offseason_input_revisions", column: "revision_id"
   add_foreign_key "departure_batches", "seasons"
@@ -1026,7 +1079,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_26_020000) do
   add_foreign_key "departure_capture_observations", "departure_source_captures"
   add_foreign_key "departure_dataset_rows", "departure_dataset_normalizations"
   add_foreign_key "departure_normalized_rows", "departure_source_normalizations"
+  add_foreign_key "departure_proposals", "departure_validations"
+  add_foreign_key "departure_proposals", "teams"
   add_foreign_key "departure_source_normalizations", "departure_source_captures"
+  add_foreign_key "departure_validations", "departure_acquisitions"
+  add_foreign_key "departure_validations", "departure_batches"
+  add_foreign_key "departure_validations", "departure_dataset_normalizations"
+  add_foreign_key "departure_validations", "offseason_input_revisions"
   add_foreign_key "game_external_identities", "games"
   add_foreign_key "game_observations", "game_scoring_reviews", column: "scoring_review_id"
   add_foreign_key "game_observations", "games"

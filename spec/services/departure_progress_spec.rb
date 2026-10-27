@@ -12,7 +12,10 @@ RSpec.describe DepartureProgress do
     membership
     capture_departures(batch)
     save_departure_rows(batch, departure_rows(team))
-    approve_departures(batch)
+    operation = Departures::ValidationPreparation.create(batch)
+    PrepareDepartureValidationJob.perform_now(operation.id)
+    approval = Departures::ValidationApproval.new(operation.reload).call(reviewer: 'reviewer@example.test')
+    PublishDepartureValidationJob.perform_now(approval.id)
   end
 
   def acquired_records(&)
@@ -24,43 +27,35 @@ RSpec.describe DepartureProgress do
     count
   end
 
-  it 'projects only comparison fields from the stored revision while retaining the original evidence' do
+  it 'reads compact revision identity and leaves full evidence retained' do
     progress = described_class.new(season)
     revision = progress.send(:revision)
-    expect(revision.payload.keys).to contain_exactly('team_inputs', 'report')
-    expect(revision.payload.fetch('team_inputs').keys).to eq([team.id.to_s])
+    expect(revision.attributes.keys).to eq(['id'])
     expect(OffseasonInputRevision.find(revision.id).payload.keys).to include('dataset', 'review')
     expect(progress.call.status).to eq('complete')
   end
 
-  it 'replays full retained evidence once without loading the acquisition again for its status' do
-    loaded_datasets = []
-    allow(Departures::RetainedEvidence).to receive(:new).and_wrap_original do |original, acquisition, **options|
-      loaded_datasets << %i[dataset evidence].map { |name| acquisition.has_attribute?(name) }
-      original.call(acquisition, **options)
+  it 'does not replay or select annual source JSON for setup progress' do
+    allow(Departures::RetainedEvidence).to receive(:new).and_raise('Source replay forbidden')
+    queries = []
+    observer = lambda do |*, event|
+      queries << event.fetch(:sql) if event.fetch(:sql).include?('SELECT "departure_acquisitions".*')
     end
-    records = acquired_records { expect(described_class.new(season).call.status).to eq('complete') }
-    expect(records).to eq(1)
-    expect(Departures::RetainedEvidence).to have_received(:new).once
-    expect(loaded_datasets).to eq([[false, false]])
+    ActiveSupport::Notifications.subscribed(observer, 'sql.active_record') do
+      records = acquired_records { expect(described_class.new(season).call.status).to eq('complete') }
+      expect(records).to eq(0)
+    end
+    expect(queries).to be_empty
   end
 
-  it 'does not retain replay source bodies in the surrounding request query cache' do
-    cached_reads = []
-    callback = lambda do |*, event|
-      sql = event[:sql]
-      full_source_read = sql.start_with?('SELECT "departure_acquisitions".*') || sql.include?('"departure_acquisitions"."evidence"')
-      source_scalar = sql.include?('jsonb_extract_path_text(evidence')
-      cached_reads << event[:cached] if sql.start_with?('SELECT') && (full_source_read || source_scalar)
-    end
-    ActiveSupport::Notifications.subscribed(callback, 'sql.active_record') do
-      ActiveRecord::Base.cache do
-        expect(described_class.new(season).call.status).to eq('complete')
-        batch.attempt
-      end
-    end
-    expect(cached_reads.size).to eq(batch.plan.fetch('sources').size + 1)
-    expect(cached_reads).not_to include(true)
+  it 'keeps unsigned historical revisions visible without treating them as current proof' do
+    DepartureApproval.delete_all
+    DepartureProposal.delete_all
+    DepartureValidation.delete_all
+    allow(Departures::RetainedEvidence).to receive(:new).and_raise('Source replay forbidden')
+    step = described_class.new(season).call
+    expect(step.status).to eq('needs_review')
+    expect(step.last_result).to include('is retained', 'validation needed')
   end
 
   it 'checks stale profile pointers and reads acquisition status without instantiating source payloads' do
@@ -73,7 +68,7 @@ RSpec.describe DepartureProgress do
     expect(records).to eq(0)
   end
 
-  it 'still replay-validates current identity mappings rather than trusting the projected saved report' do
+  it 'rejects current identity changes against the signed saved report' do
     team.update!(school: 'Changed canonical identity')
     expect(described_class.new(season).call.status).to eq('needs_review')
   end

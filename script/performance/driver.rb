@@ -8,6 +8,7 @@ require_relative 'measurements'
 require_relative 'job_driver'
 require_relative 'mixed_workload'
 require_relative 'departure_normalization_driver'
+require_relative 'departure_validation_driver'
 require 'benchmark'
 require 'securerandom'
 require 'socket'
@@ -31,11 +32,12 @@ module OffseasonPerformance
 
     def execute(result)
       collect(result)
-      check(result) unless @scenario.solver? || @scenario.name == 'departure_normalization'
+      check(result) unless @scenario.solver? || %w[departure_normalization departure_validation].include?(@scenario.name)
       result
     end
 
     def collect(result)
+      return DepartureValidationDriver.call(result, @scenario, @clients) if @scenario.name == 'departure_validation'
       return DepartureNormalizationDriver.call(result, @scenario) if @scenario.name == 'departure_normalization'
 
       collect_application(result)

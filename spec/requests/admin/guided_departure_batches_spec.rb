@@ -12,6 +12,8 @@ RSpec.describe 'Guided admin departure review' do
   let(:team_points) { 100 }
 
   before do
+    allow(PrepareDepartureValidationJob).to receive(:perform_later)
+    allow(PublishDepartureValidationJob).to receive(:perform_later)
     create(:team_season, season:, team:)
     create(:team_season, season: create(:season, year: 2025), team:)
     TeamExternalIdentity.associate!(team:, provider: 'cbbd', external_id: '20')
@@ -37,11 +39,14 @@ RSpec.describe 'Guided admin departure review' do
 
   def capture
     AcquireDepartureBatchJob.perform_now(batch.attempt.id)
+    operation = DepartureValidation.where(departure_batch_id: batch.id).order(:id).last
+    PrepareDepartureValidationJob.perform_now(operation.id)
+    expect(operation.reload.status).to eq('ready'), operation.error
     batch.reload.attempt
   end
 
   def coverage_fields
-    { review_key: Departures::CoverageReview.new(batch).review_key, expected_picks: '1',
+    { review_key: DepartureValidation.where(departure_batch_id: batch.id).maximum(:id).to_s, expected_picks: '1',
       confirm_picks: '1', picks_evidence: 'Independent final draft reference', confirm_scope: '1',
       scope_evidence: 'Reviewed completed college season', absent_postseason_team_ids: ['20'] }
   end
@@ -98,6 +103,7 @@ RSpec.describe 'Guided admin departure review' do
     expect(latest.predecessor_id).to eq(first.id)
     expect(latest.plan.dig('coverage_review', 'reviewed_by')).to eq(admin.email)
     expect(first.reload.attributes).to eq(original)
+    PrepareDepartureValidationJob.perform_now(DepartureValidation.order(:id).last.id)
     follow_redirect!
     expect(response.body).to include('Confirm draft results and college teams', 'Publish departure inputs')
     expect(Ingestion::Cbbd::HttpTransport).to have_received(:call).exactly(5).times
@@ -165,6 +171,7 @@ RSpec.describe 'Guided admin departure review' do
       expect(latest.evidence).to eq(first.evidence)
       facts = Departures::RetainedEvidence.new(latest).dataset
       expect(facts.fetch('production').first.fetch('team_points')).to eq(102)
+      PrepareDepartureValidationJob.perform_now(DepartureValidation.order(:id).last.id)
       follow_redirect!
       expect(response.parsed_body.at_css('[data-points-reconciliation]')).to be_present
       expect(Ingestion::Cbbd::HttpTransport).to have_received(:call).exactly(5).times
