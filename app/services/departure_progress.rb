@@ -47,6 +47,13 @@ class DepartureProgress
   end
 
   def report_current?
+    operation = DepartureValidation.where(departure_batch_id: batch.id, offseason_input_revision_id: revision.id).order(:id).last
+    return operation.current? if operation
+
+    legacy_report_current?
+  end
+
+  def legacy_report_current?
     report = DepartureAcquisition.uncached do
       attempt = batch.acquisitions.select(*(DepartureAcquisition.column_names - %w[dataset evidence])).order(:id).last
       Departures::BatchReview.new(batch, comparison: :persisted).report(attempt:)

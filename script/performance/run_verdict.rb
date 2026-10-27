@@ -14,11 +14,16 @@ module OffseasonPerformance
       values = results.select { |entry| entry['scenario'] == scenario }
       expected = phase_count(scenario)
       complete = scenario_complete?(values, expected)
+      if scenario == 'departure_validation'
+        complete &&= values.map { |entry| entry.fetch('phase') }.sort == DepartureValidationDriver::PHASES.sort
+      end
       COVERAGE.fetch(complete)
     end
 
     def self.phase_count(scenario)
-      get = Runner::GETS.include?(scenario) || scenario == 'departure_normalization'
+      return DepartureValidationDriver::PHASES.length if scenario == 'departure_validation'
+
+      get = Runner::GETS.include?(scenario) || %w[departure_normalization departure_validation].include?(scenario)
       get ? 2 : 1
     end
 

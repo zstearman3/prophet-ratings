@@ -4,6 +4,8 @@ module Departures
   # Checkpoints append bytes and provenance, never base64 copies of the annual payload.
   class CaptureStore
     VERSION = 'departure-captures-v1'
+    # A scalar capture reference does not retain original response bytes.
+    Reference = Data.define(:id, :sha256)
 
     def initialize(attempt)
       @attempt = attempt
@@ -61,6 +63,24 @@ module Departures
       capture = capture_record(bytes)
       Contract.check!(capture.byte_size == bytes.bytesize && capture.body == bytes.b, 'Capture content identity collision')
       capture
+    end
+
+    # Fresh validation already owns a coherent transaction. Avoid enrolling raw-body models
+    # in its callbacks; PostgreSQL still enforces uniqueness and we check actual collision bytes.
+    def self.capture_reference(bytes)
+      attributes = { sha256: Digest::SHA256.hexdigest(bytes), body: bytes.b, byte_size: bytes.bytesize }
+      insert_capture(attributes)
+      id = DepartureSourceCapture.all.skip_query_cache!.where(attributes).pick(:id)
+      Contract.check!(id, 'Capture content identity collision')
+      Reference.new(id:, sha256: attributes.fetch(:sha256))
+    end
+
+    def self.insert_capture(attributes)
+      binds = attributes.map do |name, value|
+        ActiveRecord::Relation::QueryAttribute.new(name.to_s, value, DepartureSourceCapture.type_for_attribute(name))
+      end
+      sql = 'INSERT INTO departure_source_captures (sha256, body, byte_size) VALUES ($1, $2, $3) ON CONFLICT (sha256) DO NOTHING'
+      ApplicationRecord.connection.exec_query(sql, 'Fresh departure capture', binds)
     end
 
     def self.capture_record(bytes)
