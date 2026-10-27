@@ -18,6 +18,33 @@ RSpec.describe 'Matchups' do
   end
 
   describe 'POST /submit' do
+    it 'shows legacy-model errors in the existing results area for both actions', :aggregate_failures do
+      legacy = create(:ratings_config_version, name: 'v1.2-default', current: true)
+      create(:team_rating_snapshot, team_season: ts1, ratings_config_version: legacy)
+      create(:team_rating_snapshot, team_season: ts2, ratings_config_version: legacy)
+      # Reproduce a retained version published before the complete configuration contract.
+      legacy.update_columns(config: { bundle_name: legacy.name }) # rubocop:disable Rails/SkipsModelValidations
+
+      get '/matchup'
+      page = response.parsed_body
+
+      %w[predict simulate].each do |action|
+        post '/matchup/submit', params: {
+          home_team_id: ts1.id, away_team_id: ts2.id, neutral: '0', upset_modifier: '1.0', action_type: action
+        }, as: :turbo_stream
+
+        stream = Nokogiri::HTML(response.parsed_body).at_css('turbo-stream')
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(stream['action']).to eq('update')
+        expect(stream['target']).to eq('prediction_result_frame')
+        expect(page.at_css("##{stream['target']}")).not_to be_nil
+        expect(stream.at_css('template').text).to include('Model v1.2-default lacks the complete configuration contract')
+      end
+
+      expect(legacy.reload.config).to eq('bundle_name' => 'v1.2-default')
+      expect(RatingsConfigVersion.current).to eq(legacy)
+    end
+
     it 'returns http success (turbo_stream) when valid' do
       create(:team_rating_snapshot, team_season: ts1, ratings_config_version: config)
       create(:team_rating_snapshot, team_season: ts2, ratings_config_version: config)

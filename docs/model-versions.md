@@ -43,6 +43,13 @@ current predictions/ranks may return no result. Neither path creates a version.
 A selected incomplete legacy active row fails calculation rather than falling
 through to a newer bundle.
 
+On `/matchup`, both prediction and simulation return 422 when the selected model
+lacks the complete configuration contract. The error appears in the results area,
+preserving the form for retries. Restoring calculations requires a reviewed complete
+model and matching rating snapshots for the selected teams, followed by explicit
+default activation using the rollout workflow below. Deploying a page fix alone
+does not repair the production model or its snapshots.
+
 ```ruby
 version = RatingsConfigVersion.find_by!(name: 'v1.6-pinned-model')
 ProphetRatings::OverallRatingsCalculator.new(season, ratings_config_version: version).call(as_of: date)
