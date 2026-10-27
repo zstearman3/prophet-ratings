@@ -18,22 +18,24 @@ module OffseasonPerformance
       DepartureNormalizationDriver.wait(id)
     end
 
+    BATCH_SQL = <<~SQL.squish.freeze
+      INSERT INTO departure_batches (season_id, predecessor_id, plan, decisions, acknowledgement, correction_reason, created_at, updated_at)
+      SELECT season_id, id, plan, decisions, acknowledgement, 'Synthetic fresh validation and publication', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+      FROM departure_batches WHERE id = :original_id RETURNING id
+    SQL
+    ATTEMPT_SQL = <<~SQL.squish.freeze
+      INSERT INTO departure_acquisitions
+        (departure_batch_id, predecessor_id, plan, manifest, dataset, evidence, status, started_at, finished_at, created_at, updated_at)
+      SELECT :batch_id, id, plan, manifest, dataset, evidence, status, started_at, finished_at, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+      FROM departure_acquisitions WHERE departure_batch_id = :original_id ORDER BY id DESC LIMIT 1
+    SQL
+
     def self.clone_batch(original_id)
       Fixture.guard!
-      sql = <<~SQL.squish
-        INSERT INTO departure_batches (season_id, predecessor_id, plan, decisions, acknowledgement, correction_reason, created_at, updated_at)
-        SELECT season_id, id, plan, decisions, acknowledgement, 'Synthetic fresh validation and publication', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-        FROM departure_batches WHERE id = #{Integer(original_id)} RETURNING id
-      SQL
-      id = ApplicationRecord.connection.select_value(sql)
-      sql = <<~SQL.squish
-        INSERT INTO departure_acquisitions
-          (departure_batch_id, predecessor_id, plan, manifest, dataset, evidence, status, started_at, finished_at, created_at, updated_at)
-        SELECT #{Integer(id)}, id, plan, manifest, dataset, evidence, status, started_at, finished_at, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-        FROM departure_acquisitions WHERE departure_batch_id = #{Integer(original_id)} ORDER BY id DESC LIMIT 1
-      SQL
-      ApplicationRecord.connection.execute(sql)
-      DepartureBatch.select(:id).find(id)
+      values = { original_id: Integer(original_id) }
+      values[:batch_id] = ApplicationRecord.connection.select_value(ApplicationRecord.sanitize_sql_array([BATCH_SQL, values]))
+      ApplicationRecord.connection.execute(ApplicationRecord.sanitize_sql_array([ATTEMPT_SQL, values]))
+      DepartureBatch.select(:id).find(values.fetch(:batch_id))
     end
 
     def self.validate(result, fixture)
