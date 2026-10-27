@@ -677,7 +677,7 @@ unresolved.
 
 ## Retained readiness and explicit activation
 
-Apply migration `20261022040000` using `bin/migrate` before opening this screen.
+Apply migrations through `20261027030000` using `bin/migrate` before opening this screen.
 From **Admin → Offseason setup → target season → Review readiness and explicit
 activation**, inspect the fresh selected-model report. Membership/date/alias
 review, a persisted valid selected model, finite core outputs with matching
@@ -708,6 +708,8 @@ and stale-review checks remain enforced. Reviews saved with an older fingerprint
 format require a fresh review before activation. No rating formulas or published
 captures are changed.
 
+Readiness reports, saving reviews, and activation run on the GoodJob heavy queue. The page loads immediately and polls for completion for up to ten minutes; keep the worker running. If an operation remains queued or running after a worker interruption, inspect GoodJob and use **Requeue operation**. Repeated deliveries cannot repeat a completed activation. A stale review requires a fresh report, not a retry of the stale decision.
+
 The readiness page leads with required-check blockers and review/activation
 actions. Check cards summarize the evidence; input gaps use a bounded, scrollable
 table. Full diagnostic JSON, participant evidence and saved approval/action audit
@@ -720,7 +722,7 @@ acknowledgement and deferrals. This changes no current/default flags.
 Then deliberately use **Activate season** or **Make model default** as separate
 actions, inspecting each displayed previous/target ID. Season activation reuses
 stored membership choices and the existing season activation API. Neither action
-runs source alignment, calculations, imports or job enqueueing. Activating the
+runs source alignment, rating calculations or imports; both enqueue their readiness verification and switch through GoodJob. Activating the
 season leaves the default model unchanged. Model activation affects future work
 that resolves the default, independently from season selection/publication.
 

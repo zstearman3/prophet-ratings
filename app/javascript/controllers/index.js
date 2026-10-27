@@ -21,3 +21,6 @@ application.register("forecast-provenance", ForecastProvenanceController)
 
 import PreseasonProgressController from "./preseason_progress_controller"
 application.register("preseason-progress", PreseasonProgressController)
+
+import ReadinessStartController from "./readiness_start_controller"
+application.register("readiness-start", ReadinessStartController)
