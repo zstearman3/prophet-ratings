@@ -57,13 +57,16 @@ module Ingestion
     def lock_game
       if game
         game.lock!
-        resolution.validate_game(game)
+        @reviewed_schedule_skip = ScheduleReviewReplay.new(observation, resolution, game).call
+        resolution.validate_game(game) unless @reviewed_schedule_skip
       else
         @game = Game.new
       end
     end
 
     def apply_observation
+      return @reviewed_schedule_skip if @reviewed_schedule_skip
+
       return ObservationScheduleProjection.new(observation, resolution, game).call if observation.schedule_projection?
 
       writer = ObservationWriter.new(observation, resolution, game, scoring_review: @settings[:scoring_review])

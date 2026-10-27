@@ -521,6 +521,35 @@ reports retain historical failure evidence; a retry with its own request budget
 recomputes date completion without duplicating games. No backfill, activation or
 model publication is triggered.
 
+## Explicit upcoming CBBD schedule review
+
+Migration `20261026020000` adds immutable `GameScheduleReview` decisions. Deploy
+with the normal migration gate and restart web and worker. Within an upcoming
+schedule refresh run, a retained conflicting CBBD entry offers **Resolve schedule
+conflict**. The comparison displays both source IDs, Eastern dates/tip times,
+and venues, including any preserved manual corrections. The effective retained
+schedule is stored alongside the selected source payload. Select **Keep existing entry** or **Keep incoming entry**, then
+**Approve selected schedule entry**. No written justification is required:
+`Approved by admin`, the user, timestamp, exact comparison, and selected values
+are recorded automatically. Viewing the comparison makes no changes.
+
+This review is limited to two distinct CBBD IDs with the same statistical profile
+and participants, both upcoming and unplayed. Completed/scored games, missing
+memberships, ambiguous candidates, or source identity changes remain protected.
+The chosen entry keeps the local Game and TeamGame IDs; choosing incoming updates
+pending schedule metadata through the existing writer, preserving manual venue
+corrections. The discarded source key is retired on the same game. The review,
+identity changes, and metadata updates commit atomically under date/source/game
+locks. Stale comparisons require reloading, and original source observations are
+preserved.
+
+Return to schedule results and **Retry unfinished dates** after approval. An
+unchanged discarded entry becomes an audited `reviewed_skip`, contributes no
+imported rows, and no longer blocks completion. Changed discarded source facts or
+participant/identity changes remain held. The original failed run stays in the
+audit history; its retry recomputes completion. Approval does not run a ratings
+job, fetch data, or automatically retry the date.
+
 ## Provider-scoped external identities
 
 `TeamExternalIdentity` and `GameExternalIdentity` attach durable provider keys to

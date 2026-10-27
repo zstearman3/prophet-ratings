@@ -10,13 +10,14 @@ module Ingestion
                  unmapped_external_team_identity schedule_projection_requires_pending_game missing_schedule_document_url
                  missing_accepted_provenance provider_or_profile_conflict older_source_revision equal_source_revision_conflict
                  superseded_game_identity missing_required_box_data source_scheduled source_live source_final
-                 source_postponed source_cancelled reviewed_source_changed reviewed_game_changed admin_reviewed_scoring].freeze
+                 source_postponed source_cancelled admin_reviewed_schedule admin_reviewed_schedule_skip
+                 reviewed_source_changed reviewed_game_changed admin_reviewed_scoring].freeze
     NUMBERS = %w[changed_rows ignored_observations imported_rows attempted_rows attempts retries accepted protected rejected unmatched
                  incomplete].freeze
     FLAGS = %w[complete valid_empty rolled_back retrieval_complete acquisition_complete accepted projected scheduled applied].freeze
     IDS = %w[rejection_observation_ids game_id observation_id absent_ids possible_move_ids].freeze
     OUTCOMES = %w[scheduled live final postponed cancelled unknown projected unchanged created updated invalid ambiguous conflict unmatched
-                  incomplete stale superseded protected].freeze
+                  incomplete stale superseded protected reviewed_skip].freeze
 
     def self.call(report)
       source = report.deep_stringify_keys
