@@ -10,11 +10,15 @@
       <% if @evidence[:observations][id] %>
         <p class="font-medium"><%= schedule_observation_matchup(@evidence[:observations][id]) %></p>
         <p><%= link_to "Review rejected observation #{id}", rails_admin.show_path(model_name: 'game_observation', id:), class: 'text-blue-700 underline' %>
-          · <%= @evidence[:observations][id].outcome %>. <%= @evidence[:scoring_reviews][id] ? 'Originally rejected; see the reviewed import below.' : 'Review the source game and participants; this rejected game was not imported.' %></p>
+          · <%= @evidence[:observations][id].outcome %>. <%= (@evidence[:scoring_reviews][id] || @evidence[:schedule_reviews][id]) ? 'Originally rejected; see the saved review below.' : 'Review the source game and participants; this rejected game was not imported.' %></p>
         <% if @evidence[:scoring_reviews][id] %>
           <p>Reviewed and imported: <%= link_to "Game #{@evidence[:scoring_reviews][id].game.id}", game_path(@evidence[:scoring_reviews][id].game), class: 'text-blue-700 underline' %> ·
             <%= link_to 'View scoring review', admin_schedule_refresh_run_game_scoring_review_path(@run, id), class: 'text-blue-700 underline' %>.
             Retry unfinished dates to recompute completion.</p>
+        <% elsif @evidence[:schedule_reviews][id] %>
+          <p>Schedule conflict resolved. <%= link_to 'View schedule decision', admin_schedule_refresh_run_game_schedule_review_path(@run, id), class: 'text-blue-700 underline' %>. Retry unfinished dates to recompute completion.</p>
+        <% elsif !@run.historical? && @run.cbbd? && Ingestion::ScheduleReviewEvidence.eligible?(@evidence[:observations][id]) %>
+          <p><%= link_to 'Resolve schedule conflict', admin_schedule_refresh_run_game_schedule_review_path(@run, id), class: 'text-blue-700 underline' %></p>
         <% elsif @run.historical? && @run.cbbd? && Ingestion::ScoringReviewEvidence.reviewable?(@evidence[:observations][id], @run.season) %>
           <p><%= link_to 'Resolve scoring discrepancy', admin_schedule_refresh_run_game_scoring_review_path(@run, id), class: 'text-blue-700 underline' %></p>
         <% end %>
