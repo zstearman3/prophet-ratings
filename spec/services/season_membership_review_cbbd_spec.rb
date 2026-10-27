@@ -46,14 +46,14 @@ RSpec.describe SeasonMembershipReview, :cbbd do
             TeamConference.all.map(&:attributes)]).to eq(before)
   end
 
-  it 'requires explicit coverage confirmation and preserves surrounding membership years' do
+  it 'requires explicit coverage confirmation and carries approval forward while preserving history' do
     refresh
     expect { review.apply(submission.except('confirm_source_coverage'), reviewer: 'admin') }.to raise_error(ArgumentError, /coverage/)
     review.apply(submission, reviewer: 'admin')
     expect(team.conference_for(previous)).to eq(old)
     expect(team.conference_for(season)).to eq(conference)
-    expect(team.conference_for(following)).to eq(old)
-    expect(season.reload.participation_review['source_coverage_confirmed']).to be(true)
+    expect(team.conference_for(following)).to eq(conference)
+    expect(season.reload.participation_review).to include('source_coverage_confirmed' => true, 'conference_scope' => 'from_target_year')
   end
 
   it 'rejects stale identity changes before mapping or approval' do
@@ -88,13 +88,26 @@ RSpec.describe SeasonMembershipReview, :cbbd do
     expect(season.membership_proposal['rows'].size).to eq(2)
   end
 
-  it 'rolls back all decisions when a required adjacent boundary season is missing' do
+  it 'approves an open-ended conference change without preparing the following season' do
     following.destroy!
     refresh
-    before = TeamConference.order(:id).map(&:attributes)
-    expect { review.apply(submission, reviewer: 'admin') }.to raise_error(ArgumentError, /boundary season YEAR=2028/)
-    expect(TeamConference.order(:id).map(&:attributes)).to eq(before)
-    expect(season.reload.participation_review).to eq({})
+    review.apply(submission, reviewer: 'admin')
+    expect(team.conference_for(previous)).to eq(old)
+    expect(team.team_conferences.find_by!(start_season: season)).to have_attributes(conference_id: conference.id, end_season_id: nil)
+    expect(Season.exists?(year: 2028)).to be(false)
+    expect(season.reload.participation_review['conference_scope']).to eq('from_target_year')
+  end
+
+  it 'preserves an explicit future conference change and its finite preceding boundary' do
+    team.team_conferences.sole.update!(end_season: following)
+    later = create(:season, year: 2029)
+    future = create(:team_conference, team:, conference: old, start_season: later)
+    retained = future.attributes
+    refresh
+    review.apply(submission, reviewer: 'admin')
+    expect([previous, season, following, later].map { |year| team.conference_for(year) }).to eq([old, conference, conference, old])
+    expect(team.team_conferences.find_by!(start_season: season).end_season).to eq(following)
+    expect(future.reload.attributes).to eq(retained)
   end
 
   it 'keeps absent local schools unresolved and requires reasons for explicit exclusions' do
@@ -139,7 +152,7 @@ RSpec.describe SeasonMembershipReview, :cbbd do
   end
 
   %w[independent excluded].each do |choice|
-    it "preserves finite future history for a full #{choice} decision" do
+    it "carries a full #{choice} decision forward without restoring the previous conference" do
       membership = team.team_conferences.sole
       membership.update!(end_season: following)
       other = create(:team)
@@ -152,16 +165,16 @@ RSpec.describe SeasonMembershipReview, :cbbd do
       attributes['teams'][other.id.to_s] = { 'choice' => conference.id.to_s }
       attributes['teams'][team.id.to_s] = { 'choice' => choice, 'reason' => 'Verified target-year evidence' }
       review.apply(attributes, reviewer: 'admin')
-      expect([previous, season, following].map { |year| team.conference_for(year) }).to eq([old, nil, old])
-      expect(TeamConference.find_by!(team:, start_season: following).end_season).to eq(following)
+      expect([previous, season, following].map { |year| team.conference_for(year) }).to eq([old, nil, nil])
+      expect(membership.reload.end_season).to eq(previous)
     end
   end
 
-  it 'preserves future history when the original membership starts at the target' do
+  it 'carries the new conference forward when the original membership starts at the target' do
     team.team_conferences.sole.update!(start_season: season)
     refresh
     review.apply(submission, reviewer: 'admin')
-    expect([previous, season, following].map { |year| team.conference_for(year) }).to eq([nil, conference, old])
+    expect([previous, season, following].map { |year| team.conference_for(year) }).to eq([nil, conference, conference])
   end
 
   it 'does not rewrite an unchanged membership or its timestamp' do
