@@ -5,10 +5,11 @@ module Departures
   class SourceNormalizer
     PARSER = 'departure-source-rows-v1'
 
-    def initialize(source, bytes, settings)
+    def initialize(source, bytes, settings, identity: nil)
       @source = source
       @bytes = bytes
       @settings = settings
+      @identity = identity
     end
 
     def call
@@ -42,11 +43,16 @@ module Departures
 
     def normalization
       capture = CaptureStore.capture(@bytes)
-      contract = source.slice('id', 'type', 'request', 'team_name_source', 'scope', 'scope_evidence', 'url')
-                       .merge('parser' => PARSER, 'year' => settings.fetch('prior_season_year'))
-      DepartureSourceNormalization.create_or_find_by!(identity: Contract.digest([capture.sha256, contract])) do |row|
+      contract = source_contract
+      identity = @identity || Contract.digest([capture.sha256, contract])
+      DepartureSourceNormalization.create_or_find_by!(identity:) do |row|
         row.assign_attributes(departure_source_capture_id: capture.id, contract:)
       end
+    end
+
+    def source_contract
+      source.slice('id', 'type', 'request', 'team_name_source', 'scope', 'scope_evidence', 'url')
+            .merge('parser' => PARSER, 'year' => settings.fetch('prior_season_year'))
     end
 
     def batches(&)

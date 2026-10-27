@@ -36,4 +36,11 @@ RSpec.describe OffseasonPerformance::RunVerdict do
     result['scenarios'].last['error'] = 'HTTP failure'
     expect(described_class.coverage(result, ['preseason'])).to eq('preseason' => 'incomplete')
   end
+
+  it 'requires every old/new HTTP, status, real approval, validation and first publication phase' do
+    result['scenarios'] = OffseasonPerformance::DepartureValidationDriver::PHASES.map { |phase| { 'scenario' => 'departure_validation', 'phase' => phase } }
+    expect(described_class.coverage(result, ['departure_validation'])).to eq('departure_validation' => 'measured')
+    result['scenarios'].last['phase'] = 'validate'
+    expect(described_class.coverage(result, ['departure_validation'])).to eq('departure_validation' => 'incomplete')
+  end
 end

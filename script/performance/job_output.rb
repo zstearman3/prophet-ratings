@@ -5,6 +5,14 @@ module OffseasonPerformance
   module JobOutput
     def self.bytes(job)
       name = job.class.name
+      if name == 'PrepareDepartureValidationJob'
+        return DepartureValidation.where(id: job.arguments.first).pick(Arel.sql('octet_length(report::text)'))
+      end
+
+      if name == 'PublishDepartureValidationJob'
+        operation = DepartureApproval.find(job.arguments.first).departure_validation
+        return OffseasonInputRevision.where(id: operation.offseason_input_revision_id).pick(Arel.sql('octet_length(payload::text)'))
+      end
       return normalization_bytes(name) if name.end_with?('DepartureNormalizationJob')
       return File.size('/benchmark/solver.json') if name == 'OffseasonPerformance::SolverJob'
 

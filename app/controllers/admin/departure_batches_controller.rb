@@ -5,7 +5,10 @@ module Admin
   class DepartureBatchesController < ApplicationController
     before_action :authenticate_user!
     before_action :require_admin
-    before_action(except: %i[index create]) { @batch = DepartureBatch.find(params.expect(:id)) }
+    before_action(except: %i[index create]) do
+      @batch = DepartureBatch.select(*(DepartureBatch.column_names - ['plan']), Arel.sql("plan - 'sources' AS plan"))
+                             .find(params.expect(:id))
+    end
     rescue_from ArgumentError, KeyError, ActiveRecord::RecordInvalid, Season::OperationInProgress, with: :review_error
 
     def index
@@ -16,9 +19,7 @@ module Admin
     end
 
     def show
-      page[:preparation] ||= Departures::BatchPreparation.new(batch).form_attributes
-      presenter = Departures::BatchPage.new(batch)
-      @page = page.merge(page.key?(:coverage_fields) ? presenter.legacy_review : presenter.call)
+      @page = page.merge(Departures::BatchPage.new(batch, params).call)
     end
 
     def create
@@ -33,7 +34,8 @@ module Admin
     def update
       return update_preparation if params[:preparation]
 
-      Departures::BatchReview.new(batch).save(params.require(:review).to_unsafe_h)
+      fields = params.require(:review).to_unsafe_h
+      Departures::DecisionEditor.new(batch, fields.fetch('review_key')).save(fields)
       redirect_to admin_departure_batch_path(batch), notice: I18n.t('admin.departure_batches.saved')
     end
 
@@ -50,32 +52,31 @@ module Admin
 
     def coverage
       page[:coverage_fields] = params.require(:coverage).to_unsafe_h
-      Departures::CoverageReview.new(batch).save(page[:coverage_fields], reviewer: current_user.email)
+      Departures::PreparedCoverageReview.new(batch).save(page[:coverage_fields], reviewer: current_user.email)
       redirect_to admin_departure_batch_path(batch), notice: I18n.t('admin.departure_batches.coverage_saved')
     end
 
     def recover
-      Departures::BatchAcquisition.new(batch.attempt).recover(params.require(:recovery).to_unsafe_h)
+      Departures::BatchSuccessor.new(batch).recover(params.require(:recovery).to_unsafe_h)
       redirect_to admin_departure_batch_path(batch), notice: I18n.t('admin.departure_batches.recovered')
     end
 
-    def publish
-      service, form_key = params[:draft_review] ? [Departures::DraftTeamReview, :draft_review] : [Departures::BatchReview, :review]
-      service.new(batch).publish(params.require(form_key).to_unsafe_h, reviewer: current_user.email)
-      redirect_to admin_departure_batch_path(batch), notice: I18n.t('admin.departure_batches.published')
-    end
-
     def correct
-      correction = Departures::BatchPreparation.new(batch).correct(params.expect(:reason))
+      correction = Departures::BatchSuccessor.new(batch).correct(params.expect(:reason))
       redirect_to admin_departure_batch_path(correction),
                   notice: I18n.t('admin.departure_batches.correction')
     end
 
     def source
-      attempt = batch.acquisitions.find(params.expect(:attempt_id))
-      id = params.expect(:source_id)
-      bytes = Departures::RetainedEvidence.new(attempt).bytes(id)
-      send_data bytes, type: 'text/plain', disposition: 'attachment', filename: Departures::RetainedEvidence.new(attempt).filename(id)
+      attempt_id = batch.acquisitions.select(:id).find(params.expect(:attempt_id)).id
+      metadata = Departures::SourceHistory.new(batch, attempt_id:).source(params.expect(:source_id))
+      bytes = Departures::RetainedSourceReader.new(attempt_id).bytes(metadata)
+      extension = self.class.source_extension(metadata)
+      send_data bytes, type: 'text/plain', disposition: 'attachment', filename: "departure-source-#{attempt_id}.#{extension}"
+    end
+
+    def self.source_extension(metadata)
+      metadata.fetch('snapshot_kind') == 'raw_json' ? 'json' : 'html'
     end
 
     private

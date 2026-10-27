@@ -13,6 +13,8 @@ RSpec.describe 'Admin departure results and college review' do
   let(:batch) { Departures::CapturePreparation.create(season, {}) }
 
   before do
+    allow(PrepareDepartureValidationJob).to receive(:perform_later)
+    allow(PublishDepartureValidationJob).to receive(:perform_later)
     create(:team_season, season:, team:)
     create(:team_season, season: prior_season, team:)
     create(:team_season, season:, team: new_team)
@@ -45,6 +47,7 @@ RSpec.describe 'Admin departure results and college review' do
 
   def capture
     AcquireDepartureBatchJob.perform_now(batch.attempt.id)
+    PrepareDepartureValidationJob.perform_now(DepartureValidation.where(departure_batch_id: batch.id).order(:id).last.id)
     batch.reload.attempt
   end
 
@@ -101,6 +104,9 @@ RSpec.describe 'Admin departure results and college review' do
     reviewed_players = response.parsed_body.at_css('[data-draft-team-review] table').to_html
     patch publish_admin_departure_batch_path(batch), params: { draft_review: approval }
     expect(response).to redirect_to(admin_departure_batch_path(batch))
+    expect(batch.reload.status).to eq('draft')
+    expect(OffseasonInputRevision.count).to eq(0)
+    PublishDepartureValidationJob.perform_now(DepartureApproval.last.id)
     expect(batch.reload.status).to eq('published')
     expect(batch.revision.team_input(team.id)).to include('known_points_subtotal' => 100, 'team_points' => 102,
                                                           'loss_share' => 100.0 / 102)

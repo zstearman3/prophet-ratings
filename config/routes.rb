@@ -35,9 +35,11 @@ Rails.application.routes.draw do
     resources :departure_batches, only: %i[index create show update] do
       member do
         post :acquire
+        post :revalidate, controller: :departure_validations
+        get :progress, controller: :departure_validations
         post :recover
         post :correct
-        patch :publish
+        patch :publish, controller: :departure_validations
         patch :coverage
         get :source
       end
@@ -72,6 +74,6 @@ Rails.application.routes.draw do
   resource :matchup, only: [:show] do
     post :submit, on: :collection
   end
-  resources :teams, param: :slug, only: [:index, :show]
+  resources :teams, param: :slug, only: %i[index show]
   resources :conferences, only: %i[index show]
 end

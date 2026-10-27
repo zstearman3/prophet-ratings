@@ -15,6 +15,9 @@ RUN apt-get update -qq && apt-get install --no-install-recommends -y \
     npm install --global yarn@1.22.19 && \
     rm -rf /var/lib/apt/lists/*
 
+# SQL schema dumps must use the same major version as the local/test database.
+COPY --from=postgres:15-trixie /usr/lib/postgresql/15/bin/pg_dump /usr/local/bin/pg_dump
+
 COPY Gemfile Gemfile.lock ./
 RUN bundle install
 

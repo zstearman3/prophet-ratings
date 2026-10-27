@@ -15,6 +15,7 @@ RSpec.describe Departures::BatchReview do
   let(:threads) { [] }
 
   before do
+    allow(PrepareDepartureValidationJob).to receive(:perform_later)
     create(:team_season, season:, team:)
     TeamExternalIdentity.associate!(team:, provider: 'cbbd', external_id: '20')
     capture_cbbd(batch)
@@ -34,6 +35,7 @@ RSpec.describe Departures::BatchReview do
     normalizations.delete_all
     observations.delete_all
     DepartureSourceCapture.where(id: capture_ids).delete_all
+    DepartureValidation.where(departure_batch_id: batch.id).delete_all
     DepartureAcquisition.where(departure_batch: batch).delete_all
     batch.reload.destroy!
     season.destroy!

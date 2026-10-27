@@ -15,6 +15,10 @@ module OffseasonPerformance
     end
 
     def self.worker_arguments(owner, phase)
+      if %w[departure-validation-confirm departure-validation-revalidate].include?(phase)
+        return ['start', '--max-threads=1', '--subprocesses=0', "--queues=#{name(owner, phase, 'held')}:1"]
+      end
+
       ['start', '--max-threads=1', '--subprocesses=0', "--queues=#{name(owner, phase, 'heavy')}:1;#{name(owner, phase)}:1"]
     end
   end

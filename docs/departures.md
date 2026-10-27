@@ -134,16 +134,16 @@ team scope. Saved evidence and frozen scoring results remain unchanged.
 Legacy/manual reviews keep their explicit categories, reasons and gap approvals;
 the current browser review does not ask operators to fill those fields.
 
-Review fingerprints use capture metadata and the normalized dataset revision;
-publication still verifies retained source bytes and normalized facts. Canonical
-hashes stream sorted JSON, and evidence-file serialization sorts during generation,
-avoiding full copies of the evidence tree. Publication reuses the loaded attempt
-and its verified dataset only inside the locked transaction.
-
-Publication revalidates retained bytes and current mappings under the existing
-locks and transaction. Failures preserve current inputs; identical publication
-retries return the same revision. Corrections create a new draft for fresh
-results/team confirmation without replacing the earlier evidence.
+Review fingerprints retain the normalized dataset revision and exact approved
+choices. Background validation authenticates all retained source bytes and facts,
+then seals its certificate and team proposals against the dependency generation.
+Publication checks that certificate under the shared generation lock, streams the
+canonical payload and evidence hash, and verifies the actual persisted payload
+before committing all profile pointers. It does not replay the raw source parser.
+Failures preserve current inputs; identical publication retries return the same
+revision. Corrections create a new draft for fresh results/team confirmation
+without replacing earlier evidence. A failed manual proposal keeps bounded captured
+selection rows available for editing and fresh validation.
 
 ## Retention and compatibility
 
@@ -258,22 +258,78 @@ production rules. Capture-only attempts do not freeze strict reconciliation for 
 later automatic policy. Attempts store a small `departure-dataset-v1` reference,
 revision digest and summary; ordered normalized records reconstruct the exact
 logical dataset. Canonical hashing streams records without assembling an annual
-production array. Review and publication explicitly expand facts when needed;
-publication verifies all retained retry/selected bytes, normalized source rows
-and freshly recomputed annual results before applying inputs. Published payloads
+production array. Browser review and publication use bounded persisted projections. Explicit background
+validation authenticates every retained retry/selected byte, freshly parses every
+successful source, and recomputes annual results before any approval can publish. Published payloads
 keep full logical dataset/report/team inputs for existing readers, replacing only
 the raw evidence envelope with immutable observation references.
 
-Legacy HTML/JSON/base64 attempts and revision hashes keep their original reader
-and file replay path. No historical conversion or automatic rewrite occurs, and
-no production conversion command is provided. Backups must include the new
-capture, observation and normalization tables together with acquisition/revision
-rows; the additive migration must run before new acquisitions. Source bodies are
-private evidence, not disposable cache entries. Database deletion constraints and
-immutable models preserve acquisition provenance.
+Legacy HTML/JSON/base64 evidence and original revision payload/hash contracts are
+retained. File readers/exports may expand a logical dataset; ordinary browser GETs
+never invoke replay or create temporary source files. There is no historical
+conversion or automatic rewrite. Backups must include captures, observations,
+normalizations, validation/proposal/approval tables and acquisition/revision rows.
 
-Row transfer batches are bounded, but the full legacy normalization benchmark
-still exceeds its 400 MiB peak and 50 MiB growth budgets at 2x; see
-`docs/departure-capture-handoff.md` for final source-matched evidence. Synchronous review,
-file export and publication still expand logical datasets; their peak-memory
-redesign belongs to offseason performance ticket05.
+### Background validation and approval
+
+Acquisition completion queues `PrepareDepartureValidationJob` on the existing
+`heavy` queue. Acquisition is not approval. Old batches show their historical
+report and downloads with **validation needed** until an operator explicitly
+requests validation. Refreshing review, progress or offseason setup performs
+bounded persisted reads and never queues a fallback replay.
+
+Validation records move through queued, running, ready, failed or stale. A ready
+record contains every pick, unknown/verified-zero accounting, all target-team
+inputs and the exact proposed review choices. Manual decisions use searchable,
+paginated captured-player choices and paginated source choices; existing selected
+choices remain visible across pages. Saving decisions, source recovery or advanced
+coverage creates fresh validation work and clears approval. Original acquisition
+bytes remain immutable. Saved HTML recovery checks the original URL and capture
+metadata, retains a successor, then authenticates all sources before storing its
+new dataset reference. Correction drafts copy retained JSON inside PostgreSQL and
+preserve the published predecessor.
+
+Approval records the authenticated user, one timestamp, exact decision document
+and canonical review hash. No typed approval reason is required. The confirmation
+request queues only a scalar approval ID. A capped `PublishDepartureValidationJob`
+then rechecks the certificate and predecessor and writes the complete original
+payload, canonical input hash and every target profile pointer in one transaction.
+Failed publication rolls back every output and retains a visible error; **Retry
+approved publication** uses the same immutable approval. Revalidate after changed
+inputs. Duplicate delivery of an already published approval returns its original
+revision and cannot rewind later correction pointers. GoodJob interruptions remain
+visible; close a validation only after verifying its worker was interrupted.
+
+The certificate uses a conservative database generation, not a TTL or supplied
+hash. Durable PostgreSQL triggers invalidate it for supported and direct-SQL edits
+to acquisitions, mappings, memberships, profile/revision inputs and completed
+normalized facts, including unchanged-timestamp edits. Unrelated edits in those
+tables can therefore require revalidation. The worker records generation before
+parsing and compares under the same row lock used by invalidation triggers; that
+lock is held through sealing/publication commit, while lengthy parsing runs
+without it. Pending normalization headers, contracts and source IDs use exact JSON
+representation comparisons, including integer/float changes. Proposal ownership
+and content are write-once from insertion, and only target-season members may
+receive proposals. Sealed approval and dataset-row artifacts cannot be edited
+or unsealed by changing operation status. Operation batch/acquisition/version
+identity is immutable from creation. Approval uses a nonblocking generation lock
+and returns an explicit retry response when publication is busy; duplicate queued
+approval returns promptly.
+
+Historical validation also checks the retained published revision itself through
+exact persisted JSON comparison and bounded canonical hashing. Valid acquisition
+bytes do not certify an independently corrupted historical payload/input hash.
+Integer versus float representation and array order remain significant to the
+original canonical hash. Failed or stale history stays visible and downloadable;
+no GET silently upgrades it or treats absent evidence as verified zero.
+
+These durable triggers require SQL schema dumps (`db/structure.sql`); use normal
+Rails `db:schema:load`, which dispatches to SQL format. See
+[development setup](development.md) for PostgreSQL client prerequisites. Offline
+legacy APIs remain compatible; browser validation and publication preserve the
+original full dataset/evidence/report/team-input payload for downstream readers.
+
+The complete legacy 1x/2x feasibility pair passed the 400 MiB worker peak and
+50 MiB growth limits with ordinary query caching and no forced GC. The final
+`departure_validation` benchmark additionally exercises old/new review GETs,
+progress and forty distinct real approval requests; see [performance](performance.md).

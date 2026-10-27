@@ -5,7 +5,7 @@ APP_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$APP_ROOT"
 
 if [[ $# -gt 0 ]]; then
-  echo "Usage: bin/migrate (create/migrate development and update db/schema.rb; no server required)"
+  echo "Usage: bin/migrate (create/migrate development and update db/structure.sql; no server required)"
   [[ $# -eq 1 && ( "$1" == --help || "$1" == -h ) ]] && exit 0
   exit 1
 fi
@@ -38,4 +38,4 @@ trap 'exit 143' TERM
 
 run bin/compose up -d --wait --wait-timeout 60 db
 run bin/compose run --rm --no-deps -T web bin/rails db:create db:migrate
-echo "Migrations complete. Review and stage db/schema.rb together with db/migrate changes."
+echo "Migrations complete. Review and stage db/structure.sql together with db/migrate changes."

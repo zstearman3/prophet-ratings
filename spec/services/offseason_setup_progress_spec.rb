@@ -10,7 +10,7 @@ RSpec.describe OffseasonSetupProgress do
     expected_keys = %w[prepare memberships recruiting coaching departures preseason schedule activation]
 
     expect { described_class.new(season).steps }.not_to(change do
-      [Season.count, TeamSeason.count, RecruitingBatch.count, CoachingReview.count]
+      [Season.count, TeamSeason.count, RecruitingBatch.count, CoachingReview.count, DepartureValidation.count, DepartureApproval.count]
     end)
     steps = described_class.new(season).steps
 
@@ -22,7 +22,7 @@ RSpec.describe OffseasonSetupProgress do
     expect(results).to eq(['Discovery queued; 0 pending candidates.',
                            'No participation approval is stored. No reviewed roster is stored.',
                            'Review fresh evidence and retained decisions in readiness, then separately activate season or default model.',
-                           'Review departure batches and coverage; select the model in preseason preview.'])
+                           'Review departure batches and validation; select the model in preseason preview.'])
   end
 
   it 'shows the latest queued recruiting attempt even when no approval exists' do

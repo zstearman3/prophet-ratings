@@ -11,12 +11,13 @@ require_relative 'docker_run'
 require_relative 'docker_setup'
 require_relative 'container_sampler'
 require_relative 'phase_runner'
+require_relative 'departure_validation_driver'
 
 module OffseasonPerformance
   # Coordinates standalone runs while leaving application code, maintainer services and data untouched.
   class Runner
     SCENARIOS = %w[dashboard readiness departures preseason status preview publish cbbd compare schedule solver mixed].freeze
-    AVAILABLE_SCENARIOS = (SCENARIOS + ['departure_normalization']).freeze
+    AVAILABLE_SCENARIOS = (SCENARIOS + %w[departure_normalization departure_validation]).freeze
     GETS = Scenario::GETS
 
     def initialize(argv)
@@ -97,7 +98,9 @@ module OffseasonPerformance
     end
 
     def run_scenario(scenario)
-      phases = if scenario == 'departure_normalization'
+      phases = if scenario == 'departure_validation'
+                 DepartureValidationDriver::PHASES
+               elsif scenario == 'departure_normalization'
                  %w[legacy cbbd]
                else
                  GETS.include?(scenario) ? %w[serial concurrent] : ['serial']

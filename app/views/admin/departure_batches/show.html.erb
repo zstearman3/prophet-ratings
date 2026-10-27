@@ -1,75 +1,67 @@
-<% if @page[:draft_team_review] %>
-  <%= render 'draft_team_review' %>
-<% else %>
 <section class="mx-auto max-w-6xl space-y-6 pb-12">
   <h1 class="text-3xl font-bold">Departure batch #<%= @batch.id %> · Target <%= @batch.season.year %></h1>
   <p><%= link_to 'Back to offseason setup', admin_offseason_setup_path(season_id: @batch.season_id), class: 'text-blue-700 underline' %> · <%= link_to 'All departure batches', admin_departure_batches_path(season_id: @batch.season_id), class: 'text-blue-700 underline' %> · <%= link_to 'Refresh status', admin_departure_batch_path(@batch), class: 'text-blue-700 underline' %></p>
   <% if notice %><p role="status" class="rounded bg-green-100 p-3"><%= notice %></p><% end %>
   <% if @page[:error] %><p role="alert" class="rounded bg-red-100 p-3"><%= @page[:error] %></p><% end %>
-  <section class="rounded border p-5 space-y-3"><h2 class="text-2xl font-semibold"><%= departure_stage(@batch, @page[:attempt]) %></h2>
-  <p><%= @batch.season.year - 1 %> NBA draft · college season ending <%= @batch.season.year - 1 %> · target season ending <%= @batch.season.year %></p>
-  <% if @page[:attempt]&.status.in?(%w[queued running]) %><p>The background worker fetches five sources. Refresh status to check progress. No player decisions or publication are available until source coverage is reviewed.</p><% end %>
-  <% if @page[:attempt]&.failure.present? %><p class="rounded bg-red-100 p-3"><%= @page[:attempt].failure %></p><% end %>
-  <p>Batch: <%= @batch.status %>. Inputs only: publication does not calculate ratings or activate a season.</p>
+  <section class="rounded border p-5 space-y-3">
+    <h2 class="text-xl font-semibold"><%= @page[:validation_state] %></h2>
+    <p><%= { 'queued' => 'Fetch queued', 'running' => 'Fetch in progress', 'failed' => 'Fetch failed' }[@page[:attempt]&.status] %></p>
+    <p><%= @batch.season.year - 1 %> NBA draft · college season ending <%= @batch.season.year - 1 %>. Acquisition: <%= @page[:attempt]&.status || 'not requested' %>.</p>
+    <% if @page[:attempt]&.failure.present? %><p role="alert"><%= @page[:attempt].failure %></p><% end %>
+    <% if @page[:operation]&.error.present? %><p role="alert" class="rounded bg-red-100 p-3"><%= @page[:operation].error %></p><% end %>
+    <p>Validation prepares saved evidence and choices. Only your explicit approval queues publication. Publishing saves inputs and does not run ratings or activate a season.</p>
+    <% if @page[:attempt]&.terminal? %><%= button_to 'Validate retained evidence', revalidate_admin_departure_batch_path(@batch), class: 'rounded border px-4 py-2' %><% end %>
+    <% if @page[:operation]&.status.in?(%w[queued running]) %>
+      <%= button_to 'Close interrupted validation and retry', revalidate_admin_departure_batch_path(@batch), params: { close_interrupted: '1' }, class: 'rounded border px-4 py-2', data: { turbo_confirm: 'I verified that this validation worker was interrupted.' } %>
+    <% end %>
   </section>
-  <% if @batch.revision_id %><p>Published revision #<%= @batch.revision_id %> by <%= @batch.reviewed_by %> at <%= @batch.reviewed_at %>.</p><% end %>
-  <% if @batch.predecessor_id %><p>Correction of <%= link_to "batch ##{@batch.predecessor_id}", admin_departure_batch_path(@batch.predecessor_id), class: 'text-blue-700 underline' %>: <%= @batch.correction_reason %></p><% end %>
-  <% if @batch.status == 'draft' && @page[:attempt]&.status == 'running' %>
-    <%= form_with url: acquire_admin_departure_batch_path(@batch), method: :post, data: { turbo: false }, class: 'rounded border p-4 space-y-3' do |form| %>
-      <%= form.hidden_field :capture_only, value: '1' %>
-      <p>If the worker was interrupted, close this attempt and queue a new bounded successor. Earlier bytes remain retained. An active worker will be prevented from replacing the closed evidence.</p>
-      <%= form.check_box :close_interrupted, { required: true }, '1', '0' %><%= form.label :close_interrupted, 'I verified that this acquisition was interrupted' %>
-      <%= form.submit 'Close interrupted attempt and retry', class: 'rounded border px-4 py-2 font-medium hover:bg-gray-100' %>
+  <% if @batch.revision_id %><p>Published inputs · revision #<%= @batch.revision_id %> by <%= @batch.reviewed_by %> at <%= @batch.reviewed_at %>. Historical evidence is retained.</p><% end %>
+  <% if @batch.predecessor_id %><p>Correction of <%= link_to "batch ##{@batch.predecessor_id}", admin_departure_batch_path(@batch.predecessor_id), class: 'text-blue-700 underline' %>: <%= @batch.correction_reason %>. Earlier approval and acknowledgement cleared.</p><% end %>
+  <% if @page[:players].any? %>
+    <section data-draft-team-review class="rounded border p-5 space-y-4"><h2 class="text-2xl font-semibold">Confirm draft results and college teams</h2>
+      <p>Review all drafted players and their captured college stints. Missing production stays unknown.</p>
+      <div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead><tr><th>Pick</th><th>Drafted player</th><th>College team</th><th>Player points</th><th>Result</th></tr></thead><tbody>
+      <% @page[:players].each do |player| %>
+        <% colleges = player.fetch('college_teams'); colleges = [{}] if colleges.empty? %>
+        <% colleges.each do |college| %><tr data-draft-status="<%= (college.presence || player)['status'] %>"><td class="p-2">Pick <%= player['overall_pick'] %></td><td class="p-2"><%= player['player_name_source'] %><% if player['match_method'] == 'exact_name_within_college' %><p>Matched by name within the college</p><% end %></td><td class="p-2"><%= college['team_name'].presence || college['team_name_source'].presence || player['affiliation_source'].presence || 'No matched college' %></td><td class="p-2"><%= college['player_points'].nil? ? '—' : college['player_points'] %></td><td class="p-2"><%= departure_player_status(college.presence || player) %><p><%= (college.presence || player)['reason'] %></p></td></tr><% end %>
+      <% end %>
+      </tbody></table></div>
+    </section>
+  <% elsif @page[:report].fetch('selections').any? %>
+    <section class="rounded border p-5 space-y-4"><h2 class="text-2xl font-semibold">Review saved choices</h2><div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead><tr><th>Pick</th><th>Drafted player</th><th>Accounting and evidence</th><th>Choices</th></tr></thead><tbody>
+      <% @page[:report].fetch('selections').each do |row| %><tr><td class="p-2">Pick <%= row['overall_pick'] %> · Round <%= row['round'] %></td><td class="p-2"><%= row['player_name_source'] %></td><td class="p-2"><%= departure_review_label(row['status']) %> · <%= row['reason'] %><% row.fetch('stints', []).each do |stint| %><p><%= stint['player_name_source'] %> · <%= @page[:teams_by_id][stint['team_id']]&.school %>: <%= stint['player_points'] %> points / <%= stint['team_points'] %> · <%= stint['player_minutes'] %> minutes · <%= stint['games'] %> games</p><% end %></td><td class="p-2"><% if @batch.status == 'draft' %><%= link_to 'Edit player choices', admin_departure_batch_path(@batch, selection_key: row['selection_key']), class: 'text-blue-700 underline' %><% end %></td></tr><% end %>
+    </tbody></table></div></section>
+  <% end %>
+  <% if @page[:report].fetch('teams').any? %>
+    <section class="rounded border p-5 space-y-3"><h2 class="text-xl font-semibold">Calculated lost production</h2>
+      <% @page[:report].fetch('gaps').each do |gap| %><p><%= gap %></p><% end %>
+      <div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead><tr><th>Team</th><th>Known points</th><th>Team points</th><th>Loss share</th><th>Coverage</th></tr></thead><tbody>
+      <% @page[:report].fetch('teams').each do |row| %><tr><td class="p-2"><%= @page[:teams_by_id][row['team_id']]&.school %></td><td class="p-2"><%= row['known_points_subtotal'] %></td><td class="p-2"><%= row['team_points'] || '—' %></td><td class="p-2"><%= row['loss_share'].nil? ? 'Unknown / partial' : row['loss_share'] %></td><td class="p-2" data-coverage-reason="<%= row['reason'] %>"><%= departure_review_label(row['reason']) %></td></tr><% end %>
+      </tbody></table></div><%= render 'production_warnings', warnings: @page[:report].fetch('production_warnings', []) %>
+    </section>
+  <% end %>
+  <% if @page[:ready] %>
+    <%= form_with url: publish_admin_departure_batch_path(@batch), scope: @page[:automatic] ? :draft_review : :review, method: :patch, data: { turbo: false }, class: 'rounded border p-5 space-y-3' do |form| %>
+      <%= form.hidden_field :review_key, value: @page[:operation].id %>
+      <% if !@page[:automatic] && @page[:report].fetch('gaps').any? %><label><%= form.check_box :acknowledge_gaps %> I acknowledge each displayed coverage gap and unknown loss.</label><% end %>
+      <label class="block"><%= form.check_box :confirm, { required: true } %> I approve these exact saved departure choices and college matches.</label>
+      <%= form.submit 'Publish departure inputs', class: 'rounded bg-prophet-indigo px-4 py-2 text-white' %>
     <% end %>
   <% end %>
-  <% editable = @batch.status == 'draft' && !@page[:attempt]&.status.in?(%w[queued running]) %>
-  <% if editable && @batch.plan['provider'].nil? %>
-    <p>Historical HTML evidence is retained for offline review and correction. Create a new CBBD batch for fresh acquisition.</p>
-    <% if @page[:attempt]&.terminal? %>
-      <details class="rounded border p-4"><summary class="cursor-pointer font-medium">Recover with saved HTML from permitted normal access</summary>
-        <p>Upload unchanged original HTML, at most 5 MiB. Supply the actual original URL and capture metadata; never bypass access restrictions. This retains a successor and clears decisions.</p>
-        <%= form_with url: recover_admin_departure_batch_path(@batch), scope: :recovery, multipart: true, data: { turbo: false }, class: 'mt-4 space-y-3' do |form| %>
-          <%= form.label :source_id, 'Source to replace' %><%= form.select :source_id, @page[:attempt].plan.fetch('sources').map { |source| ["#{source['id']} · #{source['url']}", source['id']] }, {}, class: 'block w-full rounded border p-2' %>
-          <% { url: 'Actual original URL', http_status: 'Actual HTTP status (200)', captured_at: 'Captured at (ISO 8601)', observed_at: 'Observed at (ISO 8601)', source_as_of: 'Source publication time (ISO 8601, if known)', source_as_of_reason: 'Reason publication time is unknown' }.each do |key, label| %><div><%= form.label key, label %><%= form.text_field key, class: 'block w-full rounded border p-2' %></div><% end %>
-          <%= form.label :html, 'Original saved HTML' %><%= form.file_field :html, accept: '.html,text/html', required: true, class: 'block w-full rounded border p-2' %><%= form.submit 'Retain recovery attempt', class: 'rounded bg-prophet-indigo px-4 py-2 text-white' %>
-        <% end %>
-      </details>
-    <% end %>
-  <% end %>
-  <% if editable && @page[:coverage] && @page[:attempt].manifest.present? %>
-    <% if @page[:capture_only] || @page[:coverage_fields] %><%= render 'coverage' %><% else %><details class="rounded border p-4"><summary class="cursor-pointer font-medium">Revise source coverage without fetching again</summary><div class="mt-4"><%= render 'coverage' %></div></details><% end %>
-  <% end %>
-  <% if @page[:attempt]&.dataset.present? %>
-  <section class="rounded border p-5 space-y-4" aria-labelledby="player-review-heading"><h2 id="player-review-heading" class="text-2xl font-semibold">3. Review players and publish</h2>
-  <%= render 'production_warnings', warnings: @page[:report].fetch('production_warnings', []) %>
-  <h3 class="text-xl font-semibold">Saved draft report</h3>
-  <% @page[:report].fetch('errors').each do |error| %><p role="alert" class="rounded bg-red-100 p-3"><%= error %></p><% end %>
-  <% @page[:report].fetch('gaps').each do |gap| %><p><%= gap %></p><% end %>
-  <div class="overflow-x-auto rounded border"><table class="w-full text-left text-sm"><thead class="bg-gray-100"><tr><th class="p-3">Team</th><th class="p-3">Known points</th><th class="p-3">Team points</th><th class="p-3">Loss share</th><th class="p-3">Coverage</th></tr></thead><tbody>
-    <% @page[:report].fetch('teams').each do |row| %><tr><td class="p-3"><%= @page[:teams_by_id].fetch(row['team_id']).school %></td><td class="p-3"><%= row['known_points_subtotal'] %></td><td class="p-3"><%= row['team_points'] %></td><td class="p-3"><%= row['loss_share'].nil? ? 'Unknown / partial' : row['loss_share'] %></td><td class="p-3"><span data-coverage-reason="<%= row['reason'] %>"><%= row['reason'].to_s.humanize %></span></td></tr><% end %>
-  </tbody></table></div>
-  <% if editable && @page[:attempt]&.dataset.present? %>
-    <%= render 'decisions' %>
-    <h2 class="text-xl font-semibold">Approve saved decisions</h2>
-    <p>Approval uses only saved decisions above. Review every listed gap before acknowledging partial publication. Failed sources, conflicting evidence and invalid facts cannot be acknowledged away.</p>
-    <%= form_with url: publish_admin_departure_batch_path(@batch), scope: :review, method: :patch, data: { turbo: false }, class: 'rounded border p-4 space-y-3' do |form| %>
-      <%= form.hidden_field :review_key, value: @page[:review_key] %>
-      <% if @page[:report].fetch('gaps').any? %><%= form.check_box :acknowledge_gaps %><%= form.label :acknowledge_gaps, 'I acknowledge each displayed coverage gap and unknown loss' %><% end %>
-      <%= form.check_box :confirm %><%= form.label :confirm, 'I approve these saved departure decisions' %><%= form.submit 'Publish reviewed inputs', class: 'rounded bg-prophet-indigo px-4 py-2 font-medium text-white hover:bg-prophet-indigo/80' %>
-    <% end %>
-  <% end %>
-  </section>
-  <% end %>
-  <% if editable && @batch.plan['provider'] == 'cbbd' %>
-  <details class="rounded border p-4"><summary class="cursor-pointer font-medium">Fetch recovery and advanced preparation</summary><div class="mt-4 space-y-3">
-    <% unless @page[:capture_only] %><details class="rounded border p-4"><summary class="cursor-pointer font-medium">Edit saved preparation (clears decisions)</summary><%= render 'preparation', preparation: @page[:preparation], season: @batch.season, destination: admin_departure_batch_path(@batch), verb: :patch %></details><% end %>
-    <%= button_to 'Fetch sources again', acquire_admin_departure_batch_path(@batch), params: { capture_only: '1' }, class: 'rounded border px-4 py-2 font-medium hover:bg-gray-100' %>
-    <p class="text-sm text-gray-600">A new fetch retains earlier evidence and requires fresh coverage and player review.</p>
-  </div></details>
-  <% end %>
+  <% if @page[:operation]&.status == 'publish_failed' && @page[:operation].approval && @page[:operation].current? %><%= button_to 'Retry approved publication', publish_admin_departure_batch_path(@batch), method: :patch, params: { review: { review_key: @page[:operation].id, confirm: '1' } }, class: 'rounded border px-4 py-2' %><% end %>
+  <% if @batch.status == 'draft' && @page[:coverage] && (params[:coverage] == '1' || @page[:coverage_fields]) %><details class="rounded border p-4"><summary>Advanced source coverage</summary><div class="mt-4"><%= render 'coverage' %></div></details><% end %>
+  <% if @batch.status == 'draft' && @page[:coverage] %><p><%= link_to 'Review advanced source coverage', admin_departure_batch_path(@batch, coverage: '1'), class: 'text-blue-700 underline' %></p><% end %>
+  <%= render 'decision_editor' if @page[:editor] %>
   <%= render 'evidence' %>
   <% if @batch.status == 'published' %>
-    <%= form_with url: correct_admin_departure_batch_path(@batch), method: :post, data: { turbo: false }, class: 'rounded border p-4 space-y-3' do |form| %><%= form.label :reason, 'Correction reason' %><%= form.text_field :reason, required: true, class: 'block w-full rounded border p-2' %><%= form.submit 'Start correction with retained evidence', class: 'rounded bg-prophet-indigo px-4 py-2 text-white' %><% end %>
+    <%= form_with url: correct_admin_departure_batch_path(@batch), method: :post, data: { turbo: false }, class: 'rounded border p-4 space-y-3' do |form| %><%= form.label :reason, 'Correction reason' %><%= form.text_field :reason, required: true, class: 'block w-full rounded border p-2' %><%= form.submit 'Start correction with retained evidence', class: 'rounded border px-4 py-2' %><% end %>
+  <% elsif @batch.plan['provider'] != 'cbbd' && @page[:attempt]&.terminal? %>
+    <%= render 'source_recovery' %>
+  <% elsif @batch.plan['provider'] == 'cbbd' %>
+    <details class="rounded border p-4"><summary>Fetch recovery and preparation</summary><div class="mt-4 space-y-3">
+      <%= button_to 'Fetch sources again', acquire_admin_departure_batch_path(@batch), params: { capture_only: '1' }, class: 'rounded border px-4 py-2' %>
+      <% if @page[:attempt]&.status == 'running' %><%= button_to 'Close interrupted attempt and retry', acquire_admin_departure_batch_path(@batch), params: { capture_only: '1', close_interrupted: '1' }, data: { turbo_confirm: 'I verified that this acquisition was interrupted.' }, class: 'rounded border px-4 py-2' %><% end %>
+      <% unless @page[:automatic] %><%= render 'preparation', preparation: @page[:preparation], season: @batch.season, destination: admin_departure_batch_path(@batch), verb: :patch %><% end %>
+    </div></details>
   <% end %>
 </section>
-<% end %>

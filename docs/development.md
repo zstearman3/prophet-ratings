@@ -109,6 +109,7 @@ Start Docker Desktop and use the versions in `.ruby-version` and `Gemfile.lock`:
 rbenv install -s 4.0.5
 gem install bundler -v 4.0.10
 brew install libpq pkg-config
+export PATH="$(brew --prefix libpq)/bin:$PATH"
 bundle config set --local build.pg --with-pg-config="$(brew --prefix libpq)/bin/pg_config"
 bin/setup
 bin/dev
@@ -157,7 +158,7 @@ releases. A new distro image can change collation rules even within PostgreSQL 1
 `bin/dev` prepares the schema and builds assets before starting the server and worker.
 Detached startup waits for containers to be running; Rails may need another
 moment to boot. Local development does not probe `/up` repeatedly. Startup writes
-the normal tracked `db/schema.rb`, so automatic migrations no longer hide schema
+the normal tracked `db/structure.sql`, so automatic migrations no longer hide schema
 updates.
 Review the diff before committing; Rails upgrades can reorder the dump as well.
 
@@ -196,6 +197,20 @@ replace the existing mutable image-tag deployment strategy.
 a fake AWS CLI, including failed launch/wait/describe and unsuccessful task results.
 It performs no AWS requests or migrations.
 
+## SQL schema and PostgreSQL clients
+
+`db/structure.sql` is the schema source because departure certificates use database
+triggers to detect direct SQL changes and protect sealed evidence. Rails dispatches
+`db:schema:load` and `db:schema:dump` using the configured SQL format; the existing
+commands stay the same. Keep trigger functions and their table dependencies in backups.
+
+Docker pins `pg_dump` to PostgreSQL 15, matching the local/test database. A newer
+major client can emit settings PostgreSQL 15 cannot load. Generate migrations and
+dumps with the documented Docker workflow. Native hooks and `bin/test --local`
+also need `psql` on `PATH` to load the SQL schema; Homebrew's `libpq` supplies it
+(the setup example adds its `bin` directory). Native verification does not dump
+your development database.
+
 ## Working on migrations
 
 `development` is this project's integration branch; branch features from it.
@@ -207,8 +222,8 @@ After adding a migration, run this **on the feature branch**, before committing:
 
 ```bash
 bin/migrate
-git diff -- db/schema.rb db/migrate
-git add db/schema.rb db/migrate/<your-migration>.rb
+git diff -- db/structure.sql db/migrate
+git add db/structure.sql db/migrate/<your-migration>.rb
 git commit
 ```
 

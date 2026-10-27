@@ -742,3 +742,36 @@ Use the [CBBD cutover runbook](cbbd-cutover.md) after reviewed memberships and
 identity mappings. The proposed disposition retains production history; future
 provider routing is separate from historical replacement, deployment and season
 activation. Operational gates currently require a NO RELEASE recommendation.
+
+
+### Departure validation and publication
+
+The departure review now separates acquisition, validation, approval and publication.
+Acquisition completion queues full-source validation; no acquired or proposed
+match is approved automatically. Reopen a batch to see queued/running, ready,
+failed, stale, publication failed or published state. Old published reports and
+source downloads remain available without synchronous replay, and old uncertified
+revisions explicitly require validation. Setup progress is complete only when the
+retained revision and all target profile pointers have a current certificate.
+
+Review all picks and college contributions, or edit manual captured-player and
+source choices through their paginated controls. Saving choices, advanced coverage,
+a recovered source or a correction queues fresh validation. Confirm the exact
+ready proposal to queue publication; the request records the authenticated actor,
+timestamp and exact decision document without requiring a typed approval reason.
+Publication atomically saves the existing full departure payload/hash and profile
+pointers. It does not select a model, run ratings or activate a season.
+
+Refresh status while jobs run. Retry a failed approved publication with its same
+approval if inputs remain current; otherwise revalidate and approve the new
+proposal. A duplicate old delivery cannot overwrite a later correction. GoodJob
+interruptions retain visible errors, and closing an interrupted validation requires
+operator verification. A busy publication can return a prompt retry response for
+new approval instead of blocking the browser behind its commit lock.
+
+Database generation triggers make mapping, roster, source, normalized fact,
+profile and revision edits invalidate existing departure certificates even when
+written directly in SQL without timestamp changes. Invalidation is conservative
+across seasons. Keep the SQL schema and certificate/provenance tables in backups;
+run the additive migration before using this workflow. Details and historical
+integrity rules are in [departures](departures.md).

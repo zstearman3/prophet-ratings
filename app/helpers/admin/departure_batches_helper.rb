@@ -22,6 +22,12 @@ module Admin
       tag.span(FETCH_LABELS.fetch(attempt.status, reviewed))
     end
 
+    def departure_review_label(value)
+      labels = request.get_header('prophet.departure_review_labels') ||
+               request.set_header('prophet.departure_review_labels', {})
+      labels[value] ||= value.to_s.humanize
+    end
+
     def departure_player_status(player)
       tag.span({ 'included' => 'Included', 'unknown_production' => 'Stats unavailable', 'skipped' => 'Skipped' }.fetch(player['status']))
     end

@@ -145,13 +145,17 @@ RSpec.describe Departures::BatchReview do
     expect { Departures::BatchPreparation.create(empty, fields) }.to raise_error(ArgumentError, /memberships/)
   end
 
-  it 'keeps progress honest for acquisition states, publication, stale identities and later failures' do
+  it 'keeps progress honest for acquisition states, publication, stale identities and later failures', :aggregate_failures do
     team = create(:team, school: 'Sample School')
     create(:team_season, season:, team:)
     batch = legacy_departure_batch(season)
     attempt = capture_departures(batch)
     save_departure_rows(batch, departure_rows(team))
     revision = approve_departures(batch)
+    expect(DepartureProgress.new(season).call.status).to eq('needs_review')
+    operation = Departures::ValidationPreparation.create(batch.reload)
+    Departures::ValidationPreparation.new(operation).call
+    expect(operation.reload.status).to eq('ready'), operation.error
     expect(DepartureProgress.new(season).call.status).to eq('complete')
     team.update!(school: 'Changed canonical identity')
     expect(DepartureProgress.new(season).call.status).to eq('needs_review')
@@ -164,7 +168,8 @@ RSpec.describe Departures::BatchReview do
       progress = DepartureProgress.new(season).call
       expect([progress.status, progress.last_result]).to eq(
         ['needs_review',
-         "Departure revision ##{revision.id} is retained. Latest departure batch ##{correction.id}: draft; acquisition #{state}."]
+         "Departure revision ##{revision.id} is retained. Latest departure batch ##{correction.id}: draft; " \
+         "acquisition #{state}; validation needed."]
       )
     end
     expect(attempt.reload.status).to eq('completed')

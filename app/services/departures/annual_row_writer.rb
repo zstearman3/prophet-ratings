@@ -35,7 +35,7 @@ module Departures
     attr_reader :record, :sources, :settings
 
     def populate
-      record.rows.delete_all(:delete_all)
+      DepartureDatasetRow.where(departure_dataset_normalization_id: record.id).delete_all
       append('failures', settings.fetch('sources').select { |source| source['failure'].present? })
       settings['schema'] == CbbdDataset::VERSION ? cbbd : legacy
     end

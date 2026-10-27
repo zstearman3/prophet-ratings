@@ -29,6 +29,7 @@ module Departures
 
     def initialize(attempt, comparison: :memory)
       @attempt = attempt
+      @sources_by_id = nil
       @comparison = comparison
     end
 
@@ -104,7 +105,8 @@ module Departures
     end
 
     def source(id)
-      source = self.class.sources(attempt.manifest).find { |entry| entry.fetch('id') == id }
+      @sources_by_id ||= self.class.sources(attempt.manifest).index_by { |entry| entry.fetch('id') }
+      source = @sources_by_id[id]
       Contract.check!(source.present?, 'Unknown retained source')
       source
     end

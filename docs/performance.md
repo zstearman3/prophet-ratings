@@ -609,3 +609,65 @@ produced this completed pair. Another fixture-only run was intentionally interru
 before the final correctness fix. Neither supplies worker acceptance evidence.
 See [the implementation handoff](departure-capture-handoff.md) for exact commands,
 source provenance, intermediate attempts, remaining failure and verification gates.
+
+
+### Persisted departure validation/publication
+
+`bin/benchmark-offseason --scale 1 --scenario departure_validation --assert --output PATH`
+is the ticket05 full legacy scenario; use scale 2 only for its required growth pair.
+It retains the ticket01 corpus, resource caps (512 MiB and 0.5 CPU for separate
+web/worker containers), normal query caching, batch sizes and no forced GC. The
+scenario has nine independently booted phases: full validation, old published
+review serial/concurrent, new prepared draft review serial/concurrent, status,
+confirmation, actual first publication, and queued revalidation. Each HTTP sequence has 10 warmups and
+30 measured requests; review GETs also retain a cold request and concurrency 3.
+Cold GET limit is 3s, serial/status/confirmation/revalidation p95 is 1s, concurrent GET p95 is 2s,
+median memory drift is 20 MiB, each web/worker peak is 400 MiB, and cross-scale growth
+is 50 MiB. Pair growth is evaluated explicitly from both whole-container artifacts;
+a single-run pass does not establish growth.
+
+The owned setup creates 41 independent draft/acquisition copies before capturing
+any certificate generation. One real worker authenticates/parses the full corpus.
+A fixture-only helper reuses that proof for 40 cases after exact persisted text
+comparison of complete plan/manifest/dataset/evidence and all decision, acknowledgement,
+season/status/policy fields under the same generation lock. Array order and numeric
+representation are preserved; a current/version-matched proof may never be stamped
+with a newer generation. Each candidate independently calculates its bounded team
+proposal and review document. This is 1 full raw validation plus 40 verified setup
+reuses, not 41 raw validation runs. Setup elapsed and added database bytes are reported.
+No production trust API, trigger bypass or changed resource/caching policy is used.
+
+The confirmation phase submits 40 distinct new approvals through normal authenticated
+HTTP (10 warm + 30 measured), checks user/time/exact-document/hash audit and 40 new scalar-ID
+jobs, and asserts zero revision/profile-pointer writes. A benchmark-owned queue
+selector holds those proof jobs; later phases cannot execute them. A separate 41st
+case is approved through the normal route and actually publishes its first revision
+on the fresh capped worker. The global heavy-work lock remains active.
+
+After publication makes the other cases stale, a ninth fresh phase submits 40 real
+revalidation POSTs (10 warm + 30 measured). It verifies 40 distinct new queued
+operations and scalar-ID preparation jobs without executing another full raw
+validation. Its owned queue selector holds those preparation jobs; all earlier
+confirmation jobs and immutable approvals remain retained and unperformed. The
+phase checks that no approval, revision, or profile pointer changes. This measures
+revalidation queue latency separately from confirmation latency. Corrupt historical
+acquisition visibility and failed-worker/no-GET-replay behavior are covered by the
+targeted departure request and validation specs, rather than a measured corrupt-route
+performance phase.
+
+After recording the terminal worker evidence, the existing 3 GiB setup/driver budget
+runs an independent verification oracle. It loads the original full retained
+fixture payload, permits only enumerated approval actor/time/version and associated
+review-hash differences, and compares the complete new payload and original canonical
+hash semantics. The oracle never supplies facts or hashes to the measured worker.
+Its time/memory/database cost is disclosed separately. Web/worker terminal/cgroup
+peaks include their actual hashing/publication work; PostgreSQL counters/SQL time
+remain separate. Runner fingerprints include every tracked/new source file; stage
+intended files before the final pair so `git diff HEAD` also covers new files.
+
+The early same-source worker feasibility artifacts are
+`tmp/departure-validation/repair3-{1x,2x}.json`; both passed absolute limits and
+cross-scale growth (validation 14.016 MiB, publication 8.961 MiB). They do not establish
+final HTTP performance. Keep the final source-matched integrated pair and explicit
+cross-scale assessment with the ticket/PR handoff. The older normalization scenario
+and its recorded failure remain historical evidence for that earlier implementation.

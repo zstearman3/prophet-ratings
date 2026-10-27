@@ -1,57 +1,59 @@
 # frozen_string_literal: true
 
-# Approval and the latest attempt remain separate, including failures after publication.
+# Progress uses a current retained certificate; visiting setup never replays raw departure evidence.
 class DepartureProgress
-  REVIEW_PAYLOAD_SQL = "jsonb_build_object('team_inputs', payload->'team_inputs', 'report', payload->'report') AS payload"
-
   def initialize(season)
     @season = season
-    @revision = OffseasonInputRevision.where(season:, kind: 'departures').select(:id, Arel.sql(REVIEW_PAYLOAD_SQL)).order(:id).last
-    @batch = DepartureBatch.where(season:).order(:id).last
+    @revision = OffseasonInputRevision.where(season:, kind: 'departures').select(:id, :input_hash).order(:id).last
+    @batch = DepartureBatch.where(season:).select(:id, :status, :revision_id).order(:id).last
   end
 
   def call
     OffseasonSetupProgress::Step.new(key: 'departures', label: 'Review departures',
                                      status: current? ? 'complete' : 'needs_review', last_result: "#{approval_summary} #{batch_summary}",
-                                     next_action: 'Review departure batches and coverage; select the model in preseason preview.')
+                                     next_action: 'Review departure batches and validation; select the model in preseason preview.')
   end
 
   private
 
-  attr_reader :season, :revision, :batch
-
   def approval_summary
-    revision ? "Departure revision ##{revision.id} is retained." : 'No reviewed departure revision is stored.'
+    @revision ? "Departure revision ##{@revision.id} is retained." : 'No reviewed departure revision is stored.'
   end
 
   def batch_summary
-    return 'No departure preparation is stored.' unless batch
+    return 'No departure preparation is stored.' unless @batch
 
-    acquisition_status = batch.acquisitions.order(id: :desc).pick(:status) || 'not requested'
-    "Latest departure batch ##{batch.id}: #{batch.status}; acquisition #{acquisition_status}."
+    acquisition = @batch.acquisitions.order(id: :desc).pick(:status) || 'not requested'
+    "Latest departure batch ##{@batch.id}: #{@batch.status}; acquisition #{acquisition}; validation #{certificate&.status || 'needed'}."
+  end
+
+  def certificate
+    @certificate ||= DepartureValidation.where(departure_batch_id: @batch&.id).order(:id).last
   end
 
   def current?
-    return false unless revision && batch&.revision_id == revision.id && batch.status == 'published'
+    return false unless @revision && @batch&.revision_id == @revision.id && @batch.status == 'published'
+    return false unless certificate&.current?
 
-    pointers_current? && report_current?
-  rescue ArgumentError, KeyError
-    false
+    verified_revision? && pointers_current?
+  end
+
+  def verified_revision?
+    case certificate.status
+    when 'published' then certificate.offseason_input_revision_id == @revision.id
+    when 'ready' then historical_current?(certificate.choices)
+    else false
+    end
+  end
+
+  def historical_current?(choices)
+    choices.values_at('historical_revision_id', 'historical_input_hash') == [@revision.id, @revision.input_hash]
   end
 
   def pointers_current?
-    id = revision.id
-    rows = season.team_seasons.includes(:team_offseason_profile).to_a
-    rows.map(&:team_id).sort == revision.payload.fetch('team_inputs').keys.map(&:to_i).sort &&
-      rows.all? { |row| row.team_offseason_profile&.departure_revision_id == id }
-  end
-
-  def report_current?
-    report = DepartureAcquisition.uncached do
-      attempt = batch.acquisitions.select(*(DepartureAcquisition.column_names - %w[dataset evidence])).order(:id).last
-      Departures::BatchReview.new(batch, comparison: :persisted).report(attempt:)
-    end
-    report.fetch('errors').empty? && report.except('gaps', 'errors',
-                                                   'reviewed_revision') == revision.payload.fetch('report').except('reviewed_revision')
+    members = @season.team_seasons
+    proposal_ids = certificate.proposals.order(:team_id).pluck(:team_id)
+    members.order(:team_id).pluck(:team_id) == proposal_ids &&
+      TeamOffseasonProfile.where(team_season_id: members.select(:id), departure_revision_id: @revision.id).count == members.count
   end
 end

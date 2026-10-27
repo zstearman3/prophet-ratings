@@ -10,11 +10,11 @@ RSpec.describe Overcommit::Hook::PreCommit::MigrationSchema do
 
   let(:configuration) { instance_double(Overcommit::Configuration, for_hook: {}) }
   let(:context) { instance_double(Overcommit::HookContext::Base, all_files: files, modified_files: staged) }
-  let(:schema) { Rails.root.join('db/schema.rb').to_s }
+  let(:schema) { Rails.root.join('db/structure.sql').to_s }
   let(:migration) { Rails.root.join('db/migrate/20260928000000_add_example.rb').to_s }
   let(:files) { [schema, migration] }
   let(:staged) { [schema, migration] }
-  let(:schema_contents) { 'ActiveRecord::Schema[8.1].define(version: 2026_09_28_000000) do' }
+  let(:schema_contents) { "INSERT INTO public.schema_migrations (version) VALUES\n('20260928000000');" }
 
   before do
     allow(File).to receive(:read).with(schema).and_return(schema_contents)
@@ -28,13 +28,13 @@ RSpec.describe Overcommit::Hook::PreCommit::MigrationSchema do
     let(:staged) { [migration] }
 
     it 'fails even if the working schema already has the right version' do
-      expect(result).to eq([:fail, 'Migration changes need a staged db/schema.rb update. ' \
-                                   'Run bin/migrate, then review and stage db/schema.rb with your migrations.'])
+      expect(result).to eq([:fail, 'Migration changes need a staged db/structure.sql update. ' \
+                                   'Run bin/migrate, then review and stage db/structure.sql with your migrations.'])
     end
   end
 
   context 'when the schema version is stale' do
-    let(:schema_contents) { 'ActiveRecord::Schema[8.1].define(version: 2026_06_22_000100) do' }
+    let(:schema_contents) { "('20260622000100');" }
 
     it 'fails even when both files are staged' do
       expect(result.first).to eq(:fail)
@@ -61,7 +61,7 @@ RSpec.describe Overcommit::Hook::PreCommit::MigrationSchema do
   end
 
   context 'when the schema is from a newer branch' do
-    let(:schema_contents) { 'ActiveRecord::Schema[8.1].define(version: 2026_09_29_000000) do' }
+    let(:schema_contents) { "('20260929000000');" }
 
     it 'rejects a schema ahead of this branch' do
       expect(result.first).to eq(:fail)

@@ -1,0 +1,971 @@
+{
+  "summary_format_version": 1,
+  "evidence_kind": "Curated retained 1x benchmark evidence; not a new run and not full raw traces",
+  "ticket_url": "https://app.notion.com/p/40417d6b0c24818097c9ebb63dca2315",
+  "scenario": "departure_validation",
+  "scale": 1,
+  "command": "bin/benchmark-offseason --scale 1 --scenario departure_validation --assert --output tmp/departure-validation/final-1x.json",
+  "result": {
+    "owner": "offseason-2e08ac1fa98d7d65",
+    "started_at": "2026-10-27T02:13:56Z",
+    "completed_at": "2026-10-27T02:18:53Z",
+    "pass": true,
+    "coverage": {
+      "departure_validation": "measured"
+    },
+    "errors": []
+  },
+  "source": {
+    "base_sha": "3e8163134c6861241f0430ae77198bbe00d36fa2",
+    "uncommitted_diff_sha256": "a2ccd3cb124cdb643fafc2424d6b937c50b76e2fbb0eae444609cbd36c7a4b8f",
+    "file_count": 1133,
+    "canonical_file_manifest_sha256": "acdb9ec5358ae86d2a4cfb67c171395c4aa47fce1785aee5a955a05d35051297",
+    "manifest_algorithm": "SHA256 of UTF-8 json.dumps({relative_path: SHA256(file_bytes)}, sort_keys=True, separators=(comma,colon), ensure_ascii=False)",
+    "documentation_only_paths_added_after_measurement": [
+      "docs/departure-validation-handoff.md",
+      "docs/evidence/departure-validation-1x.json"
+    ],
+    "changed_files_sha256": {
+      ".git-hooks/pre_commit/migration_schema.rb": "784cd9e9cdd59b54959d44d9e213974327d8950a5deddebf9974a1ad81f039e6",
+      ".overcommit.yml": "aeb1ec3fd69d7fd49ff1fbb872c78959503773c9b65752907986d750ac572dfe",
+      "Dockerfile.dev": "e8182623080b19d71eee134005deb665f696ea221e4bd661b3b69deebab8309d",
+      "app/controllers/admin/departure_batches_controller.rb": "9823db682f6f480840e3843cd33ceafb8cd7c454b29e4ab6b92825830da67d7a",
+      "app/controllers/admin/departure_validations_controller.rb": "84f50824dc66137ccef5dd9014d5e066d47de84e592c15787913ce2c66849c44",
+      "app/helpers/admin/departure_batches_helper.rb": "5881103a870dcad0d9d8793ef0ad0a2b56b97833f5e2985ce09b4ac168b3e65e",
+      "app/jobs/acquire_departure_batch_job.rb": "5879cc5c9e775eb64a8fd48c2115417a8fc68f765327532f673b5804b42decd6",
+      "app/jobs/prepare_departure_validation_job.rb": "66423a4cfdcc358f95ea448331c37442c5622ed0bdd6beb06480812b7e071962",
+      "app/jobs/publish_departure_validation_job.rb": "1f74e0a7c784d2b7d224ae191858a8d336986ffd06e66506ffe227071ec3ba95",
+      "app/models/departure_approval.rb": "58c634ff7bc6aad24638ff97a74cfe176a2530f7ac92930935527477edc26d33",
+      "app/models/departure_dataset_normalization.rb": "cb5705f0da573b2062450e8843158ce7df15c3b3f687e766e49cc89efe9d054b",
+      "app/models/departure_proposal.rb": "3aad6e829899af7676d717f3f5f47c02573daad57306379bad95d201dcafb524",
+      "app/models/departure_validation.rb": "041a73fb76e54fd3d7737f815cf6bf4c7f244e43a9e93ec26a77e9890d893a02",
+      "app/services/departure_progress.rb": "bd16a6aeb5378111e0a3deeee41612071109784a78dec872bb9f60208e7f33ff",
+      "app/services/departures/annual_row_writer.rb": "a297b507c846643fcd9d71b4740bf0da6f53ad15b789826a59892c5b4c135ebc",
+      "app/services/departures/batch_page.rb": "32caf8bbf65a4f9221dc6cda9f5a7e1e18a3c1ecb04d0d9f29e76189362a4c88",
+      "app/services/departures/batch_successor.rb": "a2e47e0422425419e57a18cfe874c44d314f4faa50e25bf807bb4b85d95bfdf1",
+      "app/services/departures/dataset_stream.rb": "5d95120b5affa98d005a053a9ca5ea2e81c435d63a43fd0693c7ee463b0226fb",
+      "app/services/departures/decision_editor.rb": "a0f1fc8ea7e9e0628b086e6e5576723def1cb7462e536ee975c3d9168c218eb9",
+      "app/services/departures/decision_input_data.rb": "defc212b9f5495f5ca083761e07d422695875e24d685737a7facdda6977250b5",
+      "app/services/departures/effective_draft_plan.rb": "5c1028960ebc6aa6d1d1209f67f8732f27d93b774f89b49a336650ec5862aff6",
+      "app/services/departures/evidence_stream.rb": "00a9d83e9efae64b9d42316b2672927eac6bd31b63357059d0a79918bcf3673a",
+      "app/services/departures/historical_validation.rb": "2155267809b6383c9ecf09043e030e54b3ac0152b1ec095c3e5ccc71347ee290",
+      "app/services/departures/json_array_reader.rb": "e1a3968e9ae0191cb4842277f821eea80e2bb74689450e7fdf9838f24c14f68e",
+      "app/services/departures/manifest_validation.rb": "4649e2394ce88d915fd2a730c04bf08dd7ec47a6f365cc58f2b3421b46ee41fa",
+      "app/services/departures/persisted_dataset_stream.rb": "0c43b428114b60f27010397fd11631cf9c4ee683bf8698d14b279f04b7aa8848",
+      "app/services/departures/persisted_payload.rb": "dbd526920bb713d4caa510539945e31c717d20bf07fc04d0d341d5525f992898",
+      "app/services/departures/prepared_annual_dataset.rb": "052ed5bb88a076c2dd7b8267e7222d6941a9b0fb025a6131ffd6a77a7882894d",
+      "app/services/departures/prepared_coverage.rb": "7cc8584d50a649571bd1b123da05edf8402fcd59097a14d35eed17a264b8944a",
+      "app/services/departures/prepared_coverage_review.rb": "f1b79d6414b4c32fe4e21acfce626b1e9b545299fc379aad92e883a1acf529df",
+      "app/services/departures/prepared_dataset.rb": "6e7cb81ededfdccbbc77b088e6c7400bebbaf7e0af7465a39f3bef3a5cc06df7",
+      "app/services/departures/prepared_payload.rb": "c6ba4e05e2993b959132a3d0761dc14a3f4167fb815f5b399d8c3f422dc3190c",
+      "app/services/departures/prepared_proposal.rb": "9f38d17d104df4caee36be4e9008df1f2a361db5e7224ab2b73c3217e533df88",
+      "app/services/departures/production_choices.rb": "7093c2f0764d8e81b695f74d6432bd45e76baf42d63e776dfbad23de1b6abe4e",
+      "app/services/departures/production_projection.rb": "6a784b2d78676074b603d29289ca19140b85cf80eb125c24dd174b0d577302e2",
+      "app/services/departures/profile_publication.rb": "bd6cf901dd5a827f739d62f36aec306091a10afdb286b137b53737ea18b124d1",
+      "app/services/departures/published_batch.rb": "93fd7c3be4d3e251d96644cc6f404f82fe0542e8876063effb7c644047fb6834",
+      "app/services/departures/retained_evidence.rb": "16e02edfe8e967c653f2281c15316ba76e27b3e5057dc9cf5ff75d6324334f73",
+      "app/services/departures/retained_source_reader.rb": "939bc92ddb7f83d41da2b39708a86b7d2dab713ccfabc007fe6a04239bca9237",
+      "app/services/departures/revision_dataset_stream.rb": "ffc24bdea506f1eb5641623aa7413b5697b19c528de52173aa1648c4efbef4f0",
+      "app/services/departures/source_history.rb": "fb8b06016a310ad6634eba1a91dcf3426fc5c32c415464c39d2a0e4750e11587",
+      "app/services/departures/source_metadata.rb": "678d79f7c3761c18dc9e081e57cd22dbca4390a81f95d4870f74bed7bcef9bc2",
+      "app/services/departures/source_normalizer.rb": "bd88c66e866de2746754ec442968845b17e3b2a1921bdc1da9bbc7e0084d1c42",
+      "app/services/departures/source_recovery.rb": "9b0243dd15176194ada7a09e60d41ad6e870bc4f6c0980cb6d3706fce05b8151",
+      "app/services/departures/sql_cursor.rb": "b5f91c1d2986643d9773069cd5af0d43e03d4841d294b2a036df39177cc5a23c",
+      "app/services/departures/validation_approval.rb": "d7dd246b26fc4ba3f70b74c38d898150d866aba7b1859feff85cc3d7c89ddbb2",
+      "app/services/departures/validation_evidence.rb": "c7ab58c060b93f7ed45abd4fa87b7e2ec0bfc15b735cb15618a2e530a13ef8e7",
+      "app/services/departures/validation_preparation.rb": "9a0b57968e70cf96625787a655af3f323b480de9165ea083c299bb75bd25b1dc",
+      "app/services/departures/validation_publication.rb": "365a4998a645531f01561ac90ba07e07c0f4d7864c21b4089ab382a79aedc672",
+      "app/views/admin/departure_batches/_decision_editor.html.erb": "b8d9825641e6ea44aeb487c39b6f74751764fafc8304575153483616f2b96643",
+      "app/views/admin/departure_batches/_evidence.html.erb": "ce0dfbf7e45a0988b132602df8f31b7538937403c9246d891ba350dfdb24fad8",
+      "app/views/admin/departure_batches/_source_recovery.html.erb": "e5999aeecf18343721176f7146e327838f4cd880db2f0d3696a0dc367590dd3f",
+      "app/views/admin/departure_batches/show.html.erb": "38e104797ac167872815c439f0dbe54436dc71a76c09a8308691b42dc44d1e81",
+      "bin/migrate": "314905db5cd2c45c50f8eb9729a97d6c4e08eae6a8847f69ffa84af7bc4bee36",
+      "config/application.rb": "bbeafe426d8a3eb1f9b9d175968b05c5a55ce1d7b271f0302c70997a54ace9a6",
+      "config/locales/departure_batches.en.yml": "1b273df511e3946bb27da9ea7ddebbdc0c39ee6307ba7864f5e9b78199b1da74",
+      "config/routes.rb": "6b404149d5a4b6c9b9acd2bc690b0c0403f9ce5404f85dd8d4b1e79f86b61fc4",
+      "db/migrate/20261026020000_create_departure_validations.rb": "0c3d16fff5f2d52401af6903446739207377753d038397f91bc822a6ca5e6b91",
+      "db/structure.sql": "c1223e6d6e967a5e8664085acf684a8abb9666b1a7385fd20042573c98c46b85",
+      "docs/departures.md": "4de57bfc4dbe5a561f5b69aef0f0d394c385032db142c3831214d5dd37bae379",
+      "docs/development.md": "b5f77def6ef8bbdb574487b34c65dcf2899093d18b94abf5526942815978c1a7",
+      "docs/offseason.md": "6a26a40312eb9690d2a1895c3252607604c490affaee418261601b3694658217",
+      "docs/performance.md": "5663733d721d9a1b570a7b391962f0a21a05808a8643738d2d955c8409522c64",
+      "script/performance/departure_payload_oracle.rb": "2608fd1403b721225fce4532b77dfe63cfced3f41981f65f546c556d911af2bf",
+      "script/performance/departure_revalidation_window.rb": "8f16128523ca691fc8fc579d963a5ca5795b5e287273c6466cce60d9dbd292f8",
+      "script/performance/departure_validation_driver.rb": "c297ba23a2ce1ed4f0de773c2fe0ef554c5a5a4c268f1c221c7d3506357ffbb5",
+      "script/performance/departure_validation_http.rb": "bd9ac54a0ae0e34c09ea7749809b547dd015ba9439d3702ba79b94c7969c277d",
+      "script/performance/departure_validation_setup.rb": "ac90f14e8d3c0bb00aad24c20ebddaf8b621ab43f1eb15e7eaf0463189721905",
+      "script/performance/driver.rb": "ce35a212d92a59ec9da1b72d2cbcfb4567fc11ed8aa199a118092173323490bd",
+      "script/performance/job_output.rb": "386fa34c603b4e8dbcf59373dce27bd62c15eb7ace642168d838b0536e2e6e7a",
+      "script/performance/phase_queue.rb": "b1e4b1c7c36d912d6ddd7d8da67bceca14bf32dc029a60efd4a5a96c2e9a0a88",
+      "script/performance/run_verdict.rb": "2e592d1b8899d2e8d5f2f48cd0ee16249bb247519693eddb29959856fbaa25d4",
+      "script/performance/runner.rb": "366f9a410514863b6f707e73f36b0376b99ae297ffd1a06390f744fb4d953b28",
+      "script/performance/scenario.rb": "5d2d5982a3fcedcc733913f4e03558fe5d581383a393c8b7a3ab6d1f2e81f87d",
+      "script/performance/verified_departure_reuse.rb": "b05d21627e3e686ad71799387efdcd8f42493a7fd254bfca6d9bde66554985e7",
+      "spec/lib/offseason_performance/departure_revalidation_window_spec.rb": "fd780bbf7b18144f5b863007f762683530ca20b0959765908ddac9c13d264d6c",
+      "spec/lib/offseason_performance/phase_queue_spec.rb": "2a7c5ee493c5701d2e623799aac0f42dd6cebf921effe957cd7fed59b7b69ad6",
+      "spec/lib/offseason_performance/run_verdict_spec.rb": "ef40d35d15e30feafc81f1c7d218de908a1b26ee37b510344adf294a068144b2",
+      "spec/lib/offseason_performance/runner_spec.rb": "964297f0ad38ed504a7b82cc0a74a353a4e823543980921e886394a05343dbe9",
+      "spec/lib/offseason_performance/verified_departure_reuse_spec.rb": "06d01e8a1d2aab9e21255b8c13b1ae2234017501e7e5119572e7a2eb5b7b6a34",
+      "spec/overcommit/hook/pre_commit/migration_schema_spec.rb": "4c3c0d8e9040b34b5f99c6537c081bb7fbe94ab4ad2f1bc8fa2296cfb4bbb8eb",
+      "spec/requests/admin/departure_batches_spec.rb": "1cc3a56f0f8f5155df1c6fca2c830929e292eb40ad46c907aead742d40d95f24",
+      "spec/requests/admin/departure_team_review_spec.rb": "a16d59cf7aba36307816176550ba5ebbad70d2498f07aeb977b6fbf9b3233e21",
+      "spec/requests/admin/departure_validation_spec.rb": "30c3c9c4fdd23fddefb6eef7e6ca6743f2e677e775bf60c9577ba93815a84903",
+      "spec/requests/admin/guided_departure_batches_spec.rb": "083fbfb906ea28111ac06c90e48bba46fe79cfc4c5b590a51314c8bf39c1d9d5",
+      "spec/requests/admin/offseason_setups_spec.rb": "0a5dcebf9e8f045f20e048275950ebd823c01a4c7ed054ac8aeca7b51b36e9fd",
+      "spec/services/departure_progress_spec.rb": "c835293dc6c6e606b0f1fb5a48d926ee623e09a73a9c00ce8385ce20272f193b",
+      "spec/services/departures/batch_review_mapping_concurrency_spec.rb": "bb582caa9abc7ed300b5f747b467f3750f36adf47cc597f53325f9f475804d2e",
+      "spec/services/departures/batch_review_spec.rb": "24d228f652cc2e3affd7feb2d422bc67a2c25adcb92d2d15531a5e76b652dc53",
+      "spec/services/departures/decision_editor_spec.rb": "d8466a32b20e6b951553a9b06233d98ac8c1008fb37e734dfb5ea3d17e3fc860",
+      "spec/services/departures/json_array_reader_spec.rb": "6f6b15935a1c085d922948910849b9d130eb1679a95fbfd1daa9810db905cdd6",
+      "spec/services/departures/source_recovery_spec.rb": "d1be5f0e0a67c109dd32140326d2173cb7bbfa4667c91fcad6a41ff4f6c65970",
+      "spec/services/departures/validation_preparation_concurrency_spec.rb": "082f9a64204b56bb7017108765abbbd23c0ab566254576d9e003ec25f5dbff7e",
+      "spec/services/departures/validation_preparation_guided_spec.rb": "1a6f2c2f9bbebc307bd1263b8add317c9e3cab2301113691b41e9b76eb946c3d",
+      "spec/services/departures/validation_preparation_spec.rb": "7dadd837f29053b7fb92ce9ba6e725978a6f9f9f9753338f13bb312a21c8432e",
+      "spec/services/departures/validation_publication_lifecycle_spec.rb": "1ec95e00838798a2402a2cebb49aac7b8e62e5de89472771d1f7d6c9b40236b3",
+      "spec/services/offseason_setup_progress_spec.rb": "16359d8c38d6b3872f05803d0b31875ab618b541dbdbaeecda3f69d97a201653",
+      "spec/support/departure_storage.rb": "29ad40dc7d9343be356ed39a7c907891022c47d96354a5fc48eb1450611d4402"
+    },
+    "deleted_files": [
+      "db/schema.rb"
+    ]
+  },
+  "raw_evidence": {
+    "result_path": "tmp/departure-validation/final-1x.json",
+    "result_sha256": "f7c6eeaef00fb74d67fd7d02ffd35886957afcb1d46e5078f37aaacd91e3b7b3",
+    "log_path": "tmp/departure-validation/final-1x.log",
+    "log_sha256": "66d8e5f2fd21ef4e394b4d544ad45d34872f22c4998fdc57f9ac647c3fa333d6",
+    "availability": "Original task worktree only; ignored raw artifacts are not included in this remote checkpoint. This summary omits host inventory and full sample traces."
+  },
+  "acceptance_status": "1x passed. Final 2x, corresponding cross-scale growth assessment and final independent QA remain incomplete.",
+  "phases": [
+    {
+      "phase": "validate",
+      "failures": [],
+      "summary": {
+        "failures": 0,
+        "production": 8030,
+        "selections": 60,
+        "production_warnings": 0
+      },
+      "worker": {
+        "kind": "job",
+        "id": "0754cf0a-9bbf-414e-81b4-21d5e9a16174",
+        "sql_count": 162508,
+        "sql_ms": 29403.901202000055,
+        "cache_hits": 1,
+        "job_class": "PrepareDepartureValidationJob",
+        "query_cache_enabled": true,
+        "output_bytes": 115991,
+        "output_definition": "persisted terminal report/result JSONB text bytes; includes scalar SQL counting cost",
+        "terminal": "performed",
+        "current_bytes": 213921792,
+        "peak_bytes": 217325568,
+        "cpu_usec": 20857529,
+        "rss_bytes": 222461952,
+        "peak_method": "cgroup_v2_since_container_boot",
+        "elapsed": 45.65732918702997,
+        "gc_count_process_delta": 260,
+        "gc_ms_process_delta": 1740
+      },
+      "job_arguments": [
+        1
+      ],
+      "status": "ready",
+      "proposals": 365,
+      "setup": {
+        "raw_validations": 1,
+        "verified_reuses": 40,
+        "distinct_cases": 41,
+        "clone_db_bytes": 187170816,
+        "total_setup_db_bytes": 220659712,
+        "setup_elapsed_seconds": 101.39638854702935
+      },
+      "measured_requests": 0,
+      "warmup_requests": 0
+    },
+    {
+      "phase": "old-serial",
+      "failures": [],
+      "summary": {
+        "p95_seconds": 0.08353849989362061,
+        "web_memory_drift_bytes": 4112384.0,
+        "first_ten_median_bytes": 182546432.0,
+        "last_ten_median_bytes": 186658816.0
+      },
+      "measured_requests": 30,
+      "warmup_requests": 10,
+      "cold": {
+        "elapsed": 0.7253526670392603,
+        "status": 200,
+        "current_bytes": 163770368,
+        "valid": true
+      }
+    },
+    {
+      "phase": "old-concurrent",
+      "failures": [],
+      "summary": {
+        "p95_seconds": 0.2120689160656184,
+        "web_memory_drift_bytes": 4421632.0,
+        "first_ten_median_bytes": 181907456.0,
+        "last_ten_median_bytes": 186329088.0
+      },
+      "measured_requests": 30,
+      "warmup_requests": 10,
+      "cold": {
+        "elapsed": 0.22835629200562835,
+        "status": 200,
+        "current_bytes": 163991552,
+        "valid": true
+      }
+    },
+    {
+      "phase": "draft-serial",
+      "failures": [],
+      "summary": {
+        "p95_seconds": 0.045503250090405345,
+        "web_memory_drift_bytes": 4595712.0,
+        "first_ten_median_bytes": 171823104.0,
+        "last_ten_median_bytes": 176418816.0
+      },
+      "measured_requests": 30,
+      "warmup_requests": 10,
+      "cold": {
+        "elapsed": 0.2006640841718763,
+        "status": 200,
+        "current_bytes": 158961664,
+        "valid": true
+      }
+    },
+    {
+      "phase": "draft-concurrent",
+      "failures": [],
+      "summary": {
+        "p95_seconds": 0.16044887504540384,
+        "web_memory_drift_bytes": 2998272.0,
+        "first_ten_median_bytes": 183504896.0,
+        "last_ten_median_bytes": 186503168.0
+      },
+      "measured_requests": 30,
+      "warmup_requests": 10,
+      "cold": {
+        "elapsed": 0.22695725108496845,
+        "status": 200,
+        "current_bytes": 164814848,
+        "valid": true
+      }
+    },
+    {
+      "phase": "status",
+      "failures": [],
+      "summary": {
+        "p95_seconds": 0.036539125023409724,
+        "web_memory_drift_bytes": 9707520.0,
+        "first_ten_median_bytes": 168876032.0,
+        "last_ten_median_bytes": 178583552.0
+      },
+      "measured_requests": 30,
+      "warmup_requests": 10
+    },
+    {
+      "phase": "confirm",
+      "failures": [],
+      "summary": {
+        "p95_seconds": 0.037009417079389095,
+        "web_memory_drift_bytes": 8708096.0,
+        "first_ten_median_bytes": 178546688.0,
+        "last_ten_median_bytes": 187254784.0
+      },
+      "measured_requests": 30,
+      "warmup_requests": 10
+    },
+    {
+      "phase": "publish",
+      "failures": [],
+      "worker": {
+        "kind": "job",
+        "id": "4d068fe1-0ba5-4c8c-ae57-57e5cc357e0d",
+        "sql_count": 17040,
+        "sql_ms": 4495.945127999948,
+        "cache_hits": 0,
+        "job_class": "PublishDepartureValidationJob",
+        "query_cache_enabled": true,
+        "output_bytes": 56481203,
+        "output_definition": "persisted terminal report/result JSONB text bytes; includes scalar SQL counting cost",
+        "terminal": "performed",
+        "current_bytes": 222072832,
+        "peak_bytes": 226455552,
+        "cpu_usec": 3159048,
+        "rss_bytes": 236171264,
+        "peak_method": "cgroup_v2_since_container_boot",
+        "elapsed": 6.575080836890265,
+        "gc_count_process_delta": 23,
+        "gc_ms_process_delta": 251
+      },
+      "job_arguments": [
+        41
+      ],
+      "status": "published",
+      "full_corpus_oracle": {
+        "exact_original_payload": true,
+        "canonical_input_hash": true,
+        "driver_memory": {
+          "current_bytes": 675610624,
+          "peak_bytes": 732983296,
+          "cpu_usec": 1822937,
+          "rss_bytes": 689643520,
+          "peak_method": "cgroup_v2_since_container_boot"
+        },
+        "elapsed_seconds": 3.022931167855859,
+        "database_bytes_delta": 0,
+        "metadata_differences": [
+          "review.revision_id",
+          "review.reviewed_by",
+          "review.reviewed_at",
+          "review_hash",
+          "report.reviewed_revision"
+        ]
+      },
+      "profile_pointers": 365,
+      "revision_id": 3,
+      "measured_requests": 0,
+      "warmup_requests": 0
+    },
+    {
+      "phase": "revalidate",
+      "failures": [],
+      "summary": {
+        "p95_seconds": 0.04791333293542266,
+        "web_memory_drift_bytes": 7946240.0,
+        "first_ten_median_bytes": 175669248.0,
+        "last_ten_median_bytes": 183615488.0
+      },
+      "measured_requests": 30,
+      "warmup_requests": 10
+    }
+  ],
+  "container_windows": [
+    {
+      "phase": "validate",
+      "service": "web",
+      "sample_count": 134,
+      "peak_bytes": 159907840,
+      "peak_methods": [
+        "cgroup_v2_since_container_boot"
+      ],
+      "limits": {
+        "Memory": 536870912,
+        "MemorySwap": 536870912,
+        "NanoCpus": 500000000,
+        "CpuQuota": 0,
+        "CpuPeriod": 0
+      },
+      "state": {
+        "Running": true,
+        "OOMKilled": false,
+        "ExitCode": 0
+      },
+      "failures": []
+    },
+    {
+      "phase": "validate",
+      "service": "worker",
+      "sample_count": 134,
+      "peak_bytes": 225824768,
+      "peak_methods": [
+        "cgroup_v2_since_container_boot"
+      ],
+      "limits": {
+        "Memory": 536870912,
+        "MemorySwap": 536870912,
+        "NanoCpus": 500000000,
+        "CpuQuota": 0,
+        "CpuPeriod": 0
+      },
+      "state": {
+        "Running": true,
+        "OOMKilled": false,
+        "ExitCode": 0
+      },
+      "failures": []
+    },
+    {
+      "phase": "validate",
+      "service": "db",
+      "sample_count": 134,
+      "peak_bytes": 1861685248,
+      "peak_methods": [
+        "cgroup_v2_since_container_boot"
+      ],
+      "limits": {
+        "Memory": 3221225472,
+        "MemorySwap": 3221225472,
+        "NanoCpus": 500000000,
+        "CpuQuota": 0,
+        "CpuPeriod": 0
+      },
+      "state": {
+        "Running": true,
+        "OOMKilled": false,
+        "ExitCode": 0
+      },
+      "failures": []
+    },
+    {
+      "phase": "old-serial",
+      "service": "web",
+      "sample_count": 7,
+      "peak_bytes": 192856064,
+      "peak_methods": [
+        "cgroup_v2_since_container_boot"
+      ],
+      "limits": {
+        "Memory": 536870912,
+        "MemorySwap": 536870912,
+        "NanoCpus": 500000000,
+        "CpuQuota": 0,
+        "CpuPeriod": 0
+      },
+      "state": {
+        "Running": true,
+        "OOMKilled": false,
+        "ExitCode": 0
+      },
+      "failures": []
+    },
+    {
+      "phase": "old-serial",
+      "service": "worker",
+      "sample_count": 7,
+      "peak_bytes": 150286336,
+      "peak_methods": [
+        "cgroup_v2_since_container_boot"
+      ],
+      "limits": {
+        "Memory": 536870912,
+        "MemorySwap": 536870912,
+        "NanoCpus": 500000000,
+        "CpuQuota": 0,
+        "CpuPeriod": 0
+      },
+      "state": {
+        "Running": true,
+        "OOMKilled": false,
+        "ExitCode": 0
+      },
+      "failures": []
+    },
+    {
+      "phase": "old-serial",
+      "service": "db",
+      "sample_count": 7,
+      "peak_bytes": 1861685248,
+      "peak_methods": [
+        "cgroup_v2_since_container_boot"
+      ],
+      "limits": {
+        "Memory": 3221225472,
+        "MemorySwap": 3221225472,
+        "NanoCpus": 500000000,
+        "CpuQuota": 0,
+        "CpuPeriod": 0
+      },
+      "state": {
+        "Running": true,
+        "OOMKilled": false,
+        "ExitCode": 0
+      },
+      "failures": []
+    },
+    {
+      "phase": "old-concurrent",
+      "service": "web",
+      "sample_count": 7,
+      "peak_bytes": 195309568,
+      "peak_methods": [
+        "cgroup_v2_since_container_boot"
+      ],
+      "limits": {
+        "Memory": 536870912,
+        "MemorySwap": 536870912,
+        "NanoCpus": 500000000,
+        "CpuQuota": 0,
+        "CpuPeriod": 0
+      },
+      "state": {
+        "Running": true,
+        "OOMKilled": false,
+        "ExitCode": 0
+      },
+      "failures": []
+    },
+    {
+      "phase": "old-concurrent",
+      "service": "worker",
+      "sample_count": 7,
+      "peak_bytes": 151842816,
+      "peak_methods": [
+        "cgroup_v2_since_container_boot"
+      ],
+      "limits": {
+        "Memory": 536870912,
+        "MemorySwap": 536870912,
+        "NanoCpus": 500000000,
+        "CpuQuota": 0,
+        "CpuPeriod": 0
+      },
+      "state": {
+        "Running": true,
+        "OOMKilled": false,
+        "ExitCode": 0
+      },
+      "failures": []
+    },
+    {
+      "phase": "old-concurrent",
+      "service": "db",
+      "sample_count": 7,
+      "peak_bytes": 1861685248,
+      "peak_methods": [
+        "cgroup_v2_since_container_boot"
+      ],
+      "limits": {
+        "Memory": 3221225472,
+        "MemorySwap": 3221225472,
+        "NanoCpus": 500000000,
+        "CpuQuota": 0,
+        "CpuPeriod": 0
+      },
+      "state": {
+        "Running": true,
+        "OOMKilled": false,
+        "ExitCode": 0
+      },
+      "failures": []
+    },
+    {
+      "phase": "draft-serial",
+      "service": "web",
+      "sample_count": 5,
+      "peak_bytes": 183664640,
+      "peak_methods": [
+        "cgroup_v2_since_container_boot"
+      ],
+      "limits": {
+        "Memory": 536870912,
+        "MemorySwap": 536870912,
+        "NanoCpus": 500000000,
+        "CpuQuota": 0,
+        "CpuPeriod": 0
+      },
+      "state": {
+        "Running": true,
+        "OOMKilled": false,
+        "ExitCode": 0
+      },
+      "failures": []
+    },
+    {
+      "phase": "draft-serial",
+      "service": "worker",
+      "sample_count": 5,
+      "peak_bytes": 152334336,
+      "peak_methods": [
+        "cgroup_v2_since_container_boot"
+      ],
+      "limits": {
+        "Memory": 536870912,
+        "MemorySwap": 536870912,
+        "NanoCpus": 500000000,
+        "CpuQuota": 0,
+        "CpuPeriod": 0
+      },
+      "state": {
+        "Running": true,
+        "OOMKilled": false,
+        "ExitCode": 0
+      },
+      "failures": []
+    },
+    {
+      "phase": "draft-serial",
+      "service": "db",
+      "sample_count": 5,
+      "peak_bytes": 1861685248,
+      "peak_methods": [
+        "cgroup_v2_since_container_boot"
+      ],
+      "limits": {
+        "Memory": 3221225472,
+        "MemorySwap": 3221225472,
+        "NanoCpus": 500000000,
+        "CpuQuota": 0,
+        "CpuPeriod": 0
+      },
+      "state": {
+        "Running": true,
+        "OOMKilled": false,
+        "ExitCode": 0
+      },
+      "failures": []
+    },
+    {
+      "phase": "draft-concurrent",
+      "service": "web",
+      "sample_count": 5,
+      "peak_bytes": 195125248,
+      "peak_methods": [
+        "cgroup_v2_since_container_boot"
+      ],
+      "limits": {
+        "Memory": 536870912,
+        "MemorySwap": 536870912,
+        "NanoCpus": 500000000,
+        "CpuQuota": 0,
+        "CpuPeriod": 0
+      },
+      "state": {
+        "Running": true,
+        "OOMKilled": false,
+        "ExitCode": 0
+      },
+      "failures": []
+    },
+    {
+      "phase": "draft-concurrent",
+      "service": "worker",
+      "sample_count": 5,
+      "peak_bytes": 151076864,
+      "peak_methods": [
+        "cgroup_v2_since_container_boot"
+      ],
+      "limits": {
+        "Memory": 536870912,
+        "MemorySwap": 536870912,
+        "NanoCpus": 500000000,
+        "CpuQuota": 0,
+        "CpuPeriod": 0
+      },
+      "state": {
+        "Running": true,
+        "OOMKilled": false,
+        "ExitCode": 0
+      },
+      "failures": []
+    },
+    {
+      "phase": "draft-concurrent",
+      "service": "db",
+      "sample_count": 5,
+      "peak_bytes": 1861685248,
+      "peak_methods": [
+        "cgroup_v2_since_container_boot"
+      ],
+      "limits": {
+        "Memory": 3221225472,
+        "MemorySwap": 3221225472,
+        "NanoCpus": 500000000,
+        "CpuQuota": 0,
+        "CpuPeriod": 0
+      },
+      "state": {
+        "Running": true,
+        "OOMKilled": false,
+        "ExitCode": 0
+      },
+      "failures": []
+    },
+    {
+      "phase": "status",
+      "service": "web",
+      "sample_count": 5,
+      "peak_bytes": 185372672,
+      "peak_methods": [
+        "cgroup_v2_since_container_boot"
+      ],
+      "limits": {
+        "Memory": 536870912,
+        "MemorySwap": 536870912,
+        "NanoCpus": 500000000,
+        "CpuQuota": 0,
+        "CpuPeriod": 0
+      },
+      "state": {
+        "Running": true,
+        "OOMKilled": false,
+        "ExitCode": 0
+      },
+      "failures": []
+    },
+    {
+      "phase": "status",
+      "service": "worker",
+      "sample_count": 5,
+      "peak_bytes": 151638016,
+      "peak_methods": [
+        "cgroup_v2_since_container_boot"
+      ],
+      "limits": {
+        "Memory": 536870912,
+        "MemorySwap": 536870912,
+        "NanoCpus": 500000000,
+        "CpuQuota": 0,
+        "CpuPeriod": 0
+      },
+      "state": {
+        "Running": true,
+        "OOMKilled": false,
+        "ExitCode": 0
+      },
+      "failures": []
+    },
+    {
+      "phase": "status",
+      "service": "db",
+      "sample_count": 5,
+      "peak_bytes": 1861685248,
+      "peak_methods": [
+        "cgroup_v2_since_container_boot"
+      ],
+      "limits": {
+        "Memory": 3221225472,
+        "MemorySwap": 3221225472,
+        "NanoCpus": 500000000,
+        "CpuQuota": 0,
+        "CpuPeriod": 0
+      },
+      "state": {
+        "Running": true,
+        "OOMKilled": false,
+        "ExitCode": 0
+      },
+      "failures": []
+    },
+    {
+      "phase": "confirm",
+      "service": "web",
+      "sample_count": 5,
+      "peak_bytes": 191586304,
+      "peak_methods": [
+        "cgroup_v2_since_container_boot"
+      ],
+      "limits": {
+        "Memory": 536870912,
+        "MemorySwap": 536870912,
+        "NanoCpus": 500000000,
+        "CpuQuota": 0,
+        "CpuPeriod": 0
+      },
+      "state": {
+        "Running": true,
+        "OOMKilled": false,
+        "ExitCode": 0
+      },
+      "failures": []
+    },
+    {
+      "phase": "confirm",
+      "service": "worker",
+      "sample_count": 5,
+      "peak_bytes": 150175744,
+      "peak_methods": [
+        "cgroup_v2_since_container_boot"
+      ],
+      "limits": {
+        "Memory": 536870912,
+        "MemorySwap": 536870912,
+        "NanoCpus": 500000000,
+        "CpuQuota": 0,
+        "CpuPeriod": 0
+      },
+      "state": {
+        "Running": true,
+        "OOMKilled": false,
+        "ExitCode": 0
+      },
+      "failures": []
+    },
+    {
+      "phase": "confirm",
+      "service": "db",
+      "sample_count": 5,
+      "peak_bytes": 1861685248,
+      "peak_methods": [
+        "cgroup_v2_since_container_boot"
+      ],
+      "limits": {
+        "Memory": 3221225472,
+        "MemorySwap": 3221225472,
+        "NanoCpus": 500000000,
+        "CpuQuota": 0,
+        "CpuPeriod": 0
+      },
+      "state": {
+        "Running": true,
+        "OOMKilled": false,
+        "ExitCode": 0
+      },
+      "failures": []
+    },
+    {
+      "phase": "publish",
+      "service": "web",
+      "sample_count": 16,
+      "peak_bytes": 172204032,
+      "peak_methods": [
+        "cgroup_v2_since_container_boot"
+      ],
+      "limits": {
+        "Memory": 536870912,
+        "MemorySwap": 536870912,
+        "NanoCpus": 500000000,
+        "CpuQuota": 0,
+        "CpuPeriod": 0
+      },
+      "state": {
+        "Running": true,
+        "OOMKilled": false,
+        "ExitCode": 0
+      },
+      "failures": []
+    },
+    {
+      "phase": "publish",
+      "service": "worker",
+      "sample_count": 16,
+      "peak_bytes": 227160064,
+      "peak_methods": [
+        "cgroup_v2_since_container_boot"
+      ],
+      "limits": {
+        "Memory": 536870912,
+        "MemorySwap": 536870912,
+        "NanoCpus": 500000000,
+        "CpuQuota": 0,
+        "CpuPeriod": 0
+      },
+      "state": {
+        "Running": true,
+        "OOMKilled": false,
+        "ExitCode": 0
+      },
+      "failures": []
+    },
+    {
+      "phase": "publish",
+      "service": "db",
+      "sample_count": 16,
+      "peak_bytes": 1861685248,
+      "peak_methods": [
+        "cgroup_v2_since_container_boot"
+      ],
+      "limits": {
+        "Memory": 3221225472,
+        "MemorySwap": 3221225472,
+        "NanoCpus": 500000000,
+        "CpuQuota": 0,
+        "CpuPeriod": 0
+      },
+      "state": {
+        "Running": true,
+        "OOMKilled": false,
+        "ExitCode": 0
+      },
+      "failures": []
+    },
+    {
+      "phase": "revalidate",
+      "service": "web",
+      "sample_count": 4,
+      "peak_bytes": 192458752,
+      "peak_methods": [
+        "cgroup_v2_since_container_boot"
+      ],
+      "limits": {
+        "Memory": 536870912,
+        "MemorySwap": 536870912,
+        "NanoCpus": 500000000,
+        "CpuQuota": 0,
+        "CpuPeriod": 0
+      },
+      "state": {
+        "Running": true,
+        "OOMKilled": false,
+        "ExitCode": 0
+      },
+      "failures": []
+    },
+    {
+      "phase": "revalidate",
+      "service": "worker",
+      "sample_count": 4,
+      "peak_bytes": 149745664,
+      "peak_methods": [
+        "cgroup_v2_since_container_boot"
+      ],
+      "limits": {
+        "Memory": 536870912,
+        "MemorySwap": 536870912,
+        "NanoCpus": 500000000,
+        "CpuQuota": 0,
+        "CpuPeriod": 0
+      },
+      "state": {
+        "Running": true,
+        "OOMKilled": false,
+        "ExitCode": 0
+      },
+      "failures": []
+    },
+    {
+      "phase": "revalidate",
+      "service": "db",
+      "sample_count": 4,
+      "peak_bytes": 1861685248,
+      "peak_methods": [
+        "cgroup_v2_since_container_boot"
+      ],
+      "limits": {
+        "Memory": 3221225472,
+        "MemorySwap": 3221225472,
+        "NanoCpus": 500000000,
+        "CpuQuota": 0,
+        "CpuPeriod": 0
+      },
+      "state": {
+        "Running": true,
+        "OOMKilled": false,
+        "ExitCode": 0
+      },
+      "failures": []
+    }
+  ],
+  "cleanup": [
+    {
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "offseason-2e08ac1fa98d7d65",
+        "-f",
+        "compose.performance.yml",
+        "down",
+        "--volumes",
+        "--remove-orphans",
+        "--timeout",
+        "10"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "docker",
+        "image",
+        "rm",
+        "offseason-2e08ac1fa98d7d65:local",
+        "offseason-2e08ac1fa98d7d65-base:local"
+      ],
+      "exit": 0
+    }
+  ]
+}

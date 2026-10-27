@@ -25,4 +25,14 @@ RSpec.describe OffseasonPerformance::PhaseQueue do
     expect { described_class.name('offseason-abcdef', '*') }.to raise_error(ArgumentError)
     expect { described_class.name('other', 'setup') }.to raise_error(ArgumentError)
   end
+
+  it 'holds the owned departure confirmation and revalidation jobs while preserving normal heavy routing in publication' do
+    owner = 'offseason-abcdef'
+    held = described_class.worker_arguments(owner, 'departure-validation-confirm').last
+    expect(held).to eq('--queues=offseason-abcdef_departure-validation-confirm_held:1')
+    expect(held).not_to include('_heavy')
+    expect(described_class.worker_arguments(owner, 'departure-validation-revalidate').last)
+      .to eq('--queues=offseason-abcdef_departure-validation-revalidate_held:1')
+    expect(described_class.worker_arguments(owner, 'departure-validation-publish').last).to include('_heavy:1;')
+  end
 end

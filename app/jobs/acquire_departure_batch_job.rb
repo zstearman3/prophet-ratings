@@ -19,6 +19,7 @@ class AcquireDepartureBatchJob < HeavyJob
     @attempt = DepartureAcquisition.find(attempt_id)
     GoodJob::Job.advisory_lock_key("prophet-ratings:departure-attempt:#{attempt_id}") do
       Departures::BatchAcquisition.new(attempt).call
+      Departures::ValidationPreparation.queue(attempt.departure_batch) if attempt.terminal?
     end
   end
 
