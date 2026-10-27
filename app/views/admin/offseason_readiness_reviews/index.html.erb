@@ -9,6 +9,7 @@
     <nav class="flex flex-wrap gap-4 text-sm text-blue-700 underline">
       <%= link_to 'Return to season dashboard', admin_offseason_setup_path(season_id: @page[:season].id) %>
       <%= link_to 'Model analysis', admin_prediction_evaluation_path(season_id: @page[:season].id, model_id: @page[:report]['model_id']) %>
+      <%= link_to 'Refresh readiness report', @page[:review] ? admin_offseason_readiness_review_path(@page[:review], season_id: @page[:season].id) : admin_offseason_readiness_reviews_path(season_id: @page[:season].id) %>
       <%= link_to 'GoodJob operations', '/good_job' %>
     </nav>
   </header>

@@ -1,17 +1,22 @@
 # frozen_string_literal: true
 
 module Admin
-  # All actions are explicitly season scoped; browser parameters never select an activation model.
+  # Every submitted decision is pinned to a season and processed by the worker.
   class OffseasonReadinessReviewsController < ApplicationController
     before_action :authenticate_user!
     before_action :require_admin
     before_action :page
-    rescue_from ArgumentError, Season::OperationInProgress, ActiveRecord::RecordInvalid, with: :review_error
 
     def index
-      season = page[:season]
-      page[:report] = OffseasonReadiness.new(season).call
-      page[:reviews] = season.offseason_readiness_reviews.order(id: :desc)
+      page[:reviews] = page[:season].offseason_readiness_reviews.order(id: :desc)
+      operation = current_operation
+      page[:operation] = operation
+      if operation&.status == 'completed' && operation.action != 'report'
+        return redirect_to admin_offseason_readiness_review_path(operation.offseason_readiness_review_id, season_id: page[:season].id)
+      end
+
+      page[:report] = operation.report if operation&.status == 'completed' && operation.action == 'report'
+      render :waiting unless page[:report]
     end
 
     def show
@@ -20,10 +25,13 @@ module Admin
     end
 
     def create
-      season = page[:season]
-      review = OffseasonReadinessReview.record!(season, reviewer: current_user, fingerprint: params[:fingerprint],
-                                                        acknowledge: params[:acknowledge], deferrals: deferrals)
-      redirect_to admin_offseason_readiness_review_path(review, season_id: season.id)
+      submitted = params.fetch(:deferrals, ActionController::Parameters.new)
+      allowed = %w[recruiting departures schedule venues predictions operations]
+      return head :unprocessable_content if (submitted.keys - allowed).any?
+
+      inputs = { fingerprint: params[:fingerprint], acknowledge: params[:acknowledge], deferrals: submitted.permit(*allowed).to_h }
+      operation = page[:season].offseason_readiness_operations.create!(actor: current_user, action: 'review', inputs:)
+      enqueue_and_redirect(operation)
     end
 
     def activate_season
@@ -36,18 +44,26 @@ module Admin
 
     private
 
-    def activate(action)
-      show
-      OffseasonReadinessActivation.new(page.fetch(:review), actor: current_user, action:).call
-      redirect_to admin_offseason_readiness_review_path(page[:review], season_id: page[:season].id)
+    def current_operation
+      return if params[:operation_id].blank?
+
+      page[:season].offseason_readiness_operations.find(params.expect(:operation_id))
     end
 
-    def deferrals
-      submitted = params.fetch(:deferrals, ActionController::Parameters.new)
-      allowed = %w[recruiting departures schedule venues predictions operations]
-      raise ArgumentError, 'Only displayed optional open checks may be deferred.' if (submitted.keys - allowed).any?
+    def activate(action)
+      review = page[:season].offseason_readiness_reviews.find(params.expect(:id))
+      operation = page[:season].offseason_readiness_operations.create!(actor: current_user, action:, offseason_readiness_review: review)
+      enqueue_and_redirect(operation)
+    end
 
-      submitted.permit(:recruiting, :departures, :schedule, :venues, :predictions, :operations).to_h
+    def enqueue_and_redirect(operation)
+      operation.enqueue
+      if operation.offseason_readiness_review_id
+        redirect_to admin_offseason_readiness_review_path(operation.offseason_readiness_review_id, season_id: page[:season].id,
+                                                                                                   operation_id: operation.id)
+      else
+        redirect_to admin_offseason_readiness_reviews_path(season_id: page[:season].id, operation_id: operation.id)
+      end
     end
 
     def require_admin
@@ -56,12 +72,6 @@ module Admin
 
     def page
       @page ||= { season: Season.find(params.expect(:season_id)) }
-    end
-
-    def review_error(error)
-      page[:error] = error.message
-      index
-      render(page[:review] ? :show : :index, status: :unprocessable_content)
     end
   end
 end

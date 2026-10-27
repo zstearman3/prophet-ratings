@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_27_020000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_27_030000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -152,7 +152,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_27_020000) do
     t.index ["team_id"], name: "index_coaching_changes_on_team_id"
     t.check_constraint "effective_year >= 1 AND effective_year <= 9999", name: "coaching_effective_year"
     t.check_constraint "previous_year >= 1 AND previous_year <= 9999", name: "coaching_previous_year"
-    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying, 'confirmed'::character varying, 'rejected'::character varying]::text[])", name: "coaching_status"
+    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying::text, 'confirmed'::character varying::text, 'rejected'::character varying::text])", name: "coaching_status"
   end
 
   create_table "coaching_reviews", force: :cascade do |t|
@@ -596,6 +596,22 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_27_020000) do
     t.index ["season_id", "kind", "input_hash"], name: "index_offseason_revisions_identity", unique: true
     t.index ["season_id", "kind", "version"], name: "index_offseason_revisions_version", unique: true
     t.index ["season_id"], name: "index_offseason_input_revisions_on_season_id"
+  end
+
+  create_table "offseason_readiness_operations", force: :cascade do |t|
+    t.bigint "season_id", null: false
+    t.bigint "actor_id", null: false
+    t.bigint "offseason_readiness_review_id"
+    t.string "action", null: false
+    t.string "status", default: "queued", null: false
+    t.jsonb "inputs", default: {}, null: false
+    t.jsonb "report", default: {}, null: false
+    t.text "error_message"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["actor_id"], name: "index_offseason_readiness_operations_on_actor_id"
+    t.index ["offseason_readiness_review_id"], name: "index_readiness_operations_on_review_id"
+    t.index ["season_id"], name: "index_offseason_readiness_operations_on_season_id"
   end
 
   create_table "offseason_readiness_reviews", force: :cascade do |t|
@@ -1103,6 +1119,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_27_020000) do
   add_foreign_key "game_sync_dates", "seasons"
   add_foreign_key "offseason_input_revisions", "offseason_input_revisions", column: "predecessor_id"
   add_foreign_key "offseason_input_revisions", "seasons"
+  add_foreign_key "offseason_readiness_operations", "offseason_readiness_reviews"
+  add_foreign_key "offseason_readiness_operations", "seasons"
+  add_foreign_key "offseason_readiness_operations", "users", column: "actor_id"
   add_foreign_key "offseason_readiness_reviews", "ratings_config_versions"
   add_foreign_key "offseason_readiness_reviews", "seasons"
   add_foreign_key "offseason_readiness_reviews", "users", column: "reviewer_id"

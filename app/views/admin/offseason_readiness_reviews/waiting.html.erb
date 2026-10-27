@@ -1,0 +1,27 @@
+<section class="mx-auto max-w-5xl space-y-6 pb-12"
+  <% if @page[:operation]&.status.in?(%w[queued running]) %>
+    data-controller="preseason-progress"
+    data-preseason-progress-url-value="<%= progress_admin_offseason_readiness_operation_path(@page[:operation], season_id: @page[:season].id) %>"
+    data-preseason-progress-status-value="<%= @page[:operation].status %>"
+  <% end %>>
+  <h1 class="text-3xl font-bold">Offseason readiness — ending year <%= @page[:season].year %></h1>
+  <p><%= link_to 'Return to season dashboard', admin_offseason_setup_path(season_id: @page[:season].id), class: 'underline' %></p>
+  <% if @page[:operation] %>
+    <p role="status">Readiness operation: <strong><%= @page[:operation].status %></strong>. This page updates automatically while the worker is running.</p>
+    <% if @page[:operation].status == 'failed' %>
+      <p role="alert" class="bg-red-100 p-3"><%= @page[:operation].error_message %></p>
+    <% end %>
+    <%= button_to 'Requeue operation', retry_admin_offseason_readiness_operation_path(@page[:operation], season_id: @page[:season].id), data: { turbo: false }, class: 'rounded border px-3 py-2' %>
+    <% if @page[:operation].status == 'failed' %>
+      <p><%= link_to 'Start a fresh readiness report', @page[:review] ? admin_offseason_readiness_review_path(@page[:review], season_id: @page[:season].id) : admin_offseason_readiness_reviews_path(season_id: @page[:season].id), class: 'underline' %> if the reviewed evidence is stale.</p>
+    <% end %>
+    <p>If progress stops, check GoodJob and requeue this operation. Duplicate deliveries cannot repeat a completed action.</p>
+    <p>GoodJob worker must be running. <%= link_to 'Refresh status', request.fullpath, class: 'underline' %> · <%= link_to 'GoodJob operations', '/good_job', class: 'underline' %></p>
+  <% else %>
+    <p role="status">Preparing readiness report. The report may take several minutes.</p>
+    <%= form_with url: admin_offseason_readiness_operations_path(season_id: @page[:season].id), data: { turbo: false, controller: 'readiness-start' } do %>
+      <%= hidden_field_tag :review_id, @page[:review].id if @page[:review] %>
+      <%= submit_tag 'Prepare readiness report', class: 'rounded border px-3 py-2' %>
+    <% end %>
+  <% end %>
+</section>
