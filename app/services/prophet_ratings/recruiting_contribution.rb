@@ -75,7 +75,7 @@ module ProphetRatings
     end
 
     def validate_units(evidence)
-      return if evidence.dig('units', 'class_points') == '247_recruit_composite_class_points'
+      return if %w[247_recruit_composite_class_points cbbd_recruit_composite_class_points].include?(evidence.dig('units', 'class_points'))
 
       raise ArgumentError, 'Recruiting requires Recruit Composite class points units'
     end

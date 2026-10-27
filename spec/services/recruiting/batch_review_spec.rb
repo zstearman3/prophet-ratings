@@ -250,6 +250,13 @@ RSpec.describe Recruiting::BatchReview do
       .to raise_error(ArgumentError, /Duplicate/)
   end
 
+  it 'keeps malformed legacy source rows fatal after a manual team assignment' do
+    document['rows'] = [nil]
+    batch.entries.sole.update!(team:)
+    expect { publish }.to raise_error(ArgumentError, /Expected row object/)
+    expect(OffseasonInputRevision.count).to eq(0)
+  end
+
   it 'detects changed normalized values and retained bytes' do
     entry = batch.entries.sole
     # rubocop:disable-next Rails/SkipsModelValidations -- simulate stored evidence corruption.
@@ -284,5 +291,100 @@ RSpec.describe Recruiting::BatchReview do
     expect(batch.reload.status).to eq('ready')
     expect(batch.reviewed_by).to be_nil
     expect([OffseasonInputRevision.count, TeamOffseasonProfile.count, TeamSeason.exists?(team:, season:)]).to eq([0, 0, false])
+  end
+
+  context 'with reviewed CBBD identities' do
+    let(:document) { nil }
+    let(:source_rows) { [{ teamId: 72, team: team.school, year: 2026, ranking: 1, rating: 70.04 }] }
+    let(:batch) do
+      record = RecruitingBatch.create!(season:, source_year: 2026, extract_bytes: JSON.generate('provider' => 'cbbd'))
+      body = JSON.generate(source_rows)
+      transport = ->(_uri, _key) { { status: 200, body:, headers: {} } }
+      Recruiting::CbbdAcquisition.new(record, api_key: 'test', transport:).call
+      Recruiting::Preview.new(record.dataset, season).call.fetch('rows').each do |row|
+        record.entries.create!(RecruitingEntry.source_attributes(row))
+      end
+      record
+    end
+
+    it 'makes durable identity win over label drift and prohibits conflicting manual assignments' do
+      TeamExternalIdentity.create!(provider: 'cbbd', external_id: '72', team: other.team)
+      expect(batch.entries.sole.team_id).to eq(other.team_id)
+      entry = batch.entries.sole
+      expect { review.save(attributes.merge('rows' => { entry.id.to_s => { 'team_id' => team.id.to_s } })) }
+        .to raise_error(ArgumentError, /identity/)
+      expect(entry.reload.team_id).to eq(other.team_id)
+      expect(publish.team_input(other.team_id)).to include('class_points' => '70.04')
+    end
+
+    it 'creates durable included identities only on approval and reuses them across batches', :aggregate_failures do
+      expect(batch.entries.sole.team_id).to eq(team.id)
+      review.save(attributes.merge('rows' => { batch.entries.sole.id.to_s => { 'team_id' => other.team_id.to_s } }))
+      expect(TeamExternalIdentity.count).to eq(0)
+      revision = publish
+      expect(TeamExternalIdentity.find_by!(provider: 'cbbd', external_id: '72').team_id).to eq(other.team_id)
+      expect(revision.team_input(other.team_id).dig('units', 'class_points')).to eq('cbbd_recruit_composite_class_points')
+      second = RecruitingBatch.create!(season:, source_year: 2026, extract_bytes: JSON.generate('provider' => 'cbbd'))
+      transport = lambda do |_uri, _key|
+        { status: 200, body: '[{"teamId":72,"team":"Changed provider label","year":2026,"ranking":2,"rating":70.04}]', headers: {} }
+      end
+      Recruiting::CbbdAcquisition.new(second, api_key: 'test', transport:).call
+      row = Recruiting::Preview.new(second.dataset, season).call.fetch('rows').sole
+      second.entries.create!(RecruitingEntry.source_attributes(row))
+      expect(second.entries.sole.team_id).to eq(other.team_id)
+      expect(publish).to eq(revision)
+    end
+
+    it 'retains a reviewed CBBD zero and unsupported auxiliary values without inventing aggregates' do
+      source_rows.first[:rating] = 0
+      revision = publish
+      expect(revision.team_input(team.id)).to include('class_points' => '0.0', 'status' => 'verified_zero')
+      expect(batch.entries.sole).to have_attributes(average_rating: nil, commit_count: nil, source_url: nil)
+    end
+
+    it 'blocks duplicate CBBD source IDs even when every occurrence is excluded' do
+      source_rows << source_rows.first.dup
+      batch.entries.each { |entry| entry.update!(excluded: true, team: nil) }
+      expect { publish }.to raise_error(ArgumentError, /Duplicate/)
+      expect([TeamExternalIdentity.count, OffseasonInputRevision.count]).to eq([0, 0])
+    end
+
+    it 'pins absent and present identity ownership in the preview freshness token' do
+      stale = attributes
+      identity = TeamExternalIdentity.create!(provider: 'cbbd', external_id: '72', team:)
+      expect { review.publish(stale, reviewer: 'reviewer') }.to raise_error(ArgumentError, /review changed/)
+      stale = attributes
+      identity.destroy!
+      TeamExternalIdentity.create!(provider: 'cbbd', external_id: '72', team: other.team)
+      expect { review.publish(stale, reviewer: 'reviewer') }.to raise_error(ArgumentError, /review changed/)
+      expect(OffseasonInputRevision.count).to eq(0)
+    end
+
+    it 'leaves excluded identities unassigned' do
+      entry = batch.entries.sole
+      review.save(attributes.merge('rows' => { entry.id.to_s => { 'team_id' => 'excluded' } }))
+      publish
+      expect(TeamExternalIdentity.count).to eq(0)
+    end
+
+    it 'rolls back identities, review metadata, revisions and profiles when publication fails' do
+      batch
+      allow(OffseasonInputs::Import).to receive(:update_profile).and_raise(ActiveRecord::RecordInvalid)
+      expect { publish }.to raise_error(ActiveRecord::RecordInvalid)
+      expect(TeamExternalIdentity.count).to eq(0)
+      expect(batch.reload.reviewed_at).to be_nil
+      expect([OffseasonInputRevision.count, TeamOffseasonProfile.count]).to eq([0, 0])
+    end
+
+    it 'rejects conflicting ownership created during publication and rolls back the whole approval' do
+      values = attributes
+      allow(TeamExternalIdentity).to receive(:associate!).and_wrap_original do |method, **args|
+        TeamExternalIdentity.create!(provider: 'cbbd', external_id: '72', team: other.team)
+        method.call(**args)
+      end
+      expect { review.publish(values, reviewer: 'reviewer') }.to raise_error(TeamExternalIdentity::Conflict)
+      expect(batch.reload.reviewed_at).to be_nil
+      expect([OffseasonInputRevision.count, TeamOffseasonProfile.count, TeamExternalIdentity.count]).to eq([0, 0, 0])
+    end
   end
 end

@@ -384,7 +384,12 @@ containing the stored recruiting `team_input` from an approved
 revision identity/input hash alongside that evidence; scoring does not query the
 profile's current pointer or approve evidence. Supported statuses are
 `verified_points`, `verified_zero` and `unknown`, with the stored units
-`247_recruit_composite_class_points`. Unknown points are null; inconsistent
+`247_recruit_composite_class_points` or `cbbd_recruit_composite_class_points`.
+The latter uses the compatible men's high-school team class-point semantics
+[documented with retained source comparisons](recruiting.md#source-semantics-evidence-2026-10-26).
+Provider selection changes no numerical formula, coefficients or configuration hashes;
+ratings replay reads captured evidence and never fetches either provider.
+Unknown points are null; inconsistent
 statuses, invalid units and negative/nonfinite points fail even at weight zero.
 Exact provider decimals and source evidence remain in the report's captured input.
 Class rank and the legacy local `recruiting_score` never enter this component.

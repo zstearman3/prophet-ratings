@@ -18,9 +18,16 @@ module Recruiting
 
     def self.match(row)
       raw = row['raw']
-      candidates = raw.is_a?(Hash) ? candidate_ids(raw['team_label']) : []
+      candidates = matching_ids(raw)
       row.merge('candidate_team_ids' => candidates, 'team_id' => unique_id(candidates),
                 'exclusions' => Row.review_errors(row) + match_errors(candidates))
+    end
+
+    def self.matching_ids(raw)
+      saved = CbbdIdentities.find(raw)
+      return [saved.team_id] if saved
+
+      raw.is_a?(Hash) ? candidate_ids(raw['team_label']) : []
     end
 
     def self.unique_id(candidates)
@@ -53,8 +60,17 @@ module Recruiting
     end
 
     def review_rows
-      @matches.each { |row| row['warnings'] = Row.review_warnings(row) }
+      @matches.each do |row|
+        row['warnings'] = Row.review_warnings(row)
+        self.class.validate_identity(row)
+      end
       %w[team_label provider_team_id team_id].each { |key| exclude_duplicates(key) }
+    end
+
+    def self.validate_identity(row)
+      return unless CbbdIdentities.conflict?(row['raw'], row['team_id'])
+
+      row['exclusions'] |= ['Conflicting durable CBBD identity; cannot reassign a provider team']
     end
 
     def exclude_duplicates(key)

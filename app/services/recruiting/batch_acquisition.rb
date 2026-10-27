@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module Recruiting
-  # Uses the existing bounded fetch/parser and saves captures plus normalized rows atomically.
+  # Uses the bounded CBBD client and saves captures plus normalized rows atomically.
   class BatchAcquisition
     def initialize(batch)
       @batch = batch
@@ -31,22 +31,9 @@ module Recruiting
 
     def acquire
       batch.update!(status: 'fetching')
-      retain(Acquisition.new(metadata).fetch(20))
-    end
+      raise ArgumentError, 'Live 247 acquisition is retired; explicitly fetch a new CBBD batch.' unless batch.cbbd?
 
-    def metadata
-      now = Time.current.iso8601
-      { 'source_year' => batch.source_year, 'target_season' => batch.season.year, 'category' => Extract::CATEGORY,
-        'observed_at' => now, 'retrieved_at' => now, 'captured_at' => now }
-    end
-
-    def retain(source)
-      artifact = AcquisitionArtifact.new(source)
-      attributes = artifact.database_attributes
-      batch.with_lock do
-        batch.update!(attributes)
-        store_rows if batch.status == 'ready'
-      end
+      CbbdAcquisition.new(batch).call { store_rows }
     end
 
     def store_rows

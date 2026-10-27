@@ -157,4 +157,14 @@ RSpec.describe ProphetRatings::RecruitingContribution do
     inputs[:baselines][:adj_offensive_efficiency] = '100'
     expect { described_class.new(inputs, config).call }.to raise_error(ArgumentError, /numeric/)
   end
+
+  it 'replays equivalent CBBD class points with unchanged quality, attenuation, contribution and configuration' do
+    historical = score(points: 65, net: 10)
+    captured = historical[:inputs].deep_dup
+    captured['reviewed_recruiting']['units']['class_points'] = 'cbbd_recruit_composite_class_points'
+    result = described_class.new(captured, historical[:configuration]).call
+    keys = %i[class_points class_fraction attenuation raw_contribution contribution baseline configuration]
+    expect(result.slice(*keys)).to eq(historical.slice(*keys))
+    expect(result[:contribution]).to be_within(1e-12).of(11.0 / 6)
+  end
 end

@@ -20,7 +20,36 @@ class RecruitingBatch < ApplicationRecord
   end
 
   def source_url
-    Recruiting::HtmlPage.source_url(source_year)
+    cbbd? ? Recruiting::CbbdExtract.source_url(source_year) : Recruiting::HtmlPage.source_url(source_year)
+  end
+
+  def provider
+    return '247sports' if extract_bytes.blank?
+
+    JSON.parse(extract_bytes).fetch('provider', '247sports')
+  end
+
+  def cbbd?
+    provider == 'cbbd'
+  end
+
+  def source_label
+    { 'cbbd' => 'CBBD Recruit Composite class points', '247sports' => '247 Recruit Composite' }.fetch(provider)
+  end
+
+  def source_captures
+    return [] unless cbbd? && snapshot_bytes.present?
+
+    JSON.parse(snapshot_bytes).fetch('captures')
+  end
+
+  def source_bytes(index)
+    return snapshot_bytes unless cbbd?
+
+    capture = source_captures.fetch(Integer(index.to_s, 10))
+    Base64.strict_decode64(capture.fetch('body_base64'))
+  rescue IndexError => error
+    raise ArgumentError, error.message
   end
 
   def dataset
