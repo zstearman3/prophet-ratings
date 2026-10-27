@@ -82,5 +82,19 @@ RSpec.describe OddsApi::ConsensusCalculator, type: :service do
       calc = described_class.new(bookmakers: [{ key: 'book3', title: 'Book3', markets: [] }], home_team:, away_team:)
       expect(calc.consensus).to include(moneyline_home: nil, spread_point: nil)
     end
+
+    it 'uses the home team spread regardless of outcome order or a more frequent away line' do
+      bookmakers.first[:markets][1][:outcomes].reverse!
+      bookmakers.last[:markets][1][:outcomes][1][:point] = 3.5
+
+      expect(calculator.consensus[:spread_point]).to eq(-3.5)
+    end
+
+    it 'accepts source labels aligned to local sides and leaves an absent home spread unavailable' do
+      bookmakers.each { |book| book[:markets][1][:outcomes].reject! { |outcome| outcome[:name] == 'UAB Blazers' } }
+      calc = described_class.new(bookmakers:, home_team: 'UAB Blazers', away_team: 'North Texas Mean Green')
+
+      expect(calc.consensus).to include(moneyline_home: -147.5, moneyline_away: 132.5, spread_point: nil)
+    end
   end
 end
