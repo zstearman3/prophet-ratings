@@ -5,8 +5,9 @@ module Admin
   class RecruitingBatchesController < ApplicationController
     before_action :authenticate_user!
     before_action :require_admin
-    before_action :load_batch, only: %i[show update publish]
-    rescue_from ArgumentError, ActiveRecord::ActiveRecordError, Season::OperationInProgress, with: :review_error
+    before_action :load_batch, only: %i[show update publish source]
+    rescue_from ArgumentError, ActiveRecord::ActiveRecordError, Season::OperationInProgress, TeamExternalIdentity::Conflict,
+                with: :review_error
 
     def index
       @listing = RecruitingBatch.listing(params[:season_id])
@@ -16,9 +17,16 @@ module Admin
       @report = review_report
     end
 
+    def source
+      send_data batch.source_bytes(params[:capture]), type: 'text/plain', disposition: 'attachment',
+                                                      filename: "recruiting-batch-#{batch.id}-source.txt"
+    end
+
     def create
       season = Season.find(params.expect(:season_id))
-      batch = RecruitingBatch.create!(season:, source_year: season.year - 1)
+      batch = RecruitingBatch.create!(season:, source_year: season.year - 1,
+                                      extract_bytes: JSON.generate('provider' => 'cbbd',
+                                                                   'extraction_version' => Recruiting::CbbdExtract::VERSION))
       AcquireRecruitingBatchJob.perform_later(batch.id)
       redirect_to admin_recruiting_batch_path(batch), notice: I18n.t('admin.recruiting_batches.queued')
     end

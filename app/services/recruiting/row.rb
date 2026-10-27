@@ -34,13 +34,23 @@ module Recruiting
 
     # Retain original validation evidence; an approved internal mapping can resolve a missing external ID.
     def self.review_errors(row)
+      errors = row.fetch('errors')
+      return errors if cbbd?(row['raw'])
+
+      errors - resolved_errors(row)
+    end
+
+    def self.cbbd?(raw)
+      raw.is_a?(Hash) && raw['provider'] == 'cbbd'
+    end
+
+    def self.resolved_errors(row)
       resolved = missing_provider_id?(row['raw']) ? [MISSING_PROVIDER_ID_ERROR] : []
       if excluded_unranked?(row)
         resolved += ['team_label: preserve nonempty source identity', 'team_url: preserve nonempty source identity',
                      'rank: requires positive integer']
       end
-
-      row.fetch('errors') - resolved
+      resolved
     end
 
     # 247 also lists unlinked schools at rank zero. They may be omitted explicitly, never imported as ranked inputs.
@@ -86,7 +96,8 @@ module Recruiting
     end
 
     def identity_errors
-      %w[team_label provider_team_id team_url].filter_map do |key|
+      keys = @raw['provider'] == 'cbbd' ? %w[team_label provider_team_id] : %w[team_label provider_team_id team_url]
+      keys.filter_map do |key|
         "#{key}: preserve nonempty source identity" unless Extract.text?(@raw[key])
       end
     end

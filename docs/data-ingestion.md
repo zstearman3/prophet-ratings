@@ -1023,8 +1023,15 @@ fallback. Only the target year or its immediate predecessor is supported. The
 scraper still validates links against its actual requested source year.
 
 Approval atomically applies conference ranges and the existing participation/date/
-alias contract under the season/ratings lock. It records the signed-in reviewer,
-review time, source rows/URL/capture and final decisions in `participation_review`.
+alias contract under the season/ratings lock. For either provider, full approval
+carries conference decisions from the target year forward, preserving earlier
+history, explicit range ends and separate future memberships. Independent/excluded
+decisions close the active conference without an automatic next-year restoration.
+A new range ends before the nearest stored future membership; a missing preceding
+boundary fails atomically. Full approval does not otherwise need a following-year
+Season. Participation and dates remain target-season decisions. It records the
+signed-in reviewer, review time, source rows/URL/capture, final decisions and
+`conference_scope: from_target_year` in `participation_review`.
 Included independents remain eligible. Source failures preserve prior drafts;
 changed local input or a replaced proposal blocks stale approval. Full approval
 for existing published outputs/current seasons is refused. No teams, aliases, ratings, snapshots or
@@ -1478,7 +1485,7 @@ they are contract fixtures, not copied or asserted live domain data.
 
 See [CBBD reviewed preparation](offseason.md#cbbd-reviewed-season-memberships) for
 reviewed exact-name/alias defaults, durable provider-ID mapping, manual metadata
-setup, coverage attestation and target-only history rules. Unique defaults remain
+setup, coverage attestation, forward approval and single-year correction scopes. Unique defaults remain
 draft selections until explicitly saved; the canonical game importer still requires
 exact saved CBBD IDs. Review, mapping, correction and proposal publication hold the existing ratings
 advisory lock and bounded transaction table locks: `seasons`, then

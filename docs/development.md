@@ -49,7 +49,9 @@ The Makefile remains as a compatibility layer: `make up` means
 
 The recruiting and coaching review screens queue fetches through GoodJob. Run the worker along
 with the web server (`bin/dev` starts both); queued work will not fetch while
-the worker is stopped. After updating RailsAdmin action registrations, restart
+the worker is stopped. Recruiting fetches require `CBBD_API_KEY` in the worker
+runtime and use the prior recruiting class from `/recruiting/teams`; retained
+historical 247 batches need no key for review/replay. After updating RailsAdmin action registrations, restart
 `web` (and restart `worker` for changed background job code).
 
 Detached development keeps logs in Docker. Run `bin/compose logs --tail=100 web`

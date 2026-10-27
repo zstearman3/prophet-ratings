@@ -1,0 +1,95 @@
+{
+  "source_url": "https://247sports.com/Season/2025-Basketball/CompositeTeamRankings/",
+  "canonical": "https://247sports.com/Season/2025-Basketball/CompositeTeamRankings/",
+  "heading": "2025 Recruit Basketball Composite Team Rankings",
+  "source_update_text": "Last updated on 08/22/26 at 9:30 PM CST",
+  "html_sha256": "1163342ee813bfc79fc0e8b444560896b21a68145709d4e28da897ca81caa058",
+  "cbbd_metadata": {
+    "url": "https://api.collegebasketballdata.com/recruiting/teams?year=2025",
+    "status": 200,
+    "captured_at": "2026-10-26T21:27:50Z",
+    "sha256": "1b550e759b78cba16f2c8a9de38183dcd81849f1237a83c81240b4f963ced196"
+  },
+  "comparison": [
+    {
+      "team": "Duke",
+      "year": 2025,
+      "provider_id": 72,
+      "source_rank": "1",
+      "source_points": "70.04",
+      "cbbd_rank": 1,
+      "cbbd_rating": 70.04,
+      "equal": true
+    },
+    {
+      "team": "Arizona",
+      "year": 2025,
+      "provider_id": 11,
+      "source_rank": "2",
+      "source_points": "69.52",
+      "cbbd_rank": 2,
+      "cbbd_rating": 69.52,
+      "equal": true
+    },
+    {
+      "team": "Houston",
+      "year": 2025,
+      "provider_id": 113,
+      "source_rank": "3",
+      "source_points": "68.54",
+      "cbbd_rank": 3,
+      "cbbd_rating": 68.54,
+      "equal": true
+    },
+    {
+      "team": "Arkansas",
+      "year": 2025,
+      "provider_id": 12,
+      "source_rank": "4",
+      "source_points": "68.27",
+      "cbbd_rank": 4,
+      "cbbd_rating": 68.27,
+      "equal": true
+    },
+    {
+      "team": "North Carolina",
+      "year": 2025,
+      "provider_id": 200,
+      "source_rank": "5",
+      "source_points": "66.63",
+      "cbbd_rank": 5,
+      "cbbd_rating": 66.63,
+      "equal": true
+    },
+    {
+      "team": "SMU",
+      "year": 2025,
+      "provider_id": 248,
+      "source_rank": "6",
+      "source_points": "66.19",
+      "cbbd_rank": 6,
+      "cbbd_rating": 66.19,
+      "equal": true
+    },
+    {
+      "team": "Kentucky",
+      "year": 2025,
+      "provider_id": 135,
+      "source_rank": "7",
+      "source_points": "66.04",
+      "cbbd_rank": 7,
+      "cbbd_rating": 66.04,
+      "equal": true
+    },
+    {
+      "team": "Tennessee",
+      "year": 2025,
+      "provider_id": 292,
+      "source_rank": "8",
+      "source_points": "66.02",
+      "cbbd_rank": 8,
+      "cbbd_rating": 66.02,
+      "equal": true
+    }
+  ]
+}

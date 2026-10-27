@@ -5,6 +5,7 @@ module Recruiting
   class BatchReview
     def initialize(batch)
       @batch = batch
+      @identities = CbbdIdentities.new(batch)
     end
 
     def report
@@ -14,7 +15,7 @@ module Recruiting
     def review_key
       metadata = batch.attributes.except('extract_bytes', 'snapshot_bytes')
       Departures::Contract.digest([metadata, batch.entries.order(:id).map(&:attributes), Team.order(:id).pluck(:id, :school),
-                                   profile_state, latest_revision&.id])
+                                   profile_state, latest_revision&.id, @identities.state])
     end
 
     def save(attributes)
@@ -53,6 +54,7 @@ module Recruiting
     end
 
     def validate_draft(attributes)
+      @identities.lock
       batch.require_draft
       raise ArgumentError, 'Recruiting review changed; reload and review again.' unless attributes['review_key'] == review_key
     end
@@ -90,6 +92,7 @@ module Recruiting
       batch.entries.where(excluded: false).where.not(team_id: nil).distinct.pluck(:team_id).each do |id|
         TeamSeason.find_or_create_by!(season: batch.season, team_id: id)
       end
+      @identities.associate
     end
 
     def publication
@@ -100,7 +103,7 @@ module Recruiting
     end
 
     def publication_metadata(payload)
-      { version: "recruiting-batch-#{batch.id}", reason: 'Manual Review', predecessor_id: latest_revision&.id,
+      { version: "recruiting-batch-#{batch.id}", reason: 'Approved by admin', predecessor_id: latest_revision&.id,
         input_hash: Departures::Contract.digest(payload) }
     end
   end

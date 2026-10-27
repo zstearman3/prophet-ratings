@@ -19,10 +19,25 @@ class RecruitingEntry < ApplicationRecord
   end
 
   def save_mapping(attributes)
-    choice = attributes.fetch('team_id')
+    assign_mapping(attributes.fetch('team_id'))
+    validate_external_identity
+
+    save!
+  end
+
+  def assign_mapping(choice)
     self.excluded = choice == 'excluded'
     self.team_id = excluded? ? nil : choice.presence
-    save!
+  end
+
+  def validate_external_identity
+    raise ArgumentError, 'Conflicting durable CBBD identity' if Recruiting::CbbdIdentities.conflict?(source_row, team_id)
+  end
+
+  def associate_external_identity
+    return unless Recruiting::Row.cbbd?(source_row)
+
+    TeamExternalIdentity.associate!(team:, provider: 'cbbd', external_id: provider_team_id)
   end
 
   def review_row

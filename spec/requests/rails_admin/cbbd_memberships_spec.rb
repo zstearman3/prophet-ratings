@@ -138,7 +138,7 @@ RSpec.describe 'RailsAdmin CBBD membership preparation', type: :request do
     post path, params: { operation: 'approve', review: review.merge(confirm_source_coverage: '1') }
     expect(response).to redirect_to(path)
     expect(team.conference_for(season)).to eq(conference)
-    expect(team.team_conferences.sole.end_season).to eq(season)
+    expect(team.team_conferences.sole.end_season).to be_nil
     expect(season.reload.participation_review['source_coverage_confirmed']).to be(true)
   end
 

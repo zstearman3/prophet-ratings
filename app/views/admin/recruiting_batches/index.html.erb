@@ -7,13 +7,13 @@
     <%= button_tag 'Show season', name: nil, class: 'border rounded px-4 py-2' %>
   <% end %>
   <% if @listing.fetch(:season) %>
-    <p>Fetch the <%= @listing.fetch(:season).year - 1 %> 247 Recruit Composite for the <%= @listing.fetch(:season).year %> season, review school mappings and approve the captured points.</p>
+    <p>Fetch the <%= @listing.fetch(:season).year - 1 %> CBBD Recruit Composite class points for the <%= @listing.fetch(:season).year %> season, review school mappings and approve the captured points.</p>
     <%= form_tag admin_recruiting_batches_path, method: :post, data: { turbo: false } do %>
       <%= hidden_field_tag :season_id, @listing.fetch(:season).id %>
       <%= button_tag 'Fetch recruiting data', name: nil, class: 'bg-blue-700 text-white rounded px-4 py-2' %>
     <% end %>
     <table class="w-full text-left border-collapse">
-      <thead><tr><th class="p-2">Batch</th><th>Status</th><th>Captured pages</th><th>Created</th><th></th></tr></thead>
+      <thead><tr><th class="p-2">Batch</th><th>Status</th><th>Captured responses</th><th>Created</th><th></th></tr></thead>
       <tbody><% @listing.fetch(:batches).each do |batch| %>
         <tr class="border-t"><td class="p-2"><%= batch.id %></td><td><%= batch.status.humanize %></td><td><%= batch.page_count %></td><td><%= batch.created_at %></td>
           <td><%= link_to 'Review', admin_recruiting_batch_path(batch), class: 'text-blue-700 underline' %></td></tr>

@@ -196,4 +196,16 @@ RSpec.describe ProphetRatings::PreseasonRevision do
     expect(home.reload.attributes.values_at('adj_offensive_efficiency', 'adj_defensive_efficiency', 'adj_pace')).to eq([102.5, 97.5, 72.15])
     expect(ProphetRatings::PreseasonPriorFormula.new(home.preseason_prior.inputs, version.config).pace_report).to include(signal: 76)
   end
+
+  it 'replays equal CBBD class points into identical combined preseason outputs without live acquisition' do
+    profile
+    publish
+    prior = home.reload.preseason_prior
+    captured = prior.inputs.deep_dup
+    captured['reviewed_recruiting']['units']['class_points'] = 'cbbd_recruit_composite_class_points'
+    allow(Ingestion::Cbbd::HttpTransport).to receive(:call).and_raise('Replay must not fetch')
+    expect(ProphetRatings::PreseasonPriorFormula.new(captured, version.config).call).to eq(prior.outputs)
+    expect(prior.outputs).to include('preseason_adj_offensive_efficiency' => 102.5, 'preseason_adj_defensive_efficiency' => 97.5)
+    expect(Ingestion::Cbbd::HttpTransport).not_to have_received(:call)
+  end
 end
