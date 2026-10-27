@@ -2,6 +2,8 @@
 
 module OddsApi
   class Importer
+    NEUTRAL_TIME_TOLERANCE = 3.hours
+
     def initialize(api_response)
       @response = api_response
     end
@@ -12,6 +14,23 @@ module OddsApi
       end
     end
 
+    def self.matching_games(team_ids, start_time)
+      candidate_games(start_time).select do |game|
+        stored_ids = [game.home_team_game&.team_id, game.away_team_game&.team_id]
+        stored_ids == team_ids || ((game.neutral? || game.venue_neutral?) && stored_ids == team_ids.reverse)
+      end
+    end
+
+    def self.candidate_games(start_time)
+      # Neutral-event tip times can straddle midnight between providers. Keep this
+      # fallback bounded and consider all candidates together so ambiguity fails closed.
+      nearby = Game.where(start_time: (start_time - NEUTRAL_TIME_TOLERANCE)..(start_time + NEUTRAL_TIME_TOLERANCE))
+      nearby_neutral = nearby.where(neutral: true).or(nearby.where(venue_type: 'neutral'))
+      Game.on_schedule_date(Game.schedule_date_for(start_time)).or(nearby_neutral)
+          .includes(:home_team_game, :away_team_game)
+    end
+    private_class_method :candidate_games
+
     private
 
     def import_game(game_data)
@@ -19,26 +38,27 @@ module OddsApi
       away_team = team_matcher.match(value_for(game_data, :away_team))
       start_time = Time.zone.parse(value_for(game_data, :commence_time))
       game = find_game(home_team:, away_team:, start_time:)
+      names_by_id = { home_team.id => value_for(game_data, :home_team), away_team.id => value_for(game_data, :away_team) }
+      home_team_name = names_by_id.fetch(game.home_team_game.team_id)
+      away_team_name = names_by_id.fetch(game.away_team_game.team_id)
 
-      import_game_odd(game:, home_team:, away_team:, game_data:)
+      import_game_odd(game:, home_team: home_team_name, away_team: away_team_name, game_data:)
       import_bookmaker_odds(
         game:,
         bookmakers: value_for(game_data, :bookmakers),
-        home_team_name: value_for(game_data, :home_team),
-        away_team_name: value_for(game_data, :away_team)
+        home_team_name:,
+        away_team_name:
       )
     end
 
     def find_game(home_team:, away_team:, start_time:)
       raise ActiveRecord::RecordNotFound, 'Could not match game teams from odds payload' unless home_team && away_team
 
-      Game
-        .on_schedule_date(Game.schedule_date_for(start_time))
-        .includes(:home_team_game, :away_team_game)
-        .detect do |game|
-          game.home_team_game&.team_id == home_team.id &&
-            game.away_team_game&.team_id == away_team.id
-        end || raise(ActiveRecord::RecordNotFound, 'Could not find game for odds payload')
+      matches = self.class.matching_games([home_team.id, away_team.id], start_time)
+      raise ActiveRecord::RecordNotFound, 'Could not find game for odds payload' if matches.empty?
+      raise ActiveRecord::RecordNotFound, 'Multiple games match odds payload' unless matches.one?
+
+      matches.first
     end
 
     def import_game_odd(game:, home_team:, away_team:, game_data:)

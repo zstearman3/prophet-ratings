@@ -109,7 +109,7 @@ The intended low-level flow is:
 1. `OddsApi::SyncService.call` fetches current odds through `OddsApi::Client`.
 2. The sync service imports each returned game independently through `OddsApi::Importer`.
 3. `TeamMatcher` matches `home_team` and `away_team` names from each payload game.
-4. `Game.on_schedule_date(Game.schedule_date_for(commence_time))` finds the local game by schedule date and team IDs.
+4. The importer finds a unique local game by Eastern schedule date and participant IDs, allowing reversed sides for stored neutral games.
 5. `OddsApi::ConsensusCalculator` calculates consensus values.
 6. `GameOdd` is created or updated.
 7. `BookmakerOdd` rows are created or updated.
@@ -122,6 +122,33 @@ Important behavior:
 - The importer raises `ActiveRecord::RecordNotFound` if teams or local games cannot be matched.
 - The sync service rescues expected per-game matching failures, continues importing other games, and returns failure details with the API game id, team names, commence time, error class, and message.
 - Consensus `GameOdd#fetched_at` is set to `Time.current`, while bookmaker rows use API `last_update` timestamps.
+
+### Neutral-site matching and side alignment
+
+The Odds API `home_team`/`away_team` and CBBD `homeTeam`/`awayTeam` are read
+literally. The providers can designate opposite sides for neutral-site events;
+the schedule importer preserves its provider's designations. Odds matching accepts
+reversed participant IDs only when the stored game has `neutral: true` or
+`venue_type: neutral`. Games without this evidence still require ordered sides.
+
+Same-date matching uses the Eastern schedule calendar. Neutral games within
+three elapsed hours of the API tip time are also candidates across the date
+boundary, covering small timestamp disagreements near midnight. This tolerance
+is an explicit matching policy, not a correction to the stored schedule or proof
+of the actual tip time. It does not allow broad adjacent-day/reschedule matching.
+All eligible candidates are considered together: multiple participant matches
+raise `ActiveRecord::RecordNotFound` with `Multiple games match odds payload` and
+write no odds for that payload, even if one candidate has ordered sides or the
+same schedule date. Missing team mappings remain errors.
+
+After matching, exact source outcome labels are aligned to the stored participant
+IDs. Consensus moneylines, spread prices and bookmaker `team_side` values use the
+local game's home/away orientation. `spread_point` is the mode of **local home
+team** spread outcomes only, preserving that team's sign independently of outcome
+ordering; absent home spread outcomes leave it unavailable. Totals are unchanged.
+No Game, TeamGame, alias, prediction or rating records are rewritten by this match.
+Existing odds are corrected on the next successful sync; no historical repair or
+recommendation regeneration runs automatically.
 
 Example manual sync from Rails console:
 
@@ -153,7 +180,7 @@ Consensus behavior:
 
 - moneyline odds are averaged across matching bookmaker outcomes
 - spread odds are averaged by side
-- spread point is the mode of all spread outcome points
+- spread point is the mode of the local home team's spread outcome points
 - total line is the mode of all total points
 - over/under odds are averaged by outcome name
 
@@ -163,7 +190,9 @@ Team outcome matching uses:
 - `Team#the_odds_api_team_id`
 - `TeamAlias#value`
 
-One caveat: the spread-point mode is calculated across both sides of the spread market. Since home and away outcomes are inverse signs, ties can depend on payload order. If this becomes model-critical, prefer deriving `spread_point` from the home-team outcome only.
+The importer supplies exact source labels aligned to local participant IDs.
+Direct calculator callers may also supply Team records, using the identifiers
+listed above. Spread-line ties retain the first encountered local home line.
 
 ## Team Matching Support
 

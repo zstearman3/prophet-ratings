@@ -180,7 +180,7 @@ RSpec.describe OddsApi::Importer, type: :service do
       aggregate_failures do
         expect(game_odd.moneyline_home).to eq(-291)
         expect(game_odd.moneyline_away).to eq(236)
-        expect(game_odd.spread_point.to_f).to eq(6.5)
+        expect(game_odd.spread_point.to_f).to eq(-6.5)
         expect(game_odd.spread_home_odds).to eq(-111)
         expect(game_odd.spread_away_odds).to eq(-109)
         # 12 bookmakers x 2 markets x 2 outcomes = 48
@@ -197,6 +197,91 @@ RSpec.describe OddsApi::Importer, type: :service do
       expect do
         described_class.new(fixture_payload).call
       end.not_to change(GameOdd, :count)
+    end
+
+    context 'when providers disagree on neutral-site sides' do
+      before do
+        game.update!(neutral: true)
+        payload.first.merge!(home_team: 'North Texas Mean Green', away_team: 'UAB Blazers')
+        spreads = payload.first[:bookmakers].first[:markets][1][:outcomes]
+        spreads[0][:price] = -105
+        spreads[1][:price] = -115
+        spreads.reverse!
+      end
+
+      it 'keeps prices, spread sign and bookmaker sides aligned with the stored participants on repeat imports' do
+        2.times { described_class.new(payload).call }
+
+        aggregate_failures do
+          expect(game.reload.game_odd).to have_attributes(moneyline_home: -135, moneyline_away: 120,
+                                                          spread_point: -2.5, spread_home_odds: -105, spread_away_odds: -115,
+                                                          total_points: 121.5)
+          expect(game.bookmaker_odds.count).to eq(6)
+          expect(game.bookmaker_odds.find_by(market: 'h2h', team_name: 'UAB Blazers')).to have_attributes(team_side: 'home', odds: -135)
+          expect(game.bookmaker_odds.find_by(market: 'spreads', team_name: 'North Texas Mean Green'))
+            .to have_attributes(team_side: 'away', value: 2.5, odds: -115)
+          expect(game).to have_attributes(home_team_name: 'UAB', away_team_name: 'North Texas', start_time:)
+        end
+      end
+
+      it 'does not reverse sides for a game without neutral-site evidence' do
+        game.update!(neutral: nil)
+
+        expect { described_class.new(payload).call }.to raise_error(ActiveRecord::RecordNotFound, /Could not find game/)
+        expect(GameOdd.count).to eq(0)
+      end
+
+      it 'accepts canonical neutral venue evidence without the legacy flag' do
+        game.update!(neutral: nil, venue_type: 'neutral')
+
+        expect { described_class.new(payload).call }.to change(GameOdd, :count).by(1)
+      end
+
+      context 'when tip times straddle an Eastern schedule-date boundary' do
+        let(:start_time) { Time.zone.parse('2026-11-02T04:59:00Z') }
+
+        before { payload.first[:commence_time] = '2026-11-02T07:00:00Z' }
+
+        it 'matches a unique neutral game within three hours across midnight' do
+          expect { described_class.new(payload).call }.to change(GameOdd, :count).by(1)
+          expect(game.reload.start_time).to eq(start_time)
+        end
+
+        it 'rejects a nearby game when neutral-site evidence is missing even with matching sides' do
+          game.update!(neutral: false)
+          payload.first.merge!(home_team: 'UAB Blazers', away_team: 'North Texas Mean Green')
+
+          expect { described_class.new(payload).call }.to raise_error(ActiveRecord::RecordNotFound)
+          expect(GameOdd.count).to eq(0)
+        end
+
+        it 'rejects cross-date matches beyond the time tolerance' do
+          payload.first[:commence_time] = '2026-11-02T08:00:00Z'
+
+          expect { described_class.new(payload).call }.to raise_error(ActiveRecord::RecordNotFound)
+          expect(GameOdd.count).to eq(0)
+        end
+
+        it 'rejects ambiguity between an ordered same-date match and a nearby reversed neutral match' do
+          other = create(:game, season:, start_time: Time.zone.parse('2026-11-02T07:00:00Z'),
+                                home_team_name: away_team.school, away_team_name: home_team.school)
+          create(:team_game, game: other, team: away_team, team_season: away_team_season, home: true)
+          create(:team_game, game: other, team: home_team, team_season: home_team_season, home: false)
+
+          expect { described_class.new(payload).call }.to raise_error(ActiveRecord::RecordNotFound, /Multiple games/)
+          expect(GameOdd.count).to eq(0)
+        end
+      end
+    end
+
+    it 'rejects multiple participant matches instead of choosing an arbitrary game' do
+      duplicate = create(:game, season:, start_time:, home_team_name: 'Other home label', away_team_name: 'Other away label')
+      create(:team_game, game: duplicate, team: home_team, team_season: home_team_season, home: true)
+      create(:team_game, game: duplicate, team: away_team, team_season: away_team_season, home: false)
+
+      expect { described_class.new(payload).call }.to raise_error(ActiveRecord::RecordNotFound, /Multiple games/)
+      expect(GameOdd.count).to eq(0)
+      expect(BookmakerOdd.count).to eq(0)
     end
   end
 end

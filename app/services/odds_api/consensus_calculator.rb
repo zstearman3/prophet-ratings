@@ -4,8 +4,8 @@ module OddsApi
   class ConsensusCalculator
     def initialize(bookmakers:, home_team:, away_team:)
       @bookmakers = Array(bookmakers)
-      @home_names = team_identifiers(home_team)
-      @away_names = team_identifiers(away_team)
+      @home_names = outcome_names(home_team)
+      @away_names = outcome_names(away_team)
     end
 
     def consensus
@@ -43,10 +43,11 @@ module OddsApi
     end
 
     ##
-    # Returns the most common spread point value across all bookmakers.
+    # Returns the most common local home-team spread point across all bookmakers.
     # @return [Numeric, nil] The mode of spread points, or nil if no spread points are available.
     def consensus_spread_point
-      points = extract_market('spreads').filter_map { |outcome| value_for(outcome, :point) }
+      points = extract_market('spreads').select { |outcome| @home_names.include?(value_for(outcome, :name)) }
+                                        .filter_map { |outcome| value_for(outcome, :point) }
       mode(points)
     end
 
@@ -89,6 +90,10 @@ module OddsApi
         market = markets.find { |entry| value_for(entry, :key) == market_key }
         market ? Array(value_for(market, :outcomes)) : []
       end
+    end
+
+    def outcome_names(team)
+      team.is_a?(String) ? [team] : team_identifiers(team)
     end
 
     def team_identifiers(team)
