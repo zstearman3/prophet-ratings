@@ -65,4 +65,45 @@ RSpec.describe GenerateNightlyPredictionsJob do
     ActiveJob::Base.deserialize(described_class.perform_later(season.id).serialize).perform_now
     expect(game.predictions).to be_empty
   end
+
+  it 'defers through six busy deliveries and forecasts after the real shared lock is released', :aggregate_failures do
+    lock_connection = PG.connect(ENV.fetch('TEST_DATABASE_URL'))
+    key_sql = GoodJob::Job.send(:advisory_lock_bigint_sql, '$1::text')
+    lock_connection.exec_params("SELECT pg_advisory_lock(#{key_sql})", [HeavyJob::LOCK_KEY])
+    job = described_class.set(queue: 'default').perform_later(season.id)
+    delivery = job.serialize
+    arguments = delivery.fetch('arguments')
+    enqueued_jobs.clear
+    deferrals = []
+
+    6.times do
+      attempted_at = Time.current.to_f
+      ActiveJob::Base.deserialize(delivery).perform_now
+      expect(game.predictions).to be_empty
+      delivery = enqueued_jobs.shift
+      deferrals << [delivery.fetch(:at) - attempted_at, delivery.fetch('queue_name'), delivery.fetch('job_id')]
+      expect(delivery.fetch('arguments')).to eq(arguments)
+      expect(enqueued_jobs).to be_empty
+      travel 1.minute
+    end
+    expect(deferrals.uniq).to eq([[60, 'heavy', job.job_id]])
+    lock_connection.close
+    lock_connection = nil
+
+    ActiveJob::Base.deserialize(delivery).perform_now
+    expect(game.predictions.sole).to have_attributes(forecast_kind: 'pregame', ratings_config_version: version)
+    expect(enqueued_jobs).to be_empty
+  ensure
+    lock_connection&.close
+  end
+
+  it 'still exhausts genuine prediction errors after five failures despite earlier delivery deferrals' do
+    job = described_class.new(season.id)
+    job.executions = 12
+    job.exception_executions[[StandardError].to_s] = ApplicationJob::MAX_EXECUTIONS - 1
+    allow(ProphetRatings::GamePredictionBuilder).to receive(:new).and_raise('synthetic prediction failure')
+
+    expect { job.perform_now }.to raise_error(StandardError, 'synthetic prediction failure')
+    expect(enqueued_jobs).to be_empty
+  end
 end

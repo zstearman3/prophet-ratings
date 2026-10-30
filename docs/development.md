@@ -565,6 +565,14 @@ remaining attempts after earlier errors; delivery counts are not reset. The
 shared database lock also serializes heavy bodies across accidental extra worker
 processes, but extra processes still multiply Rails memory and database pools.
 
+`GenerateNightlyPredictionsJob` is the exception to that lock-contention limit:
+it defers once per minute on the heavy queue until the shared lock is available,
+preserving its job ID and pinned season/model arguments. A long sync therefore
+does not exhaust an independent forecast pass after five busy deliveries. This
+wait does no prediction work, ingestion or ratings calculation. Actual prediction
+errors still use `ApplicationJob`'s bounded five-error retry policy; other heavy
+jobs retain the five-delivery contention limit above.
+
 `GOOD_JOB_POLL_INTERVAL=1`, `GOOD_JOB_SUBPROCESSES=0` and
 `GOOD_JOB_SHUTDOWN_TIMEOUT=30` are explicit defaults. `GOOD_JOB_QUEUES`, those
 variables, `WEB_CONCURRENCY`, `RAILS_MAX_THREADS` and `DB_POOL` are deliberate

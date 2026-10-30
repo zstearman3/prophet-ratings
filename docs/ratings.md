@@ -49,6 +49,13 @@ Empty, failed or pending sync runs do not prevent this scheduled forecast pass.
 The existing successful-ratings handoff remains an additional trigger; unchanged
 forecast inputs reuse the existing revision.
 
+If the shared heavy-work lock is held, the independent prediction delivery
+defers once per minute until the lock is available, retaining its pinned
+season/model arguments. Lock waits do not exhaust the pass after five deliveries;
+actual prediction errors still have the normal bounded five-error retry policy.
+This avoids waiting until the next six-hour slot when a long sync overlaps the
+prediction pass, including through legacy queues or another execution process.
+
 Snapshot validity still applies: both participants need complete compatible
 snapshots for the selected model, within the forecast's date/availability cutoff.
 Before the season's stored opening date, use the latest publication dated before
