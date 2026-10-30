@@ -40,6 +40,27 @@ inputs continue to skip a forecast with a warning. This scheduled-job alignment
 does not rewrite historical snapshots or forecasts and requires no model bundle
 or coefficient change.
 
+Production also schedules `GenerateNightlyPredictionsJob` independently at
+01:00, 07:00, 13:00 and 19:00 America/New_York, for either ingestion provider.
+It passes the current season ID and pins the selected model before enqueueing.
+This trigger consumes existing published snapshots: it requires no completed
+past-game sync, makes no provider requests and does not recalculate ratings.
+Empty, failed or pending sync runs do not prevent this scheduled forecast pass.
+The existing successful-ratings handoff remains an additional trigger; unchanged
+forecast inputs reuse the existing revision.
+
+Snapshot validity still applies: both participants need complete compatible
+snapshots for the selected model, within the forecast's date/availability cutoff.
+Before the season's stored opening date, use the latest publication dated before
+opening day, even when its snapshot date is ahead of issuance. This selects the
+snapshot closest to opening day without admitting opening-day or in-season data.
+The snapshot must still precede the game's Eastern date and must have actually
+been created/updated by issuance. On opening day and afterward, the usual
+issuance-date cutoff applies again. Missing inputs skip the affected game with a
+warning; existing snapshot dates and provenance remain unchanged. Restart the
+cron-producing worker after deploying the new `nightly_predictions` entry;
+development cron remains disabled.
+
 Direct calculator call (its default remains today, unlike the scheduled job):
 
 ```ruby
@@ -836,11 +857,18 @@ source snapshot, TeamSeason, season or venue cannot change a saved forecast's
 calculation. Replay still depends on the implementation of that model's arithmetic;
 this is an input contract, not an archive of historical executable code.
 
-Snapshots must be dated strictly before the game's Eastern schedule date, no
-later than the actual generation date, and created/updated by generation time.
-There is no same-day intraday exception. Missing eligible or complete inputs skip
-with a warning directing the operator to publish complete prior-day snapshots.
-No later source is substituted. New issuance takes all four effective season
+Snapshots must be dated strictly before the game's Eastern schedule date and
+created/updated by generation time. Normally their dates must also be no later
+than the Eastern generation date. Before `season.start_date`, the date cutoff
+instead extends to the day before opening day: use the latest eligible publication
+for each participant/model, even when dated ahead of issuance. This is a preseason
+calendar-date exception only; actual publication timestamps and matching complete
+model/date metadata remain required. The saved `input_cutoff` records this extended
+date, still capped at the day before the game. On opening day and afterward, the
+normal generation-date cutoff resumes. There is no game-day intraday exception.
+Missing eligible or complete inputs skip with a warning directing the operator to
+publish complete snapshots before the Eastern game date. Sources beyond the
+applicable cutoff are never substituted. New issuance takes all four effective season
 inputs from `stats.season_forecast_inputs` on the selected snapshots, never from
 mutable live season fields. Publication captures `average_efficiency`,
 `average_pace`, `efficiency_std_deviation` and `pace_std_deviation` once inside the
@@ -1554,4 +1582,7 @@ Complete past ingestion authorizes `CbbdSyncAnalyticsJob`, which uses the existi
 prior-day calculator and prediction builder under the shared ratings lock. It
 records ratings and prediction processing separately; prediction retries do not
 repeat committed ratings. Forecast coverage still requires checking skipped inputs.
+This authorization governs fresh ratings publication, not the independent
+`nightly_predictions` recurring job described above. Forecasts can exist while a
+CBBD run's analytics remain pending because they used an existing publication.
 See [the cutover runbook](cbbd-cutover.md); daily cutoff and formulas are unchanged.

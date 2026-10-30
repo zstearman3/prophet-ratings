@@ -14,6 +14,10 @@ class GameScheduleReview < ApplicationRecord
   before_update { raise ActiveRecord::ReadOnlyRecord, 'Schedule reviews are immutable' }
   before_destroy { raise ActiveRecord::ReadOnlyRecord, 'Schedule reviews are immutable' }
 
+  def participant_correction?
+    selected_external_id == ignored_external_id
+  end
+
   def self.digest(value)
     Digest::SHA256.hexdigest(JSON::State.new(sort_keys: true).generate(value.as_json))
   end
@@ -31,7 +35,7 @@ class GameScheduleReview < ApplicationRecord
     time = attributes.fetch('start_time')
     date = Game.schedule_date_for(time)
     timestamp = time.iso8601
-    attributes.slice('venue_name', 'venue_source', 'venue_confidence', 'venue_type', 'neutral').merge(
+    attributes.slice('home_team_name', 'away_team_name', 'venue_name', 'venue_source', 'venue_confidence', 'venue_type', 'neutral').merge(
       'start_time' => timestamp, 'schedule_date' => date.iso8601,
       'tip_time' => time == Game.schedule_time_for(date) ? nil : timestamp
     )
@@ -40,14 +44,31 @@ class GameScheduleReview < ApplicationRecord
   def current?(candidate, resolution)
     candidate&.id == game_id && candidate.season_id == season_id &&
       participants == GameScheduleReview.participants_for(resolution) &&
-      GameScheduleReview.stored_participants(candidate) == participants && identities_current?
+      GameScheduleReview.stored_participants(candidate) == participants && identities_current? && selected_participant_state?(candidate)
   end
 
   private
 
   def identities_current?
-    GameExternalIdentity.active.exists?(game_id:, provider: 'cbbd', external_id: selected_external_id) &&
-      GameExternalIdentity.where.not(superseded_at: nil).exists?(game_id:, provider: 'cbbd', external_id: ignored_external_id)
+    active = GameExternalIdentity.active.exists?(game_id:, provider: 'cbbd', external_id: selected_external_id)
+    active && (participant_correction? || GameExternalIdentity.where.not(superseded_at: nil)
+                                                            .exists?(game_id:, provider: 'cbbd', external_id: ignored_external_id))
+  end
+
+  def selected_participant_state?(candidate)
+    return true unless participant_correction?
+
+    attributes = candidate.attributes
+    return false unless candidate.scheduled? && attributes.values_at('home_team_score', 'away_team_score').all?(&:nil?)
+    return false unless GameScheduleReview.schedule_values(attributes) == selected_schedule
+
+    accepted_participant_state?
+  end
+
+  def accepted_participant_state?
+    accepted = GameObservation.where(game_id:, accepted: true).order(id: :desc).first
+    accepted && GameScheduleReview.payload_fingerprint(accepted.normalized_payload) ==
+      GameScheduleReview.payload_fingerprint(selected_payload)
   end
 
   public_class_method def self.stored_participants(candidate)

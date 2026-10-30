@@ -33,6 +33,16 @@ RSpec.describe GoodJob::Configuration do
       .to eq(%w[2026-11-01T05:00:00Z 2026-11-01T06:00:00Z 2026-11-01T12:00:00Z])
   end
 
+  it 'schedules predictions independently of game sync for both providers' do
+    %w[cbbd sports_reference].each do |provider|
+      entry = boot_configuration('production', provider:).fetch('schedule').fetch('nightly_predictions')
+      expect(entry.fetch('class')).to eq('GenerateNightlyPredictionsJob')
+      schedule = Fugit.parse(entry.fetch('cron'))
+      expect(next_occurrences(schedule, Time.utc(2026, 3, 8, 5)))
+        .to eq(%w[2026-03-08T06:00:00Z 2026-03-08T11:00:00Z 2026-03-08T17:00:00Z])
+    end
+  end
+
   def boot_configuration(environment, provider: nil)
     probe = <<~RUBY
       config = GoodJob.configuration

@@ -75,6 +75,8 @@ module Ingestion
     end
 
     def retire_source
+      return apply_participant_selection if evidence.participant_correction?
+
       game = evidence.game
       incoming_key = evidence.incoming.data.fetch(:external_game_id)
       if submission[:choice] == 'incoming'
@@ -83,6 +85,10 @@ module Ingestion
       else
         GameExternalIdentity.create!(game:, provider: 'cbbd', external_id: incoming_key, superseded_at: Time.current)
       end
+    end
+
+    def apply_participant_selection
+      write_incoming if submission[:choice] == 'incoming'
     end
 
     def write_incoming

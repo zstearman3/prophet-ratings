@@ -16,8 +16,9 @@ RSpec.describe ProphetRatings::GamePredictionBuilder do
   let(:game) { create(:game, season:, venue_type: 'neutral', status: :scheduled, start_time: 1.day.from_now) }
   let(:version) { create(:ratings_config_version) }
   let(:season) { create(:season, average_efficiency: 100, average_pace: 70) }
+  let(:generation_time) { Time.utc(2026, 10, 10, 16) }
 
-  around { |example| travel_to(Time.utc(2026, 10, 10, 16)) { example.run } }
+  around { |example| travel_to(generation_time) { example.run } }
 
   it 'rejects dirty and unsaved configuration before acquiring the game lock' do
     game = create(:game)
@@ -370,5 +371,57 @@ RSpec.describe ProphetRatings::GamePredictionBuilder do
     season.update!(efficiency_std_deviation: 40, pace_std_deviation: 30, average_efficiency: 130)
     expect(prediction).to be_persisted
     expect([prediction.replay, prediction.margin_std_deviation, prediction.total_std_deviation]).to eq(original)
+  end
+
+  context 'when generating before opening day' do
+    let(:generation_time) { Time.utc(2026, 10, 30, 16) }
+    let(:season) do
+      create(:season, year: 2027, start_date: '2026-11-01', end_date: '2027-04-10',
+                      average_efficiency: 100, average_pace: 70)
+    end
+    let(:game) { create(:game, season:, venue_type: 'neutral', status: :scheduled, start_time: Time.utc(2026, 11, 4, 23)) }
+
+    before do
+      snapshots.each do |snapshot|
+        snapshot.update!(snapshot_date: Date.new(2026, 10, 31))
+        refresh_publication(snapshot)
+      end
+    end
+
+    it 'uses the publication closest to opening day even when its date is after issuance' do
+      snapshots.each do |snapshot|
+        [Date.new(2026, 10, 29), Date.new(2026, 11, 1), Date.new(2026, 11, 3)].each do |date|
+          create(:team_rating_snapshot, :with_forecast_inputs, team_season: snapshot.team_season,
+                                                               ratings_config_version: version, snapshot_date: date)
+        end
+      end
+      prediction = build_forecast
+      expect(prediction).to have_attributes(home_team_snapshot: snapshots.first, away_team_snapshot: snapshots.last,
+                                            input_cutoff: Date.new(2026, 10, 31), generated_at: generation_time,
+                                            home_score: 70, away_score: 70)
+      expect(Prediction.selected_pregame).to contain_exactly(prediction)
+      expect(build_forecast.id).to eq(prediction.id)
+    end
+
+    it 'returns to the normal date cutoff at Eastern opening midnight' do
+      snapshots.each do |snapshot|
+        [Date.new(2026, 11, 1), Date.new(2026, 11, 2)].each do |date|
+          create(:team_rating_snapshot, :with_forecast_inputs, team_season: snapshot.team_season,
+                                                               ratings_config_version: version, snapshot_date: date)
+        end
+      end
+      travel_to Time.utc(2026, 11, 1, 3, 59)
+      expect(build_forecast.home_team_snapshot.snapshot_date).to eq(Date.new(2026, 10, 31))
+      travel_to Time.utc(2026, 11, 1, 4)
+      prediction = build_forecast
+      expect(prediction.home_team_snapshot.snapshot_date).to eq(Date.new(2026, 11, 1))
+      expect(prediction.input_cutoff).to eq(Date.new(2026, 11, 1))
+    end
+
+    it 'keeps the prior-game-date cutoff for a game scheduled before opening day' do
+      game.update!(start_time: Time.utc(2026, 10, 31, 23))
+      expect(build_forecast).to be_nil
+      expect(game.predictions).to be_empty
+    end
   end
 end

@@ -8,7 +8,7 @@ module Ingestion
     end
 
     def validate
-      raise ArgumentError, 'Only unplayed, scoreless schedule entries can be reviewed.' unless pending_game?
+      raise ArgumentError, 'Only unplayed, scoreless schedule entries can be reviewed.' unless self.class.pending_game?(game)
 
       validate_memberships
       raise ArgumentError, 'The existing game has no accepted source evidence.' unless @evidence.prior
@@ -24,15 +24,15 @@ module Ingestion
         data.values_at(:home, :away).all? { |side| side[:score].blank? && side[:stats].values.all?(&:nil?) }
     end
 
-    private
-
-    def game = @evidence.game
-
-    def pending_game?
+    def self.pending_game?(game)
       fields = GameObservation::STAT_KEYS.map(&:to_s)
       game.scheduled? && game.attributes.values_at('home_team_score', 'away_team_score').all?(&:nil?) &&
         TeamGame.where(game:).all? { |side| side.attributes.slice(*fields).values.all?(&:nil?) }
     end
+
+    private
+
+    def game = @evidence.game
 
     def validate_memberships
       resolution = @evidence.resolution

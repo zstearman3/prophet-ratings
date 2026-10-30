@@ -106,6 +106,12 @@ Rails.application.configure do
       class: 'ScheduledGameSyncJob', # name of the job class as a String; must reference an Active Job job class
       description: 'Provider-aware game sync' # optional description that appears in Dashboard
     },
+    nightly_predictions: {
+      cron: '0 1,7,13,19 * * * America/New_York',
+      class: 'GenerateNightlyPredictionsJob',
+      args: -> { [Season.current&.id] },
+      description: 'Predictions from published rating snapshots'
+    },
     odds_sync: {
       cron: '0 */6 * * *', # cron-style scheduling format by fugit gem
       class: 'SyncOddsJob', # name of the job class as a String; must reference an Active Job job class

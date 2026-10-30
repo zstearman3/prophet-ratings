@@ -56,6 +56,23 @@ the same heavy/ratings locks and existing calculators as manual jobs. Ratings an
 A prediction failure retries only that phase. A stale delivery becomes `stale` and
 cannot calculate a new day's ratings. Generic/manual job policies are unchanged.
 
+Prediction generation also has its own production recurring entry,
+`nightly_predictions`, at 01:00, 07:00, 13:00 and 19:00 America/New_York for either
+provider. It runs the existing prediction job with the current season and pinned
+model, independently of past/future sync status, using already published snapshots
+under the existing heavy/ratings locks. It performs no ingestion or ratings
+calculation. The successful-ratings prediction handoff above remains in place;
+unchanged snapshot inputs are idempotent. Restart cron-producing workers after
+deploying the added entry and inspect it separately in GoodJob. The CBBD analytics
+marker may remain pending while independent forecasts exist.
+
+Snapshots must still satisfy the prediction builder's model, participant,
+publication and issuance-cutoff checks. Before opening day, the latest publication
+dated before `season.start_date` can be used even when its date is ahead of
+issuance; it must still precede the game date and have actually been published by
+issuance. The normal date cutoff resumes on Eastern opening day. Missing/invalid
+inputs continue to skip individual games. Development cron is still disabled.
+
 **Analytics completed means processing finished, not universal forecast coverage.**
 The existing prediction builder can skip missing or invalid inputs. Compare eligible
 scheduled games with model-specific predictions and investigate every missing game.
