@@ -135,6 +135,17 @@ RSpec.describe Ingestion::ScheduleReviewResolution do
     expect(GameScheduleReview.count).to eq(0)
   end
 
+  it 'rejects a canonical game from another season even when its date and memberships match the evidence' do
+    observation
+    other_season = create(:season, year: 2028, start_date: season.start_date, end_date: season.end_date)
+    game.update!(season: other_season)
+    state = [game.attributes, GameObservation.order(:id).map(&:attributes), TeamGame.where(game:).map(&:attributes)]
+
+    expect { resolve_schedule('incoming') }.to raise_error(ArgumentError, /target season/i)
+    expect([game.reload.attributes, GameObservation.order(:id).map(&:attributes), TeamGame.where(game:).map(&:attributes)]).to eq(state)
+    expect(GameScheduleReview.count).to eq(0)
+  end
+
   it 'rejects an incoming opponent that now resolves to a rated membership' do
     observation
     visitor = create(:team, school: 'New Visitor')

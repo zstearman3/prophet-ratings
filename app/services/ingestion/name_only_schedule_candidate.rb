@@ -43,7 +43,7 @@ module Ingestion
 
       date = game.schedule_date
       season = evidence.season
-      return if date >= Game.current_schedule_date && (season.start_date..season.end_date).cover?(date)
+      return if game.season_id == season.id && date >= Game.current_schedule_date && (season.start_date..season.end_date).cover?(date)
 
       raise ArgumentError, 'Only upcoming games inside the target season can be reviewed.'
     end
