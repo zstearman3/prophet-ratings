@@ -71,9 +71,7 @@ class BetRecommendationGenerator
     ev = expected_value(prob, odds)
 
     recommended = ev >= BETTING_CONFIG[:recommended_ev_threshold]
-    team = if recommended
-             recommend_home ? 'home' : 'away'
-           end
+    team = recommend_home ? 'home' : 'away'
     confidence = prob
 
     create_recommendation(
@@ -177,7 +175,7 @@ class BetRecommendationGenerator
       game_odd_id: game_odd.id,
       ratings_config_version_id: prediction.ratings_config_version_id,
       ratings_config_version_current: prediction.ratings_config_version.current,
-      team: (recommended ? selection : nil),
+      team: selection,
       vegas_line: line,
       vegas_odds: odds,
       model_value: model_total.round(2),

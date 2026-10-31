@@ -118,25 +118,19 @@
           </td>
           <td class="px-4 py-3 align-top">
             <% if recommendations["spread"] %>
-              <div><span class="font-semibold">Vegas Line:</span> <%= recommendations["spread"].game_odd&.formatted_favorite_line || '-' %></div>
-              <div><span class="font-semibold">Model Value:</span> <%= recommendations["spread"].prediction.favorite_line || '-' %></div>
-              <div><span class="font-semibold">EV:</span> <%= (recommendations["spread"].ev * 100).round(1) %>%</div>
-              <div><span class="font-semibold">Confidence:</span> <%= (recommendations["spread"].confidence * 100).round(1) %>%</div>
+              <%= render 'betting_recommendation_details', recommendation: recommendations["spread"], probability_label: 'cover' %>
+              <div><span class="font-semibold">Model spread:</span> <%= recommendations["spread"].prediction.favorite_line || '-' %></div>
             <% end %>
           </td>
           <td class="px-4 py-3 align-top">
             <% if recommendations["moneyline"] %>
-              <div><span class="font-semibold">Vegas Odds:</span> <%= recommendations["moneyline"].game_odd&.formatted_home_moneyline || '-' %></div>
-              <div><span class="font-semibold">EV:</span> <%= (recommendations["moneyline"].ev * 100).round(1) %>%</div>
-              <div><span class="font-semibold">Confidence:</span> <%= (recommendations["moneyline"].confidence * 100).round(1) %>%</div>
+              <%= render 'betting_recommendation_details', recommendation: recommendations["moneyline"], probability_label: 'win' %>
             <% end %>
           </td>
           <td class="px-4 py-3 align-top">
             <% if recommendations["total"] %>
-              <div><span class="font-semibold">Vegas Total:</span> <%= recommendations["total"].game_odd&.total_points || '-' %></div>
+              <%= render 'betting_recommendation_details', recommendation: recommendations["total"], probability_label: recommendations["total"].team || 'selected-side' %>
               <div><span class="font-semibold">Predicted Total:</span> <%= recommendations["total"].model_value || '-' %></div>
-              <div><span class="font-semibold">EV:</span> <%= (recommendations["total"].ev * 100).round(1) %>%</div>
-              <div><span class="font-semibold">Confidence:</span> <%= (recommendations["total"].confidence * 100).round(1) %>%</div>
             <% end %>
           </td>
         </tr>

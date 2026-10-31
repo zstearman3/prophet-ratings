@@ -239,6 +239,9 @@ Important details:
 - `recommended_ev_threshold` is currently `0.05`.
 - Spread and total probabilities use a normal CDF against prediction standard deviations.
 - Moneyline EV uses `prediction.home_win_probability`.
+- Spread and total rows retain the evaluated `team` even below the EV threshold;
+  `recommended` determines whether the selection is actionable. Historical no-play
+  rows with no saved side remain unchanged and display `Evaluated side: Not saved`.
 - Existing current recommendations for the same game and bet type are marked non-current before saving a new current recommendation.
 
 Current gap: no audited job, rake task, controller action, or importer callback invokes `BetRecommendationGenerator` automatically. The `/games/betting` page only displays `current_bet_recommendations`; it does not generate them.
@@ -263,7 +266,13 @@ The page:
 - filters by schedule date
 - loads predictions, `game_odd`, and current bet recommendations
 - sorts by recommendation EV for spread, moneyline, or total
-- expands rows to show model value, Vegas line/odds, EV, and confidence
+- pairs the recommended (or explicitly labeled no-play evaluated) side with its
+  saved line/odds in both the summary and expanded details, so refreshed consensus
+  odds do not appear beside an older EV
+- labels EV as **Expected ROI**, with a tooltip expressing model-estimated net
+  profit per $100 wagered, and labels the selected side's model win/cover/over/under
+  probability explicitly; these model probabilities remain uncalibrated
+- retains model spread and predicted total as supporting comparison details
 
 The page does not filter to games that have odds despite the empty-state copy saying "No games with odds available for this date." It loads all games for the date and then displays missing recommendations as "No recommendation."
 
