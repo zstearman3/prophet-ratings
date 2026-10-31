@@ -57,7 +57,14 @@ RSpec.describe GenerateBetRecommendationsJob do
 
   it 'rolls back a failed game, processes later games, and queues a retry' do
     create_game_prediction(game)
-    create_odds(game).update!(moneyline_home: -1000, moneyline_away: nil)
+    create_odds(game)
+    failed_game_id = game.id
+    allow(BetRecommendationGenerator).to receive(:call).and_wrap_original do |original, game:|
+      recommendations = original.call(game:)
+      raise 'Injected persistence failure' if game.id == failed_game_id
+
+      recommendations
+    end
     later = create(:game, season:, status: :scheduled, start_time: 1.day.from_now)
     create_game_prediction(later)
     create_odds(later)
@@ -66,6 +73,30 @@ RSpec.describe GenerateBetRecommendationsJob do
 
     expect(game.bet_recommendations).to be_empty
     expect(later.bet_recommendations.pluck(:bet_type)).to contain_exactly('spread', 'moneyline', 'total')
+  end
+
+  it 'preserves valid markets with a one-sided moneyline without retrying the game' do
+    create_game_prediction(game)
+    create_odds(game).update!(moneyline_home: -1000, moneyline_away: nil)
+
+    expect { described_class.perform_now }.not_to have_enqueued_job(described_class)
+
+    expect(game.bet_recommendations.pluck(:bet_type)).to contain_exactly('spread', 'moneyline', 'total')
+    expect(game.bet_recommendations.find_by!(bet_type: 'moneyline'))
+      .to have_attributes(team: 'home', vegas_odds: -1000, ev: -0.34, recommended: false)
+  end
+
+  it 'retires prior recommendations when the newly active model has no usable prediction' do
+    create_game_prediction(game)
+    create_odds(game)
+    described_class.perform_now
+    original_ids = game.bet_recommendations.ids
+    create(:ratings_config_version).activate
+
+    expect { described_class.perform_now }.not_to change(BetRecommendation, :count)
+
+    expect(game.bet_recommendations.ids).to match_array(original_ids)
+    expect(game.bet_recommendations).to all(have_attributes(current: false, ratings_config_version_id: version.id))
   end
 
   def create_game_prediction(target)

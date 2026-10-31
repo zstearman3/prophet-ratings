@@ -25,7 +25,8 @@ class BetRecommendationGenerator
     prediction = game.current_prediction
     game_odd = game.game_odd
 
-    return [] if prediction.nil? || game_odd.nil?
+    return retire_current_recommendations if prediction.nil?
+    return [] if game_odd.nil?
 
     recs = []
 
@@ -33,12 +34,18 @@ class BetRecommendationGenerator
     recs << generate_moneyline_recommendation(prediction, game_odd)
     recs << generate_total_recommendation(prediction, game_odd)
 
+    retire_current_recommendations(recs.compact) if prediction.ratings_config_version.current?
     recs
   end
 
   private
 
   attr_reader :game
+
+  def retire_current_recommendations(recommendations = [])
+    game.bet_recommendations.where(current: true).where.not(id: recommendations.map(&:id)).update_all(current: false)
+    []
+  end
 
   ##
   # Generates a spread bet recommendation for the given prediction and game odds.
@@ -114,8 +121,8 @@ class BetRecommendationGenerator
 
     prob_home_wins = prediction.home_win_probability
 
-    home_ev = game_odd.moneyline_home ? expected_value(prob_home_wins, game_odd.moneyline_home) : 0
-    away_ev = game_odd.moneyline_away ? expected_value(1 - prob_home_wins, game_odd.moneyline_away) : 0
+    home_ev = game_odd.moneyline_home ? expected_value(prob_home_wins, game_odd.moneyline_home) : -Float::INFINITY
+    away_ev = game_odd.moneyline_away ? expected_value(1 - prob_home_wins, game_odd.moneyline_away) : -Float::INFINITY
 
     recommend_home = home_ev > away_ev
     prob = recommend_home ? prob_home_wins : 1 - prob_home_wins
