@@ -92,7 +92,7 @@ RSpec.describe GenerateNightlyPredictionsJob do
 
     ActiveJob::Base.deserialize(delivery).perform_now
     expect(game.predictions.sole).to have_attributes(forecast_kind: 'pregame', ratings_config_version: version)
-    expect(enqueued_jobs).to be_empty
+    expect(enqueued_jobs.pluck(:job)).to eq([GenerateBetRecommendationsJob])
   ensure
     lock_connection&.close
   end
