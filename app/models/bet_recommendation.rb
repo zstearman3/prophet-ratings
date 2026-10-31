@@ -67,23 +67,25 @@ class BetRecommendation < ApplicationRecord
   def recommendation
     return 'No play' unless recommended && team.present?
 
+    evaluated_selection || 'No play'
+  end
+
+  # Uses the saved selection and price that produced this row's EV.
+  def evaluated_selection
     case team
-    when 'home'
-      if bet_type == 'spread'
-        "#{game.home_team_name} #{game_odd.formatted_home_line}"
-      else
-        "#{game.home_team_name} #{game_odd.formatted_home_moneyline}"
-      end
-    when 'away'
-      if bet_type == 'spread'
-        "#{game.away_team_name} #{game_odd.formatted_away_line}"
-      else
-        "#{game.away_team_name} #{game_odd.formatted_away_moneyline}"
-      end
-    when 'over'
-      "Over #{game_odd.total_points}"
-    when 'under'
-      "Under #{game_odd.total_points}"
+    when 'home', 'away'
+      team_selection
+    when 'over', 'under'
+      "#{team.capitalize} #{format('%g', vegas_line)}" if vegas_line
     end
+  end
+
+  private
+
+  def team_selection
+    line_or_odds = spread_bet_type? ? vegas_line : vegas_odds
+    return unless line_or_odds
+
+    format('%<team>s %<value>+g', team: home_team? ? game.home_team_name : game.away_team_name, value: line_or_odds)
   end
 end

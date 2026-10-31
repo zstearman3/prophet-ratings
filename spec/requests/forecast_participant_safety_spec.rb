@@ -176,12 +176,12 @@ RSpec.describe 'Forecast participant safety' do
     create(:bet_recommendation, game:, game_odd: odd, prediction:, ratings_config_version: version, current: true)
     original = recommendation.attributes
     get '/games/betting', params: { date: game.schedule_date.to_s }
-    expect(response.body).to include('987.654', 'Model Value:')
+    expect(response.body).to include('987.654', 'Model spread:')
     recreate_sides(teams.reverse)
     get '/games/betting', params: { date: game.schedule_date.to_s }
     expect(response).to have_http_status(:success)
     expect(response.body).to include('Participant side mismatch')
-    expect(response.body).not_to include('987.654', 'Predicted Total:', 'Model Value:')
+    expect(response.body).not_to include('987.654', 'Predicted Total:', 'Model spread:')
     expect(recommendation.reload.attributes).to eq(original)
   end
 end
