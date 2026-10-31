@@ -101,8 +101,10 @@ All gates must pass before a separately authorized activation:
    restart/deployment, retention policy and measured storage headroom. There is no
    automatic capture cleanup policy in this change.
 5. Apply migrations and **wait for successful migration task completion** before
-   switching workers. The existing deployment migration-wait flaw is an unresolved
-   release blocker; this ticket does not alter deployment infrastructure.
+   switching workers. The deployment workflow now enforces this with
+   `bin/run-ecs-migrations`; failed, abnormal or unverified exits block service
+   updates. See the [production migration gate](development.md#production-migration-gate)
+   for prerequisites and timeout recovery. Confirm the deployment passed that gate.
 6. Confirm one intended worker topology, measured memory headroom under realistic
    retained history, and no competing scraper jobs. Small fixtures establish neither
    production memory capacity nor live provider latency.
