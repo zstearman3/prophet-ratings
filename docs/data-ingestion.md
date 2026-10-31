@@ -550,6 +550,52 @@ participant/identity changes remain held. The original failed run stays in the
 audit history; its retry recomputes completion. Approval does not run a ratings
 job, fetch data, or automatically retry the date.
 
+### Name-only opponent corrections on an existing CBBD game ID
+
+Upcoming schedule review also supports a changed external team ID or opponent
+name on the **same active CBBD game ID** when exactly one side remains a name-only
+opponent. This covers an identity correction with the same displayed name as well
+as a replacement opponent. Both source versions must retain the other side's
+linked team, season membership, orientation and external identity. It does not
+create a Team, TeamSeason or identity mapping for the name-only side.
+
+From **Refresh and review schedule**, select the target season and an **Upcoming
+schedule** CBBD refresh covering the affected date with explicit request limits.
+After it finishes, open **Review date → Resolve schedule conflict**. Compare both
+matchups and CBBD team IDs, even when their displayed names match, along with the
+Eastern dates/times and retained venue. Choose **Keep existing entry** or **Keep
+incoming entry**, then **Approve selected schedule entry**. No choice is selected
+by default and no written reason is required. The review stores `Approved by
+admin`, the approving user/time, original source observations and selected values.
+
+Keeping incoming accepts the opponent name/ID and appends accepted provenance;
+an external-ID-only correction is recorded even when the Game's name does not
+change. The local Game, linked TeamGame and active CBBD game key are preserved.
+Keeping existing retains their current values. Manual venue corrections are
+preserved in either case. Approval is atomic and makes no provider requests.
+
+Return to results and **Retry unfinished dates**. Only the exact discarded
+scheduled payload may become an audited `reviewed_skip`, while the selected
+participant/canonical state and accepted source still match. Changed source facts
+are checked normally; a conflicting revision needs a fresh review. Multiple
+immutable participant decisions may share a CBBD game key. The original failed
+run and rejected observations remain in the audit history.
+
+The correction is unavailable for expired, scored, completed or canceled games,
+linked/rated participant replacements, ambiguous identities, or games with saved
+forecasts, aggregated/bookmaker odds or betting outputs. Source and canonical
+changes after opening the comparison invalidate approval. Existing distinct-key
+schedule review retains its original protections. Apply migration
+`20261030000000` before using this extension; it preserves decisions and keeps
+retired distinct-game-key uniqueness while allowing same-key participant history.
+
+Automatic CBBD sync runs still retain their own reports. To review a scheduled
+failure through this UI, explicitly queue a bounded upcoming browser refresh for
+the affected date; this uses the existing worker/provider capture prerequisites
+and a new finite request budget. Approval neither retries that refresh nor runs
+ratings/predictions. The independent prediction schedule uses existing valid
+snapshots as described in [Ratings](ratings.md).
+
 ## Provider-scoped external identities
 
 `TeamExternalIdentity` and `GameExternalIdentity` attach durable provider keys to

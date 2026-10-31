@@ -9,13 +9,29 @@
       <h2 class="text-xl font-semibold">Approved by admin</h2>
       <p><%= review.reviewed_by.email %> · <%= review.created_at %></p>
       <p>Kept CBBD <%= review.selected_external_id %> for <%= review.selected_schedule['schedule_date'] %>.
-        Retired CBBD <%= review.ignored_external_id %>.</p>
+        <% if review.participant_correction? %>
+          The game ID remains active; the opponent identity choice was recorded.
+        <% else %>
+          Retired CBBD <%= review.ignored_external_id %>.
+        <% end %>
+      </p>
+      <% if review.participant_correction? %>
+        <% %w[home away].each do |side| %>
+          <p><strong><%= side.capitalize %>:</strong> <%= review.selected_payload.dig(side, 'name') %>
+            · CBBD team ID: <%= review.selected_payload.dig(side, 'external_team_id').presence || 'Unavailable' %></p>
+        <% end %>
+      <% end %>
       <p><%= link_to "View game #{review.game_id}", game_path(review.game), class: 'text-blue-700 underline' %></p>
       <p>Retry unfinished dates from the schedule results to recompute completion. The original failed report and both source entries remain in the audit history.</p>
     </section>
   <% elsif page[:evidence] %>
     <% evidence = page[:evidence] %>
-    <p>CBBD supplied different game IDs for this matchup. Choose the schedule entry to keep after checking the dates and times. Dates and tip times below use Eastern time and show the values that will be retained, including manual venue corrections.</p>
+    <% if evidence.participant_correction? %>
+      <p>CBBD changed the name or team ID of a name-only opponent on the same game ID. Compare the participants and choose the trusted entry. The linked team and local game records will be preserved.</p>
+    <% else %>
+      <p>CBBD supplied different game IDs for this matchup. Choose the schedule entry to keep after checking the dates and times.</p>
+    <% end %>
+    <p>Dates and tip times below use Eastern time and show the values that will be retained, including manual venue corrections.</p>
     <%= form_with url: admin_schedule_refresh_run_game_schedule_review_path(page[:run], page[:observation]), method: :patch, data: { turbo: false }, class: 'space-y-5' do %>
       <%= hidden_field_tag :fingerprint, evidence.fingerprint %>
       <fieldset class="space-y-4">
@@ -25,6 +41,10 @@
             <% schedule = evidence.schedule_for(choice) %>
             <label class="block rounded border bg-white p-5 space-y-3">
               <span class="block text-lg font-semibold"><%= radio_button_tag :choice, choice, false, required: true, class: 'mr-2' %>Keep <%= choice == 'existing' ? 'existing entry' : 'incoming entry' %></span>
+              <% %w[home away].each do |side| %>
+                <span class="block"><strong><%= side.capitalize %>:</strong> <%= payload.dig(side, 'name') %>
+                  · CBBD team ID: <%= payload.dig(side, 'external_team_id').presence || 'Unavailable' %></span>
+              <% end %>
               <span class="block"><strong>Schedule date:</strong> <%= schedule['schedule_date'] %></span>
               <span class="block"><strong>Tip time:</strong> <%= schedule['tip_time'].present? ? Time.iso8601(schedule['tip_time']).in_time_zone('America/New_York').strftime('%-I:%M %p %Z') : 'Time unknown' %></span>
               <span class="block"><strong>Venue:</strong> <%= schedule['venue_name'].presence || 'Unknown' %></span>
@@ -33,7 +53,11 @@
           <% end %>
         </div>
       </fieldset>
-      <p>The other source ID will be retired. This keeps the existing local game and its history. Scores and box statistics are not changed. Updated facts from the discarded entry will still require review.</p>
+      <% if evidence.participant_correction? %>
+        <p>The game ID stays active. Keeping incoming accepts the displayed opponent name and CBBD team ID without creating a team or season membership. The exact discarded entry can be skipped on retry; different conflicting facts still require review.</p>
+      <% else %>
+        <p>The other source ID will be retired. This keeps the existing local game and its history. Scores and box statistics are not changed. Updated facts from the discarded entry will still require review.</p>
+      <% end %>
       <%= submit_tag 'Approve selected schedule entry', class: 'rounded bg-prophet-indigo px-4 py-2 text-white' %>
     <% end %>
   <% else %>

@@ -21,8 +21,9 @@ module Ingestion
       data = @observation.data
       return false unless data.values_at(:provider, :source_status, :source_completed) == ['cbbd', 'scheduled', false]
 
-      review = GameScheduleReview.find_by(ignored_external_id: data[:external_game_id])
-      review&.current?(@game, @resolution) && review.ignored_fingerprint == GameScheduleReview.payload_fingerprint(data)
+      GameScheduleReview.where(ignored_external_id: data[:external_game_id],
+                               ignored_fingerprint: GameScheduleReview.payload_fingerprint(data))
+                        .order(id: :desc).any? { |review| review.current?(@game, @resolution) }
     end
   end
 end

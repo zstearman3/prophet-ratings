@@ -19,6 +19,11 @@ class GenerateNightlyPredictionsJob < HeavyJob
 
   private
 
+  # Lock waits defer this independent pass; actual errors retain ApplicationJob's retry budget.
+  def retry_heavy
+    retry_job(wait: 1.minute, queue: :heavy)
+  end
+
   def resolve_season(season_id)
     return Season.find_by(id: season_id) if season_id.present?
 

@@ -159,7 +159,7 @@ RSpec.describe UpdateRankingsJob do
     publish_with_predictions
 
     expect(game.predictions).to be_empty
-    expect(Rails.logger).to have_received(:warn).with(/game=#{game.id}: missing or invalid rating inputs \(prior-day only\)/)
+    expect(Rails.logger).to have_received(:warn).with(/game=#{game.id}: missing or invalid rating inputs \(snapshot cutoff\)/)
     expect(season.team_rating_snapshots.count).to eq(4)
   end
 end

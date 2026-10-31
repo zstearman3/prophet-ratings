@@ -102,14 +102,16 @@ module ProphetRatings
     end
 
     def input_cutoff
-      [game.schedule_date - 1, Game.schedule_date_for(@generation[:at])].min
+      # Preseason publications can be dated just before opening day even when published earlier.
+      publication_cutoff = [Game.schedule_date_for(@generation[:at]), game.season.start_date - 1].max
+      [game.schedule_date - 1, publication_cutoff].min
     end
 
     def prediction_inputs_available?
       return true if snapshot(:home) && snapshot(:away) &&
                      required_snapshot_volatilities.all? { |value| value.is_a?(Numeric) && value.finite? && value >= 0 }
 
-      Rails.logger.warn("Prediction skipped for game=#{game.id}: missing or invalid rating inputs (prior-day only); " \
+      Rails.logger.warn("Prediction skipped for game=#{game.id}: missing or invalid rating inputs (snapshot cutoff); " \
                         'publish complete snapshots before the Eastern game date')
       false
     end
@@ -147,7 +149,7 @@ module ProphetRatings
 
     ##
     # Returns the most recent team rating snapshot for the given team season and ratings configuration version.
-    # Excludes game-day data and sources that did not exist at generation.
+    # Excludes game-day data and sources that did not exist at generation; preseason dates may be ahead of issuance.
     #
     # @param [TeamSeason] team_season - The team season for which to retrieve the snapshot.
     # @return [TeamRatingSnapshot, nil] The latest applicable rating snapshot, or nil if none exist.

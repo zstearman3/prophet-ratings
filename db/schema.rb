@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_27_030000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_30_000000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -404,7 +404,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_27_030000) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["game_id"], name: "index_game_schedule_reviews_on_game_id"
-    t.index ["ignored_external_id"], name: "index_game_schedule_reviews_on_ignored_external_id", unique: true
+    t.index ["ignored_external_id"], name: "index_game_schedule_reviews_on_ignored_external_id"
+    t.index ["ignored_external_id"], name: "index_one_retired_schedule_game_key", unique: true, where: "((selected_external_id)::text <> (ignored_external_id)::text)"
     t.index ["prior_observation_id"], name: "index_game_schedule_reviews_on_prior_observation_id"
     t.index ["reviewed_by_id"], name: "index_game_schedule_reviews_on_reviewed_by_id"
     t.index ["schedule_refresh_run_id"], name: "index_game_schedule_reviews_on_schedule_refresh_run_id"
