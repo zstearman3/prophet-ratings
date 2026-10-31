@@ -13,6 +13,8 @@ class SyncOddsJob < ApplicationJob
     result.failures.each do |failure|
       Rails.logger.warn("Odds API sync failure: #{failure_message(failure)}")
     end
+
+    GenerateBetRecommendationsJob.perform_later
   end
 
   private

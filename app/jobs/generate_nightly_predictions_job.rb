@@ -11,13 +11,18 @@ class GenerateNightlyPredictionsJob < HeavyJob
     season = resolve_season(season_id)
     return unless season
 
+    self.class.generate_predictions(season, as_of:, ratings_config_version_id:)
+    ActiveRecord.after_all_transactions_commit { GenerateBetRecommendationsJob.perform_later }
+  end
+
+  private
+
+  public_class_method def self.generate_predictions(season, as_of:, ratings_config_version_id:)
     version = RatingsConfigVersion.resolve(ratings_config_version_id)
     season.games.scheduled.where(start_time: as_of..(as_of + LOOKAHEAD_DAYS.days)).find_each do |game|
       game.generate_prediction!(ratings_config_version: version)
     end
   end
-
-  private
 
   # Lock waits defer this independent pass; actual errors retain ApplicationJob's retry budget.
   def retry_heavy

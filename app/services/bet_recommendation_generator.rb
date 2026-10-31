@@ -25,20 +25,24 @@ class BetRecommendationGenerator
     prediction = game.current_prediction
     game_odd = game.game_odd
 
-    return [] if prediction.nil? || game_odd.nil?
+    Game.transaction(requires_new: true) do
+      # Retire unavailable markets too; rollback preserves the previous set on failure.
+      retire_current_recommendations if !prediction || prediction.ratings_config_version.current?
+      next [] unless prediction && game_odd
 
-    recs = []
-
-    recs << generate_spread_recommendation(prediction, game_odd)
-    recs << generate_moneyline_recommendation(prediction, game_odd)
-    recs << generate_total_recommendation(prediction, game_odd)
-
-    recs
+      [generate_spread_recommendation(prediction, game_odd),
+       generate_moneyline_recommendation(prediction, game_odd),
+       generate_total_recommendation(prediction, game_odd)]
+    end
   end
 
   private
 
   attr_reader :game
+
+  def retire_current_recommendations
+    game.bet_recommendations.where(current: true).update_all(current: false)
+  end
 
   ##
   # Generates a spread bet recommendation for the given prediction and game odds.
@@ -55,7 +59,7 @@ class BetRecommendationGenerator
     model_margin = prediction.home_score - prediction.away_score
     stddev = prediction.margin_std_deviation
     # As with totals, skip deterministic spreads; the EV model has no push outcome.
-    return retire_deterministic_spread(prediction) if stddev.zero?
+    return if stddev.zero?
 
     line = game_odd.spread_point
 
@@ -67,7 +71,9 @@ class BetRecommendationGenerator
 
     recommend_home = prob_home_covers >= 0.5
     prob = recommend_home ? prob_home_covers : 1 - prob_home_covers
-    odds = (recommend_home ? game_odd.spread_home_odds : game_odd.spread_away_odds) || -110
+    odds = recommend_home ? game_odd.spread_home_odds : game_odd.spread_away_odds
+    return if odds.to_f.zero?
+
     ev = expected_value(prob, odds)
 
     recommended = ev >= BETTING_CONFIG[:recommended_ev_threshold]
@@ -90,15 +96,6 @@ class BetRecommendationGenerator
     )
   end
 
-  def retire_deterministic_spread(prediction)
-    if prediction.ratings_config_version.current
-      BetRecommendation.where(game: @game, bet_type: 'spread', current: true).find_each do |recommendation|
-        recommendation.update!(current: false)
-      end
-    end
-    nil
-  end
-
   ##
   # Generates a moneyline bet recommendation for the given prediction and game odds.
   #
@@ -112,10 +109,11 @@ class BetRecommendationGenerator
 
     prob_home_wins = prediction.home_win_probability
 
-    home_ev = game_odd.moneyline_home ? expected_value(prob_home_wins, game_odd.moneyline_home) : 0
-    away_ev = game_odd.moneyline_away ? expected_value(1 - prob_home_wins, game_odd.moneyline_away) : 0
+    home_ev = expected_value(prob_home_wins, game_odd.moneyline_home)
+    away_ev = expected_value(1 - prob_home_wins, game_odd.moneyline_away)
+    return unless home_ev || away_ev
 
-    recommend_home = home_ev > away_ev
+    recommend_home = home_ev && (!away_ev || home_ev > away_ev)
     prob = recommend_home ? prob_home_wins : 1 - prob_home_wins
     odds = recommend_home ? game_odd.moneyline_home : game_odd.moneyline_away
     ev = recommend_home ? home_ev : away_ev
@@ -163,7 +161,9 @@ class BetRecommendationGenerator
 
     recommend_over = prob_over >= 0.5
     prob = recommend_over ? prob_over : (1 - prob_over)
-    odds = (recommend_over ? game_odd.total_over_odds : game_odd.total_under_odds) || -110
+    odds = recommend_over ? game_odd.total_over_odds : game_odd.total_under_odds
+    return if odds.to_f.zero?
+
     ev = expected_value(prob, odds)
 
     recommended = ev >= BETTING_CONFIG[:recommended_ev_threshold]
@@ -199,12 +199,12 @@ class BetRecommendationGenerator
 
   ##
   # Calculates the expected value of a bet given the win probability and American odds.
-  # Returns 0 if either value is missing or odds is zero.
+  # Returns nil if either value is missing or odds is zero, so unavailable sides cannot win an EV comparison.
   # @param [Float] win_prob - The probability of winning the bet (between 0 and 1).
   # @param [Integer] odds - The American odds for the bet.
   # @return [Float] The expected value, rounded to four decimal places.
   def expected_value(win_prob, odds)
-    return 0 unless odds && win_prob && odds != 0
+    return unless odds && win_prob && odds != 0
 
     payout = odds.positive? ? odds / 100.0 : 100.0 / odds.abs
     ev = (win_prob * payout) - (1 - win_prob)
@@ -213,13 +213,11 @@ class BetRecommendationGenerator
 
   ##
   # Creates or updates a bet recommendation record for the current game and bet type with the provided attributes.
-  # Marks existing recommendations of the same bet type as not current if the ratings configuration version is current.
+  # The refresh transaction retires the previous current set before creating available markets.
   # @param attrs [Hash] Attributes for the recommendation, including bet type, prediction and odds IDs, team, line, odds,
   # model value, confidence, expected value, recommendation status, and ratings config version.
   # @return [BetRecommendation] The created or updated bet recommendation record.
   def create_recommendation(**attrs)
-    BetRecommendation.where(game: @game, bet_type: attrs[:bet_type]).update_all(current: false) if attrs[:ratings_config_version_current]
-
     rec = BetRecommendation.find_or_initialize_by(
       bet_type: attrs[:bet_type],
       prediction_id: attrs[:prediction_id],

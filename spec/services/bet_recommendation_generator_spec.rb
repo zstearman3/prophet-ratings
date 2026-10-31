@@ -81,6 +81,38 @@ describe BetRecommendationGenerator do
       )
     end
 
+    {
+      'spread' => [{ spread_point: nil }, %w[moneyline total]],
+      'moneyline' => [{ moneyline_home: nil, moneyline_away: nil }, %w[spread total]],
+      'total' => [{ total_points: nil }, %w[spread moneyline]]
+    }.each do |market, (missing_odds, remaining_markets)|
+      it "retires a removed #{market} market while preserving other markets and historical rows" do
+        original = described_class.call(game:).compact
+        game_odd.update!(missing_odds)
+
+        expect { described_class.call(game:) }.not_to change(BetRecommendation, :count)
+
+        expect(original.find { |rec| rec.bet_type == market }.reload).not_to be_current
+        expect(game.bet_recommendations.where(current: true).pluck(:bet_type))
+          .to match_array(remaining_markets)
+      end
+    end
+
+    [
+      [{ moneyline_home: -1000, moneyline_away: nil }, 'home', -0.34],
+      [{ moneyline_home: nil, moneyline_away: -1000 }, 'away', -0.56]
+    ].each do |prices, selection, ev|
+      it "uses the available #{selection} moneyline even when its EV is negative" do
+        game_odd.update!(prices)
+
+        recs = described_class.call(game:).compact
+
+        expect(recs.map(&:bet_type)).to contain_exactly('spread', 'moneyline', 'total')
+        expect(recs.find(&:moneyline_bet_type?))
+          .to have_attributes(team: selection, vegas_odds: -1000, ev:, recommended: false, current: true)
+      end
+    end
+
     context 'with deterministic score uncertainty' do
       before do
         make_prediction_deterministic

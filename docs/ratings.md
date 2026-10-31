@@ -49,6 +49,12 @@ Empty, failed or pending sync runs do not prevent this scheduled forecast pass.
 The existing successful-ratings handoff remains an additional trigger; unchanged
 forecast inputs reuse the existing revision.
 
+After a successful prediction pass, recommendation generation is queued after
+all enclosing transactions commit, including the CBBD analytics transaction. It
+uses stored odds and the currently selected forecasts; no extra odds fetch or
+rating calculation is performed. Rolled-back or failed passes do not enqueue
+this refresh. See [betting recommendations](odds-integration.md#betting-recommendations).
+
 If the shared heavy-work lock is held, the independent prediction delivery
 defers once per minute until the lock is available, retaining its pinned
 season/model arguments. Lock waits do not exhaust the pass after five deliveries;

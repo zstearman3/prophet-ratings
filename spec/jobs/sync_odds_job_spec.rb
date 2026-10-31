@@ -3,6 +3,14 @@
 require 'rails_helper'
 
 RSpec.describe SyncOddsJob do
+  around do |example|
+    adapter = ActiveJob::Base.queue_adapter
+    ActiveJob::Base.queue_adapter = :test
+    example.run
+  ensure
+    ActiveJob::Base.queue_adapter = adapter
+  end
+
   let(:failure) do
     {
       odds_api_game_id: 'unmatched-game',
@@ -24,12 +32,12 @@ RSpec.describe SyncOddsJob do
     )
   end
 
-  it 'calls the odds sync service and logs the result summary' do
+  it 'logs the import results and enqueues recommendations even with partial import failures' do
     allow(OddsApi::SyncService).to receive(:call).and_return(result)
     allow(Rails.logger).to receive(:info)
     allow(Rails.logger).to receive(:warn)
 
-    described_class.perform_now
+    expect { described_class.perform_now }.to have_enqueued_job(GenerateBetRecommendationsJob)
 
     aggregate_failures do
       expect(OddsApi::SyncService).to have_received(:call)
@@ -42,5 +50,11 @@ RSpec.describe SyncOddsJob do
         'message=Could not match game teams from odds payload'
       )
     end
+  end
+
+  it 'does not enqueue recommendations when the odds fetch fails' do
+    allow(OddsApi::SyncService).to receive(:call).and_raise(StandardError, 'API unavailable')
+
+    expect { described_class.perform_now }.not_to have_enqueued_job(GenerateBetRecommendationsJob)
   end
 end
