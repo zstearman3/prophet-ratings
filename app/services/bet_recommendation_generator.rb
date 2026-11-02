@@ -72,14 +72,12 @@ class BetRecommendationGenerator
     recommend_home = prob_home_covers >= 0.5
     prob = recommend_home ? prob_home_covers : 1 - prob_home_covers
     odds = recommend_home ? game_odd.spread_home_odds : game_odd.spread_away_odds
-    return if odds.to_f.zero?
+    return unless AmericanOdds.valid?(odds)
 
     ev = expected_value(prob, odds)
 
     recommended = ev >= BETTING_CONFIG[:recommended_ev_threshold]
-    team = if recommended
-             recommend_home ? 'home' : 'away'
-           end
+    team = recommend_home ? 'home' : 'away'
     confidence = prob
 
     create_recommendation(
@@ -164,7 +162,7 @@ class BetRecommendationGenerator
     recommend_over = prob_over >= 0.5
     prob = recommend_over ? prob_over : (1 - prob_over)
     odds = recommend_over ? game_odd.total_over_odds : game_odd.total_under_odds
-    return if odds.to_f.zero?
+    return unless AmericanOdds.valid?(odds)
 
     ev = expected_value(prob, odds)
 
@@ -177,7 +175,7 @@ class BetRecommendationGenerator
       game_odd_id: game_odd.id,
       ratings_config_version_id: prediction.ratings_config_version_id,
       ratings_config_version_current: prediction.ratings_config_version.current,
-      team: (recommended ? selection : nil),
+      team: selection,
       vegas_line: line,
       vegas_odds: odds,
       model_value: model_total.round(2),
@@ -201,12 +199,12 @@ class BetRecommendationGenerator
 
   ##
   # Calculates the expected value of a bet given the win probability and American odds.
-  # Returns nil if either value is missing or odds is zero, so unavailable sides cannot win an EV comparison.
+  # Returns nil for unusable American prices, so unavailable sides cannot win an EV comparison.
   # @param [Float] win_prob - The probability of winning the bet (between 0 and 1).
   # @param [Integer] odds - The American odds for the bet.
   # @return [Float] The expected value, rounded to four decimal places.
   def expected_value(win_prob, odds)
-    return unless odds && win_prob && odds != 0
+    return unless win_prob && AmericanOdds.valid?(odds)
 
     payout = odds.positive? ? odds / 100.0 : 100.0 / odds.abs
     ev = (win_prob * payout) - (1 - win_prob)

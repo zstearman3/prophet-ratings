@@ -179,10 +179,10 @@ RSpec.describe OddsApi::Importer, type: :service do
 
       aggregate_failures do
         expect(game_odd.moneyline_home).to eq(-291)
-        expect(game_odd.moneyline_away).to eq(236)
+        expect(game_odd.moneyline_away).to eq(237)
         expect(game_odd.spread_point.to_f).to eq(-6.5)
         expect(game_odd.spread_home_odds).to eq(-111)
-        expect(game_odd.spread_away_odds).to eq(-109)
+        expect(game_odd.spread_away_odds).to eq(-110)
         # 12 bookmakers x 2 markets x 2 outcomes = 48
         expect(game.bookmaker_odds.count).to eq(48)
       end
@@ -221,6 +221,52 @@ RSpec.describe OddsApi::Importer, type: :service do
           expect(game.bookmaker_odds.find_by(market: 'spreads', team_name: 'North Texas Mean Green'))
             .to have_attributes(team_side: 'away', value: 2.5, odds: -115)
           expect(game).to have_attributes(home_team_name: 'UAB', away_team_name: 'North Texas', start_time:)
+        end
+      end
+
+      context 'with mixed-sign prices and disagreeing bookmaker lines' do
+        before do
+          first = payload.first[:bookmakers].first
+          first[:markets][0][:outcomes].each { |outcome| outcome[:price] = 100 }
+          first[:markets][1][:outcomes].find { |outcome| outcome[:name] == 'UAB Blazers' }.merge!(point: -5, price: 120)
+          first[:markets][1][:outcomes].find { |outcome| outcome[:name] == 'North Texas Mean Green' }[:point] = 5
+          first[:markets][2][:outcomes] = [{ name: 'Over', point: 145, price: 120 }, { name: 'Under', point: 145, price: -110 }]
+          second = first.deep_dup
+          second[:key] = 'second'
+          second[:title] = 'Second'
+          second[:markets][0][:outcomes].find { |outcome| outcome[:name] == 'UAB Blazers' }[:price] = -102
+          second[:markets][0][:outcomes].find { |outcome| outcome[:name] == 'North Texas Mean Green' }[:price] = -100
+          second[:markets][1][:outcomes].each do |outcome|
+            outcome[:point] = outcome[:point].positive? ? 6 : -6
+            outcome[:price] = -110
+          end
+          second[:markets][2][:outcomes].each { |outcome| outcome.merge!(point: 146, price: -110) }
+          payload.first[:bookmakers] << second
+        end
+
+        it 'stores aligned consensus and raw evidence then generates independently expected finite ROI' do
+          prediction = create_stored_prediction
+          2.times { described_class.new(payload).call }
+          odds = game.reload.game_odd
+          recommendations = BetRecommendationGenerator.call(game:).compact
+
+          aggregate_failures do
+            expect(odds).to have_attributes(moneyline_home: -101, moneyline_away: 100,
+                                            spread_point: -5, spread_home_odds: 120, spread_away_odds: -115,
+                                            total_points: 145, total_over_odds: 120, total_under_odds: -110)
+            # p(home)=0.6: 0.6*(100/101)-0.4 = 0.194059...; centered spread/total have p=0.5.
+            expect(recommendations.find(&:moneyline_bet_type?))
+              .to have_attributes(team: 'home', vegas_odds: -101, ev: 0.1941, recommended: true)
+            expect(recommendations.find(&:spread_bet_type?))
+              .to have_attributes(team: 'home', vegas_line: -5, vegas_odds: 120, confidence: 0.5, ev: 0.1, recommended: true)
+            expect(recommendations.find(&:total_bet_type?))
+              .to have_attributes(team: 'over', vegas_line: 145, vegas_odds: 120, confidence: 0.5, ev: 0.1, recommended: true)
+            expect(recommendations).to all(have_attributes(prediction:, current: true, ev: be_finite))
+            expect(game.bookmaker_odds.count).to eq(12)
+            expect(game.bookmaker_odds.pluck(:bookmaker, :market, :team_name, :value, :odds))
+              .to match_array(raw_bookmaker_evidence)
+            expect(game.bookmaker_odds.where(team_name: 'UAB Blazers').pluck(:team_side).uniq).to eq(['home'])
+          end
         end
       end
 
@@ -282,6 +328,25 @@ RSpec.describe OddsApi::Importer, type: :service do
       expect { described_class.new(payload).call }.to raise_error(ActiveRecord::RecordNotFound, /Multiple games/)
       expect(GameOdd.count).to eq(0)
       expect(BookmakerOdd.count).to eq(0)
+    end
+
+    def create_stored_prediction
+      config = create(:ratings_config_version, current: true)
+      snapshots = [home_team_season, away_team_season].map do |team_season|
+        create(:team_rating_snapshot, team_season:, ratings_config_version: config, snapshot_date: game.schedule_date)
+      end
+      create(:prediction, game:, ratings_config_version: config,
+                          home_team_snapshot: snapshots.first, away_team_snapshot: snapshots.last,
+                          home_score: 75, away_score: 70, pace: 70, home_win_probability: 0.6,
+                          home_offensive_efficiency: 107.143, away_offensive_efficiency: 100)
+    end
+
+    def raw_bookmaker_evidence
+      payload.first[:bookmakers].flat_map do |book|
+        book[:markets].flat_map do |market|
+          market[:outcomes].map { |outcome| [book[:title], market[:key], outcome[:name], outcome[:point], outcome[:price]] }
+        end
+      end
     end
   end
 end

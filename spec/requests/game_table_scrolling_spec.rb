@@ -51,7 +51,7 @@ RSpec.describe 'Game table scrolling' do
     %w[spread moneyline total].each do |bet_type|
       create(:bet_recommendation, game:, prediction:, game_odd: odd, ratings_config_version: config, bet_type:, current: true,
                                   recommended: true, team: bet_type == 'total' ? 'over' : 'home',
-                                  ev: 0.25, confidence: 0.75, vegas_odds: 150)
+                                  ev: 0.25, confidence: 0.75, vegas_odds: 150, vegas_line: bet_type == 'total' ? 145 : -5)
     end
 
     get '/games/betting', params: { date: date.to_s, sort: 'spread', direction: 'asc' }
@@ -64,7 +64,7 @@ RSpec.describe 'Game table scrolling' do
     expect(region.at_css('[data-controller="betting-expand"]')['data-action']).to eq('click->betting-expand#toggle')
     details = region.at_css('tr.expandable-row')
     expect(details['class']).to include('hidden')
-    expect(details.text).to include('Predicted Score:', 'Vegas Line:', 'Vegas Odds:', 'Predicted Total:', '75.0%')
+    expect(details.text).to include('Predicted Score:', 'Recommended bet:', 'Expected ROI:', 'Predicted Total:', '75.0%')
     expect(region.text).to include(game.home_team_name, 'Over 145')
   end
 end
