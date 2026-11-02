@@ -24,71 +24,55 @@ module OddsApi
 
     private
 
-    ##
-    # Calculates the average moneyline odds for the specified team across all bookmakers.
-    # @param [String] team_name - The name of the team for which to calculate the average moneyline.
-    # @return [Float, nil] The average moneyline odds, or nil if no prices are available.
     def average_moneyline(team_names)
-      prices = extract_prices('h2h', team_names)
-      average(prices)
+      average_prices(entries_for('h2h', team_names))
     end
 
-    ##
-    # Calculates the average spread odds for the specified team across all bookmakers.
-    # @param [String] team_name - The name of the team for which to calculate average spread odds.
-    # @return [Float, nil] The average spread odds, or nil if no data is available.
     def average_spread_odds(team_names)
-      entries = extract_market('spreads').select { |outcome| team_names.include?(value_for(outcome, :name)) }
-      average(entries.filter_map { |outcome| value_for(outcome, :price) })
+      line = consensus_spread_point
+      return unless line
+
+      prices_at_line('spreads', team_names, team_names == @home_names ? line : -line)
     end
 
-    ##
-    # Returns the most common local home-team spread point across all bookmakers.
-    # @return [Numeric, nil] The mode of spread points, or nil if no spread points are available.
     def consensus_spread_point
-      points = extract_market('spreads').select { |outcome| @home_names.include?(value_for(outcome, :name)) }
-                                        .filter_map { |outcome| value_for(outcome, :point) }
-      mode(points)
+      mode(entries_for('spreads', @home_names).map { |outcome| value_for(outcome, :point) })
     end
 
-    ##
-    # Calculates the average odds for total bets (e.g., "Over" or "Under") with the specified name across all bookmakers.
-    # @param [String] name - The name of the total bet outcome ("Over" or "Under").
-    # @return [Float, nil] The average odds for the specified total bet, or nil if no odds are available.
     def average_total_odds(name)
-      entries = extract_market('totals').select { |outcome| value_for(outcome, :name) == name }
-      average(entries.filter_map { |outcome| value_for(outcome, :price) })
+      line = consensus_total_point
+      return unless line
+
+      prices_at_line('totals', [name], line)
     end
 
-    ##
-    # Returns the most common total points line across all bookmakers.
-    # @return [Numeric, nil] The mode of total points, or nil if unavailable.
     def consensus_total_point
-      points = extract_market('totals').filter_map { |outcome| value_for(outcome, :point) }
-      mode(points)
+      mode(extract_market('totals').map { |outcome| value_for(outcome, :point) })
     end
 
-    ##
-    # Retrieves an array of prices for a given team from the specified market across all bookmakers.
-    # @param [String] market_key The key identifying the market type (e.g., 'spreads', 'h2h').
-    # @param [String] team_name The name of the team whose prices are to be extracted.
-    # @return [Array<Numeric>] An array of price values for the specified team; empty if none found.
-    def extract_prices(market_key, team_names)
-      extract_market(market_key)
-        .select { |outcome| team_names.include?(value_for(outcome, :name)) }
-        .filter_map { |outcome| value_for(outcome, :price) }
+    def prices_at_line(market_key, names, line)
+      average_prices(entries_for(market_key, names).select { |outcome| value_for(outcome, :point) == line })
     end
 
-    ##
-    # Extracts all outcome entries for a given market key from each bookmaker.
-    # @param [String] market_key - The key identifying the market to extract (e.g., 'spreads', 'totals').
-    # @return [Array<Hash>] An array of outcome hashes from all matching markets across bookmakers.
-    # Returns an empty array if no outcomes are found.
+    def entries_for(market_key, names)
+      extract_market(market_key).select { |outcome| names.include?(value_for(outcome, :name)) }
+    end
+
+    def average_prices(entries)
+      AmericanOdds.consensus(entries.map { |outcome| value_for(outcome, :price) })
+    end
+
     def extract_market(market_key)
-      @bookmakers.flat_map do |book|
+      outcomes = @bookmakers.flat_map do |book|
         markets = Array(value_for(book, :markets))
         market = markets.find { |entry| value_for(entry, :key) == market_key }
         market ? Array(value_for(market, :outcomes)) : []
+      end
+      return outcomes if market_key == 'h2h'
+
+      outcomes.select do |outcome|
+        point = value_for(outcome, :point)
+        point.is_a?(Numeric) && point.real? && point.finite?
       end
     end
 
@@ -108,12 +92,6 @@ module OddsApi
 
     def value_for(hash, key)
       hash[key] || hash[key.to_s]
-    end
-
-    def average(values)
-      return nil if values.empty?
-
-      (values.sum.to_f / values.size).round(2)
     end
 
     def mode(array)

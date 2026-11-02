@@ -104,7 +104,9 @@ class GamesController < ApplicationController
 
   def sort_by_bet_type(games, bet_type, direction)
     sorted_games = games.to_a.sort_by do |game|
-      game.current_bet_recommendations.find { |r| r.bet_type == bet_type }&.ev || -999
+      game.current_bet_recommendations.find do |recommendation|
+        recommendation.bet_type == bet_type && recommendation.valid_odds? && !recommendation.prediction.participant_exclusion_reason
+      end&.ev || -999
     end
     direction == 'desc' ? sorted_games.reverse : sorted_games
   end

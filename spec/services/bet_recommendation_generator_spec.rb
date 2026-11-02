@@ -104,6 +104,72 @@ describe BetRecommendationGenerator do
       end
     end
 
+    it 'retires invalid markets repeatedly while retaining rows and other valid markets' do
+      original = described_class.call(game:).compact
+      identifiers = original.map(&:id)
+      game_odd.update!(spread_home_odds: -1, total_under_odds: 99)
+
+      2.times do
+        expect { described_class.call(game:) }.not_to change(BetRecommendation, :count)
+        expect(game.bet_recommendations.where(current: true).pluck(:bet_type)).to eq(['moneyline'])
+      end
+      expect(game.bet_recommendations.order(:id).pluck(:id)).to match_array(identifiers)
+      expect(original.reject(&:moneyline_bet_type?).map { |rec| rec.reload.current }).to eq([false, false])
+    end
+
+    it 'evaluates a valid moneyline side independently of invalid opponent prices' do
+      [0, 1, -1, 99, -99].each do |invalid|
+        game_odd.update!(moneyline_home: -101, moneyline_away: invalid)
+        home = described_class.call(game:).compact.find(&:moneyline_bet_type?)
+        expect(home).to have_attributes(team: 'home', vegas_odds: -101, ev: 0.1941, recommended: true)
+        game_odd.update!(moneyline_home: invalid, moneyline_away: -1000)
+        away = described_class.call(game:).compact.find(&:moneyline_bet_type?)
+        expect(away).to have_attributes(team: 'away', vegas_odds: -1000, ev: -0.56, recommended: false)
+      end
+    end
+
+    it 'retires a moneyline when neither side has a usable price without replacing or deleting its evidence' do
+      original = described_class.call(game:).compact.find(&:moneyline_bet_type?)
+      saved_price = original.vegas_odds
+      game_odd.update!(moneyline_home: -99, moneyline_away: 99)
+
+      2.times { described_class.call(game:) }
+
+      expect(original.reload).to have_attributes(current: false, vegas_odds: saved_price)
+      expect(game.bet_recommendations.where(current: true).pluck(:bet_type)).to contain_exactly('spread', 'total')
+      expect(game.bet_recommendations.count).to eq(3)
+    end
+
+    it 'does not send nonnumeric or nonfinite prices to EV calculations' do
+      [nil, '150', Float::NAN, Float::INFINITY, Complex(100, 1)].each do |invalid|
+        allow(game_odd).to receive_messages(moneyline_home: invalid, moneyline_away: invalid,
+                                            spread_home_odds: invalid, total_under_odds: invalid)
+        expect(described_class.call(game:).compact).to be_empty
+      end
+    end
+
+    it 'restores the previous current set if saving a remaining valid market fails' do
+      described_class.call(game:)
+      original = game.bet_recommendations.order(:id).map(&:attributes)
+      game_odd.update!(spread_home_odds: -1)
+      allow(BetRecommendation).to receive(:find_or_initialize_by).and_wrap_original do |find, **attributes|
+        find.call(**attributes).tap { |rec| allow(rec).to receive(:save!).and_raise(ActiveRecord::RecordInvalid) }
+      end
+
+      expect { described_class.call(game:) }.to raise_error(ActiveRecord::RecordInvalid)
+      expect(game.bet_recommendations.order(:id).map(&:attributes)).to eq(original)
+    end
+
+    it 'retains the evaluated spread and total sides below the recommendation threshold' do
+      prediction.update!(home_score: 75, away_score: 70)
+      game_odd.update!(spread_point: -5, total_points: 145)
+
+      recommendations = described_class.call(game:).compact
+
+      expect(recommendations.find(&:spread_bet_type?)).to have_attributes(team: 'home', recommended: false, ev: -0.0455)
+      expect(recommendations.find(&:total_bet_type?)).to have_attributes(team: 'over', recommended: false, ev: -0.0455)
+    end
+
     context 'with deterministic score uncertainty' do
       before do
         make_prediction_deterministic
