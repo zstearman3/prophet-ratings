@@ -2,7 +2,7 @@
 
 This document captures the current state of the odds integration and the work that appears to remain.
 
-Last audited: 2026-05-23
+Last audited: 2026-11-02
 
 ## Summary
 
@@ -179,11 +179,34 @@ Service: `OddsApi::ConsensusCalculator`
 
 Consensus behavior:
 
-- moneyline odds are averaged across matching bookmaker outcomes
-- spread odds are averaged by side
-- spread point is the mode of the local home team's spread outcome points
-- total line is the mode of all total points
-- over/under odds are averaged by outcome name
+- A usable American price is numeric, real, finite, and has magnitude at least 100.
+  Missing values, numeric strings, zero, sub-100 magnitudes, NaN and infinities are
+  excluded without coercion. No valid contributing quotes leaves that side unavailable.
+- Each valid price `A` becomes an implied probability: `100 / (A + 100)` for
+  positive prices, or `abs(A) / (abs(A) + 100)` for negative prices. Take the
+  equal-weight mean `p`, retaining bookmaker margin (no de-vig).
+- Convert the mean back to American odds: `100 * (1-p) / p` below 0.5,
+  `-100 * p / (1-p)` above 0.5, and canonical `+100` at exactly 0.5. Exact ratios
+  avoid floating point drift at even money; round only the final price to the
+  nearest integer (halfway values away from zero).
+- For example, `+100/-102` produces `-101`, `+100/-100` produces `+100`,
+  `-150/-145` produces `-147`, and `+130/+135` produces `+132`. A lone valid
+  integer quote keeps its price, except `-100` becomes canonical `+100`.
+- The spread line is the mode of finite numeric local-home points. Home prices
+  contribute only at that line; away prices only at its exact opposite.
+- The total line is the mode of all finite numeric total points. Over and under
+  prices contribute only at that exact line. A side missing at the selected line
+  remains unavailable, even when another line has prices for it.
+- Missing, nonnumeric and nonfinite points cannot define a line; zero is a valid
+  spread. Both spread and total mode ties retain the first encountered line.
+
+These prices are a **synthetic consensus**, not an executable sportsbook offer.
+A bettor must check the actual sportsbook's current line and price. This changes
+market representation only: model probabilities, uncertainty, the 5% EV threshold,
+side-selection rules, matching and refresh cadence remain unchanged. Raw bookmaker
+rows retain their source prices/points, including quotes excluded from consensus;
+these mutable rows are audit evidence of the latest import, not an immutable API
+response archive.
 
 Team outcome matching uses:
 
@@ -240,9 +263,9 @@ Important details:
 - `recommended_ev_threshold` is currently `0.05`.
 - Spread and total probabilities use a normal CDF against prediction standard deviations.
 - Moneyline EV uses `prediction.home_win_probability`.
-- Moneyline compares only sides with a stored, nonzero price. A single priced side can produce a negative-EV, non-recommended result; an unavailable side cannot win the comparison.
-- Spread and total keep their existing probability-based selection rule, but skip the market if that selected side has a missing or zero price. No `-110` price is assumed, and the selection is not switched to the other side solely because its price is available.
-- A refresh retires the game's existing current recommendations before regenerating eligible markets, in the same transaction. Missing markets, unusable predictions, or deterministic uncertainty therefore cannot leave stale picks current. An explicitly inactive-model evaluation does not retire active-model picks. Historical rows remain stored.
+- Moneyline compares only sides with a usable American price. A single priced side can produce a negative-EV, non-recommended result; an unavailable side cannot win the comparison.
+- Spread and total keep their existing probability-based selection rule, but skip the market if that selected side has an unusable American price. No `-110` price is assumed, and the selection is not switched to the other side solely because its price is available.
+- A refresh retires the game's existing current recommendations before regenerating eligible markets, in the same transaction. Missing or invalid-priced markets, unusable predictions, or deterministic uncertainty therefore cannot leave stale picks current. An explicitly inactive-model evaluation does not retire active-model picks. Historical rows remain stored.
 
 `GenerateBetRecommendationsJob` runs on the serialized `heavy` queue after odds sync or a successful nightly prediction pass. It processes all scheduled games with stored odds whose start time is strictly after the job begins, including future schedule dates. It uses existing predictions and odds; it does not fetch odds or build predictions. Games missing a usable current prediction have their prior recommendations retired, and started, final, and canceled games are excluded. Stored odds are used even if that game's latest import was skipped; there is no new freshness cutoff.
 
@@ -254,7 +277,14 @@ To run a recommendation refresh without fetching odds:
 GenerateBetRecommendationsJob.perform_later
 ```
 
-The `/games/betting` page only displays `current_bet_recommendations`; it does not generate them.
+The `/games/betting` page only displays current recommendations with valid saved
+`BetRecommendation#vegas_odds` and eligible prediction participants; it does not
+generate them. Invalid legacy rows remain stored, but their picks, ROI/details,
+server EV ordering and client EV sort attributes are suppressed while awaiting
+refresh. Valid saved picks remain visible even if their mutable `GameOdd` has
+changed: selection, line and price come from the recommendation that produced its
+EV. Below-threshold selections remain “No play”; legacy rows without a saved side
+show “Not saved” rather than inferring a side from later odds.
 
 ## UI Surface
 
@@ -278,9 +308,58 @@ The page:
 - sorts by recommendation EV for spread, moneyline, or total; the first click on
   each column sorts highest EV first, repeated clicks toggle direction, and
   switching columns starts highest EV first again
-- expands rows to show model value, Vegas line/odds, EV, and confidence
+- expands rows to show saved selections/prices, expected ROI and model probabilities
 
 The page does not filter to games that have odds despite the empty-state copy saying "No games with odds available for this date." It loads all games for the date and then displays missing recommendations as "No recommendation."
+
+## Bounded post-deploy recovery and verification
+
+Code deployment alone does **not** recalculate stored `GameOdd` or
+`BetRecommendation` rows. This implementation performs no production repair or
+historical regeneration. Any operational writes below require separate approval
+for an explicit game-ID list and schedule-date window.
+
+1. Inventory the affected games before writing: record the reviewed IDs, schedule
+   dates, statuses/start times, current odds, recommendation IDs, prediction/model
+   IDs, saved prices/lines, EV and current flags. Include current recommendations
+   with `vegas_odds BETWEEN -99 AND 99` (the integer column cannot store NaN or
+   infinity), and inspect missing/invalid consensus fields. Preserve the relevant
+   bookmaker rows, fetched timestamps and the pre-repair export in the approved
+   private audit location. Later quotes cannot prove the original input set.
+2. Separate upcoming scheduled games from started/final/canceled games. For the
+   approved upcoming subset, obtain current quotes once within the approved API
+   budget and retain that response. Resolve each payload through the existing
+   matching policy and confirm its unique local game is in the reviewed ID list
+   and still upcoming **before** passing that payload to `OddsApi::Importer`.
+   Import only those confirmed payloads. Stop on ambiguity; do not broaden the ID
+   list or substitute historical quotes. An absent payload is unresolved, not a
+   successful correction.
+3. After verifying each imported consensus, refresh only the approved games still
+   scheduled and strictly in the future using
+   `BetRecommendationGenerator.call(game: game.reload)`. This uses stored model
+   predictions, retires unavailable/invalid markets transactionally and reuses
+   same-source rows. Do not enqueue a global sync/refresh for a bounded repair.
+   Missing predictions/markets can legitimately leave no current pick; record
+   those outcomes. A save failure must leave the game's previous set intact.
+4. The ordinary `GenerateBetRecommendationsJob` explicitly excludes started games,
+   so it will **not** retire their invalid legacy rows. The display guard hides
+   them, but storage can still contain current invalid rows. Handle these in a
+   separately authorized, explicit-ID retirement transaction that changes only
+   the reviewed recommendations' current flags and retains their saved evidence.
+   Do not silently regenerate historical picks using later quotes or delete rows.
+5. Reinventory the same IDs/date window: confirm repaired upcoming consensus prices
+   are valid integers or unavailable, selected-line prices match retained source
+   evidence, current rows use the intended prediction/model/source IDs, and all
+   displayed ROI is finite and independently sensible. Count invalid current
+   recommendations separately from invalid actionable/displayed ones; the latter
+   must be zero, while any remaining started-game rows must be explained. Check
+   both EV sort directions and client sort attributes. Compare row IDs/counts,
+   preserved historical rows and unrelated games against the export; repeated
+   refreshes must not duplicate same-source recommendations.
+
+No broad backfill, database reset, migration, schedule change or production data
+write is required to verify this code locally. Use synthetic importer/generator
+specs instead of running this procedure during implementation.
 
 ## Local Development Helpers
 
@@ -303,7 +382,7 @@ Relevant specs:
 - `spec/services/bet_recommendation_generator_spec.rb`
 - `spec/models/game_odd_spec.rb`
 - `spec/models/bookmaker_odd_spec.rb`
-- `spec/models/bet_recommendation_spec.rb`
+- `spec/requests/betting_recommendation_details_spec.rb`
 
 Coverage exists for:
 
