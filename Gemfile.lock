@@ -311,11 +311,11 @@ GEM
     parser (3.3.13.0)
       ast (~> 2.4.1)
       racc
-    pg (1.6.3)
-    pg (1.6.3-aarch64-linux)
-    pg (1.6.3-arm64-darwin)
-    pg (1.6.3-x86_64-darwin)
-    pg (1.6.3-x86_64-linux)
+    pg (1.7.0)
+    pg (1.7.0-aarch64-linux)
+    pg (1.7.0-arm64-darwin)
+    pg (1.7.0-x86_64-darwin)
+    pg (1.7.0-x86_64-linux)
     pkg-config (1.6.5)
     pp (0.6.4)
       prettyprint
@@ -597,7 +597,7 @@ DEPENDENCIES
   jsbundling-rails
   json (< 3)
   overcommit
-  pg (~> 1.6)
+  pg (~> 1.7)
   pry
   puma (>= 5.0)
   rack-mini-profiler
