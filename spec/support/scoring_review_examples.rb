@@ -16,7 +16,9 @@ RSpec.shared_context 'with scoring review evidence' do
                                     boxes.each_with_index.map { |box, index| source_entry(box, index + 1) }).call
   end
   let(:observation) do
-    report = Ingestion::HistoricalSyncObservation.new(row, season).call
+    payload = Ingestion::Cbbd::ImportObservation.new(row, season).payload
+    report = Ingestion::ObservationAudit.new(Ingestion::GameObservation.new(payload), nil)
+                                        .retain('invalid', row.fetch('reasons').join('; '))
     record = GameObservation.find(report.fetch(:observation_id))
     run.update!(report: { days: [{ date: date.iso8601, error: 'Held', rejection_observation_ids: [record.id] }] })
     record

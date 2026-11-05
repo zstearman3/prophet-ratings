@@ -66,14 +66,7 @@ module Ingestion
     end
 
     def import_date(date)
-      games = date_rows(date).map { |row| import_observation(row) }
-      GameSyncResult.new(imported_rows: games.count { |game| game[:applied] }, games:).call
-    end
-
-    def import_observation(row)
-      return HistoricalSyncObservation.new(row, season).call if @settings[:allow_partial]
-
-      Cbbd::ImportObservation.new(row, season).call
+      Cbbd::ImportDay.new(season, date_rows(date)).call
     end
 
     def date_rows(date)

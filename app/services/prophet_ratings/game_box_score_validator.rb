@@ -13,9 +13,9 @@ module ProphetRatings
       rebounds: { offensive_rebounds: 1, defensive_rebounds: 1 }
     }.freeze
 
-    def initialize(game, label, scoring_review: nil)
+    def initialize(game, label, scoring_review: nil, scoring_exception: nil)
       @game = game
-      @scoring_review = scoring_review
+      @scoring_review = [scoring_review, scoring_exception].compact.first
       @label = label
       @side = game.public_send("#{label}_team_game")
     end

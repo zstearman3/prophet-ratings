@@ -1,0 +1,47 @@
+<% issue_ui = Admin::GameIngestionIssuesHelper %>
+<div class="max-w-5xl mx-auto p-4 space-y-4">
+  <%= link_to 'All game issues', admin_game_ingestion_issues_path(season_id: @issue.season_id), class: 'text-blue-700 underline' %>
+  <h1 class="text-2xl font-bold"><%= issue_ui.ingestion_issue_title(@issue) %></h1>
+  <h2 class="text-xl"><%= issue_ui.ingestion_issue_matchup(@issue) %> · <%= @issue.schedule_date %></h2>
+  <% if @error %><p role="alert" class="rounded bg-red-100 p-3"><%= @error %></p><% end %>
+  <p><%= issue_ui.ingestion_issue_steps(@issue) %></p>
+  <% if @issue.state == 'open' && @issue.latest_decision&.action == 'select_participants' %><p>The participant choice is saved. Source evidence still needs correction before stats can be imported; use the source retry below.</p><% end %>
+  <p>State: <%= @issue.state.humanize %>. Source: <%= @issue.provider %>, game <%= @issue.external_game_id %>.</p>
+  <p><%= @issue.latest_observation.reason %></p>
+  <% if @issue.retry_status %><p>Last source retry: <%= @issue.retry_status.humanize %>. Refresh this page for updates.</p><% end %>
+  <% if @issue.game %><p><%= link_to 'View game', game_path(@issue.game), class: 'text-blue-700 underline' %></p><% end %>
+  <% payload = @issue.source_payload %>
+  <table class="w-full text-left"><thead><tr><th>Side</th><th>Stored team / score</th><th>Source team / ID / score</th></tr></thead><tbody>
+    <% %w[home away].each do |label| %><tr class="border-t"><td><%= label.titleize %></td><td><%= @issue.game&.public_send("#{label}_team_name") %> · <%= @issue.game&.public_send("#{label}_team_score") %></td><td><%= payload.dig(label, 'name') %> · <%= payload.dig(label, 'external_team_id') %> · <%= payload.dig(label, 'score') %></td></tr><% end %>
+  </tbody></table>
+  <% if @issue.category == 'scoring' %>
+    <%= form_with url: admin_game_ingestion_issue_path(@issue), method: :patch, scope: :resolution, local: true, data: { turbo: false } do |f| %>
+      <%= f.hidden_field :action, value: 'acknowledge' %><%= f.hidden_field :fingerprint, value: @issue.comparison_fingerprint %>
+      <%= f.submit 'Acknowledge reported result', class: 'rounded bg-indigo-700 text-white px-3 py-2' %>
+    <% end %>
+    <%= form_with url: admin_game_ingestion_issue_path(@issue), method: :patch, scope: :resolution, local: true, data: { turbo: false } do |f| %>
+      <%= f.hidden_field :action, value: 'select_scores' %><%= f.hidden_field :fingerprint, value: @issue.comparison_fingerprint %>
+      <% issue_ui.ingestion_score_candidates(@issue).each do |label, totals| %>
+        <p><%= label.titleize %>: reported score <%= payload.dig(label, 'score') %>; box points <%= payload.dig(label, 'stats', 'points') %>; shooting total <%= Ingestion::ScoringReviewEvidence.shooting_total(payload.fetch(label).deep_symbolize_keys) %>.</p>
+        <% if totals.size > 1 %><%= label_tag "resolution_values_#{label}", "#{label.titleize} selected total" %><%= select_tag "resolution[values][#{label}]", options_for_select(totals, payload.dig(label, 'score')) %><% end %>
+      <% end %>
+      <p>Applying a different total changes the recorded result and the inputs used by the next ratings run.</p>
+      <%= f.submit 'Approve and apply selected totals', class: 'rounded bg-indigo-700 text-white px-3 py-2' %>
+    <% end %>
+  <% elsif @issue.category == 'participants' %>
+    <%= form_with url: admin_game_ingestion_issue_path(@issue), method: :patch, scope: :resolution, local: true, data: { turbo: false } do |f| %>
+      <%= f.hidden_field :action, value: 'select_participants' %><%= f.hidden_field :fingerprint, value: @issue.comparison_fingerprint %>
+      <% %w[home away].each do |label| %><p><%= label_tag "resolution_values_#{label}", "#{label.titleize} participant" %><%= select_tag "resolution[values][#{label}]", options_for_select(issue_ui.ingestion_team_options(@issue, label), issue_ui.ingestion_selected_team(@issue, label)) %></p><% end %>
+      <%= f.submit 'Approve participants and import saved stats', class: 'rounded bg-indigo-700 text-white px-3 py-2' %>
+    <% end %>
+  <% elsif @issue.category == 'source_revision' %>
+    <%= form_with url: admin_game_ingestion_issue_path(@issue), method: :patch, scope: :resolution, local: true, data: { turbo: false } do |f| %>
+      <%= f.hidden_field :action, value: 'accept_source' %><%= f.hidden_field :fingerprint, value: @issue.comparison_fingerprint %>
+      <%= f.submit 'Approve source correction and import saved stats', class: 'rounded bg-indigo-700 text-white px-3 py-2' %>
+    <% end %>
+  <% end %>
+  <%= button_to 'Retry source for this game', retry_admin_game_ingestion_issue_path(@issue), params: { fingerprint: @issue.comparison_fingerprint }, class: 'rounded border p-2', data: { turbo: false } %>
+  <details><summary>Retained box counts</summary><% %w[home away].each do |label| %><h3><%= label.titleize %></h3><dl><% payload.fetch(label).fetch('stats', {}).each do |stat, value| %><dt class="inline-block mr-2"><%= stat.humanize %>: <%= value.nil? ? 'Missing' : value %></dt><% end %></dl><% end %></details>
+  <h2 class="text-xl font-semibold">Decision history</h2>
+  <% @issue.decisions.order(:id).each do |decision| %><p><%= decision.message %> · <%= decision.actor.email %> · <%= decision.created_at %> · <%= decision.action.humanize %> · <%= decision.values.to_json %></p><% end %>
+</div>

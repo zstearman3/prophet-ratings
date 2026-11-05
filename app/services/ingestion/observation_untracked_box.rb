@@ -3,9 +3,9 @@
 module Ingestion
   # Missing counts remain unknown, but every supplied checkable relationship must hold.
   class ObservationUntrackedBox
-    def initialize(data, label, scoring_review: nil)
+    def initialize(data, label, scoring_review: nil, scoring_exception: nil)
       @data = data
-      @scoring_review = scoring_review
+      @scoring_review = [scoring_review, scoring_exception].compact.first
       @label = label
       @stats = data.fetch(label).fetch(:stats)
     end

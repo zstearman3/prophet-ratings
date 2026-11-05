@@ -12,6 +12,9 @@ module Ingestion
       end
 
       def call
+        issue_replay = GameIssueReplay.new(row:, season: @season).call
+        return issue_replay.merge(final_box: result_coverage(issue_replay)) if issue_replay
+
         reviewed = ScoringReviewReplay.new(row, @season).call
         return reviewed.merge(final_box: result_coverage(reviewed)) if reviewed
 
@@ -35,10 +38,18 @@ module Ingestion
       def canonical_import
         observation = GameObservation.new(payload)
         reasons = ImportValidation.new(row).reasons
-        return ObservationAudit.new(observation, nil).retain('invalid', reasons.join('; ')).merge(final_box: 'invalid') if reasons.any?
+        return invalid_import(observation, reasons) if reasons.any?
 
         report = GameObservationImporter.new(observation:, season: @season).call
         report.merge(final_box: result_coverage(report))
+      end
+
+      def invalid_import(observation, reasons)
+        if ScoringReviewEvidence.reviewable?(row, @season)
+          ScoringDiscrepancyImport.new(row:, season: @season).call.merge(final_box: 'complete')
+        else
+          ObservationAudit.new(observation, nil).retain('invalid', reasons.join('; ')).merge(final_box: 'invalid')
+        end
       end
 
       def metadata

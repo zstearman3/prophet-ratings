@@ -12,14 +12,29 @@ module Ingestion
       end
 
       def call
-        GoodJob::Job.advisory_lock_key("cbbd-sync:#{@run.id}") do
-          @run.reload
-          %i[past future].each { |phase| sync_phase(phase) }
-        end
+        GoodJob::Job.advisory_lock_key("cbbd-sync:#{@run.id}") { execute_phases }
+        validate_phases
         @run
       end
 
+      def self.phase_status(report)
+        processed, acquired, complete, issues = report.values_at(:processing_complete, :acquisition_complete, :complete, :issue_ids)
+        return 'failed' unless processed && acquired
+
+        complete && issues.to_a.empty? ? 'completed' : 'completed_with_issues'
+      end
+
       private
+
+      def execute_phases
+        @run.reload
+        %i[past future].each { |phase| sync_phase(phase) }
+      end
+
+      def validate_phases
+        failures = %i[past future].select { |phase| @run.public_send("#{phase}_status") == 'failed' }
+        raise GameSyncProvider::Incomplete, { complete: false, failed_phases: failures, run_id: @run.id } if failures.any?
+      end
 
       def sync_phase(phase)
         @phase = phase
@@ -49,7 +64,7 @@ module Ingestion
       end
 
       def record_import(report)
-        record_phase(report[:complete] ? 'completed' : 'failed', report)
+        record_phase(self.class.phase_status(report), report)
       end
 
       def record_phase(status, report = {})

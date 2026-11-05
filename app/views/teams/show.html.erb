@@ -168,9 +168,10 @@
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
             <% @team_games.each do |tg| %>
-              <% game = tg.game %>
+              <% game = @display_games[tg.game_id] %>
               <% opponent_game = tg.home? ? game.away_team_game : game.home_team_game %>
               <% next unless game %>
+              <% next unless (tg.home? ? game.home_team_game : game.away_team_game)&.team_id == @team.id %>
               <% opponent = opponent_game&.team %>
               <% opponent_name = opponent&.school || (tg.home? ? game.away_team_name : game.home_team_name) %>
               <tr>
@@ -184,6 +185,7 @@
                   <% else %>
                     <%= opponent_name %>
                   <% end %>
+                  <%= render 'shared/game_ingestion_issues', game: %>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-prophet-black">
                   <% if game.completed? && game.home_team_score && game.away_team_score %>
@@ -202,7 +204,7 @@
                       end %>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-prophet-black">
-                  <% prediction = @predictions_by_game[game.id] %>
+                  <% prediction = @predictions_by_game[game.id] unless game.is_a?(GameResultPresenter) %>
                   <% if prediction %>
                     <% prediction_label = if game.final_unmatched?
                          prediction.forecast_kind == 'pregame' ? 'Historical pregame forecast' : "Historical · #{prediction.provenance_label}"

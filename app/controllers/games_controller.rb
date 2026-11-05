@@ -7,6 +7,7 @@ class GamesController < ApplicationController
       away_team_game: %i[team team_season]
     ).find(params.expect(:id))
 
+    @game = GameResultPresenter.wrap([@game]).sole
     @config = RatingsConfigVersion.current
     @historical_prediction = @game.historical_prediction(ratings_config_version: @config)
     @prediction = @game.current_prediction(ratings_config_version: @config) unless @historical_prediction
@@ -26,6 +27,7 @@ class GamesController < ApplicationController
     @games = schedule_games_for(date)
     @ratings_config_version = RatingsConfigVersion.current
     @snapshots_by_team_season_and_date = snapshots_by_team_season_and_date(@games, @ratings_config_version, @date)
+    @games = GameResultPresenter.wrap(@games)
   end
 
   ##
@@ -49,7 +51,7 @@ class GamesController < ApplicationController
                    { away_team_game: :team_season }
                  )
 
-    @games = sort_games(@games, @sort)
+    @games = sort_games(GameResultPresenter.wrap(@games), @sort)
   end
 
   private

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_30_000000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_04_010000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -344,6 +344,46 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_30_000000) do
     t.index ["game_id"], name: "index_game_external_identities_on_game_id"
     t.index ["provider", "external_id"], name: "index_game_external_identities_on_provider_and_external_id", unique: true
     t.index ["provider", "game_id"], name: "index_game_external_identities_on_active_provider_game", unique: true, where: "(superseded_at IS NULL)"
+  end
+
+  create_table "game_ingestion_decisions", force: :cascade do |t|
+    t.bigint "game_ingestion_issue_id", null: false
+    t.bigint "actor_id", null: false
+    t.string "action", null: false
+    t.string "source_fingerprint", null: false
+    t.string "comparison_fingerprint", null: false
+    t.jsonb "values", default: {}, null: false
+    t.string "message", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["actor_id"], name: "index_game_ingestion_decisions_on_actor_id"
+    t.index ["game_ingestion_issue_id"], name: "index_game_ingestion_decisions_on_game_ingestion_issue_id"
+  end
+
+  create_table "game_ingestion_issues", force: :cascade do |t|
+    t.bigint "season_id", null: false
+    t.bigint "game_id"
+    t.string "provider", null: false
+    t.string "external_game_id", null: false
+    t.string "category", null: false
+    t.string "state", default: "open", null: false
+    t.bigint "original_observation_id", null: false
+    t.bigint "latest_observation_id", null: false
+    t.string "source_fingerprint", null: false
+    t.jsonb "effective_payload", default: {}, null: false
+    t.jsonb "participants", default: {}, null: false
+    t.bigint "retry_acquisition_id"
+    t.string "retry_job_id"
+    t.string "retry_status"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["game_id"], name: "index_game_ingestion_issues_on_game_id"
+    t.index ["latest_observation_id"], name: "index_game_ingestion_issues_on_latest_observation_id"
+    t.index ["original_observation_id"], name: "index_game_ingestion_issues_on_original_observation_id"
+    t.index ["retry_acquisition_id"], name: "index_game_ingestion_issues_on_retry_acquisition_id"
+    t.index ["season_id", "provider", "external_game_id", "category"], name: "index_ingestion_issues_on_source_category", unique: true
+    t.index ["season_id"], name: "index_game_ingestion_issues_on_season_id"
+    t.index ["state", "season_id", "id"], name: "index_game_ingestion_issues_on_state_and_season_id_and_id"
   end
 
   create_table "game_observations", force: :cascade do |t|
@@ -1104,6 +1144,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_30_000000) do
   add_foreign_key "departure_validations", "departure_dataset_normalizations"
   add_foreign_key "departure_validations", "offseason_input_revisions"
   add_foreign_key "game_external_identities", "games"
+  add_foreign_key "game_ingestion_decisions", "game_ingestion_issues"
+  add_foreign_key "game_ingestion_decisions", "users", column: "actor_id"
+  add_foreign_key "game_ingestion_issues", "cbbd_review_runs", column: "retry_acquisition_id"
+  add_foreign_key "game_ingestion_issues", "game_observations", column: "latest_observation_id"
+  add_foreign_key "game_ingestion_issues", "game_observations", column: "original_observation_id"
+  add_foreign_key "game_ingestion_issues", "games"
+  add_foreign_key "game_ingestion_issues", "seasons"
   add_foreign_key "game_observations", "game_scoring_reviews", column: "scoring_review_id"
   add_foreign_key "game_observations", "games"
   add_foreign_key "game_odds", "games"

@@ -10,6 +10,8 @@ module Ingestion
 
     def call
       @result.merge(complete: @games.none? { |game| GameSyncProvider.held?(game) }, retrieval_complete: true,
+                    processing_complete: true, committed_rows: @result[:imported_rows],
+                    issue_ids: @games.flat_map { |game| game.fetch(:issue_ids, []) }.uniq,
                     valid_empty: @games.empty?, outcomes: tally(:outcome), counts:, final_box_coverage: tally(:final_box))
     end
 

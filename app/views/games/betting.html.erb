@@ -37,6 +37,7 @@
     </thead>
     <tbody>
       <% @games.each do |game| %>
+      <%= render 'shared/game_ingestion_issues', game: %>
         <% usable_recommendations, excluded_recommendations = game.current_bet_recommendations.partition { |recommendation| !recommendation.prediction.participant_exclusion_reason } %>
         <% recommendations = usable_recommendations.select(&:valid_odds?).index_by(&:bet_type) %>
 

@@ -34,8 +34,8 @@ RSpec.describe Ingestion::ScheduleRefreshExecution do
     fixture['boxes'] += fixture['boxes'].map do |box|
       box.deep_dup.merge('gameId' => 2, 'teamId' => box['teamId'] + 20, 'opponentId' => box['opponentId'] + 20)
     end
-    fixture['boxes'][2]['teamStats']['points']['total'] = 999
-    fixture['boxes'][3]['opponentStats']['points']['total'] = 999
+    fixture['boxes'][2]['teamStats']['rebounds']['total'] = 999
+    fixture['boxes'][3]['opponentStats']['rebounds']['total'] = 999
     allow(ENV).to receive(:fetch).and_call_original
     { 'CBBD_API_KEY' => 'synthetic', 'CBBD_CAPTURE_DIRECTORY' => directory }.each do |key, value|
       allow(ENV).to receive(:fetch).with(key, nil).and_return(value)
@@ -54,15 +54,15 @@ RSpec.describe Ingestion::ScheduleRefreshExecution do
     expect(TeamGame.count).to eq(2)
     expect(GameSyncDate.sole).to have_attributes(status: 'failed', imported_rows: 1)
     day = run.report.fetch('days').sole
-    expect(day).to include('imported_rows' => 1, 'changed_rows' => 1, 'status' => 'failed')
+    expect(day).to include('imported_rows' => 1, 'changed_rows' => 1, 'status' => 'completed_with_issues')
     expect(day['rolled_back']).not_to be(true)
     retained = GameObservation.where(id: day.fetch('rejection_observation_ids')).sole
     expect(retained).to have_attributes(accepted: false, game_id: nil, outcome: 'invalid')
     expect(run.rejection_observations.keys).to include(retained.id)
     expect(run.pending_dates).to eq([date.iso8601])
     first_game = Game.sole.id
-    fixture['boxes'][2]['teamStats']['points']['total'] = 65
-    fixture['boxes'][3]['opponentStats']['points']['total'] = 65
+    fixture['boxes'][2]['teamStats']['rebounds']['total'] = 30
+    fixture['boxes'][3]['opponentStats']['rebounds']['total'] = 30
     child = run.create_retry!(run.requested_by)
     described_class.new(child).call
     expect(child.reload.status).to eq('succeeded')
@@ -84,16 +84,16 @@ RSpec.describe Ingestion::ScheduleRefreshExecution do
     expect(run.report.fetch('days').sole['imported_rows']).to eq(1)
   end
 
-  it 'rolls back successful rows and rejection audits when retained progress cannot be saved' do
+  it 'preserves committed games and rejection audits when retained progress cannot be saved' do
     allow(run).to receive(:checkpoint).and_raise(IOError, 'private report failure')
     described_class.new(run).call
     expect(run.reload.status).to eq('failed')
-    expect([Game.count, TeamGame.count, GameObservation.count]).to eq([0, 0, 0])
+    expect([Game.count, TeamGame.count, GameObservation.count]).to eq([1, 2, 2])
     expect(GameSyncDate.where(status: 'completed')).not_to exist
     expect(run.report).to eq({})
   end
 
-  it 'rolls back the entire date on unexpected importer errors' do
+  it 'preserves earlier committed games on unexpected importer errors' do
     allow(Ingestion::Cbbd::ImportObservation).to receive(:new).and_wrap_original do |original, row, selected_season|
       raise IOError, 'unexpected import failure' if row['source_game_id'] == 2
 
@@ -101,14 +101,14 @@ RSpec.describe Ingestion::ScheduleRefreshExecution do
     end
     described_class.new(run).call
     expect(run.reload.status).to eq('incomplete')
-    expect([Game.count, TeamGame.count, GameObservation.count]).to eq([0, 0, 0])
-    expect(run.report.fetch('days').sole['imported_rows'].to_i).to eq(0)
+    expect([Game.count, TeamGame.count, GameObservation.count]).to eq([1, 2, 1])
+    expect(run.report.fetch('days').sole['imported_rows'].to_i).to eq(1)
   end
 
-  it 'preserves whole-date rollback for callers that do not opt in' do
+  it 'also commits valid CBBD games for callers without an opt-in flag' do
     result = Ingestion::GameSyncRun.new(season:, dates: [date], resume: false, provider: 'cbbd', provider_options: options).call
     expect(result[:complete]).to be(false)
-    expect(result[:days].sole).to include(rolled_back: true, imported_rows: 0)
-    expect([Game.count, TeamGame.count]).to eq([0, 0])
+    expect(result[:days].sole).to include(processing_complete: true, imported_rows: 1)
+    expect([Game.count, TeamGame.count]).to eq([1, 2])
   end
 end

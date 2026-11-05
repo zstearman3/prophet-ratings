@@ -2,6 +2,9 @@
 
 Rails.application.routes.draw do
   namespace :admin do
+    resources :game_ingestion_issues, only: %i[index show update] do
+      post :retry, on: :member
+    end
     resources :offseason_readiness_operations, only: %i[create] do
       get :progress, on: :member
       post :retry, on: :member

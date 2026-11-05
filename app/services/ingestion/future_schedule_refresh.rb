@@ -41,10 +41,6 @@ module Ingestion
 
     attr_reader :season, :provider_run
 
-    def successful_days
-      @options.fetch(:successful_days)
-    end
-
     def selected_dates
       window = start_date..end_date
       dates = @options.fetch(:dates, window.to_a).map { |date| HistoricalSyncWindow.parse_date(date) }.uniq.sort
@@ -55,7 +51,9 @@ module Ingestion
 
     def sync_report(days, failed_dates)
       { year: season.year, days:, absent_ids: absent_games, failed_dates:, retry_window: GameSyncRun.retry_window(failed_dates),
-        complete: failed_dates.empty?, **provider_run.summary }
+        complete: failed_dates.empty?, processing_complete: days.all? { |day| day[:processing_complete] },
+        operational_failure: days.any? { |day| day[:operational_failure] },
+        issue_ids: days.flat_map { |day| day.fetch(:issue_ids, []) }.uniq, **provider_run.summary }
     end
 
     def start_date = @window.first
@@ -71,14 +69,14 @@ module Ingestion
     end
 
     def absent_games
-      seen_ids = successful_days.flat_map { |day| day.fetch(:games, []) }.filter_map { |game| game[:game_id] }
+      seen_ids = @options.fetch(:successful_days).flat_map { |day| day.fetch(:games, []) }.filter_map { |game| game[:game_id] }
       absence_dates.flat_map do |date|
         season.games.scheduled.on_schedule_date(date).where.not(id: seen_ids).pluck(:id)
       end
     end
 
     def absence_dates
-      successful_days.select { |day| self.class.complete_coverage?(day) }.pluck(:date)
+      @options.fetch(:successful_days).select { |day| self.class.complete_coverage?(day) }.pluck(:date)
     end
 
     def refresh_day(date, attempt: 0)
@@ -91,13 +89,16 @@ module Ingestion
     end
 
     def refresh_transaction(date)
-      Game.transaction(requires_new: true) do
-        result = provider_run.call(date).merge(date:)
-        HistoricalSyncDay::ReconciliationError.validate(result)
+      return Cbbd::RefreshDay.new(provider: provider_run, date:, on_day: @options[:on_day]).call if provider_run.cbbd?
 
-        @options[:on_day]&.call(result)
-        result
-      end
+      Game.transaction(requires_new: true) { checkpoint_sports_reference(date) }
+    end
+
+    def checkpoint_sports_reference(date)
+      result = provider_run.call(date).merge(date:)
+      HistoricalSyncDay::ReconciliationError.validate(result)
+      @options[:on_day]&.call(result)
+      result
     end
 
     def retry_or_report(date, error, attempt)
@@ -112,7 +113,7 @@ module Ingestion
     end
 
     def failure_report(date, error)
-      day = HistoricalSyncDay.failure_report(error).merge(date:)
+      day = HistoricalSyncDay.failure_report(error).merge(date:, processing_complete: false, operational_failure: true)
       day.merge!(self.class.checkpoint_references(error)) if @options[:on_day]
       day
     end

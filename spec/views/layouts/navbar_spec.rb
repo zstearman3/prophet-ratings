@@ -77,7 +77,8 @@ RSpec.describe 'layouts/_navbar' do
     document = Nokogiri::HTML(rendered)
     expect(document.at_css('details[data-admin-navigation][open]')).not_to be_nil
     expect(document.at_css('a[aria-current="page"]')&.text).to include('Offseason setup')
-    expect(document.css('details[data-admin-navigation] a').map { |link| link.text.strip }).to eq(['Offseason setup', 'Model analysis'])
+    expect(document.css('details[data-admin-navigation] a').map { |link| link.text.strip })
+      .to eq(['Game issues', 'Offseason setup', 'Model analysis'])
     parent_classes = document.at_css('details[data-admin-navigation]').parent['class'].split
     submenu = document.at_css('details[data-admin-navigation] > ul')
     submenu_classes = submenu['class'].split

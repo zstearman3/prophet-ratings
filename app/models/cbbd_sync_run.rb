@@ -36,11 +36,18 @@ class CbbdSyncRun < ApplicationRecord
 
   def enqueue_analytics
     with_lock do
-      return unless past_status == 'completed' && analytics_status == 'pending'
+      return unless past_processing_complete? && analytics_status == 'pending'
       return update!(analytics_status: 'stale') unless current_authorization?
 
       queue_analytics
     end
+  end
+
+  def past_processing_complete?
+    return true if past_status == 'completed'
+
+    past_status == 'completed_with_issues' && past_report['processing_complete'] == true &&
+      past_report['acquisition_complete'] == true && past_report['operational_failure'] != true
   end
 
   def current_authorization?

@@ -31,6 +31,22 @@ RSpec.describe 'Betting recommendation details' do
     end
   end
 
+  it 'omits old-matchup recommendations and hidden model details for a retained replacement result' do
+    payload = { 'source_status' => 'final', 'source_completed' => true, 'schedule_date' => game.schedule_date.iso8601,
+                'home' => { 'name' => game.home_team_name, 'score' => 81, 'stats' => {} },
+                'away' => { 'name' => 'Replacement College', 'score' => 80, 'stats' => {} } }
+    source = GameObservation.create!(provider: 'cbbd', external_game_id: 'replacement-result', outcome: 'conflict',
+                                     reason: 'participant_or_orientation_conflict', normalized_payload: payload)
+    GameIngestionIssue.capture!(season:, observation: source, category: 'participants', game:)
+
+    get betting_games_path(date: game.schedule_date, sort: 'spread')
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include('Replacement College', 'No recommendation')
+    expect(response.body).not_to include('Ohio State +2.5', 'Expected ROI:', 'Model spread:', 'Forecast unavailable:', 'Admin review')
+    expect(response.parsed_body.at_css('tr[data-ev-for-spread]')['data-ev-for-spread']).to eq('-999')
+  end
+
   it 'pairs away recommendations with their saved prices and probabilities despite refreshed market odds' do
     cells = request_details
 
