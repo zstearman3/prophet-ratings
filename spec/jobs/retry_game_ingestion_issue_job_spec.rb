@@ -44,6 +44,30 @@ RSpec.describe RetryGameIngestionIssueJob do
     expect(calls).to eq(['/games', '/games/teams'])
   end
 
+  it 'keeps an active retry running when another delivery cannot obtain its lock' do
+    issue = missing_issue
+    service = Ingestion::GameIssueRetry.new(issue:, user: admin, fingerprint: issue.comparison_fingerprint)
+    job_id = service.enqueue
+    acquisition = issue.reload.retry_acquisition
+    issue.update!(retry_status: 'running')
+    allow(GoodJob::Job).to receive(:advisory_lock_key).with("game-issue-retry:#{issue.id}").and_return(nil)
+
+    expect { described_class.new.perform(issue.id, acquisition.id) }.to raise_error(HeavyJob::Contention)
+    expect(issue.reload.retry_status).to eq('running')
+    expect(service.enqueue).to eq(job_id)
+    expect(CbbdReviewRun.count).to eq(1)
+  end
+
+  it 'still marks genuine acquisition errors as failed' do
+    issue = missing_issue
+    Ingestion::GameIssueRetry.new(issue:, user: admin, fingerprint: issue.comparison_fingerprint).enqueue
+    acquisition = issue.reload.retry_acquisition
+    allow(Ingestion::Cbbd::ReviewAcquisition).to receive(:new).and_raise(IOError, 'synthetic acquisition failure')
+
+    expect { described_class.new.perform(issue.id, acquisition.id) }.to raise_error(IOError)
+    expect(issue.reload.retry_status).to eq('failed')
+  end
+
   it 'rejects stale retry intent without enqueuing another acquisition' do
     issue = missing_issue
     service = Ingestion::GameIssueRetry.new(issue:, user: admin, fingerprint: 'stale')

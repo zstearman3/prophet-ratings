@@ -46,7 +46,8 @@ module Ingestion
 
       def invalid_import(observation, reasons)
         if ScoringReviewEvidence.reviewable?(row, @season)
-          ScoringDiscrepancyImport.new(row:, season: @season).call.merge(final_box: 'complete')
+          report = ScoringDiscrepancyImport.new(row:, season: @season).call
+          report.merge(final_box: result_coverage(report))
         else
           ObservationAudit.new(observation, nil).retain('invalid', reasons.join('; ')).merge(final_box: 'invalid')
         end

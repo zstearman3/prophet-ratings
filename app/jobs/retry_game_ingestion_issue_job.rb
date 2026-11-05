@@ -8,17 +8,27 @@ class RetryGameIngestionIssueJob < HeavyJob
   end
 
   def perform(issue_id, acquisition_id)
-    @issue = GameIngestionIssue.find(issue_id)
-    @acquisition_id = acquisition_id
+    load_retry(issue_id, acquisition_id)
     with_retry_lock
+  rescue HeavyJob::Contention
+    raise
   rescue StandardError
-    issue&.update!(retry_status: 'failed') if issue&.retry_acquisition_id == acquisition_id
+    record_failure
     raise
   end
 
   private
 
   attr_reader :issue, :acquisition_id
+
+  def load_retry(issue_id, acquisition_id)
+    @issue = GameIngestionIssue.find(issue_id)
+    @acquisition_id = acquisition_id
+  end
+
+  def record_failure
+    issue&.update!(retry_status: 'failed') if issue&.retry_acquisition_id == acquisition_id
+  end
 
   def with_retry_lock
     acquired = GoodJob::Job.advisory_lock_key("game-issue-retry:#{issue.id}") { [retry_source] }

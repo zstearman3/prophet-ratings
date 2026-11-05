@@ -39,7 +39,7 @@ If no date is provided, the job defaults to yesterday in the Eastern schedule-da
 Flow:
 
 1. Validate the Eastern schedule date and resolve an explicit `season_id:` when provided.
-2. With a season, run one scoped `Ingestion::GameSyncRun` for the date with `resume: false`, using the configured provider and atomic checkpoint/import behavior.
+2. With a season, run one scoped `Ingestion::GameSyncRun` for the date with `resume: false`, using the configured provider and its checkpoint/import behavior.
 3. Without a season, use `Ingestion::GamesIngestionService.new(date:)` for the unscoped Sports Reference path only. CBBD requires an explicit season.
 4. Sports Reference acquisition still scrapes batches, enriches venue data and imports canonical observations. Return the ingestion report.
 
@@ -168,16 +168,19 @@ ingestion across sync/refresh/daily/team callers.
 
 The admin **Refresh and review schedule → Historical games** flow uses the same
 `GameSyncRun` service in an ID-only background job, retaining sanitized per-date
-progress atomically with imported games and completion checkpoints. It resumes
-completed checkpoints by default; **Reimport completed dates too** explicitly
-rescans them. It does not run ratings or force protected source corrections.
-For this admin historical CBBD path, each game is isolated in a savepoint:
+progress and completion checkpoints. It resumes completed checkpoints by default;
+**Reimport completed dates too** explicitly rescans them. It does not run ratings
+or force protected source corrections.
+For this admin historical CBBD path, each game has its own transaction:
 expected reconciliation failures preserve a rejected audit while valid games
-commit. A date with held games remains failed and retryable, with honest committed
-counts; retries recognize already imported games. A database/runtime failure or
-failure to persist the date report still rolls back that date transaction.
-All CBBD callers, including CLI historical sync and upcoming refresh, now retain
-valid games independently. Sports Reference retains its whole-date transaction.
+commit independently. A date with held games remains failed and retryable, with
+honest committed counts; retries recognize already imported games. A later
+database/runtime error or failure to persist the date report cannot undo committed
+games or retained rejection audits. The failed operation remains visible and
+retryable.
+All CBBD callers, including CLI historical sync and upcoming refresh, retain
+valid games independently. Sports Reference retains its whole-date transaction,
+including completion checkpoints and retained per-date progress.
 
 This job is used by `season:sync_games` and the explicit legacy all-season
 `import:games` task, not bootstrap or deployment. Prefer small, explicit windows to
@@ -1066,7 +1069,7 @@ When changing ingestion code:
 - `SyncNightlyGamesJob` imports a rolling window and then can enqueue `UpdateRankingsJob`.
 - `SyncFromLastGamesJob` resumes from the latest imported game date, delegates each date to `Ingestion::GamesIngestionService`, and then can enqueue `UpdateRankingsJob`.
 - `SyncFullSeasonGamesJob` requires a target season, validates historical bounds, checkpoints successful/empty dates transactionally and retries failed/unknown dates on resume. Exhausted dates raise a structured incomplete-run report after later dates run. It does not enqueue ratings by itself. See [Offseason Operations](offseason.md) for initial checkpoint adoption, bounded rescan and recovery.
-- All ingestion service callers share a per-date advisory lock. Historical sync and future refresh hold it through their date transaction commit; contention fails visibly instead of starting concurrent imports.
+- All ingestion service callers share a per-date advisory lock. Historical sync and future refresh hold it through all per-game commits and reporting for CBBD, or the whole-date transaction for Sports Reference; contention fails visibly instead of starting concurrent imports.
 - `SyncTeamGamesJob` is useful for targeted repair, delegates team-date rows to `Ingestion::GamesIngestionService`, and defaults `season_id` to `Season.last.id`.
 - `Scraper::GamesScraper#scrape_day_batch` slices with an exact batch size; adjacent batches do not overlap. Schedule responses are cached per scraper and failed/unrecognized pages raise instead of counting as empty dates.
 - `Importer::GamesImporter` logs partial team matches but can still preserve games with missing team-season associations.

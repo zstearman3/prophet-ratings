@@ -25,6 +25,30 @@ RSpec.describe 'Private game ingestion review', type: :request do
     expect(issue.reload.decisions.sole.message).to eq('Acknowledged by admin')
   end
 
+  it 'places each betting admin-review link inside its matchup cell' do
+    game = issue.game
+    sign_in admin
+    get betting_games_path(date: game.schedule_date)
+    expect(response).to have_http_status(:ok)
+    matchup = response.parsed_body.at_css('tbody tr td')
+    expect(matchup.text).to include('Synthetic Away @ Synthetic Home', 'Admin review')
+    expect(response.parsed_body.css('tbody > span')).to be_empty
+  end
+
+  it 'links to the issue queue without excluding source corrections on another date' do
+    game = issue.game
+    payload = issue.latest_observation.normalized_payload.deep_dup.merge('schedule_date' => (date + 1.day).iso8601)
+    source = GameObservation.create!(provider: 'cbbd', external_game_id: '1', outcome: 'conflict', normalized_payload: payload)
+    issue.refresh_source(source, game)
+    sign_in admin
+    get game_path(game)
+    link = response.parsed_body.at_xpath('//a[text()="Admin review"]')
+    expect(link).not_to be_nil
+    get link['href']
+    expect(response).to have_http_status(:ok)
+    expect(response.parsed_body.at_css("a[href='/admin/game_ingestion_issues/#{issue.id}']")).not_to be_nil
+  end
+
   it 'keeps all review endpoints unavailable to signed-in nonadmins' do
     sign_in create(:user)
     [[:get, '/admin/game_ingestion_issues'], [:get, "/admin/game_ingestion_issues/#{issue.id}"],

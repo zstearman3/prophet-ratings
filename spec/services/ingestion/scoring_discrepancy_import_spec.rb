@@ -32,6 +32,7 @@ RSpec.describe Ingestion::ScoringDiscrepancyImport do
     TeamSeason.joins(:team).find_by!(teams: { school: 'Synthetic Away' }).destroy!
     Team.find_by!(school: 'Synthetic Away').destroy!
     report = import
+    expect(report[:final_box]).to eq('not_applicable')
     game = Game.find(report[:game_id])
     expect(game).to be_final_unmatched
     expect(game.home_team_game.points).to eq(65)

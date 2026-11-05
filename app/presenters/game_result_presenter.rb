@@ -66,9 +66,16 @@ class GameResultPresenter < SimpleDelegator
 
   def link_side(side, label)
     original = __getobj__.public_send("#{label}_team_game")
-    return unless original && __getobj__.public_send("#{label}_team_name") == @source.dig(label, 'name')
+    return unless confirmed_participant?(original, label)
 
     side.team = original.team
     side.team_season = original.team_season
+  end
+
+  def confirmed_participant?(original, label)
+    return false unless original && __getobj__.public_send("#{label}_team_name") == @source.dig(label, 'name')
+
+    identity = TeamExternalIdentity.find_by(provider: @source['provider'], external_id: @source.dig(label, 'external_team_id'))
+    identity&.team_id == original.team_id
   end
 end
