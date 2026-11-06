@@ -1,0 +1,5 @@
+en:
+  admin:
+    game_ingestion_issues:
+      retry_queued: "Source retry queued. Refresh to see the result."
+      invalid_filter: "Choose a valid date and filter."

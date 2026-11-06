@@ -85,7 +85,7 @@ RSpec.describe Ingestion::Cbbd::ScheduledSync do
   it 'retains captures after a held canonical date and never renews the failed phase budget' do
     TeamExternalIdentity.delete_all
     execute
-    expect(run.reload.past_status).to eq('failed')
+    expect(run.reload.past_status).to eq('completed_with_issues')
     expect(Game.count).to eq(0)
     expect(CbbdReviewRun.find(run.past_acquisition_id).verified_replay['complete']).to be(true)
     execute
@@ -102,18 +102,19 @@ RSpec.describe Ingestion::Cbbd::ScheduledSync do
         { status: 503, headers: {}, body: 'synthetic failure' }
       end
     end
-    described_class.new(run, api_key: 'synthetic', transport: failed_future).call
+    expect { described_class.new(run, api_key: 'synthetic', transport: failed_future).call }
+      .to raise_error(Ingestion::GameSyncProvider::Incomplete)
     expect(run.reload).to have_attributes(past_status: 'completed', future_status: 'failed')
     run.enqueue_analytics
     expect(run.reload.analytics_status).to eq('queued')
-    execute
+    expect { execute }.to raise_error(Ingestion::GameSyncProvider::Incomplete)
     expect(requests.size).to eq(4)
   end
 
   it 'does not reacquire an interrupted persisted acquisition' do
     acquisition = CbbdReviewRun.create!(season:, start_date: date, end_date: date, maximum_requests: 2, retries: 0, status: 'running')
     run.update!(past_acquisition: acquisition)
-    execute
+    expect { execute }.to raise_error(Ingestion::GameSyncProvider::Incomplete)
     expect(run.reload.past_status).to eq('failed')
     expect(acquisition.reload.failure).to include('interrupted')
     expect(requests.size).to eq(2) # Future has its own finite budget.
@@ -151,7 +152,7 @@ RSpec.describe Ingestion::Cbbd::ScheduledSync do
     mappings = TeamExternalIdentity.where(provider: 'cbbd').pluck(:team_id, :external_id)
     TeamExternalIdentity.delete_all
     execute
-    expect(run.reload.past_status).to eq('failed')
+    expect(run.reload.past_status).to eq('completed_with_issues')
     expect([Game.count, TeamGame.count]).to eq([0, 0])
     mappings.each { |team_id, external_id| TeamExternalIdentity.associate!(team: Team.find(team_id), provider: 'cbbd', external_id:) }
     arguments = { season:, dates: [date], provider: 'cbbd', provider_options: { prepared_run: run.past_acquisition.reload }, resume: true }
@@ -195,14 +196,27 @@ RSpec.describe Ingestion::Cbbd::ScheduledSync do
     expect(requests).to be_empty
   end
 
-  it 'exhausts each phase cap without renewing either budget on duplicate delivery' do
+  it 'exhausts each phase cap without renewing either budget on duplicate delivery', :aggregate_failures do
     limited = CbbdSyncRun.create!(season:, ratings_config_version: RatingsConfigVersion.default_version,
                                   schedule_date: date + 1, bucket: Time.utc(2025, 11, 2, 18), maximum_requests: 1, retries: 0)
-    described_class.new(limited, api_key: 'synthetic', transport:).call
+    expect { described_class.new(limited, api_key: 'synthetic', transport:).call }
+      .to raise_error(Ingestion::GameSyncProvider::Incomplete)
     expect(limited.reload).to have_attributes(past_status: 'failed', future_status: 'failed')
     expect(requests.size).to eq(2)
-    described_class.new(limited, api_key: 'synthetic', transport:).call
+    expect { described_class.new(limited, api_key: 'synthetic', transport:).call }
+      .to raise_error(Ingestion::GameSyncProvider::Incomplete)
     expect(requests.size).to eq(2)
     expect(Game.count).to eq(0)
+  end
+
+  it 'releases and executes daily analytics after fully processed games leave reviewable issues', :aggregate_failures do
+    TeamExternalIdentity.delete_all
+    execute
+    expect(run.reload.past_status).to eq('completed_with_issues')
+    run.enqueue_analytics
+    expect(run.reload.analytics_status).to eq('queued')
+    CbbdSyncAnalyticsJob.new.perform(run.id)
+    expect(run.reload.analytics_status).to eq('completed')
+    expect(season.team_rating_snapshots).to exist
   end
 end

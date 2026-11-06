@@ -64,8 +64,16 @@ module Ingestion
     end
 
     def self.failure_report(error)
-      report = error.is_a?(ReconciliationError) ? error.report.merge(rejection_observation_ids: error.retained_observation_ids) : {}
+      report = case error
+               when ReconciliationError then retained_report(error)
+               when GameSyncProvider::Incomplete then error.report
+               else {}
+               end
       report.merge(error: "#{error.class}: #{error.message}")
+    end
+
+    def self.retained_report(error)
+      error.report.merge(rejection_observation_ids: error.retained_observation_ids)
     end
 
     def self.rejection_ids(result)
@@ -98,7 +106,8 @@ module Ingestion
     def retry_or_report(retries)
       if provider_run.cbbd? || retries >= MAX_RETRIES
         return notify(@options.fetch(:failure_report, {}).merge(date:, status: 'failed', attempts: checkpoint.attempts,
-                                                                error: checkpoint.last_error))
+                                                                error: checkpoint.last_error,
+                                                                processing_complete: false, operational_failure: true))
       end
 
       sleep(BASE_DELAY_SECONDS * (2**retries))
@@ -110,6 +119,8 @@ module Ingestion
     end
 
     def import_transaction
+      return import_cbbd if provider_run.cbbd?
+
       GameSyncDate.transaction(requires_new: true) do
         result = provider_run.call(date)
         outcome = save_result(result)
@@ -117,8 +128,14 @@ module Ingestion
       end
     end
 
+    def import_cbbd
+      result = provider_run.call(date)
+      outcome = save_result(result)
+      notify(outcome.merge(date:, attempts: checkpoint.attempts))
+    end
+
     def save_result(result)
-      return save_partial_result(result) if @options[:allow_partial] && provider_run.cbbd? && !result[:complete]
+      return save_partial_result(result) if provider_run.cbbd? && !result[:complete]
 
       ReconciliationError.validate(result)
       checkpoint.complete(result)
@@ -128,7 +145,7 @@ module Ingestion
     def save_partial_result(result)
       message = 'Some source games need review; see the committed row count.'
       checkpoint.update!(status: 'failed', imported_rows: result.fetch(:imported_rows), completed_at: nil, last_error: message)
-      result.merge(status: 'failed', error: message, rejection_observation_ids: self.class.rejection_ids(result))
+      result.merge(status: 'completed_with_issues', error: message, rejection_observation_ids: self.class.rejection_ids(result))
     end
 
     def notify(result)

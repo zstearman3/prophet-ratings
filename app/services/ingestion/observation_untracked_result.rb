@@ -3,10 +3,10 @@
 module Ingestion
   # Untracked opponents contribute visible results, never inferred statistics or rating inputs.
   class ObservationUntrackedResult
-    def initialize(observation, game, scoring_review: nil)
+    def initialize(observation, game, scoring_review: nil, scoring_exception: nil)
       @data = observation.data
       @game = game
-      @scoring_review = scoring_review
+      @scoring_review = [scoring_review, scoring_exception].compact.first
     end
 
     def call

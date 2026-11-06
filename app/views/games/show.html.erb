@@ -1,4 +1,5 @@
 <% if current_user&.admin? %>
+  <%= render 'shared/game_ingestion_issues', game: @game %>
   <p><%= link_to 'Return to schedule review', admin_schedule_refresh_runs_path(season_id: @game.season_id) %>
     <%= link_to 'Edit game', rails_admin.edit_path(model_name: 'game', id: @game.id) %></p>
 <% end %>

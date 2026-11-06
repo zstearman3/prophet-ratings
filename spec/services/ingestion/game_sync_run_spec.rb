@@ -95,7 +95,7 @@ RSpec.describe Ingestion::GameSyncRun do
     expect(report[:days].pluck(:status)).to eq(%w[completed skipped completed])
   end
 
-  it 'rolls back an earlier accepted row and accepted-incomplete row and retains rejected evidence safely', :aggregate_failures do
+  it 'keeps an earlier accepted row and rolls back only the incomplete game with retained evidence', :aggregate_failures do
     other_home = create(:team, school: 'Other Home')
     create(:team_season, team: other_home, season:)
     TeamExternalIdentity.associate!(team: other_home, provider: 'cbbd', external_id: '30')
@@ -108,10 +108,10 @@ RSpec.describe Ingestion::GameSyncRun do
     expect { sync }.to raise_error(Ingestion::GameSyncProvider::Incomplete) do |error|
       expect(error.report[:failed_dates]).to eq([date])
     end
-    expect([Game.count, TeamGame.count, GameExternalIdentity.count]).to eq([0, 0, 0])
-    expect(GameObservation.where(accepted: true)).to be_empty
+    expect([Game.count, TeamGame.count, GameExternalIdentity.count]).to eq([1, 2, 1])
+    expect(GameObservation.where(accepted: true).sole.game).to eq(Game.sole)
     audit = GameObservation.where(outcome: 'incomplete').sole
-    expect(audit).to have_attributes(game_id: nil, accepted: false, reason: 'date_rolled_back: missing_required_box_data')
+    expect(audit).to have_attributes(game_id: nil, accepted: false, reason: 'game_rolled_back: missing_required_box_data')
     expect(audit.raw_payload['source_game_id']).to eq(2)
   end
 
@@ -188,7 +188,8 @@ RSpec.describe Ingestion::GameSyncRun do
     fixture['games'].first['neutralSite'] = true
     fixture['boxes'].each { |box| box['neutralSite'] = true }
     expect { sync(resume: false) }.to raise_error(Ingestion::GameSyncProvider::Incomplete) do |error|
-      expect(error.report[:days].first).to include(rolled_back: true, outcomes: { 'conflict' => 1 })
+      expect(error.report[:days].first).to include(processing_complete: true, status: 'completed_with_issues',
+                                                   outcomes: { 'conflict' => 1 })
     end
     expect(Game.last.neutral).not_to be(true)
   end
@@ -207,13 +208,14 @@ RSpec.describe Ingestion::GameSyncRun do
     expect(requests.length).to eq(4)
   end
 
-  it 'retains incomplete final evidence safely after a future date transaction rolls back' do
+  it 'retains incomplete final evidence safely after only that game rolls back' do
     allow(Game).to receive(:current_schedule_date).and_return(date)
     fixture['boxes'] = []
     report = Ingestion::FutureScheduleRefresh.new(season:, start_date: date, end_date: date, provider: 'cbbd',
                                                   provider_options: options).call
     expect(report).to include(complete: false, failed_dates: [date], absent_ids: [])
-    expect(report[:days].first).to include(rolled_back: true, counts: include(accepted: 0, incomplete: 1))
+    expect(report[:days].first).to include(processing_complete: true, status: 'completed_with_issues',
+                                           counts: include(accepted: 0, incomplete: 1))
     expect(Game.count).to eq(0)
     expect(GameObservation.last).to have_attributes(accepted: false, game_id: nil, outcome: 'incomplete')
   end
@@ -244,7 +246,8 @@ RSpec.describe Ingestion::GameSyncRun do
     state = Game.last.attributes
     fixture['boxes'] = []
     expect { sync(resume: false) }.to raise_error(Ingestion::GameSyncProvider::Incomplete) do |error|
-      expect(error.report[:days].first).to include(rolled_back: true, final_box_coverage: { 'missing' => 1 })
+      expect(error.report[:days].first).to include(processing_complete: true, status: 'completed_with_issues',
+                                                   final_box_coverage: { 'missing' => 1 })
     end
     expect(Game.last.attributes).to eq(state)
     expect(GameSyncDate.find_by!(schedule_date: date).status).to eq('failed')

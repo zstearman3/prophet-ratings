@@ -1,0 +1,3 @@
+<% if current_user&.admin? && game.game_ingestion_issues.any? %>
+  <span class="text-xs text-amber-800"><%= link_to 'Admin review', admin_game_ingestion_issues_path(season_id: game.season_id, state: 'all'), class: 'underline' %></span>
+<% end %>

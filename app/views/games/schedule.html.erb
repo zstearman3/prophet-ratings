@@ -23,6 +23,7 @@
           <td class="px-4 py-2 font-semibold">
             <%= link_to "#{game.away_team_name} @ #{game.home_team_name}", game_path(game),
               class: "text-gray-800 hover:text-blue-600" %>
+            <%= render 'shared/game_ingestion_issues', game: %>
           </td>
           <td class="px-4 py-2">
             <% status = game.status_string.upcase %>

@@ -12,10 +12,11 @@ module Ingestion
                  superseded_game_identity missing_required_box_data source_scheduled source_live source_final
                  source_postponed source_cancelled admin_reviewed_schedule admin_reviewed_schedule_skip
                  reviewed_source_changed reviewed_game_changed admin_reviewed_scoring].freeze
-    NUMBERS = %w[changed_rows ignored_observations imported_rows attempted_rows attempts retries accepted protected rejected unmatched
-                 incomplete].freeze
-    FLAGS = %w[complete valid_empty rolled_back retrieval_complete acquisition_complete accepted projected scheduled applied].freeze
-    IDS = %w[rejection_observation_ids game_id observation_id absent_ids possible_move_ids].freeze
+    NUMBERS = %w[committed_rows changed_rows ignored_observations imported_rows attempted_rows attempts retries accepted
+                 protected rejected unmatched incomplete].freeze
+    FLAGS = %w[processing_complete operational_failure complete valid_empty rolled_back retrieval_complete acquisition_complete accepted
+               projected scheduled applied].freeze
+    IDS = %w[issue_ids rejection_observation_ids game_id observation_id absent_ids possible_move_ids].freeze
     OUTCOMES = %w[scheduled live final postponed cancelled unknown projected unchanged created updated invalid ambiguous conflict unmatched
                   incomplete stale superseded protected reviewed_skip].freeze
 
@@ -73,7 +74,7 @@ module Ingestion
     end
 
     def self.safe_text(key, value)
-      { 'date' => date(value), 'status' => %w[skipped completed failed].include?(value) ? value : nil,
+      { 'date' => date(value), 'status' => %w[skipped completed completed_with_issues failed].include?(value) ? value : nil,
         'error' => value && 'Source acquisition or reconciliation failed; inspect private evidence and identity review.',
         'outcome' => OUTCOMES.include?(value) ? value : nil, 'reason' => reason(value) }[key]
     end

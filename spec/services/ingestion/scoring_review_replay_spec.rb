@@ -50,7 +50,8 @@ RSpec.describe Ingestion::ScoringReviewReplay do
     changed['home']['stats']['turnovers']['value'] = 11
     Ingestion::Cbbd::ImportObservation.new(changed, season).call
     expect { approve }.to raise_error(ArgumentError, /source.*changed|fresh/i)
-    expect(Game.count).to eq(0)
+    expect(Game.sole.home_team_game.turnovers).to eq(11)
+    expect(GameScoringReview.count).to eq(0)
   end
 
   it 'does not reuse approval after a source identity has been superseded' do

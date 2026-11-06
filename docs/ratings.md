@@ -1599,3 +1599,27 @@ This authorization governs fresh ratings publication, not the independent
 `nightly_predictions` recurring job described above. Forecasts can exist while a
 CBBD run's analytics remain pending because they used an existing publication.
 See [the cutover runbook](cbbd-cutover.md); daily cutoff and formulas are unchanged.
+
+
+## Reported scores with scoring-total discrepancies
+
+CBBD ingestion accepts a complete confirmed final when its only discrepancies are
+`points: component mismatch` or `points disagree with score`. The reported game
+score is authoritative for canonical game scores and team points. Shooting counts
+remain as supplied, and immutable source observations retain original box points
+and arithmetic. An exact persisted ingestion exception authorizes only the points
+relationship; other strict validation checks remain required, including on later
+re-finalization. This changes data acceptance, not model coefficients or the solver.
+
+Eligible tracked games enter ratings immediately, without waiting for an admin to
+acknowledge the discrepancy. Untracked opponents remain `final_unmatched` and
+excluded from ratings. Games with held participant/missing/invalid results do not
+enter canonical ratings calculations, even if their retained source result is
+shown publicly. Other valid games from the same date still contribute.
+
+Admin selections can correct supplied score totals, participants or a displayed
+source revision. The next ordinary ratings run uses those corrected stored inputs;
+these actions do not rewrite historical snapshots, frozen forecast inputs or
+configuration hashes, and do not automatically enqueue a backfill. The private
+admin issue history records the evidence, approving user, timestamp and choices.
+No discrepancy or acknowledgment markers are shown to nonadmins.

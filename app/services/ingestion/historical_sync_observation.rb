@@ -9,17 +9,29 @@ module Ingestion
     end
 
     def call
-      Game.transaction(requires_new: true) { import_result }
+      import_transaction
     rescue HistoricalSyncDay::ReconciliationError => error
-      error.retained_game_report
+      retain_rejection(error)
     end
 
     private
 
+    def import_transaction
+      Game.transaction(requires_new: true) { import_result }
+    end
+
+    def retain_rejection(error)
+      Game.transaction(requires_new: true) { with_issues(error.retained_game_report) }
+    end
+
     def import_result
       result = Cbbd::ImportObservation.new(@row, @season).call
       validate_result(result)
-      result
+      with_issues(result)
+    end
+
+    def with_issues(result)
+      GameIssueRecorder.new(season: @season, report: result).report
     end
 
     def validate_result(result)

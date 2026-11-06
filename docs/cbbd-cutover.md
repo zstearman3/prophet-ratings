@@ -24,7 +24,8 @@ season bounds and today minus three through yesterday; future dates are today
 through today plus seven, clipped to the season. Each phase gets its own
 `CbbdReviewRun` and PostgreSQL capture bytes, digests, normalized replay, request
 ledger and quota headers. Acquisition finishes before canonical date transactions;
-held dates roll back canonical writes without losing captures. No shared directory,
+held games roll back only their own canonical writes without losing captures.
+Other games commit independently, before their date reports are saved. No shared directory,
 JSON editing, or ECS file transfer is required for scheduled evidence. Existing
 manual CLI commands retain their explicit filesystem contract.
 
@@ -47,8 +48,9 @@ repeated producers; a new bucket is a new bounded refresh. An interrupted
 acquisition never automatically renews its budget. Unknown coverage and
 incomplete captures remain failures.
 
-A complete nonempty past phase authorizes the pinned daily analytics job even if
-future refresh fails. Source retries never independently authorize ratings.
+A fully acquired and processed nonempty past phase authorizes the pinned daily
+analytics job even if individual games need review or future refresh fails.
+`completed_with_issues` is processing completion, not clean final-result coverage. Source retries never independently authorize ratings.
 GoodJob insertion and the enqueue marker share one PostgreSQL transaction.
 `analytics_status=queued` means only enqueued. The scoped analytics delivery uses
 the same heavy/ratings locks and existing calculators as manual jobs. Ratings and
@@ -110,7 +112,8 @@ All gates must pass before a separately authorized activation:
    production memory capacity nor live provider latency.
 7. Assign an operator for failed runs and quota warnings. Alert/respond when no
    complete past sync is observed for more than 12 hours during active dates.
-   Monitor daily snapshot date/model separately: expected prior-day cutoff lag is
+   Monitor processing completion, unresolved admin game issues and daily snapshot
+   date/model separately: expected prior-day cutoff lag is
    not a sync failure. Check `analytics_error`, GoodJob retained errors/attempts,
    capture ledgers, phase failed dates and forecast coverage. No paid monitoring
    service is added here.
@@ -210,3 +213,27 @@ need review. Evaluation comparisons must state provider/semantic profile and
 history coverage. Do not claim prediction improvement from this cutover or mark
 the separate ticket 08 historical parity/replacement work complete. Any unavailable
 live examples and operational gates above remain unverified until authorized.
+
+
+## Per-game issue recovery
+
+The additive `20261104010000` migration introduces private issue/decision records.
+Restart web and workers after migration. Scheduled game issues no longer force a
+whole-date rollback: valid games and scoring-only discrepancies commit immediately.
+Fully acquired/processed past phases release daily analytics even when some games
+remain held. Phase reports distinguish processing, clean coverage and committed
+rows. Acquisition/runtime failures remain GoodJob failures; expected row issues
+are actionable at **Admin → Game issues** rather than failed queue deliveries.
+
+Use **Retry source for this game** for a bounded original-date retry, or apply
+saved stats after participant selection. Retries use database captures with the
+configured scheduled request/retry limits; a new explicit retry means a new finite
+budget. Source corrections lacking freshness evidence require explicit admin
+acceptance. Invalid/missing results do not become successful finals automatically.
+Scoring-only discrepancies use reported final scores immediately in ratings;
+acknowledgment is private bookkeeping. All issue indicators/history are hidden
+from nonadmins. See [ingestion recovery](data-ingestion.md#independent-cbbd-imports-and-private-game-issues).
+
+Deploying this code does not itself repair November 2 or run a ratings backfill.
+A separately authorized bounded import/retry is required to revisit affected
+production games, especially once they leave the three-day scheduled lookback.

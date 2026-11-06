@@ -580,16 +580,18 @@ its imported games; interruption preserves completed progress. The results table
 distinguishes skipped dates, empty dates, imports and failures. A retry imports
 only the parent run's unfinished dates with a new explicit request budget.
 
-Historical CBBD imports retain valid games even if another game on the same date
+All CBBD imports retain valid games even if another game on the same date
 needs review. Each held game is rolled back independently and keeps its audit;
 the date remains incomplete, and its results show how many rows were committed.
-Unexpected database/runtime errors still roll back the date. Retrying an
+Unexpected database/runtime errors stop unsafe work but preserve earlier committed
+games; the affected operation remains incomplete. Retrying an
 incomplete date recognizes the valid games already stored without duplicating them.
 Games against name-only opponents stay visible, with no fabricated opponent
 membership. Completed name-only games use `final_unmatched` and do not enter
-ratings calculations. Inconsistent supplied scoring totals remain held for review.
+ratings calculations. Complete finals with scoring-only discrepancies import reported scores immediately
+and create a private admin warning. Other invalid evidence remains held.
 
-For eligible historical CBBD scoring discrepancies, open **Review date → Resolve
+For older retained historical CBBD scoring rejections, open **Review date → Resolve
 scoring discrepancy**. Compare reported game/box points with the supplied shooting
 arithmetic and box counts. The reported final score is selected by default. Choose
 a trusted supplied total for each affected team, review the resulting score, then
@@ -761,3 +763,20 @@ Use the [CBBD cutover runbook](cbbd-cutover.md) after reviewed memberships and
 identity mappings. The proposed disposition retains production history; future
 provider routing is separate from historical replacement, deployment and season
 activation. Operational gates currently require a NO RELEASE recommendation.
+
+
+### Private game issue queue
+
+**Admin → Game issues** lists both scheduled and manually discovered ingestion
+issues, including those outside the rolling lookback. Admins can acknowledge
+accepted scoring warnings, apply alternate supplied totals, select participants
+and replay saved boxes, explicitly accept source corrections, or request a finite
+single-game source retry. Valid participant choices remain recorded if another
+source defect still prevents import. No typed approval reason is required.
+
+Game/schedule/team pages link the private queue only for admins. Nonadmins see
+ordinary results and statistics, without operational icons, issue state,
+acknowledgment messages, history, tooltips or hidden review data. These actions do
+not run ratings backfills, create memberships, change global provider mappings,
+rewrite frozen forecasts or deploy production changes. See the
+[full recovery behavior](data-ingestion.md#independent-cbbd-imports-and-private-game-issues).

@@ -8,6 +8,7 @@ class TeamsController < ApplicationController
     load_team_games
     load_snapshot_lookup
     load_predictions
+    @display_games = GameResultPresenter.wrap(@team_games.map(&:game)).index_by(&:id)
 
     respond_to do |format|
       format.html

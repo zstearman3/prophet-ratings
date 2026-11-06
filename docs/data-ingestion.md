@@ -39,7 +39,7 @@ If no date is provided, the job defaults to yesterday in the Eastern schedule-da
 Flow:
 
 1. Validate the Eastern schedule date and resolve an explicit `season_id:` when provided.
-2. With a season, run one scoped `Ingestion::GameSyncRun` for the date with `resume: false`, using the configured provider and atomic checkpoint/import behavior.
+2. With a season, run one scoped `Ingestion::GameSyncRun` for the date with `resume: false`, using the configured provider and its checkpoint/import behavior.
 3. Without a season, use `Ingestion::GamesIngestionService.new(date:)` for the unscoped Sports Reference path only. CBBD requires an explicit season.
 4. Sports Reference acquisition still scrapes batches, enriches venue data and imports canonical observations. Return the ingestion report.
 
@@ -168,16 +168,19 @@ ingestion across sync/refresh/daily/team callers.
 
 The admin **Refresh and review schedule → Historical games** flow uses the same
 `GameSyncRun` service in an ID-only background job, retaining sanitized per-date
-progress atomically with imported games and completion checkpoints. It resumes
-completed checkpoints by default; **Reimport completed dates too** explicitly
-rescans them. It does not run ratings or force protected source corrections.
-For this admin historical CBBD path, each game is isolated in a savepoint:
+progress and completion checkpoints. It resumes completed checkpoints by default;
+**Reimport completed dates too** explicitly rescans them. It does not run ratings
+or force protected source corrections.
+For this admin historical CBBD path, each game has its own transaction:
 expected reconciliation failures preserve a rejected audit while valid games
-commit. A date with held games remains failed and retryable, with honest committed
-counts; retries recognize already imported games. A database/runtime failure or
-failure to persist the date report still rolls back that date transaction.
-CLI historical sync, Sports Reference, and upcoming refresh retain their existing
-whole-date failure behavior.
+commit independently. A date with held games remains failed and retryable, with
+honest committed counts; retries recognize already imported games. A later
+database/runtime error or failure to persist the date report cannot undo committed
+games or retained rejection audits. The failed operation remains visible and
+retryable.
+All CBBD callers, including CLI historical sync and upcoming refresh, retain
+valid games independently. Sports Reference retains its whole-date transaction,
+including completion checkpoints and retained per-date progress.
 
 This job is used by `season:sync_games` and the explicit legacy all-season
 `import:games` task, not bootstrap or deployment. Prefer small, explicit windows to
@@ -1066,7 +1069,7 @@ When changing ingestion code:
 - `SyncNightlyGamesJob` imports a rolling window and then can enqueue `UpdateRankingsJob`.
 - `SyncFromLastGamesJob` resumes from the latest imported game date, delegates each date to `Ingestion::GamesIngestionService`, and then can enqueue `UpdateRankingsJob`.
 - `SyncFullSeasonGamesJob` requires a target season, validates historical bounds, checkpoints successful/empty dates transactionally and retries failed/unknown dates on resume. Exhausted dates raise a structured incomplete-run report after later dates run. It does not enqueue ratings by itself. See [Offseason Operations](offseason.md) for initial checkpoint adoption, bounded rescan and recovery.
-- All ingestion service callers share a per-date advisory lock. Historical sync and future refresh hold it through their date transaction commit; contention fails visibly instead of starting concurrent imports.
+- All ingestion service callers share a per-date advisory lock. Historical sync and future refresh hold it through all per-game commits and reporting for CBBD, or the whole-date transaction for Sports Reference; contention fails visibly instead of starting concurrent imports.
 - `SyncTeamGamesJob` is useful for targeted repair, delegates team-date rows to `Ingestion::GamesIngestionService`, and defaults `season_id` to `Season.last.id`.
 - `Scraper::GamesScraper#scrape_day_batch` slices with an exact batch size; adjacent batches do not overlap. Schedule responses are cached per scraper and failed/unrecognized pages raise instead of counting as empty dates.
 - `Importer::GamesImporter` logs partial team matches but can still preserve games with missing team-season associations.
@@ -1364,7 +1367,8 @@ defaults to `sports_reference`; Ruby callers can supply `provider:` and
 `provider_options:`. There is no fallback or provider blending. Historical and
 future windows use strict inclusive `YYYY-MM-DD` Eastern schedule dates inside the
 explicit season. A daily CBBD call requires `season_id:`. Nightly passes its target
-season through the same atomic date importer. Sports Reference past failures prevent
+season through the same provider-aware importer. CBBD commits individual games;
+Sports Reference retains atomic date transactions. Sports Reference past failures prevent
 rankings; successful nonempty past coverage can release rankings while future
 coverage remains explicitly incomplete. CBBD never automatically enqueues rankings.
 
@@ -1374,8 +1378,9 @@ profile/adapter revision. Existing rows keep their attempts/status/error and are
 marked `legacy-unscoped`; they do not certify the current Sports Reference bridge
 or CBBD. The first current-scope run revisits them. Resume skips only matching
 completed dates; a normalization revision invalidates incompatible completion.
-Imports and date completion commit together under the shared provider-neutral date
-lock. Existing identity/bootstrap/game locks also serialize cross-provider games
+Sports Reference imports and date completion commit together under the shared
+provider-neutral date lock. CBBD keeps that lock while committing individual games
+before its date checkpoint. Existing identity/bootstrap/game locks also serialize cross-provider games
 and known identities that move across dates. Unknown cross-provider moves remain
 held for review. Source absence never deletes or cancels a stored game.
 
@@ -1404,17 +1409,18 @@ Each date reports valid empty coverage, outcome counts, accepted/protected/rejec
 unmatched/incomplete counts and final-box coverage separately. A recognized empty
 window can complete. Scheduled/live rows can succeed without final boxes; final
 rows missing required boxes, invalid/conflicting/ambiguous/unmatched rows and stale
-or superseded holds leave the date unfinished. Any earlier domain writes on that
-date roll back. Retained rejection audits have `accepted:false`, `game_id:nil` and
-an explicit `date_rolled_back` reason; failed reports mark `rolled_back` and zero
-committed accepted rows. Sports Reference and CBBD both classify final-box coverage
+or superseded holds leave clean date coverage unfinished. Sports Reference rolls
+back that date, with `date_rolled_back` rejection evidence. CBBD rolls back only
+the held game, with `game_rolled_back` evidence; other games remain committed and
+reports include their actual committed counts. Reporting failures cannot undo
+previously committed CBBD games. Sports Reference and CBBD both classify final-box coverage
 from the current source observation as `complete`, `missing`, `invalid` or
 `not_final`; unchanged stored values cannot supply missing source boxes.
 `unknown` remains only for callers that provide no observation coverage metadata.
 Missing fields and zero values retain original availability evidence in the audit;
 no source update timestamp is inferred from capture time.
 
-CBBD date failures do not repeat acquisition, and ActiveJob does not automatically
+CBBD held games and date failures do not repeat acquisition, and ActiveJob does not automatically
 retry incomplete CBBD runs with a new budget. Operator tasks print structured
 reports and exit nonzero. Inspect the private manifest, repair mappings/evidence
 or wait for quota recovery, then explicitly resume with a fresh reviewed budget.
@@ -1687,3 +1693,65 @@ acquisitions and an atomic analytics handoff. Manual `SyncNightlyGamesJob` CBBD
 calls retain their explicit bounds and do not automatically release ratings.
 See [cutover readiness](cbbd-cutover.md) for cadence, configuration, durable
 evidence, recovery and the NO RELEASE gates.
+
+
+## Independent CBBD imports and private game issues
+
+Apply migration `20261104010000` before running the updated web and worker code.
+Every CBBD game imports in its own transaction. Its accepted observation, raw
+values and issue evidence commit together; a held game retains a rejection and
+private `GameIngestionIssue`. A later row, date or checkpoint failure cannot undo
+previously committed games. Operational/acquisition failures still fail visibly;
+never interpret an incomplete fetch as complete processing.
+
+Reports separate `processing_complete`, `complete` (clean coverage),
+`committed_rows`, `issue_ids` and `operational_failure`. Held games produce
+`completed_with_issues` while the date checkpoint stays failed/retryable. Resume
+skips only clean completed dates. An accepted scoring warning does not prevent
+clean coverage. Scheduled phases can be `completed_with_issues`; analytics uses
+fully acquired/processed past phases, including their valid games, while excluding
+held games. Both enqueue and execution enforce the same pinned-date authorization.
+Unexpected scheduled failures raise into GoodJob after retaining phase evidence;
+expected game issues appear in the admin queue without failing the whole job.
+
+For complete confirmed finals whose only defects are scoring-total relationships,
+reported game scores become canonical game scores and team points immediately.
+Keep the supplied shooting counts and original box points in immutable source
+evidence. Persist an exact-input arithmetic exception, not a fabricated admin
+approval. Other component failures, impossible shots, invalid duration, incomplete
+tracked boxes, identity conflicts and unknown source freshness remain held.
+Untracked opponents retain `final_unmatched` and remain outside ratings inputs.
+
+Admins use **Admin → Game issues** (`/admin/game_ingestion_issues`). Filter by
+season, Eastern date, category and open/resolved state. Each issue shows its
+source/stored comparison, rating impact, retained boxes and available actions:
+
+- Scoring: acknowledge unchanged reported totals, or apply an alternate supplied
+  score/box/shooting total to an already-final game.
+- Participants: choose existing season teams or the source's untracked opponent;
+  apply the retained boxes immediately. This decision is scoped to this game,
+  without creating global mappings or memberships. If source fields remain
+  incomplete, the valid selection is recorded and the issue remains open.
+- Source revisions: explicitly approve the displayed correction when ordinary
+  freshness checks cannot establish ordering.
+- Missing/invalid results: **Retry source for this game** queues one finite,
+  database-backed acquisition for the original date, even outside the rolling
+  lookback. It uses `CBBD_SCHEDULED_MAX_REQUESTS` (default 50) and
+  `CBBD_SCHEDULED_RETRIES` (default 2), with the existing worker API key. Only the
+  selected external game is imported. Duplicate delivery cannot renew the budget;
+  an interrupted/failed acquisition requires another explicit retry.
+
+Repeated polls retain decisions for unchanged source/game facts; changed facts
+reopen review and invalidate stale submissions. Decisions record the approving
+admin, time and exact selected values with automatic standard messages, requiring
+no typed justification. No action starts a ratings backfill or rewrites frozen
+forecasts or historical rating snapshots; subsequent ratings use corrected stored
+inputs. Existing historical schedule/scoring review records remain valid.
+
+All operational badges/icons, acknowledgment text, approval messages, issue state,
+history, comparisons and resolution controls are **admin-only**. Guests and
+nonadmins receive ordinary game results/stats without review metadata in visible
+or hidden HTML, accessibility labels, tooltips or embedded page data. A uniquely
+associated retained source final can supply public names, scores and raw boxes
+while participant attribution is held; disputed sides have no stale team link and
+contribute no canonical ratings inputs until resolved.

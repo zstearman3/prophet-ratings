@@ -54,6 +54,7 @@
                 <span>Admin</span><span aria-hidden="true" class="text-xs">▾</span>
               </summary>
               <ul class="ml-5 border-l-2 border-purple-200 pl-3 md:absolute md:right-0 md:z-20 md:ml-0 md:mt-1 md:min-w-52 md:rounded-lg md:border md:border-l md:bg-white md:p-1 md:shadow-lg">
+                <li><%= link_to 'Game issues', admin_game_ingestion_issues_path, class: nav_link_class %></li>
                 <% offseason_current = request.path.start_with?('/admin/offseason_setup') %>
                 <% analysis_current = request.path.start_with?('/admin/prediction_evaluation') %>
                 <li><%= link_to 'Offseason setup', admin_offseason_setup_path, aria: nav_link_aria.call(offseason_current), class: [nav_link_class, (active_link_class if offseason_current)].compact.join(' ') %></li>

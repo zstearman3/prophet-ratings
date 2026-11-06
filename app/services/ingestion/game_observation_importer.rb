@@ -3,9 +3,9 @@
 module Ingestion
   # All provider imports share identity, transaction, freshness and strict finalization rules.
   class GameObservationImporter
-    def initialize(observation:, season: nil, scoring_review: nil)
+    def initialize(observation:, season: nil, scoring_review: nil, scoring_exception: nil)
       @observation = observation.is_a?(GameObservation) ? observation : GameObservation.new(observation)
-      @settings = { season:, scoring_review: }
+      @settings = { season:, scoring_review:, scoring_exception: }
     end
 
     def call
@@ -40,6 +40,7 @@ module Ingestion
     def prepare_locked_game
       resolution.lock
       @settings[:scoring_review]&.validate_payload(data, resolution)
+      @settings[:scoring_exception]&.validate_payload(data, resolution)
       @game = resolution.game
       lock_game
     end
@@ -51,7 +52,7 @@ module Ingestion
       return unless resolution.untracked? && observation.final?
 
       ObservationUntrackedResult.new(observation, Game.new,
-                                     scoring_review: @settings[:scoring_review]).validate
+                                     scoring_review: @settings[:scoring_review], scoring_exception: @settings[:scoring_exception]).validate
     end
 
     def lock_game
@@ -69,7 +70,8 @@ module Ingestion
 
       return ObservationScheduleProjection.new(observation, resolution, game).call if observation.schedule_projection?
 
-      writer = ObservationWriter.new(observation, resolution, game, scoring_review: @settings[:scoring_review])
+      writer = ObservationWriter.new(observation, resolution, game, scoring_review: @settings[:scoring_review],
+                                                                    scoring_exception: @settings[:scoring_exception])
       if writer.identical?
         associate_identity
         return retain('unchanged', 'canonical_values_unchanged')

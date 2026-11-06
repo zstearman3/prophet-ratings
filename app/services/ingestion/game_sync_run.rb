@@ -24,6 +24,12 @@ module Ingestion
       { start_date: dates.min, end_date: dates.max, resume: true } if dates.any?
     end
 
+    def self.processing_report(days)
+      { processing_complete: days.all? { |day| day[:status] == 'skipped' || day[:processing_complete] == true },
+        operational_failure: days.pluck(:operational_failure).any?,
+        issue_ids: days.flat_map { |result| result.fetch(:issue_ids, []) }.uniq }
+    end
+
     private
 
     def provider_failure(error)
@@ -36,6 +42,7 @@ module Ingestion
     def summarize(days)
       failures = days.select { |day| day[:error] }.pluck(:date)
       { year: @season.year, days:, failed_dates: failures, complete: failures.empty?, retry_window: retry_window(failures) }
+        .merge(self.class.processing_report(days))
     end
 
     def resume

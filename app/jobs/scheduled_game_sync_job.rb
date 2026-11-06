@@ -2,6 +2,10 @@
 
 # Pin before enqueue and before HeavyJob can reschedule a direct perform_now.
 class ScheduledGameSyncJob < HeavyJob
+  rescue_from Ingestion::GameSyncProvider::Incomplete do |error|
+    raise error
+  end
+
   before_enqueue :pin_scope
   before_perform :pin_scope, prepend: true
 
@@ -24,8 +28,11 @@ class ScheduledGameSyncJob < HeavyJob
     return unless @run_id
 
     run = CbbdSyncRun.find(@run_id)
-    Ingestion::Cbbd::ScheduledSync.new(run).call
-    run.enqueue_analytics
+    begin
+      Ingestion::Cbbd::ScheduledSync.new(run).call
+    ensure
+      run.enqueue_analytics
+    end
   end
 
   def pin_scope

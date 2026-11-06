@@ -30,7 +30,7 @@ class CbbdSyncAnalyticsJob < HeavyJob
   def execute
     @run.reload
     return if %w[completed stale].include?(@run.analytics_status)
-    return unless @run.past_status == 'completed' && authorized?
+    return unless @run.past_processing_complete? && authorized?
 
     calculate unless ratings_completed?
     predict if ready_to_predict?
