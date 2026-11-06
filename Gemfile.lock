@@ -203,8 +203,8 @@ GEM
     google-protobuf (4.36.1-x86_64-linux-gnu)
       bigdecimal
       rake (~> 13.3)
-    groupdate (6.7.0)
-      activesupport (>= 7.1)
+    groupdate (6.8.0)
+      activesupport (>= 7.2)
     gruff (0.32.0)
       bigdecimal (>= 3.0)
       histogram
