@@ -58,6 +58,15 @@ describe BetRecommendationGenerator do
   end
 
   describe '.call' do
+    it 'retains evaluated spread and total sides when their EV is below the recommendation threshold' do
+      allow(prediction).to receive_messages(margin_std_deviation: 100.0, total_std_deviation: 100.0)
+
+      recs = described_class.call(game:).compact.index_by(&:bet_type)
+
+      expect(recs.fetch('spread')).to have_attributes(team: 'home', recommended: false)
+      expect(recs.fetch('total')).to have_attributes(team: 'under', recommended: false)
+    end
+
     it 'generates spread and moneyline recommendations with their source associations and model output' do
       recs = described_class.call(game:)
       expect(recs.find { |rec| rec.bet_type == 'spread' }).to have_attributes(

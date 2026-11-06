@@ -5,7 +5,8 @@ require 'rails_helper'
 RSpec.describe 'Betting recommendation details' do
   let(:season) { create(:season, :current) }
   let(:config) { create(:ratings_config_version, current: true) }
-  let(:game) { create(:game, season:, start_time: 1.day.from_now, home_team_name: 'BYU', away_team_name: 'Ohio State') }
+  let(:start_time) { Game.schedule_day_range(Game.current_schedule_date + 1).begin.change(hour: 12) }
+  let(:game) { create(:game, season:, start_time:, home_team_name: 'BYU', away_team_name: 'Ohio State') }
   let(:snapshots) do
     create_list(:team_season, 2, season:).map do |participant|
       create(:team_rating_snapshot, team_season: participant, ratings_config_version: config)
