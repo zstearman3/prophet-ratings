@@ -15,7 +15,7 @@ gem 'httparty'
 gem 'jbuilder'
 gem 'jsbundling-rails'
 # Rails 8.1 JSON decoding passes a positional options hash; JSON 3 requires keywords.
-gem 'json', '< 3'
+gem 'json', '< 4'
 gem 'pg', '~> 1.6'
 gem 'puma', '>= 5.0'
 gem 'rails', '~> 8.1.4'
