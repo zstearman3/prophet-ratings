@@ -305,7 +305,9 @@ The page:
 
 - filters by schedule date
 - loads predictions, `game_odd`, and current bet recommendations
-- sorts by recommendation EV for spread, moneyline, or total
+- sorts by recommendation EV for spread, moneyline, or total; the first click on
+  each column sorts highest EV first, repeated clicks toggle direction, and
+  switching columns starts highest EV first again
 - expands rows to show saved selections/prices, expected ROI and model probabilities
 
 The page does not filter to games that have odds despite the empty-state copy saying "No games with odds available for this date." It loads all games for the date and then displays missing recommendations as "No recommendation."
