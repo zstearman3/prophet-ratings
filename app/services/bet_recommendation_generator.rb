@@ -22,23 +22,28 @@ class BetRecommendationGenerator
   # Returns an array of created recommendations for spread, moneyline, and total bet types.
   # @return [Array<BetRecommendation>] The generated bet recommendations (may include nils if data is insufficient).
   def call
-    prediction = game.current_prediction
-    game_odd = game.game_odd
-
-    Game.transaction(requires_new: true) do
-      # Retire unavailable markets too; rollback preserves the previous set on failure.
+    game.with_lock(requires_new: true) do
+      prediction = game.current_prediction
+      game_odd = game.game_odd&.reload
+      # All three markets and the immutable issue use this same quote object.
       retire_current_recommendations if !prediction || prediction.ratings_config_version.current?
-      next [] unless prediction && game_odd
-
-      [generate_spread_recommendation(prediction, game_odd),
-       generate_moneyline_recommendation(prediction, game_odd),
-       generate_total_recommendation(prediction, game_odd)]
+      recommendations = generate_markets(prediction, game_odd)
+      BetRecommendationIssue.capture(game:, prediction:, evaluation: { odds: game_odd, recommendations: })
+      recommendations
     end
   end
 
   private
 
   attr_reader :game
+
+  def generate_markets(prediction, game_odd)
+    return [] unless prediction && game_odd
+
+    [generate_spread_recommendation(prediction, game_odd),
+     generate_moneyline_recommendation(prediction, game_odd),
+     generate_total_recommendation(prediction, game_odd)]
+  end
 
   def retire_current_recommendations
     game.bet_recommendations.where(current: true).update_all(current: false)

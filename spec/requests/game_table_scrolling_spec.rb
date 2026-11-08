@@ -14,11 +14,22 @@ RSpec.describe 'Game table scrolling' do
       expect(response).to have_http_status(:success)
       expect(region['aria-label']).to be_present
       expect(document.at_css("##{region['aria-describedby']}").text).to include('Scroll horizontally')
-      expect(region.at_css('table tbody td')['colspan']).to eq('4')
+      expect(region.at_css('table tbody td')['colspan']).to eq(page == 'schedule' ? '5' : '4')
       expect(region.text).to include(page == 'schedule' ? 'No games scheduled' : 'No games with odds')
       expect(document.at_css('input[type="date"]')['value']).to eq(date.to_s)
       expect(document.at_css('input[type="submit"]')['value']).to eq('Go')
     end
+  end
+
+  it 'keeps the daily betting summary in its own named keyboard scrolling region' do
+    get '/games/betting', params: { date: date.to_s }
+
+    region = response.parsed_body.at_css('[role="region"][aria-label="Daily betting summary"]')
+    expect(region['tabindex']).to eq('0')
+    expect(response.parsed_body.at_css("##{region['aria-describedby']}").text).to include('Scroll horizontally')
+    table = region.at_css('table[aria-label="Daily betting performance"]')
+    expect(table.css('thead th').map(&:text)).to eq(['Market', 'W–L–P', 'Settled bets', 'Units risked', 'Net profit', 'Realized ROI'])
+    expect(table.css('tbody tr').last.at_css('th').text).to eq('All bets')
   end
 
   it 'preserves final scores, matchup links and missing predictions in the schedule' do

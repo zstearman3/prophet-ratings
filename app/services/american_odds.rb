@@ -6,6 +6,12 @@ module AmericanOdds
     price.is_a?(Numeric) && price.real? && price.finite? && price.abs >= 100
   end
 
+  def self.net_win(price)
+    return unless valid?(price)
+
+    price.positive? ? price / 100.0 : 100.0 / price.abs
+  end
+
   def self.consensus(prices)
     probabilities = prices.filter_map { |price| implied_probability(price) if valid?(price) }
     return if probabilities.empty?

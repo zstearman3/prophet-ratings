@@ -1,0 +1,4 @@
+<% unless result.status == 'no_play' %>
+  <div class="text-xs"><%= result.status.capitalize %><% if result.stake.positive? %> · <%= performance_units(result.net_units) %> · Realized ROI: <%= performance_percentage(result.realized_roi) %><% end %></div>
+<% end %>
+<% if result.reason %><div class="text-xs text-gray-500"><%= result.reason.humanize %></div><% end %>

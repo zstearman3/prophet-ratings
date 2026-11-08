@@ -8,4 +8,4 @@
   <div><span class="font-semibold">Odds:</span> <%= format('%+g', recommendation.vegas_odds) %></div>
 <% end %>
 <div title="Model-estimated profit: <%= number_to_currency(recommendation.ev * 100) %> per $100 wagered."><span class="font-semibold">Expected ROI:</span> <%= format('%+.1f%%', recommendation.ev * 100) %></div>
-<div title="Uncalibrated model estimate"><span class="font-semibold">Model <%= probability_label %> probability:</span> <%= (recommendation.confidence * 100).round(1) %>%</div>
+<div title="Uncalibrated model estimate"><span class="font-semibold">Model <%= probability_label %> probability:</span> <%= recommendation.confidence ? performance_percentage(recommendation.confidence) : 'Unavailable' %></div>

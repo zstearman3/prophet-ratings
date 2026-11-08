@@ -10,9 +10,23 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_04_010000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_08_010000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "bet_recommendation_issues", force: :cascade do |t|
+    t.bigint "game_id", null: false
+    t.bigint "prediction_id", null: false
+    t.bigint "ratings_config_version_id", null: false
+    t.datetime "issued_at", null: false
+    t.datetime "captured_start_time", null: false
+    t.datetime "odds_fetched_at"
+    t.jsonb "evidence", null: false
+    t.index ["game_id", "prediction_id", "issued_at"], name: "index_bet_issues_on_game_prediction_issuance"
+    t.index ["game_id"], name: "index_bet_recommendation_issues_on_game_id"
+    t.index ["prediction_id"], name: "index_bet_recommendation_issues_on_prediction_id"
+    t.index ["ratings_config_version_id"], name: "index_bet_recommendation_issues_on_ratings_config_version_id"
+  end
 
   create_table "bet_recommendations", force: :cascade do |t|
     t.bigint "game_id", null: false
@@ -1105,6 +1119,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_04_010000) do
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
   end
 
+  add_foreign_key "bet_recommendation_issues", "games", on_delete: :cascade
+  add_foreign_key "bet_recommendation_issues", "predictions", on_delete: :cascade
+  add_foreign_key "bet_recommendation_issues", "ratings_config_versions", on_delete: :cascade
   add_foreign_key "bet_recommendations", "game_odds"
   add_foreign_key "bet_recommendations", "games"
   add_foreign_key "bet_recommendations", "predictions"
