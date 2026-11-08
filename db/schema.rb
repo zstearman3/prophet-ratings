@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_08_010000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_08_020000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -52,6 +52,25 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_08_010000) do
     t.index ["prediction_id", "game_odd_id", "bet_type"], name: "index_bet_recommendations_on_prediction_game_odd_bet_type", unique: true
     t.index ["prediction_id"], name: "index_bet_recommendations_on_prediction_id"
     t.index ["ratings_config_version_id"], name: "index_bet_recommendations_on_ratings_config_version_id"
+  end
+
+  create_table "bet_settlements", force: :cascade do |t|
+    t.bigint "game_id", null: false
+    t.bigint "ratings_config_version_id", null: false
+    t.bigint "prediction_id"
+    t.bigint "bet_recommendation_issue_id"
+    t.string "bet_type", null: false
+    t.string "status", null: false
+    t.text "reason"
+    t.integer "stake", null: false
+    t.float "net_units"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["bet_recommendation_issue_id"], name: "index_bet_settlements_on_bet_recommendation_issue_id"
+    t.index ["game_id", "ratings_config_version_id", "bet_type"], name: "index_bet_settlements_on_game_model_market", unique: true
+    t.index ["game_id"], name: "index_bet_settlements_on_game_id"
+    t.index ["prediction_id"], name: "index_bet_settlements_on_prediction_id"
+    t.index ["ratings_config_version_id"], name: "index_bet_settlements_on_ratings_config_version_id"
   end
 
   create_table "bookmaker_odds", force: :cascade do |t|
@@ -1126,6 +1145,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_08_010000) do
   add_foreign_key "bet_recommendations", "games"
   add_foreign_key "bet_recommendations", "predictions"
   add_foreign_key "bet_recommendations", "ratings_config_versions"
+  add_foreign_key "bet_settlements", "bet_recommendation_issues", on_delete: :nullify
+  add_foreign_key "bet_settlements", "games", on_delete: :cascade
+  add_foreign_key "bet_settlements", "predictions", on_delete: :nullify
+  add_foreign_key "bet_settlements", "ratings_config_versions", on_delete: :cascade
   add_foreign_key "bookmaker_odds", "games"
   add_foreign_key "cbbd_review_captures", "cbbd_review_runs"
   add_foreign_key "cbbd_review_comparisons", "cbbd_review_runs"

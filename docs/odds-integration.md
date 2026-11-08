@@ -463,6 +463,74 @@ favorite. Expected ROI in Details is a pregame model estimate, distinct from
 realized returns. This is simulated performance at saved consensus odds.
 
 Daily reads perform no writes. Existing `BetRecommendation#result`/`payout` columns
-are not populated by this feature. Automatic post-sync settlement persistence,
-retries and correction orchestration belong to the linked population follow-up;
-no new cron, sync cadence, model math or recommendation threshold is introduced.
+remain legacy fields and are not populated by automatic settlement. Schedule and
+Betting Recommendations continue to use the shared live grader, so stale stored
+results never enter displayed ROI while a settlement job waits or fails.
+
+## Automatic settlement and recovery
+
+Run `bin/migrate` to apply `20261108020000` before importing outcomes. The additive
+`bet_settlements` table starts empty; no historical backfill runs. It stores the
+current derived result for each game, stored model and market, with a unique
+PostgreSQL index on that identity. Nullable forecast and saved-issue references
+retain the exact grading source while those parents exist. The append-only issue
+is the historical evidence; settlements can be overwritten by corrections.
+Deleting a game/model cascades its settlements; deleting a forecast/issue clears
+its reference rather than attributing the result to another source.
+
+Relevant `Game` saves (status, either score, start time or participant names) and
+`TeamGame` identity changes/removal register a handoff at the actual outer commit.
+Both old and new game IDs are captured when a side moves. Rollbacks enqueue
+nothing, derived-stat-only saves enqueue nothing, and games without saved issues
+or existing results are skipped. Multiple relevant saves may enqueue duplicates;
+settlement is idempotent. This covers both provider imports through the canonical
+writer/finalizer, including corrected scores whose dirty tracking is replaced by
+later derived-stat saves. A later date, future schedule refresh or analytics
+failure cannot retract a handoff already committed.
+
+`SettleBetRecommendationsJob` accepts explicit game IDs on the shared `heavy`
+queue and inherits `HeavyJob`'s global advisory lock. It calls
+`BetSettlementRecorder` under a fresh per-game transaction and game lock. It uses
+`DailyPredictionPerformance` and `DailyBetResult` unchanged, selecting the current
+eligible forecast and final whole saved issue for **each retained stored model**,
+including inactive models; global model activation never redirects grading.
+Current quotes, mutable recommendation flags, prediction generation and external
+requests are not settlement inputs. Latest no-play/absent markets, a replacement
+forecast without an issue, invalid prices/lines/outcomes, participant corrections,
+unmatched finals, canceled games and games returned to scheduled clear old stakes
+and profit according to the same shared statuses. Pending, void, no-play,
+unavailable and excluded results have stake 0 and no net units; win/loss/push use
+the existing unrounded one-unit arithmetic above.
+
+All three markets and all models of one game commit together. Another game's
+failure does not roll back successful games. Logs show per-game status counts, a
+summary of processed games/records/settled and observed nonsettled statuses, and
+failed game IDs with errors. Failures raise after the remaining IDs are processed,
+using `ApplicationJob`'s bounded retry policy in GoodJob through `HeavyJob`.
+Shared-lock contention defers delivery for five seconds without doing settlement
+work and preserves the explicit game IDs. Contention fails when a contended
+delivery reaches five total deliveries. Settlement errors separately use
+`ApplicationJob`'s five-error retry policy. Five settlement-body attempts are not
+guaranteed.
+Contention exhaustion remains a retained failed GoodJob job for inspection and
+explicit dashboard retry. Retried successful games reuse their rows and do not
+accumulate additional stakes.
+
+After retry exhaustion, inspect the failed game IDs and error in GoodJob, resolve
+the cause, then retry that stored job from the GoodJob dashboard. An enqueue
+failure is logged and raised after the import commit; the committed outcome is
+retained, but there may be no stored job to retry. Raising from an after-commit
+callback also stops subsequent callbacks in that transaction. Inspect and recover
+all affected game IDs from that committed transaction, including callbacks that
+never ran and therefore have no failure log or job. For that case, or other bounded
+operator recovery, enqueue only the reviewed affected IDs without refetching or
+rerunning imports:
+
+```ruby
+SettleBetRecommendationsJob.perform_later(reviewed_game_ids)
+```
+
+Inspect those IDs' `BetSettlement` rows and logs afterward; missing/deleted games
+are skipped. Operational recovery requires authorization for that explicit ID
+list. There is no new cron, provider cadence, request budget, model math,
+recommendation threshold or historical population operation.
