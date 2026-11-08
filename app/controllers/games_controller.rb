@@ -28,6 +28,7 @@ class GamesController < ApplicationController
     @ratings_config_version = RatingsConfigVersion.current
     @snapshots_by_team_season_and_date = snapshots_by_team_season_and_date(@games, @ratings_config_version, @date)
     @games = GameResultPresenter.wrap(@games)
+    load_daily_performance
   end
 
   ##
@@ -47,14 +48,25 @@ class GamesController < ApplicationController
                    :predictions,
                    :game_odd,
                    :current_bet_recommendations,
+                   :bet_recommendation_issues,
                    { home_team_game: :team_season },
                    { away_team_game: :team_season }
                  )
 
-    @games = sort_games(GameResultPresenter.wrap(@games), @sort)
+    @ratings_config_version = RatingsConfigVersion.published_default
+    @games = GameResultPresenter.wrap(@games)
+    load_daily_performance
+    @games = sort_games(@games, @sort)
   end
 
   private
+
+  def load_daily_performance
+    @performance_by_game = @games.index_with do |game|
+      DailyPredictionPerformance.new(game, ratings_config_version: @ratings_config_version)
+    end.transform_keys(&:id)
+    @daily_summary = DailyPerformanceSummary.new(@performance_by_game.values)
+  end
 
   def parsed_date_or_redirect(route)
     if params[:date].blank?
@@ -76,7 +88,8 @@ class GamesController < ApplicationController
   def schedule_games_for(date)
     Game.on_schedule_date(date)
         .order(:start_time)
-        .includes(:predictions, { home_team_game: :team_season }, { away_team_game: :team_season })
+        .includes(:predictions, :bet_recommendation_issues, :current_bet_recommendations,
+                  { home_team_game: :team_season }, { away_team_game: :team_season })
   end
 
   def snapshots_by_team_season_and_date(games, ratings_config_version, date)
@@ -106,9 +119,7 @@ class GamesController < ApplicationController
 
   def sort_by_bet_type(games, bet_type, direction)
     sorted_games = games.to_a.sort_by do |game|
-      game.current_bet_recommendations.find do |recommendation|
-        recommendation.bet_type == bet_type && recommendation.valid_odds? && !recommendation.prediction.participant_exclusion_reason
-      end&.ev || -999
+      @performance_by_game.fetch(game.id).recommendations[bet_type]&.ev || -999
     end
     direction == 'desc' ? sorted_games.reverse : sorted_games
   end

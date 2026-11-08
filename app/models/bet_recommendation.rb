@@ -39,6 +39,8 @@
 #  fk_rails_...  (ratings_config_version_id => ratings_config_versions.id)
 #
 class BetRecommendation < ApplicationRecord
+  include BettingSelection
+
   belongs_to :ratings_config_version
   belongs_to :game
   belongs_to :prediction
@@ -60,6 +62,10 @@ class BetRecommendation < ApplicationRecord
     over: 'over',
     under: 'under'
   }, suffix: true
+
+  def usable_for_forecast?(forecast)
+    prediction_id == forecast&.id && !prediction.participant_exclusion_reason && valid_odds?
+  end
 
   def valid_odds?
     AmericanOdds.valid?(vegas_odds)

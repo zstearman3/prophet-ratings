@@ -420,3 +420,49 @@ A pragmatic next increment would be:
 2. Decide whether bookmaker odds need a database-level uniqueness constraint on `game_id`, `bookmaker`, `market`, and `team_name`.
 
 Keep the first production version conservative: import available odds, preserve bookmaker rows, generate recommendations only when required model data exists, and clearly skip games that cannot be matched.
+
+## Daily simulated results and saved recommendation issues
+
+Run `bin/migrate` to apply `20261108010000` before generating recommendations or
+opening Schedule/Betting Recommendations. The additive `bet_recommendation_issues`
+table starts empty; there is no backfill or historical quote reconstruction.
+Include these append-only evidence rows in database backups.
+
+Each trustworthy pregame refresh captures the complete spread/moneyline/total set
+under the game lock, linked to its forecast and model. The issue retains ordered
+team/team-season identities and names, selected side, handicap/total, American
+price, selected-side model probability, actionable flag, model value, Expected ROI,
+quote source/timing and captured tipoff. All markets use one in-memory quote.
+Missing markets and unusable quote timestamps are retained as unavailable evidence;
+they cannot expose a prior actionable pick. Exact consecutive retries reuse an
+issue, while changed evidence appends a revision. Started/final games and unverified
+or future-generated forecasts cannot establish pregame issuance. Ordinary model
+updates and `destroy!` are blocked for saved issues. Direct `delete` and SQL are
+not supported archival-edit paths and are not blocked by Rails read-only protection.
+Intentional parent deletion retains existing application deletion behavior through
+cascading foreign keys.
+
+`DailyPredictionPerformance` selects the final issue by issuance time and ID for
+the exact displayed forecast **before** validating it. Current recommendation flags,
+later quotes and eventual outcomes never choose an older issue. Legacy rows remain
+visible when no issue exists, explicitly excluded from performance. Participant
+corrections suppress old picks; retained source finals and unmatched finals never
+grade stale canonical outcomes. Corrected usable canonical final scores recalculate
+results without changing the issued recommendation.
+
+`DailyBetResult` and `DailyPerformanceSummary` provide shared read-only settlement
+and accounting. Each actionable settled bet risks exactly 1u. Positive American
+odds A win A/100u; negative A win 100/abs(A)u; losses return -1u. Pushes return 0u
+and count 1u in settled stakes. Pending, void/canceled, No play, unavailable and
+excluded records contribute no stakes/profit. Spreads use the saved selected-side
+handicap; totals compare the saved over/under line. Realized ROI is total net
+profit / total settled stakes, unavailable at zero stakes. Two -110 wins and one
+loss produce +0.8181818u / 3u = +27.2727%; calculations are unrounded, with rounding
+only for display. Moneyline selections remain independent of the straight-up
+favorite. Expected ROI in Details is a pregame model estimate, distinct from
+realized returns. This is simulated performance at saved consensus odds.
+
+Daily reads perform no writes. Existing `BetRecommendation#result`/`payout` columns
+are not populated by this feature. Automatic post-sync settlement persistence,
+retries and correction orchestration belong to the linked population follow-up;
+no new cron, sync cadence, model math or recommendation threshold is introduced.

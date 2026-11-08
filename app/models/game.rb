@@ -94,6 +94,7 @@ class Game < ApplicationRecord
   has_many :predictions, dependent: :destroy
   has_one :game_odd, dependent: :destroy
   has_many :bookmaker_odds, dependent: :destroy
+  has_many :bet_recommendation_issues, dependent: :delete_all
   has_many :bet_recommendations, dependent: :destroy
   # rubocop:disable-next Rails/HasManyOrHasOneDependent, Rails/InverseOf
   has_many :current_bet_recommendations, -> { where(current: true) }, class_name: 'BetRecommendation'

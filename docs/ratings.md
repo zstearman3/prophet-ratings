@@ -1623,3 +1623,17 @@ these actions do not rewrite historical snapshots, frozen forecast inputs or
 configuration hashes, and do not automatically enqueue a backfill. The private
 admin issue history records the evidence, approving user, timestamp and choices.
 No discrepancy or acknowledgment markers are shown to nonadmins.
+
+## Daily straight-up results
+
+Schedule uses the same saved forecast/model for projected scores and straight-up
+results. Verified pregame forecasts pick home when stored home-win probability is
+at least 0.5, independently of rounded projected scores. The displayed predicted
+winner probability is the selected side's stored probability. Eligible unfinished
+games are Pending; only usable canonical finals with matching ordered participants
+are Correct/Incorrect. Legacy/reconstructed forecasts, unmatched/source finals,
+missing/tied/nonfinite outcomes and invalid pregame provenance remain excluded.
+The selected Eastern schedule date summary reports W–L, graded/pending/excluded
+counts and accuracy (unavailable with no graded games). Corrected final scores can
+change grading without rewriting forecasts. Shared read-only services also power
+[the simulated betting summaries](odds-integration.md#daily-simulated-results-and-saved-recommendation-issues).

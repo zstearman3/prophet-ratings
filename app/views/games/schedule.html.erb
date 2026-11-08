@@ -15,10 +15,13 @@
         <th class="px-4 py-2 text-left">Status</th>
         <th class="px-4 py-2 text-left">Score</th>
         <th class="px-4 py-2 text-left">Prediction</th>
+        <th class="px-4 py-2 text-left">Model result</th>
       </tr>
     </thead>
     <tbody>
       <% @games.each do |game| %>
+        <% performance = @performance_by_game.fetch(game.id) %>
+        <% result = performance.straight_up %>
         <tr class="border-t">
           <td class="px-4 py-2 font-semibold">
             <%= link_to "#{game.away_team_name} @ #{game.home_team_name}", game_path(game),
@@ -48,7 +51,7 @@
           </td>
           <td class="px-4 py-2">
             <% historical_prediction = game.historical_prediction(ratings_config_version: @ratings_config_version) %>
-            <% prediction = historical_prediction || game.current_prediction(ratings_config_version: @ratings_config_version) %>
+            <% prediction = performance.prediction %>
             <% if prediction.present? %>
               <% prediction_label = if historical_prediction
                    prediction.forecast_kind == 'pregame' ? 'Historical pregame forecast' : "Historical · #{prediction.provenance_label}"
@@ -65,17 +68,26 @@
               <% if prediction.home_win_probability %>
                 <span class="block text-xs text-gray-500"><%= historical_prediction ? 'Captured home win probability' : 'Home win' %>: <%= number_to_percentage(prediction.home_win_probability * 100, precision: 1) %></span>
               <% end %>
+              <% if result.winner && !historical_prediction %>
+                <span class="block text-xs text-gray-500">Predicted winner: <%= result.winner %> (<%= performance_percentage(result.probability) %>)</span>
+              <% end %>
             <% else %>
               <span class="text-xs text-gray-400"><%= game.current_prediction_unavailable_reason&.humanize || 'No prediction' %></span>
             <% end %>
+          </td>
+          <td class="px-4 py-2">
+            <span><%= result.status.capitalize %></span>
+            <% if result.reason %><div class="text-xs text-gray-500"><%= result.reason.humanize %></div><% end %>
           </td>
         </tr>
       <% end %>
       <% if @games.empty? %>
         <tr>
-          <td colspan="4" class="text-center text-gray-400 py-4">No games scheduled for this date.</td>
+          <td colspan="5" class="text-center text-gray-400 py-4">No games scheduled for this date.</td>
         </tr>
       <% end %>
     </tbody>
   </table>
 </div>
+<% summary = @daily_summary.schedule %>
+<p class="mt-4 text-sm">Straight-up <%= summary[:wins] %>–<%= summary[:losses] %> · Accuracy: <%= performance_percentage(summary[:accuracy]) %> · graded: <%= summary[:graded] %> · pending: <%= summary[:pending] %> · excluded: <%= summary[:excluded] %> (Eastern schedule date)</p>
