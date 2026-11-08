@@ -1755,3 +1755,29 @@ or hidden HTML, accessibility labels, tooltips or embedded page data. A uniquely
 associated retained source final can supply public names, scores and raw boxes
 while participant attribution is held; disputed sides have no stale team link and
 contribute no canonical ratings inputs until resolved.
+
+
+## Committed outcome settlement
+
+Apply additive migration `20261108020000` with `bin/migrate` before importing
+outcomes. Canonical game writes and finalization now hand off affected game IDs to
+`SettleBetRecommendationsJob` at the actual outer commit, only when saved pregame
+issues or existing settlements exist. This shared model boundary covers both
+Sports Reference and CBBD without changing acquisition or provider scheduling.
+Rollbacks discard the handoff; multiple finalizer saves cannot mask an earlier
+score/status change. Participant-only corrections and side removal also hand off;
+a moved side captures both old and new game IDs before later saves replace dirty
+tracking. Derived statistics alone do not enqueue settlement.
+
+The independent job stores all markets/model results atomically for each game in
+`BetSettlement`, using retained issues and the same read-only daily grader. A
+later date import, future refresh or analytics failure does not retract work
+already queued for committed games. Settlement failures preserve other games'
+successes and retry independently of acquisition, so recovery never needs another
+provider request or full sync. Invalidated outcomes clear previously settled
+stakes/returns. Pages continue live grading while stored results catch up.
+
+See [automatic settlement and recovery](odds-integration.md#automatic-settlement-and-recovery)
+for identity, accounting, logs, five-delivery GoodJob retries, retry exhaustion and
+bounded explicit-ID recovery after enqueue failure. The table starts empty; no
+historical backfill or operational import is part of deployment.

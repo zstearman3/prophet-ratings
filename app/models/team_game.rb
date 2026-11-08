@@ -83,6 +83,20 @@ class TeamGame < ApplicationRecord
   alias_attribute :offensive_efficiency, :offensive_rating
   alias_attribute :defensive_efficiency, :defensive_rating
 
+  after_destroy :schedule_bet_settlement
+  after_save :schedule_bet_settlement, if: :settlement_identity_changed?
+
+  def schedule_bet_settlement
+    # Capture both scalar IDs now; a later save can replace this instance's dirty tracking.
+    game_ids = saved_change_to_game_id || [game_id]
+    game_ids.compact.uniq.each { |id| BetSettlementRecorder.schedule(id) }
+  end
+
+  def settlement_identity_changed?
+    saved_changes.keys.intersect?(%w[game_id team_id team_season_id home])
+  end
+  private :schedule_bet_settlement, :settlement_identity_changed?
+
   def calculate_game_stats
     update!(
       two_pt_percentage: calculated_two_pt_percentage,
