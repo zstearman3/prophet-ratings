@@ -66,7 +66,7 @@ group :development do
   gem 'overcommit'
   # Static analysis security scanner for Ruby on Rails
   gem 'brakeman', require: false
-  gem 'reek', '~> 6.5', require: false
+  gem 'reek', '~> 6.6', require: false
 end
 
 group :charts do
